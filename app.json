@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "PawPawCare",
+    "slug": "r0b0t0",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/REPLACE_WITH_YOUR_EAS_PROJECT_ID",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pawpawcare.app",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.pawpawcare.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#fff8f4"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      "@react-native-community/datetimepicker"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "598e341a-f9a8-4117-a609-fcafc34e1dcd"
+      }
+    },
+    "owner": "ahmedchioua"
+  }
+}

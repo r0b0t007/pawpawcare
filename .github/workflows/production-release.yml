@@ -1,0 +1,202 @@
+# Triggered by pushing a version tag: git tag v1.2.3 && git push --tags
+# 1. Syncs app.json version to the tag
+# 2. Builds production AAB (Android) + IPA (iOS) via EAS
+# 3. Submits to Google Play (internal track) and App Store Connect (TestFlight)
+# 4. Creates a GitHub Release with release notes
+#
+# Required GitHub secrets:
+#   EXPO_TOKEN               — from expo.dev/settings/access-tokens
+#   GOOGLE_SERVICE_ACCOUNT   — contents of google-service-account.json (base64 encoded)
+#   APPLE_ID                 — your Apple ID email
+#   ASC_APP_ID               — App Store Connect numeric app ID
+#   APPLE_TEAM_ID            — 10-character Apple Developer Team ID
+#   APPLE_APP_SPECIFIC_PASSWORD — app-specific password from appleid.apple.com
+
+name: Production Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: "Submit to stores after build?"
+        required: true
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+
+jobs:
+  # ── 1. Sync version in app.json to the git tag ──────────────────────────────
+  sync-version:
+    name: Sync app version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: extract
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Building version $TAG"
+
+      - name: Update app.json version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const cfg = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            cfg.expo.version = '${{ steps.extract.outputs.version }}';
+            // Increment versionCode / buildNumber automatically (EAS autoIncrement handles this)
+            fs.writeFileSync('app.json', JSON.stringify(cfg, null, 2) + '\n');
+            console.log('app.json version set to', cfg.expo.version);
+          "
+
+      - name: Commit version bump
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app.json
+          git diff --cached --quiet || git commit -m "chore: bump version to ${{ steps.extract.outputs.version }} [skip ci]"
+          git push origin HEAD:main || true
+
+  # ── 2. Build production binaries ────────────────────────────────────────────
+  build:
+    name: EAS Production Build
+    needs: sync-version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build production (Android AAB + iOS IPA)
+        run: |
+          eas build \
+            --profile production \
+            --platform all \
+            --non-interactive
+        # Blocks until both builds complete. Watch progress at expo.dev/builds.
+
+  # ── 3. Submit to stores ──────────────────────────────────────────────────────
+  submit:
+    name: Submit to stores
+    needs: build
+    runs-on: ubuntu-latest
+    # Only runs when the tag push triggers it AND submit input is true (or always on tag)
+    if: ${{ github.event_name == 'push' || github.event.inputs.submit == 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write Google service account key
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT }}" | base64 -d > google-service-account.json
+
+      - name: Submit to Google Play (internal track)
+        run: |
+          eas submit \
+            --profile production \
+            --platform android \
+            --latest \
+            --non-interactive
+        env:
+          EXPO_APPLE_ID: ${{ secrets.APPLE_ID }}
+          EXPO_ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+          EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Submit to App Store Connect (TestFlight)
+        run: |
+          eas submit \
+            --profile production \
+            --platform ios \
+            --latest \
+            --non-interactive
+        env:
+          EXPO_APPLE_ID: ${{ secrets.APPLE_ID }}
+          EXPO_ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+          EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+
+      - name: Clean up credentials
+        if: always()
+        run: rm -f google-service-account.json
+
+  # ── 4. Create GitHub Release ─────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s" | head -20)
+          else
+            COMMITS=$(git log "$PREV_TAG"..HEAD --pretty=format:"- %s")
+          fi
+          echo "commits<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$COMMITS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "PawPawCare ${{ github.ref_name }}"
+          body: |
+            ## What's new in ${{ github.ref_name }}
+
+            ${{ steps.changelog.outputs.commits }}
+
+            ---
+            📱 **Android** — available on Google Play (internal track)
+            🍎 **iOS** — available on TestFlight
+            ⚡ **OTA** — JS updates delivered automatically on next app launch
+          draft: false
+          prerelease: false

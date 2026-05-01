@@ -1,0 +1,51 @@
+# Triggered on pushes to the `preview` branch or manually.
+# Builds an internal APK (Android) + ad-hoc IPA (iOS) for QA testing.
+# EAS posts a QR code / install link to the build; share it with testers.
+
+name: Preview Build
+
+on:
+  push:
+    branches: [preview]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Platform to build"
+        required: true
+        default: "all"
+        type: choice
+        options: [all, android, ios]
+
+jobs:
+  build:
+    name: EAS Preview Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build preview (Android + iOS)
+        run: |
+          PLATFORM="${{ github.event.inputs.platform || 'all' }}"
+          eas build \
+            --profile preview \
+            --platform "$PLATFORM" \
+            --non-interactive \
+            --no-wait
+        # --no-wait: returns immediately; monitor progress at expo.dev/builds

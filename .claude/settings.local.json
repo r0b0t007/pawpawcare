@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx expo *)",
+      "Bash(pip install *)",
+      "Bash(python -c ' *)",
+      "Bash(timeout 8 python run_dev.py)"
+    ]
+  }
+}

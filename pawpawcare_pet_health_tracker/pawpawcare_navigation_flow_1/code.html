@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PawPawCare - Pets Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#d8e2ff",
+                        "surface-container-high": "#f2e6dc",
+                        "surface-container": "#f8ece2",
+                        "secondary-container": "#2170e4",
+                        "surface-container-highest": "#ece0d7",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#1abdff",
+                        "inverse-primary": "#fdb965",
+                        "on-secondary": "#ffffff",
+                        "deep-charcoal": "#151c27",
+                        "outline": "#867461",
+                        "surface-bright": "#fff8f4",
+                        "on-surface-variant": "#514538",
+                        "on-tertiary": "#ffffff",
+                        "surface-tint": "#855300",
+                        "on-surface": "#201b15",
+                        "primary-fixed": "#ffddb8",
+                        "on-secondary-fixed-variant": "#004395",
+                        "background": "#fff8f4",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#855300",
+                        "inverse-on-surface": "#fbefe5",
+                        "tertiary-fixed": "#c5e7ff",
+                        "surface-container-low": "#fef1e7",
+                        "outline-variant": "#d5c4b2",
+                        "on-error-container": "#93000a",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#362f29",
+                        "primary-fixed-dim": "#fdb965",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#ece0d7",
+                        "primary": "#653e00",
+                        "tertiary-fixed-dim": "#88cffa",
+                        "on-tertiary-fixed": "#001e2d",
+                        "on-tertiary-container": "#addeff",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#001a42",
+                        "surface-dim": "#e4d8ce",
+                        "on-background": "#201b15",
+                        "surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-primary-fixed-variant": "#653e00",
+                        "tertiary": "#004c6a",
+                        "on-primary-container": "#ffd09a",
+                        "on-tertiary-fixed-variant": "#004c6a",
+                        "secondary": "#085ac0",
+                        "on-primary-fixed": "#2a1700",
+                        "on-secondary-container": "#002c66"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "40px",
+                        "margin": "24px",
+                        "gutter": "16px",
+                        "xs": "4px",
+                        "sm": "12px",
+                        "md": "24px",
+                        "xl": "64px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "label-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "title-lg": ["Plus Jakarta Sans"],
+                        "display": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "title-lg": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display": ["44px", { "lineHeight": "52px", "letterSpacing": "-0.02em", "fontWeight": "800" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col pt-16 pb-20 md:pb-0">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-orange-100/20 dark:border-zinc-800/50 shadow-sm flex items-center justify-between px-4 h-16 w-full max-w-screen-xl mx-auto">
+<div class="flex items-center gap-4">
+<img alt="User Profile" class="w-10 h-10 rounded-full object-cover" data-alt="A close-up portrait of a smiling young adult with warm lighting. The image is a professional headshot suitable for a user profile avatar. The background is slightly blurred to emphasize the subject. Warm, inviting tones complement the UI's primary orange palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7rV1qESN5l29D75bP2s5oyuyNeMI14AZbHlkTQ6gYltXkFPZUgLiC-9d8wD14ZiOCGKK9SncVgJO65GV__F76rzYmTGsDN91x-3fzLlcUmaEqjspR_P4DSidLvt1x5Vy2RJR9DqqaDdtFSXuMTjle66uH2cADzOK-yJn4QPi6zbWfMRM07LT2oH2uVdLi7jznvENFh9SXERPy2dTe_67zXw7xWqZ1e1RRd4ASOdSVIvtuayas8NEYxSC2tCBXh2AVEVoJCC1HXA"/>
+<h1 class="text-xl font-bold tracking-tight text-orange-700 dark:text-orange-500 font-headline-md text-headline-md">PawPawCare</h1>
+</div>
+<!-- Desktop Nav -->
+<nav class="hidden md:flex gap-6">
+<a class="text-slate-500 dark:text-zinc-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 active:scale-95 px-3 py-2 rounded-lg font-label-md text-label-md" href="#">Dashboard</a>
+<a class="text-orange-600 dark:text-orange-400 font-semibold hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 active:scale-95 px-3 py-2 rounded-lg font-label-md text-label-md bg-orange-100/50" href="#">Pets</a>
+<a class="text-slate-500 dark:text-zinc-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 active:scale-95 px-3 py-2 rounded-lg font-label-md text-label-md" href="#">Community</a>
+<a class="text-slate-500 dark:text-zinc-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 active:scale-95 px-3 py-2 rounded-lg font-label-md text-label-md" href="#">Schedule</a>
+</nav>
+<button class="text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 active:scale-95 p-2 rounded-full">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</header>
+<!-- Main Content -->
+<main class="flex-grow w-full max-w-screen-xl mx-auto px-4 py-8 md:py-12">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-background mb-2">My Pets</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Manage your furry friends' profiles and health records.</p>
+</div>
+<button class="flex items-center gap-2 bg-primary text-on-primary px-6 py-3 rounded-lg hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150 active:scale-95 font-label-md text-label-md shadow-[0_8px_30px_rgba(133,83,0,0.12)]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+                Add a Pet
+            </button>
+</div>
+<!-- Pets Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Pet Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-[0_8px_30px_rgba(133,83,0,0.06)] hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden group border border-surface-container-low">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-fixed/20 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+<div class="flex items-start gap-4 mb-6 relative z-10">
+<img alt="Luna the Dog" class="w-20 h-20 rounded-full object-cover border-4 border-surface-container-lowest shadow-sm" data-alt="A portrait of a cheerful Golden Retriever puppy looking directly at the camera. The lighting is bright and airy, reflecting a modern, optimistic aesthetic. The background is soft and slightly blurred, emphasizing the pet's friendly expression. Warm, golden tones dominate, matching the app's warm color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDj5UjtOwxvW7Yz0KVzVQO-TzTpWnUPJC9QmfVG3fFV3f_OHIAsOJ1b1iBjSax8jZ27eHhbntgkLRimtAfmCRX-3DI9wY9s2SVmwfGZp_sQ6tv6PKWn3NoGZSq_fb_hpZ4Kes0WBdRCoIAKChjXJwF-P-9FumZMZYAM0-VwlUsduThnzioLxbDmt1JEthYRDqgDvJ7_Y9y-_5qz2PkNxLCdRFlumaYPnSyNJd7kRS-9gp4bur6C6j7BU1WKOdtf57Jvncmu2J0h_g"/>
+<div class="flex-grow">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-title-lg text-title-lg text-on-surface mb-1">Luna</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Golden Retriever • 2 yrs</p>
+</div>
+<span class="material-symbols-outlined text-outline">more_vert</span>
+</div>
+</div>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-center bg-surface-container-low p-3 rounded-lg">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary">vaccines</span>
+<span class="font-label-md text-label-md text-on-surface">Next Vaccine</span>
+</div>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full font-label-sm text-label-sm">Oct 15, 2023</span>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 bg-secondary-fixed text-on-secondary-fixed px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-secondary-fixed-dim transition-colors text-center">View Profile</button>
+</div>
+</div>
+</div>
+<!-- Pet Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-[0_8px_30px_rgba(133,83,0,0.06)] hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden group border border-surface-container-low">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-fixed/20 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+<div class="flex items-start gap-4 mb-6 relative z-10">
+<img alt="Milo the Cat" class="w-20 h-20 rounded-full object-cover border-4 border-surface-container-lowest shadow-sm" data-alt="A portrait of an inquisitive tabby cat with large green eyes. The cat is sitting against a clean, light background. The lighting is soft and natural, creating a serene and approachable mood. The color palette features neutral grays and soft whites, fitting a modern, clean UI aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCf9i-0tt1k6OFeRVrfPweaQ8XSebrwtarXPPrHEpL-R7cKTduG0Zl7v-AZuS5JkklmYvgp-nIy3prMLvAi1fBZZzRLr-tTvS-mQJzGWdH6SQ8yZ5N1vxNZVQ_R8Wgp-wXrixW5JgmLZRYeF217gTBaLlRchAkCaiNSI8seShs8c3H3T29n9m82-cFQXL2hiWOd1wD8m9vTIqL6eod1lJKS4khy0Gd1IdAKvPsW3gAxesw1WqFokx6xLwyzmbTO2vztdGBS2uWUBw"/>
+<div class="flex-grow">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="font-title-lg text-title-lg text-on-surface mb-1">Milo</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Tabby Cat • 4 yrs</p>
+</div>
+<span class="material-symbols-outlined text-outline">more_vert</span>
+</div>
+</div>
+</div>
+<div class="space-y-4">
+<div class="flex justify-between items-center bg-surface-container-low p-3 rounded-lg">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-error">warning</span>
+<span class="font-label-md text-label-md text-on-surface">Annual Checkup</span>
+</div>
+<span class="bg-error-container text-on-error-container px-3 py-1 rounded-full font-label-sm text-label-sm">Overdue</span>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 bg-secondary-fixed text-on-secondary-fixed px-4 py-2 rounded-lg font-label-md text-label-md hover:bg-secondary-fixed-dim transition-colors text-center">View Profile</button>
+</div>
+</div>
+</div>
+<!-- Pet Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl p-6 shadow-[0_8px_30px_rgba(133,83,0,0.06)] hover:-translate-y-1 transition-transform duration-300 relative overflow-hidden group border border-surface-container-low flex flex-col justify-center items-center text-center cursor-pointer border-dashed border-2 border-outline-variant hover:border-primary transition-colors">
+<div class="w-16 h-16 bg-primary-fixed/30 rounded-full flex items-center justify-center mb-4 text-primary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl">add</span>
+</div>
+<h3 class="font-title-lg text-title-lg text-on-surface mb-2">New Family Member?</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4">Add another pet to your PawPawCare dashboard.</p>
+<span class="text-primary font-label-md text-label-md group-hover:underline">Add Pet Profile</span>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 rounded-t-2xl border-t border-slate-100 dark:border-zinc-800 shadow-[0_-4px_20px_rgba(133,83,0,0.06)] bg-white/90 dark:bg-zinc-900/90 backdrop-blur-lg fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-safe pt-2 h-20 text-[11px] font-medium uppercase tracking-wider">
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150 w-full" href="#">
+<span class="material-symbols-outlined mb-1">dashboard</span>
+            Dashboard
+        </a>
+<a class="flex flex-col items-center justify-center bg-orange-100/50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 rounded-xl px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150 w-full" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">pets</span>
+            Pets
+        </a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150 w-full" href="#">
+<span class="material-symbols-outlined mb-1">forum</span>
+            Community
+        </a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150 w-full" href="#">
+<span class="material-symbols-outlined mb-1">event_note</span>
+            Schedule
+        </a>
+</nav>
+</body></html>

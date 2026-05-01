@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Community Feed - PawPawCare</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#d8e2ff",
+                        "surface-container-high": "#f2e6dc",
+                        "surface-container": "#f8ece2",
+                        "secondary-container": "#2170e4",
+                        "surface-container-highest": "#ece0d7",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#1abdff",
+                        "inverse-primary": "#fdb965",
+                        "on-secondary": "#ffffff",
+                        "deep-charcoal": "#151c27",
+                        "outline": "#867461",
+                        "surface-bright": "#fff8f4",
+                        "on-surface-variant": "#514538",
+                        "on-tertiary": "#ffffff",
+                        "surface-tint": "#855300",
+                        "on-surface": "#201b15",
+                        "primary-fixed": "#ffddb8",
+                        "on-secondary-fixed-variant": "#004395",
+                        "background": "#fff8f4",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#855300",
+                        "inverse-on-surface": "#fbefe5",
+                        "tertiary-fixed": "#c5e7ff",
+                        "surface-container-low": "#fef1e7",
+                        "outline-variant": "#d5c4b2",
+                        "on-error-container": "#93000a",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#362f29",
+                        "primary-fixed-dim": "#fdb965",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#ece0d7",
+                        "primary": "#653e00",
+                        "tertiary-fixed-dim": "#88cffa",
+                        "on-tertiary-fixed": "#001e2d",
+                        "on-tertiary-container": "#addeff",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#001a42",
+                        "surface-dim": "#e4d8ce",
+                        "on-background": "#201b15",
+                        "surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-primary-fixed-variant": "#653e00",
+                        "tertiary": "#004c6a",
+                        "on-primary-container": "#ffd09a",
+                        "on-tertiary-fixed-variant": "#004c6a",
+                        "secondary": "#085ac0",
+                        "on-primary-fixed": "#2a1700",
+                        "on-secondary-container": "#002c66"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "40px",
+                        "margin": "24px",
+                        "gutter": "16px",
+                        "xs": "4px",
+                        "sm": "12px",
+                        "md": "24px",
+                        "xl": "64px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "label-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "title-lg": ["Plus Jakarta Sans"],
+                        "display": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "title-lg": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "display": ["44px", {"lineHeight": "52px", "letterSpacing": "-0.02em", "fontWeight": "800"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background antialiased pb-24 md:pb-0 pt-16">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-orange-100/20 dark:border-zinc-800/50 shadow-sm font-sans antialiased">
+<div class="flex items-center justify-between px-4 h-16 w-full max-w-screen-xl mx-auto">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-surface-container-lowest shadow-[0_4px_12px_rgba(133,83,0,0.08)] cursor-pointer hover:scale-105 transition-transform duration-150">
+<img alt="User profile photo" class="w-full h-full object-cover" data-alt="A close-up portrait of a cheerful person smiling warmly, lit by soft natural daylight. The image has a clean, airy aesthetic matching a light-mode corporate pet care platform, emphasizing approachability and trust." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVrs9HYaQ-d63cZ_CRtZ7KJV9BZklwyBtm_tCiOQwn0O3CagodlaBHwDvgix7tUrr3LlmlqpVR9sL5ONw2W5CWMxGvdZ8J2t1NNSLewzAovz6TglBKrfRajfmx9SK1o7_p5EdUu8ZncUrUsROICsUOzBfUXQYWx1YZ4oAyatSiHzMcCmlavS6XOtB9MuOPK1LxUUca5LM3ZOCJznFl4-zKHaG8-7drakkFsKfO1rNF8N58rL6GX5v3K8IEb-f0X9qGnPKzcybw6A"/>
+</div>
+<span class="text-xl font-bold tracking-tight text-orange-700 dark:text-orange-500">PawPawCare</span>
+</div>
+<!-- Web Nav Cluster -->
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-slate-500 dark:text-zinc-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-150 font-label-md text-label-md" href="#">Dashboard</a>
+<a class="text-slate-500 dark:text-zinc-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-150 font-label-md text-label-md" href="#">Pets</a>
+<a class="text-orange-600 dark:text-orange-400 font-semibold font-label-md text-label-md relative after:content-[''] after:absolute after:-bottom-1 after:left-0 after:w-full after:h-0.5 after:bg-orange-500 after:rounded-t-full" href="#">Community</a>
+<a class="text-slate-500 dark:text-zinc-400 hover:text-orange-500 dark:hover:text-orange-400 transition-colors duration-150 font-label-md text-label-md" href="#">Schedule</a>
+</nav>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 active:scale-95">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</div>
+</header>
+<main class="max-w-screen-md mx-auto px-4 md:px-0 pt-md pb-xl">
+<!-- Join the Pack Section (Bento Style) -->
+<section class="mb-lg">
+<div class="flex items-center justify-between mb-sm">
+<h2 class="font-title-lg text-title-lg text-on-surface">Join the Pack</h2>
+<button class="font-label-md text-label-md text-secondary hover:text-secondary-container transition-colors duration-150 flex items-center gap-xs">
+                    View all <span class="material-symbols-outlined text-[16px]" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-gutter">
+<!-- Group Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-sm shadow-[0_8px_30px_rgba(133,83,0,0.06)] hover:shadow-[0_12px_40px_rgba(133,83,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer border border-surface-variant flex flex-col gap-sm">
+<div class="h-24 w-full rounded-lg overflow-hidden relative">
+<img alt="Dogs playing in park" class="w-full h-full object-cover" data-alt="A lively scene of several diverse dogs playing together in a sunny, green urban park. The lighting is bright and cheerful, highlighting the energetic mood. The image fits a warm, optimistic corporate aesthetic with natural colors." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDE9k_7PH2ueS2b4X7zcnkeEbODwAhjUa3_q_H0DZvS8-gI8-HsMF3dI-syWqCH2CEo06YcIJSHUjTSvdMUbx57pnjol9JxSnlS_VtCKDMb1WWwdjizb7CKeLLWgtDYAloaAZPxeegSu8lAYaqRQ1YG_eXYACe9BEKY9tGGpSQaONa8I5dYS8JlrNsTvxjOpQV0YDkYkI1yiyWZD5uf8gvO4pPquuBHMFQfOZ20qsJbQtzxKSK7SYc_kVMbeS2TFEcgoQDZfvQ7ng"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+<div class="absolute bottom-2 left-2 flex -space-x-2">
+<img alt="" class="w-6 h-6 rounded-full border border-surface-container-lowest" data-alt="Small profile thumbnail of a smiling pet owner in a bright setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUYBjNEZaQnMdsd8XEAl_xgH56u35saEabrAdmMIIkgYFHGc-bVMklrVB4ZWiWt8kFRYLT7flZMRFrS3bCxgSh-t-wS4eC9fqwZ6duONeuLz3HlcvgNnBp24UV-0tAhmSaIvT-5sfqF4Ppp_4FKpzVgyWIA6UmhIVL-ExChmZqqdaMc_julOcWRDUSyIEoiyL0MoMjnzt1e8kSx3ENNCphDxmOTSyT1b4piqWTXmBfSK_kDcj_ZiI8-d9_d7TLjQSzBuUoQ_Iz2w"/>
+<img alt="" class="w-6 h-6 rounded-full border border-surface-container-lowest" data-alt="Small profile thumbnail of a smiling pet owner in a bright setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDsFGGMA2TvDXd1S0VuYQthwamzzpwBl4T2TRPP83yTwV4JqZ4Dwm6kjkOFbEI6Xy1IFMBMjwkTpyn8TJYOsGLde8YYvrscKJLR_F8DfQYO1H1xgcvpe2GUv_tMWQLWHRaUL1nq-od5BB-QiLblo2ZQi6P7P9WzHInCbZ2hZxRegW9luPk_Zj2IMzsAWOK7D4g-BQeFKl_6YahB14nJeS7wqNNYfjpEIyS1oHY2IXOAHZqalemSuurcjN52WBThfs7FPgCLe9kSRw"/>
+<div class="w-6 h-6 rounded-full border border-surface-container-lowest bg-surface-container-high flex items-center justify-center font-label-sm text-[8px] text-on-surface-variant">+12</div>
+</div>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface truncate">Downtown Dog Walkers</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-xs flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="location_on">location_on</span> Central Park
+                        </p>
+</div>
+<button class="mt-auto w-full py-2 bg-surface-container-low text-primary-container font-label-md text-label-md rounded-lg hover:bg-primary-fixed transition-colors duration-150">Join Group</button>
+</div>
+<!-- Group Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-sm shadow-[0_8px_30px_rgba(133,83,0,0.06)] hover:shadow-[0_12px_40px_rgba(133,83,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer border border-surface-variant flex flex-col gap-sm">
+<div class="h-24 w-full rounded-lg overflow-hidden relative">
+<img alt="Cats on a play structure" class="w-full h-full object-cover" data-alt="Several cute cats lounging and playing on a modern indoor cat tree near a large window. Soft, diffused daylight creates a calm and inviting atmosphere, aligning with a premium pet care platform's visual style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHw_IiUm-W3IJxgDx9aTnkAlNhyJlV68jo8Kalm67rQXEND1P-XsIYoNCcRid2-5SVM04abokWKtYztpGahyZ0wxDzrmRjDmTHP7kNGdP1Za49hN4pIX4Dc7K-a8xyTV3BUiFrV0TdV4RT-bVaoHaxQXLbF2kc2smqWdGiim3xN5lyhnK3V9IG9dH9NEmdmG43go8Q86fbM7JUD2CS72OJqx3BawYiz5K1QLrD46_6WMYD8TqH0pUtD5MM1ikb-Iuk7MJgXSx47w"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+<div class="absolute bottom-2 left-2 flex -space-x-2">
+<img alt="" class="w-6 h-6 rounded-full border border-surface-container-lowest" data-alt="Small profile thumbnail of a smiling pet owner in a bright setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQu_uVoJc0JKa4l_nwOC1Nv_lLfFALbliWhqkIvrQm5s11DeEe7tcPvEeF663cP1y_idhhn4ccOizPKfQfoKI5TmrkOOAsogP5m8KBbTKwotRMqtP2qntY_xTcGDKMe8by4rOfRdgEiiffQRNZqKfPdQ2fvHVY8TnxDIBoiY-c0Hek9DmsUPaiqWL-19IhWreC4tUwm6X2Iw1KS8jJY7wlLHF3aK03n7Hg5Srjf0tMbU_RrxITvEE9xVjhN8Umzy6nGuemAP1mqA"/>
+<img alt="" class="w-6 h-6 rounded-full border border-surface-container-lowest" data-alt="Small profile thumbnail of a smiling pet owner in a bright setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB72DPQ1auq0NY22cp5X71uQbO9c0cvHcP-WtiW4GF7NQR3ql1zLrgum0I0legp-Sb1B4ZFkRHUatfGK0HxTPO7cHMAxq4MROVzN7vWFiWy1HIOgvLgEvnTywTSG7OWOHzC3VqMApgZ4kzii4vUMHdrirEaAWJ28n7GMGtWQsdjqQGqiOkFTEFtr6GjF0-jByJU3apZf236BxDd-qZREorLXa5Kxogf0o9hRyM86ib31uvV3ucRAVulKR5bjOA131SHWtC4Ok-PAw"/>
+<div class="w-6 h-6 rounded-full border border-surface-container-lowest bg-surface-container-high flex items-center justify-center font-label-sm text-[8px] text-on-surface-variant">+8</div>
+</div>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface truncate">Feline Friends NYC</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-xs flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="forum">forum</span> Online / Meetups
+                        </p>
+</div>
+<button class="mt-auto w-full py-2 bg-surface-container-low text-primary-container font-label-md text-label-md rounded-lg hover:bg-primary-fixed transition-colors duration-150">Join Group</button>
+</div>
+<!-- Group Card 3 (Hidden on mobile to keep 2 cols, shows on md) -->
+<div class="hidden md:flex bg-surface-container-lowest rounded-xl p-sm shadow-[0_8px_30px_rgba(133,83,0,0.06)] hover:shadow-[0_12px_40px_rgba(133,83,0,0.08)] hover:-translate-y-1 transition-all duration-300 cursor-pointer border border-surface-variant flex-col gap-sm">
+<div class="h-24 w-full rounded-lg overflow-hidden relative">
+<img alt="Dog training class" class="w-full h-full object-cover" data-alt="A professional dog training session outdoors in a grassy field. A trainer is working with a golden retriever. Bright, sunny lighting conveys a sense of achievement and positive reinforcement, fitting a trusted corporate pet brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCZHulOXf1bgxtnwLvOPUH4Pzz7omN62_xJRyAVr5su_wVQ1n3OLrZZggqZDPbmSt38UgAbuVq4pt82PsnAhjoRrqOmkZuYPIMl9b7lEEBacnHjsCxrHVb3Bw9HwTn4rXJSNO4oMr2OaxTVKQrN3en5KoUVtoo9gqCw-4QHGgN3G2pvpYgHZXX4BPOrqi4JIFJt-qnyTQT-XKXnFkKH1AfTT96SHbswD0n8U0hi_DMal7Fb2jBUJeDRZUxNJLzaxy2Dsupmo9p_jQ"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+<div class="absolute bottom-2 left-2 flex -space-x-2">
+<img alt="" class="w-6 h-6 rounded-full border border-surface-container-lowest" data-alt="Small profile thumbnail of a smiling pet owner in a bright setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3Ew4rA_lKqJVeDQi3tf_FYjx_lwkR6hjR8mldUgXyv4az6UtS5FhuZvnSDpZnJwdAsYw6S-NmOVkoaEpE7BdqhBZAJ2e3pMSqpks_kjA8ZpuLNz0azWm4YFrg5bvZigH80UCdo4bGLh2LuxhtPf50sQVGCPqHdo2Sq-upGJizvNeUIgPBb1vCRrw7kq2oordwCyq1MA4g1UpwkUrgGIBEzqCxivNtJBJYJfY2Z_Qp2gRNIf1JibUxXoa_n9NXXITk-58pBiSoZQ"/>
+<img alt="" class="w-6 h-6 rounded-full border border-surface-container-lowest" data-alt="Small profile thumbnail of a smiling pet owner in a bright setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBNYpcmqVUYTv3hRe7NyzDFBvPe3x5sGY-zmuw_D2A99n1RUcvHGmG2judZ9YGHNAQx39dGTIGsCH7NVzVvcN78SKZYa5pNvUXpvWCSGTc5Fr5zdlXPfwH7pL7wxrnPHryAicUIbovV6bR0FQZ0pzA8LW5JbH6jsuYmm5ohkRpfNGCxOeZTEEih9klsv4RmiJtcwD4yJ9E08tZMpIaHYMMg6PRDaq3aMP6LDUcPeulSnb58KwippQWMUbQjtKEgGkhBRJy7Pi5sQA"/>
+<div class="w-6 h-6 rounded-full border border-surface-container-lowest bg-surface-container-high flex items-center justify-center font-label-sm text-[8px] text-on-surface-variant">+24</div>
+</div>
+</div>
+<div>
+<h3 class="font-label-md text-label-md text-on-surface truncate">Puppy Training Basics</h3>
+<p class="font-label-sm text-label-sm text-on-surface-variant mt-xs flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="school">school</span> Westside Academy
+                        </p>
+</div>
+<button class="mt-auto w-full py-2 bg-surface-container-low text-primary-container font-label-md text-label-md rounded-lg hover:bg-primary-fixed transition-colors duration-150">Join Group</button>
+</div>
+</div>
+</section>
+<!-- Feed Content -->
+<section class="flex flex-col gap-md">
+<!-- Create Post Input (Glassmorphic) -->
+<div class="bg-surface-container-lowest/80 backdrop-blur-md rounded-xl p-4 shadow-[0_8px_30px_rgba(133,83,0,0.04)] border border-surface-variant flex gap-sm items-center">
+<img alt="User" class="w-10 h-10 rounded-full object-cover shadow-sm" data-alt="User profile photo" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWkU27P2kDSOU1CZOBBcXTjyPdPOv7SVkpqW_knrPJDH2I2F5rFnGJvvoBscd_AIOWmQHk7cEGaRMQs-5ceQbhD26tWeb0ZDyEP-t2x8sJRTc7B-gf8ZCPPHcF4zScppn763erU1AhckcDMQAgaKIWnN-9p2zA2fCKpjTuQwHDxWGnssRm8RxUDPWEM1GwPQErxjRiNjXWQNY4-zXkeGvHGFVE4eodFAJ4HALHFHV-jKtnb0Gw9_TLloZxPtxThoGIrHQFdBIGiQ"/>
+<input class="flex-1 bg-surface-container-low border-none rounded-lg px-4 py-2 font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:ring-2 focus:ring-primary-container/50 transition-shadow" placeholder="Share a moment with your pet..." type="text"/>
+<button class="w-10 h-10 flex items-center justify-center rounded-lg bg-primary-container text-on-primary hover:bg-primary transition-colors duration-150 shadow-sm active:translate-y-px">
+<span class="material-symbols-outlined" data-icon="image">image</span>
+</button>
+</div>
+<!-- Post 1 -->
+<article class="bg-surface-container-lowest rounded-xl p-md shadow-[0_8px_40px_rgba(133,83,0,0.05)] border border-surface-variant/50">
+<!-- Post Header -->
+<div class="flex items-center justify-between mb-sm">
+<div class="flex items-center gap-3">
+<img alt="Author" class="w-12 h-12 rounded-full object-cover shadow-[0_2px_8px_rgba(0,0,0,0.1)]" data-alt="Profile picture of a friendly woman in her 30s with short hair, outdoors." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlzjqdhl6JwcSLvdClZZQyVVsQ1VW6d5RDt4kMkO4uIjLZHFIdOMyCAkKDdfml36txeLPhD2GdX7nPb7DrQAGm0zJfsoYSoXgyfxefL0UdUmhiIFrcHATEj-v6piL2kLIUN2F-yYjtpKReUBWCmwLx4dMYxpH_8ILPoXSWKi_GN4BacE1J3OBEyX1zve92Rp3cPh6fSAJAR4mCYuYggRb9W1sxDL8eVlkUkCrXuBdElN2DY-6PlfgNaE64qSZAHg7lc_EkXPOtRQ"/>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface">Sarah &amp; Bella</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="schedule">schedule</span> 2 hours ago
+                            </p>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="more_horiz">more_horiz</span>
+</button>
+</div>
+<!-- Post Text -->
+<p class="font-body-md text-body-md text-on-surface mb-sm">
+                    Bella finally mastered the 'spin' trick today! So proud of her progress. Next up: bringing me my slippers. 🐾✨ #DogTraining #GoldenRetriever
+                </p>
+<!-- Post Image -->
+<div class="w-full h-64 md:h-80 rounded-lg overflow-hidden mb-sm shadow-sm">
+<img alt="Golden Retriever looking happy" class="w-full h-full object-cover hover:scale-105 transition-transform duration-500" data-alt="A beautiful, happy Golden Retriever sitting on a soft rug indoors, looking up attentively. The lighting is warm and natural, casting soft shadows that enhance the cozy, premium home environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5Oc7uFHmuymNpKJUiqpeFIZnrw29g21NjwrnORt6ateW7U7WAKYnTdDZfKjirjmZMEqjXY030I6AxokP5bK_MbT1bz9lpiqokhFOEDyHCisTsvOO1QUBbgO-9wIfw1mGAEkEFGiwE8NUiUb1w0My8B9lHWSvJXtDQN2lT4jPy71SSaarZXZaVNdsvgwpgQ_zFePl-d7xakDFyfQZzyIq7WjEMBffMUfADSuVgkGBURR47EykFWaLRh2UdamKbCMXUE5C92wLcGA"/>
+</div>
+<!-- Post Actions (Paws & Comments) -->
+<div class="flex items-center justify-between pt-sm border-t border-surface-container-highest">
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-primary-container transition-colors group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform" data-icon="pets" data-weight="fill" style="font-variation-settings: 'FILL' 1;">pets</span>
+<span class="font-label-md text-label-md">124 Paws</span>
+</button>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-secondary-container transition-colors group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform" data-icon="chat_bubble_outline">chat_bubble_outline</span>
+<span class="font-label-md text-label-md">18 Comments</span>
+</button>
+</div>
+<button class="text-on-surface-variant hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined" data-icon="share">share</span>
+</button>
+</div>
+</article>
+<!-- Post 2 -->
+<article class="bg-surface-container-lowest rounded-xl p-md shadow-[0_8px_40px_rgba(133,83,0,0.05)] border border-surface-variant/50">
+<div class="flex items-center justify-between mb-sm">
+<div class="flex items-center gap-3">
+<img alt="Author" class="w-12 h-12 rounded-full object-cover shadow-[0_2px_8px_rgba(0,0,0,0.1)]" data-alt="Profile picture of a young man wearing glasses, smiling gently in a well-lit indoor setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBwzXbjm7asaDxtkD1U7mW56Aqx89neK8f8CvsDi5ZL_F-R0OpnpLTVQ6ydezOh7zdx_yRI88iQwk0H1NfOvv-svPQz1cFIcBcD45lgV0dw7CWaNC5pEGGAQKiUCXME0YfupFzLB0p--cdqK8zF7jRHaXgXyzxNDtaSJiHt51xpK4Vpz_V2IHIPctwsirQgagAD1PST0ABG-JgKZDULwoSibzLeOcYOSL8AB37OYpQzO3BbMLPsBRa3X_73TvwoBDIxzua4Tn8dJQ"/>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface">Mark &amp; Luna</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="schedule">schedule</span> 5 hours ago
+                            </p>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined" data-icon="more_horiz">more_horiz</span>
+</button>
+</div>
+<p class="font-body-md text-body-md text-on-surface mb-sm">
+                    Just discovered a new pet-friendly cafe downtown. Luna highly recommends the puppuccino! Highly suggest checking it out if you're in the area. ☕️🐶
+                </p>
+<div class="flex items-center justify-between pt-sm border-t border-surface-container-highest">
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-primary-container transition-colors group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform" data-icon="pets">pets</span>
+<span class="font-label-md text-label-md">89 Paws</span>
+</button>
+<button class="flex items-center gap-1 text-on-surface-variant hover:text-secondary-container transition-colors group">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform" data-icon="chat_bubble_outline">chat_bubble_outline</span>
+<span class="font-label-md text-label-md">5 Comments</span>
+</button>
+</div>
+<button class="text-on-surface-variant hover:text-primary-container transition-colors">
+<span class="material-symbols-outlined" data-icon="share">share</span>
+</button>
+</div>
+</article>
+</section>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 rounded-t-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-lg border-t border-slate-100 dark:border-zinc-800 shadow-[0_-4px_20px_rgba(133,83,0,0.06)]">
+<div class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-safe pt-2 h-20">
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1 group-hover:-translate-y-1 transition-transform" data-icon="dashboard">dashboard</span>
+<span class="text-[11px] font-medium uppercase tracking-wider font-label-sm">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1 group-hover:-translate-y-1 transition-transform" data-icon="pets">pets</span>
+<span class="text-[11px] font-medium uppercase tracking-wider font-label-sm">Pets</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-orange-100/50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 rounded-xl px-3 py-1 active:scale-90 transition-all duration-150 shadow-[inset_0_2px_4px_rgba(255,255,255,0.5)] dark:shadow-none" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="forum" data-weight="fill" style="font-variation-settings: 'FILL' 1;">forum</span>
+<span class="text-[11px] font-medium uppercase tracking-wider font-label-sm">Community</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150 group" href="#">
+<span class="material-symbols-outlined mb-1 group-hover:-translate-y-1 transition-transform" data-icon="event_note">event_note</span>
+<span class="text-[11px] font-medium uppercase tracking-wider font-label-sm">Schedule</span>
+</a>
+</div>
+</nav>
+</body></html>

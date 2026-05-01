@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Pet Profile &amp; Health - Luna</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#d8e2ff",
+                        "surface-container-high": "#f2e6dc",
+                        "surface-container": "#f8ece2",
+                        "secondary-container": "#2170e4",
+                        "surface-container-highest": "#ece0d7",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#1abdff",
+                        "inverse-primary": "#fdb965",
+                        "on-secondary": "#ffffff",
+                        "deep-charcoal": "#151c27",
+                        "outline": "#867461",
+                        "surface-bright": "#fff8f4",
+                        "on-surface-variant": "#514538",
+                        "on-tertiary": "#ffffff",
+                        "surface-tint": "#855300",
+                        "on-surface": "#201b15",
+                        "primary-fixed": "#ffddb8",
+                        "on-secondary-fixed-variant": "#004395",
+                        "background": "#fff8f4",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#855300",
+                        "inverse-on-surface": "#fbefe5",
+                        "tertiary-fixed": "#c5e7ff",
+                        "surface-container-low": "#fef1e7",
+                        "outline-variant": "#d5c4b2",
+                        "on-error-container": "#93000a",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#362f29",
+                        "primary-fixed-dim": "#fdb965",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#ece0d7",
+                        "primary": "#653e00",
+                        "tertiary-fixed-dim": "#88cffa",
+                        "on-tertiary-fixed": "#001e2d",
+                        "on-tertiary-container": "#addeff",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#001a42",
+                        "surface-dim": "#e4d8ce",
+                        "on-background": "#201b15",
+                        "surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-primary-fixed-variant": "#653e00",
+                        "tertiary": "#004c6a",
+                        "on-primary-container": "#ffd09a",
+                        "on-tertiary-fixed-variant": "#004c6a",
+                        "secondary": "#085ac0",
+                        "on-primary-fixed": "#2a1700",
+                        "on-secondary-container": "#002c66"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "40px",
+                        "margin": "24px",
+                        "gutter": "16px",
+                        "xs": "4px",
+                        "sm": "12px",
+                        "md": "24px",
+                        "xl": "64px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "label-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "title-lg": ["Plus Jakarta Sans"],
+                        "display": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "title-lg": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display": ["44px", { "lineHeight": "52px", "letterSpacing": "-0.02em", "fontWeight": "800" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen flex flex-col pt-16 pb-20 md:pb-0">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-orange-100/20 dark:border-zinc-800/50 shadow-sm">
+<div class="flex items-center justify-between px-4 h-16 w-full max-w-screen-xl mx-auto">
+<div class="flex items-center gap-3">
+<img alt="User Profile" class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A small, circular headshot portrait of a smiling person, used as a user profile avatar in a modern light-mode web application. The lighting is bright and evenly distributed, highlighting a friendly expression. The image is framed within a subtle border, fitting perfectly into the top navigation bar's clean, minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDyy26nasLqxtwnXsqWjcWvg243E1mbsvglKausmAEpHcU2eeBzVX4jT6OJXtjF1cE2dPCOnD2aFvUBJyddrYm6uPCw14I7lp8qW9lpRfZS5hsxPnR4uyQUGBEf6bgaao6dPwPjXdJ-mq9nEIUtm5TAfFgyGuGXunsa41G8_E4pt2Wa4OwXGyRCXxcQ3S9Cyypa8qWSLuanib1TbG01JcdSygpSHrJAOx4lF9fBOJgtKt1dQUVv_KsNqDYdVugaYxWZ3rCJdMZHbQ"/>
+<span class="text-xl font-bold tracking-tight text-orange-700 dark:text-orange-500 font-sans antialiased">PawPawCare</span>
+</div>
+<!-- Web Nav -->
+<nav class="hidden md:flex gap-6">
+<a class="text-slate-500 dark:text-zinc-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 px-3 py-2 rounded-lg font-label-md text-label-md" href="#">Dashboard</a>
+<a class="text-orange-600 dark:text-orange-400 font-semibold hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 px-3 py-2 rounded-lg font-label-md text-label-md" href="#">Pets</a>
+<a class="text-slate-500 dark:text-zinc-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 px-3 py-2 rounded-lg font-label-md text-label-md" href="#">Community</a>
+<a class="text-slate-500 dark:text-zinc-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 px-3 py-2 rounded-lg font-label-md text-label-md" href="#">Schedule</a>
+</nav>
+<button class="p-2 rounded-full hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 active:scale-95 transition-transform duration-150 text-orange-600 dark:text-orange-400">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow w-full max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 py-md flex flex-col gap-lg">
+<!-- Hero Profile Section -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-md flex flex-col md:flex-row items-center md:items-start gap-margin">
+<div class="relative">
+<img alt="Luna the Dog" class="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-surface-container-highest shadow-sm" data-alt="A high-quality, close-up portrait of an adorable Golden Retriever dog named Luna. The dog has a happy, bright expression with slightly perked ears, set against a soft, naturally blurred outdoor background. The warm sunlight enhances the golden tones of her fur, perfectly complementing the light and airy, optimistic aesthetic of the pet care app design." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBBLA6zdp3fRPjVPNCUxc-cXhTwpCQ_IBiDe1JKa3HMcnM_SYp90yCShhV7FVOY9jgRN8jC39sN7a8aACKUDypjXdT9JJmjmaVJDS1E94Kr4X6_tIs5UtPIiFiUyye_7NCRMvxVbPjgSTnlELLA8Q4iQwXDnAzD0RgpXlsDiqSmzawJAQi2vSpqjaBadHZrBqRazAnP-5OYWkhAwnUDTgrwR4P18450JbujnqklS9NeNFxG1vJgbNJ3Xcue9Zv1oPttKYsuFEMeRw"/>
+<div class="absolute bottom-2 right-2 bg-tertiary text-on-tertiary rounded-full w-8 h-8 flex items-center justify-center border-2 border-surface-container-lowest shadow-sm">
+<span class="material-symbols-outlined text-[18px]">female</span>
+</div>
+</div>
+<div class="flex-grow text-center md:text-left flex flex-col gap-xs">
+<h1 class="font-display text-display text-on-surface">Luna</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Golden Retriever • 3 Years Old</p>
+<div class="flex flex-wrap justify-center md:justify-start gap-sm mt-sm">
+<span class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">scale</span> 28 kg
+                    </span>
+<span class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">cake</span> Oct 12, 2020
+                    </span>
+<span class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm px-3 py-1 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">pets</span> Microchipped
+                    </span>
+</div>
+</div>
+<div class="flex gap-sm">
+<button class="bg-surface-container-high text-on-surface hover:bg-surface-dim transition-colors duration-150 px-4 py-2 rounded-lg font-label-md text-label-md shadow-sm">
+                    Edit Profile
+                </button>
+</div>
+</section>
+<!-- Bento Grid Layout for Details -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-gutter">
+<!-- Health Stats (card-walk-stat style) -->
+<section class="md:col-span-2 bg-secondary-container text-on-secondary-container rounded-xl shadow-[0_8px_30px_rgb(8,90,192,0.1)] p-margin flex flex-col gap-sm relative overflow-hidden">
+<!-- Decorative background element -->
+<div class="absolute -right-10 -top-10 opacity-10">
+<span class="material-symbols-outlined text-[150px]">favorite</span>
+</div>
+<div class="flex items-center justify-between relative z-10">
+<h2 class="font-title-lg text-title-lg text-on-secondary flex items-center gap-2">
+<span class="material-symbols-outlined">monitor_heart</span> Health Stats
+                    </h2>
+<span class="bg-surface-container-lowest/20 text-on-secondary font-label-sm text-label-sm px-3 py-1 rounded-full">Last Checkup: 2 weeks ago</span>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-sm mt-sm relative z-10">
+<div class="bg-surface-container-lowest/10 rounded-lg p-sm backdrop-blur-sm border border-surface-container-lowest/10">
+<p class="font-label-sm text-label-sm text-secondary-fixed-dim uppercase tracking-wider mb-1">Heart Rate</p>
+<p class="font-headline-lg text-headline-lg text-on-secondary">72 <span class="text-sm font-normal text-secondary-fixed-dim">bpm</span></p>
+</div>
+<div class="bg-surface-container-lowest/10 rounded-lg p-sm backdrop-blur-sm border border-surface-container-lowest/10">
+<p class="font-label-sm text-label-sm text-secondary-fixed-dim uppercase tracking-wider mb-1">Weight Status</p>
+<p class="font-headline-lg text-headline-lg text-on-secondary">Ideal</p>
+</div>
+<div class="bg-surface-container-lowest/10 rounded-lg p-sm backdrop-blur-sm border border-surface-container-lowest/10">
+<p class="font-label-sm text-label-sm text-secondary-fixed-dim uppercase tracking-wider mb-1">Activity Level</p>
+<p class="font-headline-lg text-headline-lg text-on-secondary">High</p>
+</div>
+<div class="bg-surface-container-lowest/10 rounded-lg p-sm backdrop-blur-sm border border-surface-container-lowest/10">
+<p class="font-label-sm text-label-sm text-secondary-fixed-dim uppercase tracking-wider mb-1">Next Vax</p>
+<p class="font-headline-md text-headline-md text-on-secondary mt-1">Dec 2024</p>
+</div>
+</div>
+</section>
+<!-- Daily Activities -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-margin flex flex-col gap-sm">
+<h2 class="font-title-lg text-title-lg text-on-surface flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary">directions_run</span> Daily Activities
+                </h2>
+<ul class="flex flex-col gap-3">
+<li class="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-container-low transition-colors duration-150 cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">park</span>
+</div>
+<div class="flex-grow">
+<p class="font-label-md text-label-md text-on-surface">Park Walk</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">45 mins • Morning</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant">chevron_right</span>
+</li>
+<li class="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-container-low transition-colors duration-150 cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined">sports_tennis</span>
+</div>
+<div class="flex-grow">
+<p class="font-label-md text-label-md text-on-surface">Fetch</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">20 mins • Afternoon</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant">chevron_right</span>
+</li>
+<li class="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-container-low transition-colors duration-150 cursor-pointer">
+<div class="w-10 h-10 rounded-full bg-surface-variant flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">self_improvement</span>
+</div>
+<div class="flex-grow">
+<p class="font-label-md text-label-md text-on-surface">Training Session</p>
+<p class="font-label-sm text-label-sm text-on-surface-variant">15 mins • Evening</p>
+</div>
+<span class="material-symbols-outlined text-outline-variant">chevron_right</span>
+</li>
+</ul>
+</section>
+<!-- Favorite Foods -->
+<section class="bg-surface-container-lowest rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-margin flex flex-col gap-sm md:col-span-3 lg:col-span-1">
+<h2 class="font-title-lg text-title-lg text-on-surface flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-orange-500">restaurant</span> Favorite Foods
+                </h2>
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container text-on-surface font-label-md text-label-md px-4 py-2 rounded-full border border-surface-container-highest shadow-sm">
+                        Salmon Kibble
+                    </span>
+<span class="bg-surface-container text-on-surface font-label-md text-label-md px-4 py-2 rounded-full border border-surface-container-highest shadow-sm">
+                        Carrots
+                    </span>
+<span class="bg-surface-container text-on-surface font-label-md text-label-md px-4 py-2 rounded-full border border-surface-container-highest shadow-sm">
+                        Peanut Butter
+                    </span>
+<span class="bg-surface-container text-on-surface font-label-md text-label-md px-4 py-2 rounded-full border border-surface-container-highest shadow-sm">
+                        Sweet Potato
+                    </span>
+<button class="bg-surface-container-lowest text-primary font-label-md text-label-md px-4 py-2 rounded-full border border-dashed border-outline-variant hover:bg-surface-container-low transition-colors duration-150 flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">add</span> Add
+                    </button>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 rounded-t-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-lg border-t border-slate-100 dark:border-zinc-800 shadow-[0_-4px_20px_rgba(133,83,0,0.06)] fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-safe pt-2 h-20">
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined mb-1">dashboard</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Dashboard</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-orange-100/50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 rounded-xl px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">pets</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Pets</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined mb-1">forum</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Community</span>
+</a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1 hover:text-orange-500 dark:hover:text-orange-400 active:scale-90 transition-all duration-150" href="#">
+<span class="material-symbols-outlined mb-1">event_note</span>
+<span class="text-[11px] font-medium uppercase tracking-wider">Schedule</span>
+</a>
+</nav>
+</body></html>

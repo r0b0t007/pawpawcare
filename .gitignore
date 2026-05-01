@@ -1,0 +1,18 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# credentials — never commit these
+google-service-account.json
+*.p8
+*.p12
+*.mobileprovision
+
+# env
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

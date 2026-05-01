@@ -1,0 +1,44 @@
+# Triggered on every push to main.
+# Publishes an OTA (over-the-air) JS bundle update via EAS Update.
+# Users receive it silently on their next app launch — no store review needed.
+
+name: OTA Update
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Update message shown in EAS dashboard"
+        required: false
+        default: "Manual OTA update"
+
+jobs:
+  update:
+    name: Publish OTA update
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Publish OTA update
+        run: |
+          MESSAGE="${{ github.event.inputs.message || github.event.head_commit.message }}"
+          eas update --auto --message "$MESSAGE" --non-interactive

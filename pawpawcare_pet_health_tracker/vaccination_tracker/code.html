@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Vaccination Tracker</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#d8e2ff",
+                        "surface-container-high": "#f2e6dc",
+                        "surface-container": "#f8ece2",
+                        "secondary-container": "#2170e4",
+                        "surface-container-highest": "#ece0d7",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-container": "#1abdff",
+                        "inverse-primary": "#fdb965",
+                        "on-secondary": "#ffffff",
+                        "deep-charcoal": "#151c27",
+                        "outline": "#867461",
+                        "surface-bright": "#fff8f4",
+                        "on-surface-variant": "#514538",
+                        "on-tertiary": "#ffffff",
+                        "surface-tint": "#855300",
+                        "on-surface": "#201b15",
+                        "primary-fixed": "#ffddb8",
+                        "on-secondary-fixed-variant": "#004395",
+                        "background": "#fff8f4",
+                        "on-primary": "#ffffff",
+                        "primary-container": "#855300",
+                        "inverse-on-surface": "#fbefe5",
+                        "tertiary-fixed": "#c5e7ff",
+                        "surface-container-low": "#fef1e7",
+                        "outline-variant": "#d5c4b2",
+                        "on-error-container": "#93000a",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#362f29",
+                        "primary-fixed-dim": "#fdb965",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#ece0d7",
+                        "primary": "#653e00",
+                        "tertiary-fixed-dim": "#88cffa",
+                        "on-tertiary-fixed": "#001e2d",
+                        "on-tertiary-container": "#addeff",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#001a42",
+                        "surface-dim": "#e4d8ce",
+                        "on-background": "#201b15",
+                        "surface": "#f9f9ff",
+                        "secondary-fixed-dim": "#adc6ff",
+                        "on-primary-fixed-variant": "#653e00",
+                        "tertiary": "#004c6a",
+                        "on-primary-container": "#ffd09a",
+                        "on-tertiary-fixed-variant": "#004c6a",
+                        "secondary": "#085ac0",
+                        "on-primary-fixed": "#2a1700",
+                        "on-secondary-container": "#002c66"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "40px",
+                        "margin": "24px",
+                        "gutter": "16px",
+                        "xs": "4px",
+                        "sm": "12px",
+                        "md": "24px",
+                        "xl": "64px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "label-sm": ["Plus Jakarta Sans"],
+                        "headline-md": ["Plus Jakarta Sans"],
+                        "headline-lg": ["Plus Jakarta Sans"],
+                        "body-md": ["Plus Jakarta Sans"],
+                        "label-md": ["Plus Jakarta Sans"],
+                        "body-lg": ["Plus Jakarta Sans"],
+                        "title-lg": ["Plus Jakarta Sans"],
+                        "display": ["Plus Jakarta Sans"]
+                    },
+                    "fontSize": {
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "title-lg": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "display": ["44px", { "lineHeight": "52px", "letterSpacing": "-0.02em", "fontWeight": "800" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background min-h-screen font-body-md text-body-md pt-16 pb-24 md:pb-0">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 bg-slate-50/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-orange-100/20 dark:border-zinc-800/50 shadow-sm transition-transform duration-150 active:scale-95">
+<div class="flex items-center justify-between px-4 h-16 w-full max-w-screen-xl mx-auto font-sans antialiased text-orange-600 dark:text-orange-400">
+<div class="flex items-center gap-gutter">
+<img alt="User Profile" class="w-8 h-8 rounded-full object-cover" data-alt="A small, high-quality circular avatar image of a smiling person, suitable for a modern corporate web application profile picture. The lighting is bright and inviting, reflecting a warm, optimistic pet-care aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAABusETB2I3Gh96O_vTt9blBVgPC7y-RTFcL76BGRhuHw5JBj7PyFR_z6P_2alOaZu8JIJAZEPx-_ASMdRSZ6r0P7VCo_woGAaAKIaHIruXfaZifcYMsrJkEqNEe1vKhu3oPLYlkt5jNGZ6F0-H53zETNVJiDVEUoMZbepaSl8vMWRkcLGmTcyhdPGabY_gMAcSWRVWeWdA85eoKHQlQzgU3xMfQs--7eFx6DGWHFzuPlK4thhbMNjB5-_o3Vde6rUG0pNfcmPjQ"/>
+<span class="text-xl font-bold tracking-tight text-orange-700 dark:text-orange-500">PawPawCare</span>
+</div>
+<div class="hidden md:flex items-center gap-margin">
+<nav class="flex gap-gutter">
+<a class="text-slate-500 dark:text-zinc-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 px-sm py-xs rounded-lg font-label-md text-label-md" href="#">Dashboard</a>
+<a class="text-orange-600 dark:text-orange-400 font-semibold hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 px-sm py-xs rounded-lg font-label-md text-label-md" href="#">Pets</a>
+<a class="text-slate-500 dark:text-zinc-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 px-sm py-xs rounded-lg font-label-md text-label-md" href="#">Community</a>
+<a class="text-slate-500 dark:text-zinc-400 hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 px-sm py-xs rounded-lg font-label-md text-label-md" href="#">Schedule</a>
+</nav>
+</div>
+<button class="hover:bg-orange-50 dark:hover:bg-zinc-900 transition-colors duration-150 p-xs rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+</div>
+</header>
+<main class="max-w-3xl mx-auto px-4 py-8 mt-lg">
+<header class="mb-lg">
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-xs">Vaccination Tracker</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Keep track of Bella's health milestones.</p>
+</header>
+<section class="mb-xl relative">
+<h2 class="font-title-lg text-title-lg text-on-surface mb-md">Upcoming</h2>
+<div class="absolute left-[15px] top-[48px] bottom-0 w-0.5 bg-outline-variant/30 hidden sm:block z-0"></div>
+<div class="flex flex-col gap-sm relative z-10">
+<!-- Upcoming Item 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0_8px_30px_rgb(133,83,0,0.06)] flex flex-col sm:flex-row gap-md items-start sm:items-center group hover:-translate-y-1 transition-transform duration-150 ease-in-out">
+<div class="hidden sm:flex w-8 h-8 rounded-full bg-surface-container-low border-2 border-surface-container-lowest items-center justify-center flex-shrink-0 shadow-sm z-10 relative -left-[32px]">
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="calendar_today">calendar_today</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-start mb-xs">
+<h3 class="font-title-lg text-title-lg text-on-surface">Rabies Booster</h3>
+<span class="bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm px-sm py-xs rounded-full border border-outline-variant/50">Due Soon</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]" data-icon="event">event</span> Oct 15, 2024</p>
+</div>
+</div>
+<!-- Upcoming Item 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0_8px_30px_rgb(133,83,0,0.06)] flex flex-col sm:flex-row gap-md items-start sm:items-center group hover:-translate-y-1 transition-transform duration-150 ease-in-out">
+<div class="hidden sm:flex w-8 h-8 rounded-full bg-surface-container-low border-2 border-surface-container-lowest items-center justify-center flex-shrink-0 shadow-sm z-10 relative -left-[32px]">
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="calendar_today">calendar_today</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-start mb-xs">
+<h3 class="font-title-lg text-title-lg text-on-surface">Bordetella</h3>
+<span class="bg-surface-container font-label-sm text-label-sm px-sm py-xs rounded-full border border-outline-variant/30 text-outline">Upcoming</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]" data-icon="event">event</span> Nov 02, 2024</p>
+</div>
+</div>
+</div>
+</section>
+<section class="mb-lg relative">
+<h2 class="font-title-lg text-title-lg text-on-surface mb-md">Completed</h2>
+<div class="absolute left-[15px] top-[48px] bottom-0 w-0.5 bg-outline-variant/30 hidden sm:block z-0"></div>
+<div class="flex flex-col gap-sm relative z-10">
+<!-- Completed Item 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0_4px_20px_rgb(8,90,192,0.04)] flex flex-col sm:flex-row gap-md items-start sm:items-center opacity-80 hover:opacity-100 transition-opacity duration-150">
+<div class="hidden sm:flex w-8 h-8 rounded-full bg-secondary-fixed border-2 border-surface-container-lowest items-center justify-center flex-shrink-0 shadow-sm z-10 relative -left-[32px]">
+<span class="material-symbols-outlined text-secondary text-[16px] fill" data-icon="check_circle">check_circle</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-start mb-xs">
+<h3 class="font-title-lg text-title-lg text-on-surface">DHPP</h3>
+<span class="bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm px-sm py-xs rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-[14px]" data-icon="verified">verified</span> Administered</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]" data-icon="event">event</span> Aug 10, 2023</p>
+</div>
+</div>
+<!-- Completed Item 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-md shadow-[0_4px_20px_rgb(8,90,192,0.04)] flex flex-col sm:flex-row gap-md items-start sm:items-center opacity-80 hover:opacity-100 transition-opacity duration-150">
+<div class="hidden sm:flex w-8 h-8 rounded-full bg-secondary-fixed border-2 border-surface-container-lowest items-center justify-center flex-shrink-0 shadow-sm z-10 relative -left-[32px]">
+<span class="material-symbols-outlined text-secondary text-[16px] fill" data-icon="check_circle">check_circle</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-start mb-xs">
+<h3 class="font-title-lg text-title-lg text-on-surface">Leptospirosis</h3>
+<span class="bg-secondary-fixed text-on-secondary-fixed-variant font-label-sm text-label-sm px-sm py-xs rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-[14px]" data-icon="verified">verified</span> Administered</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex items-center gap-xs"><span class="material-symbols-outlined text-[18px]" data-icon="event">event</span> Jul 22, 2023</p>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA -->
+<div class="mt-xl flex justify-center">
+<button class="bg-primary text-on-primary font-label-md text-label-md px-xl py-sm rounded-lg shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 flex items-center gap-sm">
+<span class="material-symbols-outlined" data-icon="vaccines">vaccines</span>
+                Schedule New Vaccination
+            </button>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-safe pt-2 h-20 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-lg border-t border-slate-100 dark:border-zinc-800 shadow-[0_-4px_20px_rgba(133,83,0,0.06)] rounded-t-2xl z-50 text-[11px] font-medium uppercase tracking-wider text-orange-600 dark:text-orange-400 active:scale-90 transition-all duration-150 hover:text-orange-500 dark:hover:text-orange-400">
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="dashboard">dashboard</span>
+            Dashboard
+        </a>
+<a class="flex flex-col items-center justify-center bg-orange-100/50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 rounded-xl px-3 py-1" href="#">
+<span class="material-symbols-outlined mb-1 fill" data-icon="pets">pets</span>
+            Pets
+        </a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="forum">forum</span>
+            Community
+        </a>
+<a class="flex flex-col items-center justify-center text-slate-400 dark:text-zinc-500 px-3 py-1" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="event_note">event_note</span>
+            Schedule
+        </a>
+</nav>
+</body></html>
