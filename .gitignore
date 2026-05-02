@@ -1,17 +1,28 @@
-node_modules/
-.expo/
-dist/
-web-build/
+# Frontend
+frontend/node_modules/
+frontend/.expo/
+frontend/dist/
+frontend/web-build/
 
-# credentials — never commit these
+# Backend
+backend/__pycache__/
+backend/*.pyc
+backend/.venv/
+backend/venv/
+backend/*.db
+backend/*.sqlite3
+
+# Credentials — never commit these
 google-service-account.json
+frontend/google-service-account.json
 *.p8
 *.p12
 *.mobileprovision
 
-# env
+# Environment variables
 .env
 .env.local
+backend/.env
 
 # OS
 .DS_Store

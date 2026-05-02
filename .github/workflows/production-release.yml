@@ -1,5 +1,5 @@
 # Triggered by pushing a version tag: git tag v1.2.3 && git push --tags
-# 1. Syncs app.json version to the tag
+# 1. Syncs frontend/app.json version to the tag
 # 2. Builds production AAB (Android) + IPA (iOS) via EAS
 # 3. Submits to Google Play (internal track) and App Store Connect (TestFlight)
 # 4. Creates a GitHub Release with release notes
@@ -28,7 +28,7 @@ on:
         options: ["true", "false"]
 
 jobs:
-  # ── 1. Sync version in app.json to the git tag ──────────────────────────────
+  # ── 1. Sync version in frontend/app.json to the git tag ─────────────────────
   sync-version:
     name: Sync app version
     runs-on: ubuntu-latest
@@ -48,22 +48,21 @@ jobs:
           echo "version=$TAG" >> "$GITHUB_OUTPUT"
           echo "Building version $TAG"
 
-      - name: Update app.json version
+      - name: Update frontend/app.json version
         run: |
           node -e "
             const fs = require('fs');
-            const cfg = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            const cfg = JSON.parse(fs.readFileSync('frontend/app.json', 'utf8'));
             cfg.expo.version = '${{ steps.extract.outputs.version }}';
-            // Increment versionCode / buildNumber automatically (EAS autoIncrement handles this)
-            fs.writeFileSync('app.json', JSON.stringify(cfg, null, 2) + '\n');
-            console.log('app.json version set to', cfg.expo.version);
+            fs.writeFileSync('frontend/app.json', JSON.stringify(cfg, null, 2) + '\n');
+            console.log('frontend/app.json version set to', cfg.expo.version);
           "
 
       - name: Commit version bump
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add app.json
+          git add frontend/app.json
           git diff --cached --quiet || git commit -m "chore: bump version to ${{ steps.extract.outputs.version }} [skip ci]"
           git push origin HEAD:main || true
 
@@ -72,6 +71,9 @@ jobs:
     name: EAS Production Build
     needs: sync-version
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
 
     steps:
       - name: Checkout
@@ -82,6 +84,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -105,8 +108,10 @@ jobs:
     name: Submit to stores
     needs: build
     runs-on: ubuntu-latest
-    # Only runs when the tag push triggers it AND submit input is true (or always on tag)
     if: ${{ github.event_name == 'push' || github.event.inputs.submit == 'true' }}
+    defaults:
+      run:
+        working-directory: ./frontend
 
     steps:
       - name: Checkout
@@ -117,6 +122,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
