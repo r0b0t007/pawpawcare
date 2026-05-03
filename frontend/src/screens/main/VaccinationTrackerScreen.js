@@ -10,16 +10,16 @@ import { useData } from '../../context/DataContext';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 const STATUS_STYLES = {
-  overdue: { bg: colors.errorContainer, fg: colors.onErrorContainer, label: 'Overdue' },
-  due_soon: { bg: '#fff0c3', fg: '#7a5c00', label: 'Due Soon' },
-  upcoming: { bg: colors.surfaceContainerHigh, fg: colors.onSurfaceVariant, label: 'Upcoming' },
-  completed: { bg: colors.secondaryFixed, fg: colors.onSecondaryFixedVariant, label: 'Administered' },
+  overdue: { bg: colors.errorContainer, fg: colors.onErrorContainer, label: 'Overdue', dot: colors.error, icon: 'alert-circle-outline' },
+  due_soon: { bg: colors.dueSoonBg, fg: colors.dueSoonFg, label: 'Due Soon', dot: '#d4a000', icon: 'clock-alert-outline' },
+  upcoming: { bg: colors.tertiaryFixed, fg: colors.tertiary, label: 'Upcoming', dot: colors.tertiary, icon: 'calendar-clock' },
+  completed: { bg: colors.successBg, fg: colors.successFg, label: 'Administered', dot: colors.successFg, icon: 'check-circle-outline' },
 };
 
 const formatDisplay = (iso) => {
   if (!iso) return null;
   const d = new Date(iso + 'T12:00:00');
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
 export default function VaccinationTrackerScreen({ navigation, route }) {
@@ -49,7 +49,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
 
   const handleAdd = async () => {
     if (!form.name.trim() || !form.dueDate) {
-      Alert.alert('Missing Fields', 'Please fill in vaccine name and due date.');
+      Alert.alert('Missing Fields', 'Please fill in the vaccine name and due date.');
       return;
     }
     await addVaccination(petId, {
@@ -84,6 +84,8 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
     );
   };
 
+  const petColor = pet.color || colors.primaryFixed;
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -93,14 +95,46 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
             <MaterialCommunityIcons name="arrow-left" size={22} color={colors.onSurface} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
-            <Text style={styles.pageTitle}>Vaccination Tracker</Text>
-            <Text style={styles.pageSubtitle}>Keep track of {pet.name}'s health milestones.</Text>
+            <Text style={styles.pageTitle}>Vaccinations</Text>
+            <Text style={styles.pageSubtitle}>{pet.name}'s health records</Text>
+          </View>
+          <View style={[styles.petBadge, { backgroundColor: petColor }]}>
+            <Text style={styles.petBadgeText}>{pet.name[0]}</Text>
           </View>
         </View>
 
-        <Section title="Upcoming">
+        {/* Stats summary */}
+        <View style={styles.summaryRow}>
+          <SummaryChip
+            icon="calendar-clock"
+            label="Upcoming"
+            value={upcoming.length}
+            bg={colors.tertiaryFixed}
+            fg={colors.tertiary}
+          />
+          <SummaryChip
+            icon="check-circle-outline"
+            label="Completed"
+            value={completed.length}
+            bg={colors.successBg}
+            fg={colors.successFg}
+          />
+          <SummaryChip
+            icon="needle"
+            label="Total"
+            value={vaccinations.length}
+            bg={colors.primaryFixed}
+            fg={colors.primaryContainer}
+          />
+        </View>
+
+        {/* Upcoming */}
+        <Section title="Upcoming" count={upcoming.length}>
           {upcoming.length === 0 ? (
-            <Text style={styles.empty}>No upcoming vaccinations.</Text>
+            <View style={styles.emptyState}>
+              <MaterialCommunityIcons name="check-circle-outline" size={22} color={colors.successFg} />
+              <Text style={styles.emptyText}>All vaccinations up to date!</Text>
+            </View>
           ) : (
             upcoming.map((vax) => (
               <VaxCard
@@ -113,18 +147,21 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
           )}
         </Section>
 
-        <Section title="Completed">
-          {completed.length === 0 ? (
-            <Text style={styles.empty}>No completed vaccinations yet.</Text>
-          ) : (
-            completed.map((vax) => (
+        {/* Completed */}
+        {completed.length > 0 && (
+          <Section title="Completed" count={completed.length}>
+            {completed.map((vax) => (
               <VaxCard key={vax.id} vax={vax} onDelete={() => confirmDelete(vax)} />
-            ))
-          )}
-        </Section>
+            ))}
+          </Section>
+        )}
 
-        <TouchableOpacity style={styles.addBtn} onPress={() => setModal(true)} activeOpacity={0.85}>
-          <MaterialCommunityIcons name="needle" size={18} color={colors.onPrimary} />
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => setModal(true)}
+          activeOpacity={0.88}
+        >
+          <MaterialCommunityIcons name="plus" size={20} color={colors.onPrimary} />
           <Text style={styles.addBtnText}>Schedule New Vaccination</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -133,24 +170,25 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       <Modal visible={modal} transparent animationType="slide">
         <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>New Vaccination</Text>
-            <View style={{ gap: spacing.sm }}>
-              <View style={{ gap: 6 }}>
+            <View style={{ gap: spacing.md }}>
+              <View style={{ gap: 8 }}>
                 <Text style={styles.inputLabel}>Vaccine Name</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="e.g. Rabies Booster"
-                  placeholderTextColor={colors.onSurfaceVariant}
+                  placeholderTextColor={colors.outlineVariant}
                   value={form.name}
                   onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
                   autoFocus
                 />
               </View>
 
-              <View style={{ gap: 6 }}>
+              <View style={{ gap: 8 }}>
                 <Text style={styles.inputLabel}>Due Date</Text>
-                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
-                  <MaterialCommunityIcons name="calendar" size={18} color={colors.primaryContainer} />
+                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)} activeOpacity={0.88}>
+                  <MaterialCommunityIcons name="calendar-month-outline" size={18} color={colors.primaryContainer} />
                   <Text style={[styles.dateBtnText, !form.dueDate && styles.datePlaceholder]}>
                     {form.dueDate ? formatDisplay(form.dueDate) : 'Select due date'}
                   </Text>
@@ -159,18 +197,21 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
             </View>
 
             <View style={styles.sheetActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => { setModal(false); setForm({ name: '', dueDate: '' }); }}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => { setModal(false); setForm({ name: '', dueDate: '' }); }}
+                activeOpacity={0.88}
+              >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleAdd}>
-                <Text style={styles.confirmText}>Add</Text>
+              <TouchableOpacity style={styles.confirmBtn} onPress={handleAdd} activeOpacity={0.88}>
+                <Text style={styles.confirmText}>Schedule</Text>
               </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Android date picker — renders outside the modal */}
       {showDatePicker && Platform.OS === 'android' && (
         <DateTimePicker
           value={dueDateObj}
@@ -180,11 +221,11 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
         />
       )}
 
-      {/* iOS date picker — nested modal */}
       {Platform.OS === 'ios' && (
         <Modal visible={showDatePicker} transparent animationType="slide">
           <View style={styles.iosOverlay}>
             <View style={styles.iosSheet}>
+              <View style={styles.sheetHandle} />
               <View style={styles.iosHeader}>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
                   <Text style={styles.iosCancel}>Cancel</Text>
@@ -209,10 +250,25 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
   );
 }
 
-function Section({ title, children }) {
+function SummaryChip({ icon, label, value, bg, fg }) {
+  return (
+    <View style={[styles.summaryChip, { backgroundColor: bg }]}>
+      <MaterialCommunityIcons name={icon} size={18} color={fg} />
+      <Text style={[styles.summaryValue, { color: fg }]}>{value}</Text>
+      <Text style={[styles.summaryLabel, { color: fg }]}>{label}</Text>
+    </View>
+  );
+}
+
+function Section({ title, count, children }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <View style={[styles.countBadge, { backgroundColor: colors.surfaceContainerHigh }]}>
+          <Text style={styles.countText}>{count}</Text>
+        </View>
+      </View>
       <View style={styles.timeline}>{children}</View>
     </View>
   );
@@ -224,35 +280,42 @@ function VaxCard({ vax, onComplete, onDelete }) {
 
   return (
     <View style={[styles.vaxCard, isComplete && styles.vaxCardComplete]}>
-      <View style={[styles.dot, { backgroundColor: isComplete ? colors.secondaryFixed : colors.surfaceContainerHigh }]}>
-        {isComplete ? (
-          <MaterialCommunityIcons name="check-circle" size={16} color={colors.secondary} />
-        ) : (
-          <MaterialCommunityIcons name="calendar-today" size={13} color={colors.outline} />
-        )}
+      {/* Timeline dot */}
+      <View style={styles.dotColumn}>
+        <View style={[styles.dot, { backgroundColor: s.bg, borderColor: s.dot }]}>
+          <MaterialCommunityIcons name={s.icon} size={14} color={s.fg} />
+        </View>
+        <View style={styles.dotLine} />
       </View>
+
       <View style={styles.vaxContent}>
         <View style={styles.vaxHeader}>
           <Text style={styles.vaxName}>{vax.name}</Text>
           <View style={[styles.statusBadge, { backgroundColor: s.bg }]}>
-            {isComplete && <MaterialCommunityIcons name="check-decagram" size={12} color={s.fg} style={{ marginRight: 2 }} />}
             <Text style={[styles.statusText, { color: s.fg }]}>{s.label}</Text>
           </View>
         </View>
         <View style={styles.vaxDateRow}>
-          <MaterialCommunityIcons name="calendar" size={14} color={colors.outline} />
+          <MaterialCommunityIcons name="calendar-outline" size={13} color={colors.outline} />
           <Text style={styles.vaxDate}>
-            {isComplete ? `Administered: ${vax.administeredDate?.split('T')[0] || 'Done'}` : `Due: ${vax.dueDate}`}
+            {isComplete
+              ? `Administered: ${formatDisplay(vax.administeredDate?.split('T')[0]) || 'Done'}`
+              : `Due: ${formatDisplay(vax.dueDate) || vax.dueDate}`
+            }
           </Text>
         </View>
         <View style={styles.vaxActions}>
           {!isComplete && onComplete && (
-            <TouchableOpacity style={styles.completeBtn} onPress={onComplete}>
-              <MaterialCommunityIcons name="check" size={14} color={colors.secondary} />
+            <TouchableOpacity style={styles.completeBtn} onPress={onComplete} activeOpacity={0.88}>
+              <MaterialCommunityIcons name="check" size={13} color={colors.successFg} />
               <Text style={styles.completeBtnText}>Mark Done</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={onDelete} style={styles.deleteBtn}>
+          <TouchableOpacity
+            onPress={onDelete}
+            style={styles.deleteBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <MaterialCommunityIcons name="delete-outline" size={16} color={colors.outline} />
           </TouchableOpacity>
         </View>
@@ -265,100 +328,223 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingBottom: spacing.xl },
   topRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
-    paddingHorizontal: spacing.margin, paddingTop: spacing.md, paddingBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.margin,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   back: {
-    width: 40, height: 40, borderRadius: radii.full,
-    backgroundColor: colors.surfaceContainerLow, justifyContent: 'center', alignItems: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceContainerLow,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 2,
   },
   pageTitle: { ...typography.headlineMd, color: colors.onSurface },
-  pageSubtitle: { ...typography.bodyMd, color: colors.onSurfaceVariant },
-  section: { paddingHorizontal: spacing.margin, marginTop: spacing.lg },
-  sectionTitle: { ...typography.titleLg, color: colors.onSurface, marginBottom: spacing.md },
+  pageSubtitle: { ...typography.bodyMd, color: colors.onSurfaceVariant, fontSize: 14 },
+  petBadge: {
+    width: 46,
+    height: 46,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  petBadgeText: { ...typography.headlineMd, color: colors.primaryContainer, fontSize: 20 },
+  summaryRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.margin,
+    marginBottom: spacing.md,
+  },
+  summaryChip: {
+    flex: 1,
+    padding: spacing.sm,
+    borderRadius: radii.xl,
+    alignItems: 'center',
+    gap: 2,
+    minHeight: 76,
+    justifyContent: 'center',
+  },
+  summaryValue: { ...typography.headlineMd, fontSize: 22, lineHeight: 28 },
+  summaryLabel: { ...typography.labelSm, fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  section: { paddingHorizontal: spacing.margin, marginBottom: spacing.md },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  sectionTitle: { ...typography.titleLg, color: colors.onSurface },
+  countBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.xs,
+  },
+  countText: { ...typography.labelSm, color: colors.onSurfaceVariant, fontFamily: 'PlusJakartaSans_600SemiBold' },
   timeline: { gap: spacing.sm },
   vaxCard: {
-    backgroundColor: colors.surfaceContainerLowest, borderRadius: radii.xl,
-    padding: spacing.md, flexDirection: 'row', gap: spacing.md,
-    alignItems: 'flex-start', ...shadows.card,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
   },
-  vaxCardComplete: { opacity: 0.85 },
+  vaxCardComplete: { opacity: 0.8 },
+  dotColumn: { alignItems: 'center', width: 32 },
   dot: {
-    width: 32, height: 32, borderRadius: radii.full,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: colors.surfaceContainerLowest, flexShrink: 0,
+    width: 32,
+    height: 32,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
   },
-  vaxContent: { flex: 1, gap: spacing.xs },
+  dotLine: { flex: 1, width: 2, backgroundColor: colors.surfaceContainerHigh, marginTop: 4, minHeight: 12 },
+  vaxContent: {
+    flex: 1,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radii.xl,
+    padding: spacing.md,
+    gap: spacing.xs,
+    ...shadows.card,
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerLow,
+  },
   vaxHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  vaxName: { ...typography.titleLg, color: colors.onSurface, flex: 1, marginRight: spacing.sm },
+  vaxName: { ...typography.titleLg, color: colors.onSurface, flex: 1, marginRight: spacing.sm, fontSize: 16 },
   statusBadge: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radii.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+    flexShrink: 0,
   },
-  statusText: { ...typography.labelSm },
+  statusText: { ...typography.labelSm, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11 },
   vaxDateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  vaxDate: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  vaxDate: { ...typography.bodyMd, color: colors.onSurfaceVariant, fontSize: 13 },
   vaxActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
   completeBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
-    borderWidth: 1, borderColor: colors.secondaryFixed,
-    paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radii.full,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1.5,
+    borderColor: colors.successBg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(26,107,58,0.05)',
   },
-  completeBtnText: { ...typography.labelSm, color: colors.secondary },
-  deleteBtn: { marginLeft: 'auto' },
-  empty: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  completeBtnText: { ...typography.labelSm, color: colors.successFg, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  deleteBtn: { marginLeft: 'auto', padding: 2 },
+  emptyState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    backgroundColor: colors.successBg,
+  },
+  emptyText: { ...typography.bodyMd, color: colors.successFg, fontSize: 14 },
   addBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-    backgroundColor: colors.primary, paddingVertical: spacing.md,
-    marginHorizontal: spacing.margin, borderRadius: radii.lg, marginTop: spacing.xl,
-    shadowColor: colors.primaryContainer, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15, shadowRadius: 20, elevation: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    marginHorizontal: spacing.margin,
+    borderRadius: radii.xl,
+    marginTop: spacing.sm,
+    minHeight: 56,
+    ...shadows.button,
   },
   addBtnText: { ...typography.labelMd, color: colors.onPrimary, fontSize: 15 },
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   sheet: {
     backgroundColor: colors.surfaceContainerLowest,
-    borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl,
-    padding: spacing.lg, paddingBottom: spacing.xl, gap: spacing.md,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: radii.full,
+    backgroundColor: colors.outlineVariant,
+    alignSelf: 'center',
+    marginBottom: spacing.xs,
   },
   sheetTitle: { ...typography.titleLg, color: colors.onSurface },
   inputLabel: { ...typography.labelMd, color: colors.onSurface },
   input: {
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.DEFAULT,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
-    borderWidth: 1, borderColor: colors.outlineVariant,
-    ...typography.bodyMd, color: colors.onSurface,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    ...typography.bodyMd,
+    color: colors.onSurface,
+    minHeight: 52,
   },
   dateBtn: {
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.DEFAULT,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
-    borderWidth: 1, borderColor: colors.outlineVariant,
-    minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   dateBtnText: { ...typography.bodyMd, color: colors.onSurface, flex: 1 },
-  datePlaceholder: { color: colors.onSurfaceVariant },
+  datePlaceholder: { color: colors.outlineVariant },
   sheetActions: { flexDirection: 'row', gap: spacing.sm },
   cancelBtn: {
-    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.lg,
-    backgroundColor: colors.surfaceContainerHigh, alignItems: 'center',
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceContainerHigh,
+    alignItems: 'center',
+    minHeight: 50,
+    justifyContent: 'center',
   },
   cancelText: { ...typography.labelMd, color: colors.onSurface },
   confirmBtn: {
-    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.lg,
-    backgroundColor: colors.primary, alignItems: 'center',
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    minHeight: 50,
+    justifyContent: 'center',
+    ...shadows.button,
   },
   confirmText: { ...typography.labelMd, color: colors.onPrimary },
-  iosOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  iosOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   iosSheet: {
     backgroundColor: colors.surfaceContainerLowest,
-    borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
     paddingBottom: spacing.xl,
   },
   iosHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-    borderBottomWidth: 1, borderBottomColor: colors.surfaceContainerLow,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceContainerLow,
   },
   iosTitle: { ...typography.titleLg, color: colors.onSurface },
   iosCancel: { ...typography.labelMd, color: colors.onSurfaceVariant },

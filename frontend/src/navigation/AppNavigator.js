@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
-import { colors, typography } from '../theme';
+import { colors, typography, radii } from '../theme';
 
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -42,49 +42,67 @@ function PetsStack() {
   );
 }
 
+const TAB_ICONS = {
+  Dashboard: { active: 'view-dashboard', inactive: 'view-dashboard-outline' },
+  Pets: { active: 'paw', inactive: 'paw-outline' },
+  Community: { active: 'forum', inactive: 'forum-outline' },
+  Schedule: { active: 'account', inactive: 'account-outline' },
+};
+
 function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          height: 68,
-          paddingBottom: 8,
-          paddingTop: 8,
-          backgroundColor: 'rgba(255,255,255,0.97)',
+          height: Platform.OS === 'ios' ? 80 : 66,
+          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+          paddingTop: 10,
+          backgroundColor: '#fffaf7',
+          borderTopWidth: 1,
           borderTopColor: colors.surfaceContainerHighest,
-          shadowColor: '#855300',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.06,
-          shadowRadius: 20,
-          elevation: 10,
+          shadowColor: '#5a3500',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.07,
+          shadowRadius: 16,
+          elevation: 12,
         },
         tabBarActiveTintColor: colors.primaryContainer,
-        tabBarInactiveTintColor: '#94a3b8',
+        tabBarInactiveTintColor: colors.outline,
         tabBarLabelStyle: {
           ...typography.labelSm,
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
+          fontSize: 10,
+          letterSpacing: 0.3,
           marginTop: 2,
         },
         tabBarIcon: ({ focused, color }) => {
-          const icons = {
-            Dashboard: focused ? 'view-dashboard' : 'view-dashboard-outline',
-            Pets: focused ? 'paw' : 'paw-outline',
-            Community: focused ? 'forum' : 'forum-outline',
-            Schedule: focused ? 'calendar-text' : 'calendar-text-outline',
-          };
-          return <MaterialCommunityIcons name={icons[route.name]} size={22} color={color} />;
+          const { active, inactive } = TAB_ICONS[route.name] || { active: 'help', inactive: 'help-circle-outline' };
+          return (
+            <View style={focused ? styles.activeIconWrap : null}>
+              <MaterialCommunityIcons name={focused ? active : inactive} size={24} color={color} />
+            </View>
+          );
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
-      <Tab.Screen name="Pets" component={PetsStack} />
-      <Tab.Screen name="Community" component={CommunityScreen} />
-      <Tab.Screen name="Schedule" component={ScheduleScreen} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Pets" component={PetsStack} options={{ tabBarLabel: 'Pets' }} />
+      <Tab.Screen name="Community" component={CommunityScreen} options={{ tabBarLabel: 'Community' }} />
+      <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );
 }
+
+const styles = {
+  activeIconWrap: {
+    backgroundColor: colors.primaryFixed,
+    borderRadius: radii.lg,
+    width: 48,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+};
 
 export default function AppNavigator() {
   const { user, isLoading } = useAuth();

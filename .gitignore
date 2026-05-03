@@ -3,6 +3,7 @@ frontend/node_modules/
 frontend/.expo/
 frontend/dist/
 frontend/web-build/
+frontend/src/config.js
 
 # Backend
 backend/__pycache__/
@@ -11,6 +12,9 @@ backend/.venv/
 backend/venv/
 backend/*.db
 backend/*.sqlite3
+
+# Root node_modules
+node_modules/
 
 # Credentials — never commit these
 google-service-account.json
@@ -23,6 +27,15 @@ frontend/google-service-account.json
 .env
 .env.local
 backend/.env
+
+# AI editor / assistant tool directories (personal, not team config)
+.agents/
+.claude/
+.junie/
+.kiro/
+.qwen/
+.windsurf/
+skills-lock.json
 
 # OS
 .DS_Store

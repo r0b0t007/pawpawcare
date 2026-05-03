@@ -10,11 +10,11 @@ import { colors, typography, spacing, radii, shadows } from '../../theme';
 function statusBadge(vax) {
   if (!vax || vax.length === 0) return null;
   const overdue = vax.find((v) => v.status === 'overdue');
-  if (overdue) return { label: 'Overdue', bg: colors.errorContainer, fg: colors.onErrorContainer };
+  if (overdue) return { label: 'Overdue', bg: colors.errorContainer, fg: colors.onErrorContainer, dot: colors.error };
   const due = vax.find((v) => v.status === 'due_soon');
-  if (due) return { label: 'Due Soon', bg: '#fff0c3', fg: '#7a5c00' };
+  if (due) return { label: 'Due Soon', bg: colors.dueSoonBg, fg: colors.dueSoonFg, dot: '#d4a000' };
   const upcoming = vax.find((v) => v.status === 'upcoming');
-  if (upcoming) return { label: 'Upcoming', bg: colors.tertiaryFixed, fg: colors.onTertiaryFixed };
+  if (upcoming) return { label: 'Upcoming', bg: colors.tertiaryFixed, fg: colors.onTertiaryFixed, dot: colors.tertiary };
   return null;
 }
 
@@ -38,27 +38,34 @@ export default function PetsListScreen({ navigation }) {
       <TouchableOpacity
         style={styles.card}
         onPress={() => navigation.navigate('PetProfile', { petId: pet.id })}
-        activeOpacity={0.85}
+        activeOpacity={0.88}
       >
-        <View style={[styles.decor, { backgroundColor: pet.color || colors.primaryFixed }]} />
+        {/* Color accent strip */}
+        <View style={[styles.colorStrip, { backgroundColor: pet.color || colors.primaryFixed }]} />
         <View style={styles.cardContent}>
           <View style={[styles.avatar, { backgroundColor: pet.color || colors.primaryFixed }]}>
             <Text style={styles.avatarText}>{pet.name[0]}</Text>
           </View>
           <View style={styles.info}>
             <View style={styles.nameRow}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.petName}>{pet.name}</Text>
-                <Text style={styles.petBreed}>{pet.breed} • {pet.age} yr{pet.age !== 1 ? 's' : ''}</Text>
+                <Text style={styles.petBreed}>
+                  {pet.type ? pet.type.charAt(0).toUpperCase() + pet.type.slice(1) : ''}{pet.breed ? ` · ${pet.breed}` : ''}{pet.age ? ` · ${pet.age} yr${pet.age !== 1 ? 's' : ''}` : ''}
+                </Text>
               </View>
-              <TouchableOpacity onPress={() => confirmDelete(pet)} style={styles.more}>
+              <TouchableOpacity
+                onPress={() => confirmDelete(pet)}
+                style={styles.deleteBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.outline} />
               </TouchableOpacity>
             </View>
 
             {badge && (
               <View style={styles.badgeRow}>
-                <MaterialCommunityIcons name="needle" size={14} color={badge.fg} />
+                <View style={[styles.statusDot, { backgroundColor: badge.dot }]} />
                 <View style={[styles.badge, { backgroundColor: badge.bg }]}>
                   <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
                 </View>
@@ -68,8 +75,10 @@ export default function PetsListScreen({ navigation }) {
             <TouchableOpacity
               style={styles.profileBtn}
               onPress={() => navigation.navigate('PetProfile', { petId: pet.id })}
+              activeOpacity={0.88}
             >
               <Text style={styles.profileBtnText}>View Profile</Text>
+              <MaterialCommunityIcons name="arrow-right" size={14} color={colors.onSecondaryFixed} />
             </TouchableOpacity>
           </View>
         </View>
@@ -81,9 +90,15 @@ export default function PetsListScreen({ navigation }) {
     <View style={styles.headerWrap}>
       <View>
         <Text style={styles.pageTitle}>My Pets</Text>
-        <Text style={styles.pageSubtitle}>Manage your furry friends' profiles.</Text>
+        <Text style={styles.pageSubtitle}>
+          {pets.length === 0 ? 'Add your first pet below' : `${pets.length} pet${pets.length !== 1 ? 's' : ''} in your care`}
+        </Text>
       </View>
-      <TouchableOpacity style={styles.addBtn} onPress={() => navigation.navigate('AddPet')}>
+      <TouchableOpacity
+        style={styles.addBtn}
+        onPress={() => navigation.navigate('AddPet')}
+        activeOpacity={0.88}
+      >
         <MaterialCommunityIcons name="plus" size={18} color={colors.onPrimary} />
         <Text style={styles.addBtnText}>Add Pet</Text>
       </TouchableOpacity>
@@ -91,12 +106,16 @@ export default function PetsListScreen({ navigation }) {
   );
 
   const ListFooter = () => (
-    <TouchableOpacity style={styles.addCard} onPress={() => navigation.navigate('AddPet')}>
-      <View style={[styles.avatar, { backgroundColor: colors.surfaceContainerHigh }]}>
-        <MaterialCommunityIcons name="plus" size={28} color={colors.primary} />
+    <TouchableOpacity
+      style={styles.addCard}
+      onPress={() => navigation.navigate('AddPet')}
+      activeOpacity={0.88}
+    >
+      <View style={[styles.addCardIcon, { backgroundColor: colors.primaryFixed }]}>
+        <MaterialCommunityIcons name="plus" size={28} color={colors.primaryContainer} />
       </View>
-      <Text style={[styles.petName, { color: colors.primary, marginTop: spacing.sm }]}>New Family Member?</Text>
-      <Text style={[styles.petBreed, { textAlign: 'center', marginTop: spacing.xs }]}>Add another pet to your dashboard.</Text>
+      <Text style={styles.addCardTitle}>New Family Member?</Text>
+      <Text style={styles.addCardSub}>Add another pet to your profile</Text>
     </TouchableOpacity>
   );
 
@@ -119,51 +138,90 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   list: { padding: spacing.margin, gap: spacing.md, paddingBottom: spacing.xl },
   headerWrap: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: spacing.sm,
   },
   pageTitle: { ...typography.headlineLg, color: colors.onBackground, marginBottom: spacing.xs },
   pageSubtitle: { ...typography.bodyMd, color: colors.onSurfaceVariant },
   addBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderRadius: radii.lg, ...shadows.strong,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.xl,
+    ...shadows.button,
   },
   addBtnText: { ...typography.labelMd, color: colors.onPrimary },
   card: {
-    backgroundColor: colors.surfaceContainerLowest, borderRadius: radii.xl,
-    overflow: 'hidden', ...shadows.card,
-    borderWidth: 1, borderColor: colors.surfaceContainerLow,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radii.xl,
+    overflow: 'hidden',
+    ...shadows.card,
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerLow,
   },
-  decor: {
-    position: 'absolute', top: -16, right: -16,
-    width: 80, height: 80, borderRadius: radii.full, opacity: 0.3,
-  },
+  colorStrip: { height: 6, width: '100%' },
   cardContent: { padding: spacing.md, flexDirection: 'row', gap: spacing.md },
   avatar: {
-    width: 72, height: 72, borderRadius: radii.full,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: colors.surfaceContainerLowest,
+    width: 68,
+    height: 68,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.8)',
+    ...shadows.card,
   },
-  avatarText: { ...typography.headlineMd, color: colors.primaryContainer },
+  avatarText: { ...typography.headlineMd, color: colors.primaryContainer, fontSize: 28 },
   info: { flex: 1, gap: spacing.sm },
-  nameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  nameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   petName: { ...typography.titleLg, color: colors.onSurface, marginBottom: 2 },
-  petBreed: { ...typography.bodyMd, color: colors.onSurfaceVariant },
-  more: { padding: spacing.xs },
+  petBreed: { ...typography.bodyMd, color: colors.onSurfaceVariant, fontSize: 13 },
+  deleteBtn: { padding: spacing.xs },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  badge: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radii.full },
-  badgeText: { ...typography.labelSm },
+  statusDot: { width: 7, height: 7, borderRadius: radii.full },
+  badge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+  },
+  badgeText: { ...typography.labelSm, fontFamily: 'PlusJakartaSans_600SemiBold' },
   profileBtn: {
     backgroundColor: colors.secondaryFixed,
-    paddingVertical: spacing.sm, borderRadius: radii.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.xs,
   },
   profileBtnText: { ...typography.labelMd, color: colors.onSecondaryFixed },
   addCard: {
-    backgroundColor: colors.surfaceContainerLowest, borderRadius: radii.xl,
-    padding: spacing.lg, alignItems: 'center',
-    borderWidth: 2, borderColor: colors.outlineVariant, borderStyle: 'dashed',
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderWidth: 2,
+    borderColor: colors.outlineVariant,
+    borderStyle: 'dashed',
   },
+  addCardIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  addCardTitle: { ...typography.titleLg, color: colors.primaryContainer },
+  addCardSub: { ...typography.bodyMd, color: colors.onSurfaceVariant, textAlign: 'center', fontSize: 14 },
 });

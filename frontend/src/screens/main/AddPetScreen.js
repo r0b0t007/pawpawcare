@@ -7,7 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
-import { colors, typography, spacing, radii } from '../../theme';
+import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 const PET_TYPES = [
   { id: 'dog', label: 'Dog', icon: 'dog' },
@@ -17,7 +17,10 @@ const PET_TYPES = [
   { id: 'other', label: 'Other', icon: 'paw' },
 ];
 
-const GENDERS = ['male', 'female'];
+const GENDERS = [
+  { id: 'male', label: 'Male', icon: 'gender-male' },
+  { id: 'female', label: 'Female', icon: 'gender-female' },
+];
 
 export default function AddPetScreen({ navigation, route }) {
   const { petId } = route.params || {};
@@ -38,7 +41,6 @@ export default function AddPetScreen({ navigation, route }) {
   });
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
-
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const birthdayDate = form.birthday ? new Date(form.birthday + 'T12:00:00') : new Date();
@@ -46,7 +48,7 @@ export default function AddPetScreen({ navigation, route }) {
   const formatBirthday = (iso) => {
     if (!iso) return null;
     const d = new Date(iso + 'T12:00:00');
-    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const onDateChange = (event, selectedDate) => {
@@ -83,10 +85,13 @@ export default function AddPetScreen({ navigation, route }) {
     }
   };
 
+  const selectedType = PET_TYPES.find((t) => t.id === form.type);
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* Header */}
           <View style={styles.topRow}>
             <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
               <MaterialCommunityIcons name="arrow-left" size={22} color={colors.onSurface} />
@@ -95,50 +100,86 @@ export default function AddPetScreen({ navigation, route }) {
             <View style={{ width: 40 }} />
           </View>
 
-          {/* Pet avatar preview */}
+          {/* Avatar preview */}
           <View style={styles.avatarArea}>
             <View style={[styles.bigAvatar, { backgroundColor: existing?.color || colors.primaryFixed }]}>
               <MaterialCommunityIcons
-                name={PET_TYPES.find((t) => t.id === form.type)?.icon || 'paw'}
-                size={52}
+                name={selectedType?.icon || 'paw'}
+                size={48}
                 color={colors.primaryContainer}
               />
             </View>
-            <Text style={styles.avatarHint}>Pet avatar is auto-generated</Text>
+            <Text style={styles.avatarHint}>Avatar is auto-generated</Text>
           </View>
 
           {/* Pet type */}
-          <Label text="Pet Type" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typeRow} contentContainerStyle={{ paddingHorizontal: spacing.margin, gap: spacing.sm }}>
-            {PET_TYPES.map((t) => (
-              <TouchableOpacity
-                key={t.id}
-                style={[styles.typeChip, form.type === t.id && styles.typeChipActive]}
-                onPress={() => set('type', t.id)}
-              >
-                <MaterialCommunityIcons name={t.icon} size={20} color={form.type === t.id ? colors.onPrimary : colors.onSurfaceVariant} />
-                <Text style={[styles.typeLabel, form.type === t.id && styles.typeLabelActive]}>{t.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <View style={styles.section}>
+            <FieldLabel text="Pet Type" />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.typeRow}
+              contentContainerStyle={{ paddingHorizontal: spacing.margin, gap: spacing.sm }}
+            >
+              {PET_TYPES.map((t) => (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[styles.typeChip, form.type === t.id && styles.typeChipActive]}
+                  onPress={() => set('type', t.id)}
+                  activeOpacity={0.88}
+                >
+                  <MaterialCommunityIcons
+                    name={t.icon}
+                    size={22}
+                    color={form.type === t.id ? colors.onPrimary : colors.onSurfaceVariant}
+                  />
+                  <Text style={[styles.typeLabel, form.type === t.id && styles.typeLabelActive]}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
 
-          <View style={styles.form}>
-            <Field label="Name *">
-              <TextInput style={styles.input} placeholder="e.g. Luna" placeholderTextColor={colors.onSurfaceVariant} value={form.name} onChangeText={(v) => set('name', v)} />
+          {/* Form fields */}
+          <View style={styles.formCard}>
+            <Field label="Pet Name *">
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Luna"
+                placeholderTextColor={colors.outlineVariant}
+                value={form.name}
+                onChangeText={(v) => set('name', v)}
+              />
             </Field>
+
             <Field label="Breed">
-              <TextInput style={styles.input} placeholder="e.g. Golden Retriever" placeholderTextColor={colors.onSurfaceVariant} value={form.breed} onChangeText={(v) => set('breed', v)} />
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Golden Retriever"
+                placeholderTextColor={colors.outlineVariant}
+                value={form.breed}
+                onChangeText={(v) => set('breed', v)}
+              />
             </Field>
+
             <View style={styles.row2}>
               <View style={{ flex: 1 }}>
                 <Field label="Age (years)">
-                  <TextInput style={styles.input} placeholder="2" placeholderTextColor={colors.onSurfaceVariant} value={form.age} onChangeText={(v) => set('age', v)} keyboardType="number-pad" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="2"
+                    placeholderTextColor={colors.outlineVariant}
+                    value={form.age}
+                    onChangeText={(v) => set('age', v)}
+                    keyboardType="number-pad"
+                  />
                 </Field>
               </View>
-                      <View style={{ flex: 1 }}>
+              <View style={{ flex: 1 }}>
                 <Field label="Birthday">
-                  <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)}>
-                    <MaterialCommunityIcons name="calendar" size={18} color={colors.primaryContainer} />
+                  <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)} activeOpacity={0.88}>
+                    <MaterialCommunityIcons name="calendar-month-outline" size={18} color={colors.primaryContainer} />
                     <Text style={[styles.dateBtnText, !form.birthday && styles.datePlaceholder]}>
                       {form.birthday ? formatBirthday(form.birthday) : 'Select date'}
                     </Text>
@@ -146,15 +187,27 @@ export default function AddPetScreen({ navigation, route }) {
                 </Field>
               </View>
             </View>
+
             <View style={styles.row2}>
               <View style={{ flex: 2 }}>
                 <Field label="Weight">
-                  <TextInput style={styles.input} placeholder="e.g. 28" placeholderTextColor={colors.onSurfaceVariant} value={form.weight} onChangeText={(v) => set('weight', v)} keyboardType="decimal-pad" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g. 28"
+                    placeholderTextColor={colors.outlineVariant}
+                    value={form.weight}
+                    onChangeText={(v) => set('weight', v)}
+                    keyboardType="decimal-pad"
+                  />
                 </Field>
               </View>
               <View style={{ flex: 1 }}>
                 <Field label="Unit">
-                  <TouchableOpacity style={styles.unitToggle} onPress={() => set('weightUnit', form.weightUnit === 'kg' ? 'lbs' : 'kg')}>
+                  <TouchableOpacity
+                    style={styles.unitToggle}
+                    onPress={() => set('weightUnit', form.weightUnit === 'kg' ? 'lbs' : 'kg')}
+                    activeOpacity={0.88}
+                  >
                     <Text style={styles.unitText}>{form.weightUnit}</Text>
                     <MaterialCommunityIcons name="swap-horizontal" size={16} color={colors.primaryContainer} />
                   </TouchableOpacity>
@@ -163,31 +216,38 @@ export default function AddPetScreen({ navigation, route }) {
             </View>
 
             {/* Gender */}
-            <Label text="Gender" />
-            <View style={styles.genderRow}>
-              {GENDERS.map((g) => (
-                <TouchableOpacity
-                  key={g}
-                  style={[styles.genderChip, form.gender === g && styles.genderChipActive]}
-                  onPress={() => set('gender', g)}
-                >
-                  <MaterialCommunityIcons
-                    name={g === 'female' ? 'gender-female' : 'gender-male'}
-                    size={18}
-                    color={form.gender === g ? colors.onPrimary : colors.onSurfaceVariant}
-                  />
-                  <Text style={[styles.typeLabel, form.gender === g && styles.typeLabelActive]}>
-                    {g.charAt(0).toUpperCase() + g.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Field label="Gender">
+              <View style={styles.genderRow}>
+                {GENDERS.map((g) => (
+                  <TouchableOpacity
+                    key={g.id}
+                    style={[styles.genderChip, form.gender === g.id && styles.genderChipActive]}
+                    onPress={() => set('gender', g.id)}
+                    activeOpacity={0.88}
+                  >
+                    <MaterialCommunityIcons
+                      name={g.icon}
+                      size={18}
+                      color={form.gender === g.id ? colors.onPrimary : colors.onSurfaceVariant}
+                    />
+                    <Text style={[styles.typeLabel, form.gender === g.id && styles.typeLabelActive]}>
+                      {g.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Field>
 
             {/* Microchipped */}
             <View style={styles.switchRow}>
-              <View>
-                <Text style={styles.switchLabel}>Microchipped</Text>
-                <Text style={styles.switchSub}>Is your pet microchipped?</Text>
+              <View style={styles.switchInfo}>
+                <View style={[styles.switchIcon, { backgroundColor: colors.tertiaryFixed }]}>
+                  <MaterialCommunityIcons name="chip" size={18} color={colors.tertiary} />
+                </View>
+                <View>
+                  <Text style={styles.switchLabel}>Microchipped</Text>
+                  <Text style={styles.switchSub}>Is your pet microchipped?</Text>
+                </View>
               </View>
               <Switch
                 value={form.microchipped}
@@ -197,15 +257,19 @@ export default function AddPetScreen({ navigation, route }) {
               />
             </View>
 
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
-              <MaterialCommunityIcons name="content-save" size={18} color={colors.onPrimary} />
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSave}
+              activeOpacity={0.88}
+            >
+              <MaterialCommunityIcons name={isEdit ? 'content-save' : 'paw'} size={18} color={colors.onPrimary} />
               <Text style={styles.saveBtnText}>{isEdit ? 'Save Changes' : 'Add Pet'}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Date picker — Android: native dialog, iOS: modal with spinner */}
+      {/* Android date picker */}
       {showDatePicker && Platform.OS === 'android' && (
         <DateTimePicker
           value={birthdayDate}
@@ -216,10 +280,12 @@ export default function AddPetScreen({ navigation, route }) {
         />
       )}
 
+      {/* iOS date picker modal */}
       {Platform.OS === 'ios' && (
         <Modal visible={showDatePicker} transparent animationType="slide">
           <View style={styles.iosPickerOverlay}>
             <View style={styles.iosPickerSheet}>
+              <View style={styles.sheetHandle} />
               <View style={styles.iosPickerHeader}>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
                   <Text style={styles.iosPickerCancel}>Cancel</Text>
@@ -245,13 +311,13 @@ export default function AddPetScreen({ navigation, route }) {
   );
 }
 
-function Label({ text }) {
-  return <Text style={[styles.fieldLabel, { paddingHorizontal: spacing.margin, marginBottom: 6, marginTop: spacing.sm }]}>{text}</Text>;
+function FieldLabel({ text }) {
+  return <Text style={[styles.fieldLabel, { paddingHorizontal: spacing.margin, marginBottom: 6, marginTop: spacing.xs }]}>{text}</Text>;
 }
 
 function Field({ label, children }) {
   return (
-    <View style={{ gap: 6 }}>
+    <View style={{ gap: 8 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
       {children}
     </View>
@@ -262,83 +328,166 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingBottom: spacing.xl },
   topRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.margin, paddingTop: spacing.md, paddingBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.margin,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   back: {
-    width: 40, height: 40, borderRadius: radii.full,
-    backgroundColor: colors.surfaceContainerLow, justifyContent: 'center', alignItems: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceContainerLow,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   pageTitle: { ...typography.titleLg, color: colors.onBackground },
   avatarArea: { alignItems: 'center', paddingVertical: spacing.md },
-  bigAvatar: { width: 96, height: 96, borderRadius: radii.xl, justifyContent: 'center', alignItems: 'center' },
-  avatarHint: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: spacing.xs },
+  bigAvatar: {
+    width: 104,
+    height: 104,
+    borderRadius: radii.xxl,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...shadows.medium,
+  },
+  avatarHint: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: spacing.sm },
+  section: { marginBottom: spacing.sm },
   typeRow: { marginBottom: spacing.sm },
   typeChip: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderRadius: radii.lg, backgroundColor: colors.surfaceContainerLow,
-    borderWidth: 1, borderColor: colors.outlineVariant,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surfaceContainerLow,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    minHeight: 46,
   },
-  typeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  typeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary, ...shadows.button },
   typeLabel: { ...typography.labelMd, color: colors.onSurfaceVariant },
   typeLabelActive: { color: colors.onPrimary },
-  form: { paddingHorizontal: spacing.margin, gap: spacing.md },
+  formCard: {
+    backgroundColor: colors.surfaceContainerLowest,
+    marginHorizontal: spacing.margin,
+    borderRadius: radii.xxl,
+    padding: spacing.md,
+    gap: spacing.md,
+    ...shadows.medium,
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerLow,
+  },
   fieldLabel: { ...typography.labelMd, color: colors.onSurface },
   input: {
     backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radii.DEFAULT, paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.outlineVariant,
-    ...typography.bodyMd, color: colors.onSurface, minHeight: 52,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    ...typography.bodyMd,
+    color: colors.onSurface,
+    minHeight: 54,
   },
   row2: { flexDirection: 'row', gap: spacing.sm },
   unitToggle: {
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.DEFAULT,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
-    borderWidth: 1, borderColor: colors.outlineVariant, minHeight: 52,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
   },
   unitText: { ...typography.labelMd, color: colors.primaryContainer },
   genderRow: { flexDirection: 'row', gap: spacing.sm },
   genderChip: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
-    paddingVertical: spacing.sm, borderRadius: radii.lg,
-    backgroundColor: colors.surfaceContainerLow, borderWidth: 1, borderColor: colors.outlineVariant,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surfaceContainerLow,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    minHeight: 46,
   },
-  genderChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  genderChipActive: { backgroundColor: colors.primary, borderColor: colors.primary, ...shadows.button },
   switchRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: colors.surfaceContainerLowest, padding: spacing.md, borderRadius: radii.xl,
-    borderWidth: 1, borderColor: colors.surfaceContainerLow,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceContainerLow,
+    padding: spacing.sm,
+    borderRadius: radii.lg,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
   },
+  switchInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  switchIcon: { width: 38, height: 38, borderRadius: radii.md, justifyContent: 'center', alignItems: 'center' },
   switchLabel: { ...typography.labelMd, color: colors.onSurface },
   switchSub: { ...typography.labelSm, color: colors.onSurfaceVariant },
   saveBtn: {
-    backgroundColor: colors.primary, paddingVertical: spacing.md, borderRadius: radii.lg,
-    alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: spacing.base,
-    marginTop: spacing.sm,
-    shadowColor: colors.primaryContainer, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15, shadowRadius: 20, elevation: 5,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: radii.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: spacing.base,
+    marginTop: spacing.xs,
+    minHeight: 56,
+    ...shadows.button,
   },
   saveBtnText: { ...typography.labelMd, color: colors.onPrimary, fontSize: 16 },
   dateBtn: {
     backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radii.DEFAULT, paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm, borderWidth: 1, borderColor: colors.outlineVariant,
-    minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
-  dateBtnText: { ...typography.bodyMd, color: colors.onSurface, flex: 1 },
-  datePlaceholder: { color: colors.onSurfaceVariant },
-  iosPickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  dateBtnText: { ...typography.bodyMd, color: colors.onSurface, flex: 1, fontSize: 14 },
+  datePlaceholder: { color: colors.outlineVariant },
+  iosPickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   iosPickerSheet: {
     backgroundColor: colors.surfaceContainerLowest,
-    borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
     paddingBottom: spacing.xl,
   },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: radii.full,
+    backgroundColor: colors.outlineVariant,
+    alignSelf: 'center',
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
   iosPickerHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-    borderBottomWidth: 1, borderBottomColor: colors.surfaceContainerLow,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceContainerLow,
   },
   iosPickerTitle: { ...typography.titleLg, color: colors.onSurface },
   iosPickerCancel: { ...typography.labelMd, color: colors.onSurfaceVariant },

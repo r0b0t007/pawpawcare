@@ -37,7 +37,7 @@ async function refreshAccessToken() {
 
     const res = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
       body: JSON.stringify({ refresh_token: refresh }),
     });
 
@@ -63,13 +63,25 @@ async function refreshAccessToken() {
 export async function request(method, path, body, { skipAuth = false } = {}) {
   const { access } = await getTokens();
 
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = {
+    'Content-Type': 'application/json',
+    'bypass-tunnel-reminder': 'true',
+  };
   if (!skipAuth && access) headers['Authorization'] = `Bearer ${access}`;
 
   const init = { method, headers };
   if (body !== undefined) init.body = JSON.stringify(body);
 
-  let res = await fetch(`${API_URL}${path}`, init);
+  const url = `${API_URL}${path}`;
+  console.log('[API]', method, url);
+  let res;
+  try {
+    res = await fetch(url, init);
+  } catch (e) {
+    console.log('[API ERROR]', e?.message, 'URL was:', url);
+    throw new Error(`Network error: ${e?.message || 'unknown'} (${url})`);
+  }
+  console.log('[API]', res.status, url);
 
   // Auto-refresh on 401
   if (res.status === 401 && !skipAuth) {

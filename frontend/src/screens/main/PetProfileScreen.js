@@ -8,8 +8,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
-const ACTIVITY_ICONS = ['tree', 'tennis-ball', 'school', 'cat', 'sleep', 'run', 'swimming', 'bike', 'dog-side', 'toy-brick'];
-
 export default function PetProfileScreen({ navigation, route }) {
   const { petId } = route.params;
   const { pets, addFavoriteFood, removeFavoriteFood, addActivity } = useData();
@@ -51,93 +49,109 @@ export default function PetProfileScreen({ navigation, route }) {
 
   const upcoming = (pet.vaccinations || []).filter((v) => v.status !== 'completed');
   const nextVax = upcoming[0];
+  const petColor = pet.color || colors.primaryFixed;
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Back + Edit */}
-        <View style={styles.topRow}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color={colors.onSurface} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => navigation.navigate('AddPet', { petId })}
-          >
-            <MaterialCommunityIcons name="pencil" size={18} color={colors.primaryContainer} />
-            <Text style={styles.editBtnText}>Edit</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Hero */}
-        <View style={styles.hero}>
-          <View style={[styles.heroAvatar, { backgroundColor: pet.color || colors.primaryFixed }]}>
-            <Text style={styles.heroAvatarText}>{pet.name[0]}</Text>
-            {pet.gender && (
-              <View style={[styles.genderBadge, { backgroundColor: pet.gender === 'female' ? '#fce4ec' : '#e3f2fd' }]}>
-                <MaterialCommunityIcons
-                  name={pet.gender === 'female' ? 'gender-female' : 'gender-male'}
-                  size={16}
-                  color={pet.gender === 'female' ? '#c2185b' : '#1565c0'}
-                />
-              </View>
-            )}
+        {/* Hero band */}
+        <View style={[styles.heroBand, { backgroundColor: petColor }]}>
+          <View style={styles.topRow}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <MaterialCommunityIcons name="arrow-left" size={22} color={colors.primaryContainer} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={() => navigation.navigate('AddPet', { petId })}
+            >
+              <MaterialCommunityIcons name="pencil-outline" size={18} color={colors.primaryContainer} />
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.heroInfo}>
+
+          <View style={styles.heroContent}>
+            <View style={styles.heroAvatarWrap}>
+              <View style={[styles.heroAvatar, { backgroundColor: 'rgba(255,255,255,0.35)' }]}>
+                <Text style={styles.heroAvatarText}>{pet.name[0]}</Text>
+              </View>
+              {pet.gender && (
+                <View style={[styles.genderBadge, { backgroundColor: pet.gender === 'female' ? '#fce4ec' : '#e3f2fd' }]}>
+                  <MaterialCommunityIcons
+                    name={pet.gender === 'female' ? 'gender-female' : 'gender-male'}
+                    size={14}
+                    color={pet.gender === 'female' ? '#c2185b' : '#1565c0'}
+                  />
+                </View>
+              )}
+            </View>
             <Text style={styles.heroName}>{pet.name}</Text>
-            <Text style={styles.heroBreed}>{pet.breed} • {pet.age} year{pet.age !== 1 ? 's' : ''} old</Text>
+            <Text style={styles.heroBreed}>
+              {pet.type ? pet.type.charAt(0).toUpperCase() + pet.type.slice(1) : ''}
+              {pet.breed ? ` · ${pet.breed}` : ''}
+              {pet.age ? ` · ${pet.age} yr${pet.age !== 1 ? 's' : ''}` : ''}
+            </Text>
             <View style={styles.pillsRow}>
-              {pet.weight ? (
-                <Pill icon="scale" label={`${pet.weight} ${pet.weightUnit || 'kg'}`} />
-              ) : null}
-              {pet.birthday ? (
-                <Pill icon="cake-variant-outline" label={pet.birthday} />
-              ) : null}
-              {pet.microchipped ? (
-                <Pill icon="chip" label="Microchipped" />
-              ) : null}
+              {pet.weight ? <Pill icon="scale" label={`${pet.weight} ${pet.weightUnit || 'kg'}`} /> : null}
+              {pet.birthday ? <Pill icon="cake-variant-outline" label={pet.birthday} /> : null}
+              {pet.microchipped ? <Pill icon="chip" label="Microchipped" /> : null}
             </View>
           </View>
+        </View>
+
+        {/* Curved transition */}
+        <View style={[styles.heroTail, { backgroundColor: petColor }]}>
+          <View style={styles.heroTailCurve} />
         </View>
 
         {/* Health Stats */}
         {pet.healthStats && (
           <View style={styles.healthCard}>
             <View style={styles.healthHeader}>
-              <Text style={styles.healthTitle}>
-                <MaterialCommunityIcons name="heart-pulse" size={18} color={colors.onSecondary} /> Health Stats
-              </Text>
+              <MaterialCommunityIcons name="heart-pulse" size={18} color={colors.secondary} />
+              <Text style={styles.healthTitle}>Health Stats</Text>
               <Text style={styles.healthSub}>Last checkup: {pet.healthStats.lastCheckup || 'Unknown'}</Text>
             </View>
             <View style={styles.statsGrid}>
-              <HealthStat label="Heart Rate" value={pet.healthStats.heartRate ? `${pet.healthStats.heartRate} bpm` : 'N/A'} />
-              <HealthStat label="Weight" value={pet.healthStats.weightStatus || 'Unknown'} />
-              <HealthStat label="Activity" value={pet.healthStats.activityLevel || 'Low'} />
-              <HealthStat label="Next Vax" value={pet.healthStats.nextVax || 'Not set'} />
+              <HealthStat icon="heart-pulse" label="Heart Rate" value={pet.healthStats.heartRate ? `${pet.healthStats.heartRate} bpm` : 'N/A'} color={colors.error} />
+              <HealthStat icon="scale" label="Weight" value={pet.healthStats.weightStatus || 'Unknown'} color={colors.tertiary} />
+              <HealthStat icon="run" label="Activity" value={pet.healthStats.activityLevel || 'Low'} color={colors.primaryContainer} />
+              <HealthStat icon="needle" label="Next Vax" value={pet.healthStats.nextVax || 'Not set'} color={colors.secondary} />
             </View>
           </View>
         )}
 
-        {/* Vaccinations quick */}
+        {/* Vaccinations */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Vaccinations</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('VaccinationTracker', { petId })}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('VaccinationTracker', { petId })}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
           </View>
           {nextVax ? (
             <View style={styles.vaxRow}>
-              <MaterialCommunityIcons name="needle" size={20} color={colors.tertiary} />
-              <Text style={styles.vaxName}>{nextVax.name}</Text>
-              <Text style={styles.vaxDate}>{nextVax.dueDate}</Text>
+              <View style={[styles.vaxDot, { backgroundColor: colors.tertiaryFixed }]}>
+                <MaterialCommunityIcons name="needle" size={16} color={colors.tertiary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.vaxName}>{nextVax.name}</Text>
+                <Text style={styles.vaxDate}>Due: {nextVax.dueDate}</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={18} color={colors.outlineVariant} />
             </View>
           ) : (
-            <Text style={styles.emptyText}>No upcoming vaccinations</Text>
+            <View style={styles.emptyRow}>
+              <MaterialCommunityIcons name="check-circle-outline" size={18} color={colors.successFg || colors.secondary} />
+              <Text style={styles.emptyText}>All vaccinations up to date</Text>
+            </View>
           )}
           <TouchableOpacity
             style={styles.outlineBtn}
             onPress={() => navigation.navigate('VaccinationTracker', { petId })}
+            activeOpacity={0.88}
           >
             <MaterialCommunityIcons name="needle" size={16} color={colors.tertiary} />
             <Text style={styles.outlineBtnText}>Manage Vaccinations</Text>
@@ -148,12 +162,19 @@ export default function PetProfileScreen({ navigation, route }) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Daily Activities</Text>
-            <TouchableOpacity onPress={() => setActivityModal(true)}>
-              <MaterialCommunityIcons name="plus" size={22} color={colors.primary} />
+            <TouchableOpacity
+              onPress={() => setActivityModal(true)}
+              style={styles.addIconBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="plus" size={18} color={colors.onPrimary} />
             </TouchableOpacity>
           </View>
           {(pet.activities || []).length === 0 ? (
-            <Text style={styles.emptyText}>No activities yet. Add one!</Text>
+            <TouchableOpacity style={styles.emptyState} onPress={() => setActivityModal(true)} activeOpacity={0.88}>
+              <MaterialCommunityIcons name="run" size={24} color={colors.primaryContainer} />
+              <Text style={styles.emptyStateText}>Add a daily activity</Text>
+            </TouchableOpacity>
           ) : (
             pet.activities.map((act) => (
               <ActivityRow key={act.id} activity={act} />
@@ -165,20 +186,32 @@ export default function PetProfileScreen({ navigation, route }) {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Favorite Foods</Text>
-            <TouchableOpacity onPress={() => setFoodModal(true)}>
-              <MaterialCommunityIcons name="plus" size={22} color={colors.primary} />
+            <TouchableOpacity
+              onPress={() => setFoodModal(true)}
+              style={styles.addIconBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="plus" size={18} color={colors.onPrimary} />
             </TouchableOpacity>
           </View>
           <View style={styles.foodsWrap}>
             {(pet.favoriteFoods || []).map((food) => (
-              <TouchableOpacity key={food.id} onLongPress={() => removeFavoriteFood(petId, food.id)}>
-                <View style={styles.foodChip}>
-                  <Text style={styles.foodChipText}>{food.name}</Text>
-                </View>
-              </TouchableOpacity>
+              <View key={food.id} style={styles.foodChip}>
+                <MaterialCommunityIcons name="food-drumstick-outline" size={13} color={colors.primaryContainer} />
+                <Text style={styles.foodChipText}>{food.name}</Text>
+                <TouchableOpacity
+                  onPress={() => removeFavoriteFood(petId, food.id)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <MaterialCommunityIcons name="close" size={13} color={colors.outline} />
+                </TouchableOpacity>
+              </View>
             ))}
             {(pet.favoriteFoods || []).length === 0 && (
-              <Text style={styles.emptyText}>No favorite foods yet.</Text>
+              <TouchableOpacity style={styles.emptyState} onPress={() => setFoodModal(true)} activeOpacity={0.88}>
+                <MaterialCommunityIcons name="food-drumstick-outline" size={24} color={colors.primaryContainer} />
+                <Text style={styles.emptyStateText}>Add a favorite food</Text>
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -188,20 +221,21 @@ export default function PetProfileScreen({ navigation, route }) {
       <Modal visible={foodModal} transparent animationType="slide">
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
             <Text style={styles.modalTitle}>Add Favorite Food</Text>
             <TextInput
               style={styles.modalInput}
               placeholder="e.g. Salmon Kibble"
-              placeholderTextColor={colors.onSurfaceVariant}
+              placeholderTextColor={colors.outlineVariant}
               value={newFood}
               onChangeText={setNewFood}
               autoFocus
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => { setFoodModal(false); setNewFood(''); }}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => { setFoodModal(false); setNewFood(''); }} activeOpacity={0.88}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalAdd} onPress={handleAddFood}>
+              <TouchableOpacity style={styles.modalAdd} onPress={handleAddFood} activeOpacity={0.88}>
                 <Text style={styles.modalAddText}>Add</Text>
               </TouchableOpacity>
             </View>
@@ -213,19 +247,20 @@ export default function PetProfileScreen({ navigation, route }) {
       <Modal visible={activityModal} transparent animationType="slide">
         <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
             <Text style={styles.modalTitle}>Add Activity</Text>
             <TextInput
               style={styles.modalInput}
               placeholder="Activity name (e.g. Park Walk)"
-              placeholderTextColor={colors.onSurfaceVariant}
+              placeholderTextColor={colors.outlineVariant}
               value={newActivity.name}
               onChangeText={(v) => setNewActivity({ ...newActivity, name: v })}
               autoFocus
             />
             <TextInput
               style={[styles.modalInput, { marginTop: spacing.sm }]}
-              placeholder="Duration (minutes)"
-              placeholderTextColor={colors.onSurfaceVariant}
+              placeholder="Duration in minutes"
+              placeholderTextColor={colors.outlineVariant}
               value={newActivity.duration}
               onChangeText={(v) => setNewActivity({ ...newActivity, duration: v })}
               keyboardType="number-pad"
@@ -236,6 +271,7 @@ export default function PetProfileScreen({ navigation, route }) {
                   key={t}
                   style={[styles.timeChip, newActivity.timeOfDay === t && styles.timeChipActive]}
                   onPress={() => setNewActivity({ ...newActivity, timeOfDay: t })}
+                  activeOpacity={0.88}
                 >
                   <Text style={[styles.timeChipText, newActivity.timeOfDay === t && { color: colors.onPrimary }]}>
                     {t}
@@ -244,10 +280,10 @@ export default function PetProfileScreen({ navigation, route }) {
               ))}
             </View>
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancel} onPress={() => setActivityModal(false)}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setActivityModal(false)} activeOpacity={0.88}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalAdd} onPress={handleAddActivity}>
+              <TouchableOpacity style={styles.modalAdd} onPress={handleAddActivity} activeOpacity={0.88}>
                 <Text style={styles.modalAddText}>Add</Text>
               </TouchableOpacity>
             </View>
@@ -261,15 +297,18 @@ export default function PetProfileScreen({ navigation, route }) {
 function Pill({ icon, label }) {
   return (
     <View style={styles.pill}>
-      <MaterialCommunityIcons name={icon} size={13} color={colors.onSurfaceVariant} />
+      <MaterialCommunityIcons name={icon} size={12} color="rgba(101,62,0,0.7)" />
       <Text style={styles.pillText}>{label}</Text>
     </View>
   );
 }
 
-function HealthStat({ label, value }) {
+function HealthStat({ icon, label, value, color }) {
   return (
     <View style={styles.healthStat}>
+      <View style={[styles.healthStatIcon, { backgroundColor: `${color}18` }]}>
+        <MaterialCommunityIcons name={icon} size={14} color={color} />
+      </View>
       <Text style={styles.healthStatLabel}>{label}</Text>
       <Text style={styles.healthStatValue}>{value}</Text>
     </View>
@@ -277,20 +316,18 @@ function HealthStat({ label, value }) {
 }
 
 function ActivityRow({ activity }) {
-  const iconMap = { tree: 'tree', 'tennis-ball': 'tennis-ball', school: 'school', cat: 'cat', sleep: 'sleep', run: 'run', swimming: 'swimming', bike: 'bike', 'dog-side': 'dog-side', 'toy-brick': 'toy-brick' };
-  const icon = iconMap[activity.icon] || 'run';
   const bgColors = { morning: colors.primaryFixed, afternoon: colors.tertiaryFixed, evening: colors.surfaceVariant };
   const fgColors = { morning: colors.primaryContainer, afternoon: colors.tertiary, evening: colors.onSurfaceVariant };
+  const timeIcons = { morning: 'weather-sunny', afternoon: 'weather-partly-cloudy', evening: 'weather-night' };
   return (
     <View style={styles.actRow}>
       <View style={[styles.actIcon, { backgroundColor: bgColors[activity.timeOfDay] || colors.primaryFixed }]}>
-        <MaterialCommunityIcons name={icon} size={18} color={fgColors[activity.timeOfDay] || colors.primaryContainer} />
+        <MaterialCommunityIcons name={timeIcons[activity.timeOfDay] || 'run'} size={16} color={fgColors[activity.timeOfDay] || colors.primaryContainer} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.actName}>{activity.name}</Text>
-        <Text style={styles.actDetail}>{activity.duration} mins • {activity.timeOfDay}</Text>
+        <Text style={styles.actDetail}>{activity.duration} min · {activity.timeOfDay}</Text>
       </View>
-      <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
     </View>
   );
 }
@@ -299,132 +336,263 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingBottom: spacing.xl },
   empty: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  heroBand: { paddingBottom: 28 },
   topRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: spacing.margin, paddingTop: spacing.md, paddingBottom: spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.margin,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   backBtn: {
-    width: 40, height: 40, borderRadius: radii.full,
-    backgroundColor: colors.surfaceContainerLow, justifyContent: 'center', alignItems: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: radii.full,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   editBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
-    backgroundColor: colors.surfaceContainerLow,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radii.lg,
-  },
-  editBtnText: { ...typography.labelMd, color: colors.primaryContainer },
-  hero: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.surfaceContainerLowest,
-    marginHorizontal: spacing.margin, padding: spacing.md,
-    borderRadius: radii.xl, ...shadows.card, marginBottom: spacing.md,
-  },
-  heroAvatar: {
-    width: 90, height: 90, borderRadius: radii.full,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: colors.surfaceContainerHighest,
-  },
-  heroAvatarText: { ...typography.display, fontSize: 36, color: colors.primaryContainer },
-  genderBadge: {
-    position: 'absolute', bottom: 2, right: 2,
-    width: 24, height: 24, borderRadius: radii.full,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 2, borderColor: colors.surfaceContainerLowest,
-  },
-  heroInfo: { flex: 1 },
-  heroName: { ...typography.display, fontSize: 34, color: colors.onSurface, lineHeight: 40 },
-  heroBreed: { ...typography.bodyLg, color: colors.onSurfaceVariant, marginBottom: spacing.sm },
-  pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    backgroundColor: colors.surfaceContainerLow,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.4)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     borderRadius: radii.full,
   },
-  pillText: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  healthCard: {
-    backgroundColor: colors.secondaryContainer,
-    marginHorizontal: spacing.margin, padding: spacing.md,
-    borderRadius: radii.xl, marginBottom: spacing.md,
-    shadowColor: colors.secondary,
-    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 4,
+  editBtnText: { ...typography.labelMd, color: colors.primaryContainer },
+  heroContent: { alignItems: 'center', paddingBottom: spacing.sm },
+  heroAvatarWrap: { position: 'relative', marginBottom: spacing.sm },
+  heroAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.5)',
   },
-  healthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  healthTitle: { ...typography.titleLg, color: colors.onSecondary },
-  healthSub: { ...typography.labelSm, color: 'rgba(255,255,255,0.7)' },
+  heroAvatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 40, color: colors.primaryContainer },
+  genderBadge: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 26,
+    height: 26,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.8)',
+  },
+  heroName: { ...typography.headlineLg, color: colors.primaryContainer, fontSize: 28, letterSpacing: -0.3 },
+  heroBreed: { ...typography.bodyMd, color: 'rgba(101,62,0,0.65)', marginBottom: spacing.sm },
+  pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, justifyContent: 'center', paddingHorizontal: spacing.margin },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radii.full,
+  },
+  pillText: { ...typography.labelSm, color: colors.primaryContainer },
+  heroTail: { height: 28 },
+  heroTailCurve: {
+    height: 28,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
+  },
+  healthCard: {
+    backgroundColor: colors.surfaceContainerLowest,
+    marginHorizontal: spacing.margin,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    marginBottom: spacing.md,
+    ...shadows.medium,
+    borderWidth: 1,
+    borderColor: colors.secondaryFixed,
+  },
+  healthHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  healthTitle: { ...typography.titleLg, color: colors.onSurface, flex: 1 },
+  healthSub: { ...typography.labelSm, color: colors.onSurfaceVariant },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   healthStat: {
-    flex: 1, minWidth: '45%',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: radii.md, padding: spacing.sm,
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.lg,
+    padding: spacing.sm,
+    gap: 3,
   },
-  healthStatLabel: { ...typography.labelSm, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
-  healthStatValue: { ...typography.headlineMd, color: colors.onSecondary, fontSize: 18 },
+  healthStatIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  healthStatLabel: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'uppercase', letterSpacing: 0.4 },
+  healthStatValue: { ...typography.titleLg, color: colors.onSurface, fontSize: 16 },
   section: {
     backgroundColor: colors.surfaceContainerLowest,
-    marginHorizontal: spacing.margin, padding: spacing.md,
-    borderRadius: radii.xl, marginBottom: spacing.md, ...shadows.card,
+    marginHorizontal: spacing.margin,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    marginBottom: spacing.md,
+    ...shadows.card,
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerLow,
   },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  sectionTitle: { ...typography.titleLg, color: colors.onSurface },
-  seeAll: { ...typography.labelMd, color: colors.secondary },
-  vaxRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.surfaceContainerLow, padding: spacing.sm, borderRadius: radii.md,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  vaxName: { ...typography.labelMd, color: colors.onSurface, flex: 1 },
+  sectionTitle: { ...typography.titleLg, color: colors.onSurface },
+  addIconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: radii.full,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seeAll: { ...typography.labelMd, color: colors.secondary, fontSize: 13 },
+  vaxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceContainerLow,
+    padding: spacing.sm,
+    borderRadius: radii.lg,
+    marginBottom: spacing.sm,
+  },
+  vaxDot: { width: 36, height: 36, borderRadius: radii.full, justifyContent: 'center', alignItems: 'center' },
+  vaxName: { ...typography.labelMd, color: colors.onSurface },
   vaxDate: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  emptyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
   outlineBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing.xs, borderWidth: 1, borderColor: colors.tertiaryFixed,
-    paddingVertical: spacing.sm, borderRadius: radii.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    borderWidth: 1.5,
+    borderColor: colors.tertiaryFixed,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: 'rgba(0,76,106,0.04)',
   },
   outlineBtnText: { ...typography.labelMd, color: colors.tertiary },
-  emptyText: { ...typography.bodyMd, color: colors.onSurfaceVariant },
-  actRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    padding: spacing.sm, borderRadius: radii.md,
-    borderBottomWidth: 1, borderBottomColor: colors.surfaceContainerLow,
+  emptyText: { ...typography.bodyMd, color: colors.onSurfaceVariant, fontSize: 14 },
+  emptyState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.lg,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    borderStyle: 'dashed',
   },
-  actIcon: { width: 40, height: 40, borderRadius: radii.full, justifyContent: 'center', alignItems: 'center' },
+  emptyStateText: { ...typography.labelMd, color: colors.onSurfaceVariant },
+  actRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceContainerLow,
+  },
+  actIcon: { width: 38, height: 38, borderRadius: radii.full, justifyContent: 'center', alignItems: 'center' },
   actName: { ...typography.labelMd, color: colors.onSurface },
-  actDetail: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  actDetail: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'capitalize' },
   foodsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   foodChip: {
-    backgroundColor: colors.surfaceContainer, borderRadius: radii.full,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderWidth: 1, borderColor: colors.surfaceContainerHighest,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primaryFixed,
+    borderRadius: radii.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderWidth: 1,
+    borderColor: colors.primaryFixedDim,
   },
-  foodChipText: { ...typography.labelMd, color: colors.onSurface },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  foodChipText: { ...typography.labelMd, color: colors.primaryContainer, fontSize: 13 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   modalSheet: {
-    backgroundColor: colors.surfaceContainerLowest, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl,
-    padding: spacing.lg, paddingBottom: spacing.xl,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderTopLeftRadius: radii.xxl,
+    borderTopRightRadius: radii.xxl,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: radii.full,
+    backgroundColor: colors.outlineVariant,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
   },
   modalTitle: { ...typography.titleLg, color: colors.onSurface, marginBottom: spacing.md },
   modalInput: {
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.DEFAULT,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
-    borderWidth: 1, borderColor: colors.outlineVariant, ...typography.bodyMd, color: colors.onSurface,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    ...typography.bodyMd,
+    color: colors.onSurface,
+    minHeight: 50,
   },
   timeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
   timeChip: {
-    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.lg,
-    backgroundColor: colors.surfaceContainerLow, alignItems: 'center',
-    borderWidth: 1, borderColor: colors.outlineVariant,
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceContainerLow,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
   },
   timeChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   timeChipText: { ...typography.labelMd, color: colors.onSurfaceVariant, textTransform: 'capitalize' },
   modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   modalCancel: {
-    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.lg,
-    backgroundColor: colors.surfaceContainerHigh, alignItems: 'center',
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceContainerHigh,
+    alignItems: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
   },
   modalCancelText: { ...typography.labelMd, color: colors.onSurface },
   modalAdd: {
-    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.lg,
-    backgroundColor: colors.primary, alignItems: 'center',
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+    ...shadows.button,
   },
   modalAddText: { ...typography.labelMd, color: colors.onPrimary },
 });

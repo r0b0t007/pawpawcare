@@ -1,7 +1,7 @@
-import React, { useState } from 'react'; // useState used for draft post input
+import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, FlatList, KeyboardAvoidingView, Platform,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -22,6 +22,14 @@ function avatarColor(name) {
   return AVATAR_COLORS[i];
 }
 
+const GROUP_COLORS = [
+  { bg: '#ffddb8', accent: '#855300', icon: 'dog' },
+  { bg: '#c5e7ff', accent: '#004c6a', icon: 'cat' },
+  { bg: '#d8e2ff', accent: '#085ac0', icon: 'bird' },
+  { bg: '#b2f2d4', accent: '#1a6b3a', icon: 'rabbit' },
+  { bg: '#ffd6e7', accent: '#8b1a4a', icon: 'paw' },
+];
+
 export default function CommunityScreen() {
   const { user } = useAuth();
   const { posts, groups, togglePaw, addPost, toggleGroupMembership } = useData();
@@ -38,54 +46,71 @@ export default function CommunityScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Community</Text>
-          <Text style={styles.subtitle}>Connect with fellow pet owners</Text>
+          <View>
+            <Text style={styles.title}>Community</Text>
+            <Text style={styles.subtitle}>Connect with fellow pet owners</Text>
+          </View>
+          <View style={[styles.headerIcon, { backgroundColor: colors.primaryFixed }]}>
+            <MaterialCommunityIcons name="account-group-outline" size={22} color={colors.primaryContainer} />
+          </View>
         </View>
 
         {/* Join the Pack */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Join the Pack</Text>
-          <TouchableOpacity>
-            <Text style={styles.seeAll}>View all</Text>
-          </TouchableOpacity>
+          <Text style={styles.groupCount}>{groups.filter(g => g.isJoined).length}/{groups.length} joined</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupsRow}>
-          {groups.map((group) => (
-            <GroupCard key={group.id} group={group} onToggle={() => toggleGroupMembership(group.id)} />
+          {groups.map((group, idx) => (
+            <GroupCard key={group.id} group={group} palette={GROUP_COLORS[idx % GROUP_COLORS.length]} onToggle={() => toggleGroupMembership(group.id)} />
           ))}
         </ScrollView>
 
         {/* Create Post */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Share a Moment</Text>
+        </View>
         <View style={styles.createPost}>
           <View style={[styles.createAvatar, { backgroundColor: avatarColor(user?.name) }]}>
             <Text style={styles.createAvatarText}>{(user?.name || 'U')[0]}</Text>
           </View>
-          <TextInput
-            style={styles.createInput}
-            placeholder="Share a moment with your pet..."
-            placeholderTextColor={colors.onSurfaceVariant}
-            value={draft}
-            onChangeText={setDraft}
-            multiline
-          />
-          {draft.trim().length > 0 && (
-            <TouchableOpacity style={styles.sendBtn} onPress={handlePost}>
-              <MaterialCommunityIcons name="send" size={18} color={colors.onPrimary} />
-            </TouchableOpacity>
-          )}
+          <View style={{ flex: 1 }}>
+            <TextInput
+              style={styles.createInput}
+              placeholder="What's your pet up to?"
+              placeholderTextColor={colors.outlineVariant}
+              value={draft}
+              onChangeText={setDraft}
+              multiline
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.sendBtn, !draft.trim() && styles.sendBtnDisabled]}
+            onPress={handlePost}
+            disabled={!draft.trim()}
+            activeOpacity={0.88}
+          >
+            <MaterialCommunityIcons name="send" size={17} color={colors.onPrimary} />
+          </TouchableOpacity>
         </View>
 
         {/* Feed */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Feed</Text>
+          {posts.length > 0 && (
+            <Text style={styles.feedCount}>{posts.length} post{posts.length !== 1 ? 's' : ''}</Text>
+          )}
         </View>
         {posts.map((post) => (
           <PostCard key={post.id} post={post} userId={user?.id} onPaw={() => togglePaw(post.id)} />
         ))}
         {posts.length === 0 && (
           <View style={styles.empty}>
-            <MaterialCommunityIcons name="forum-outline" size={40} color={colors.outline} />
-            <Text style={styles.emptyText}>No posts yet. Be the first!</Text>
+            <View style={styles.emptyIllustration}>
+              <MaterialCommunityIcons name="forum-outline" size={36} color={colors.primaryContainer} />
+            </View>
+            <Text style={styles.emptyTitle}>No posts yet</Text>
+            <Text style={styles.emptyText}>Be the first to share a moment with your pet!</Text>
           </View>
         )}
       </ScrollView>
@@ -93,29 +118,31 @@ export default function CommunityScreen() {
   );
 }
 
-function GroupCard({ group, onToggle }) {
-  const groupColors = ['#ffddb8', '#c5e7ff', '#d8e2ff'];
-  const bg = groupColors[group.id.charCodeAt(1) % groupColors.length] || '#ffddb8';
+function GroupCard({ group, palette, onToggle }) {
   const joined = group.isJoined;
-
   return (
-    <View style={[styles.groupCard, { borderTopWidth: 3, borderTopColor: '#855300' }]}>
-      <View style={[styles.groupBanner, { backgroundColor: bg }]}>
-        <MaterialCommunityIcons name="paw" size={28} color={colors.primaryContainer} />
+    <View style={styles.groupCard}>
+      <View style={[styles.groupBanner, { backgroundColor: palette.bg }]}>
+        <MaterialCommunityIcons name={palette.icon} size={30} color={palette.accent} />
       </View>
       <View style={styles.groupInfo}>
         <Text style={styles.groupName} numberOfLines={2}>{group.name}</Text>
         <View style={styles.groupMeta}>
-          <MaterialCommunityIcons name="account-group-outline" size={12} color={colors.onSurfaceVariant} />
+          <MaterialCommunityIcons name="account-multiple-outline" size={12} color={colors.onSurfaceVariant} />
           <Text style={styles.groupMetaText}>{group.members} members</Text>
         </View>
       </View>
       <TouchableOpacity
         style={[styles.joinBtn, joined && styles.joinBtnActive]}
         onPress={onToggle}
+        activeOpacity={0.88}
       >
+        {joined
+          ? <MaterialCommunityIcons name="check" size={14} color={colors.primaryContainer} />
+          : null
+        }
         <Text style={[styles.joinBtnText, joined && styles.joinBtnTextActive]}>
-          {joined ? 'Joined ✓' : 'Join Group'}
+          {joined ? 'Joined' : 'Join'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -136,28 +163,28 @@ function PostCard({ post, userId, onPaw }) {
           <Text style={styles.postAuthor}>{post.authorName}</Text>
           <Text style={styles.postTime}>{timeAgo(post.createdAt)}</Text>
         </View>
-        <TouchableOpacity style={styles.moreBtn}>
+        <TouchableOpacity style={styles.moreBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <MaterialCommunityIcons name="dots-horizontal" size={20} color={colors.onSurfaceVariant} />
         </TouchableOpacity>
       </View>
       <Text style={styles.postContent}>{post.content}</Text>
       <View style={styles.postDivider} />
       <View style={styles.postActions}>
-        <TouchableOpacity style={styles.actionBtn} onPress={onPaw}>
+        <TouchableOpacity style={styles.actionBtn} onPress={onPaw} activeOpacity={0.85}>
           <MaterialCommunityIcons
             name={hasPawed ? 'paw' : 'paw-outline'}
             size={18}
             color={hasPawed ? colors.primaryContainer : colors.onSurfaceVariant}
           />
           <Text style={[styles.actionText, hasPawed && { color: colors.primaryContainer }]}>
-            {post.paws} Paws
+            {post.paws} {post.paws === 1 ? 'Paw' : 'Paws'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn}>
+        <TouchableOpacity style={styles.actionBtn} activeOpacity={0.85}>
           <MaterialCommunityIcons name="comment-outline" size={18} color={colors.onSurfaceVariant} />
-          <Text style={styles.actionText}>{post.comments} Comments</Text>
+          <Text style={styles.actionText}>{post.comments}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { marginLeft: 'auto' }]}>
+        <TouchableOpacity style={[styles.actionBtn, { marginLeft: 'auto' }]} activeOpacity={0.85}>
           <MaterialCommunityIcons name="share-outline" size={18} color={colors.onSurfaceVariant} />
         </TouchableOpacity>
       </View>
@@ -168,64 +195,126 @@ function PostCard({ post, userId, onPaw }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   scroll: { paddingBottom: spacing.xl },
-  header: { paddingHorizontal: spacing.margin, paddingTop: spacing.md, paddingBottom: spacing.sm },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.margin,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
   title: { ...typography.headlineMd, color: colors.onBackground },
   subtitle: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  headerIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: radii.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   sectionHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: spacing.margin, marginBottom: spacing.sm, marginTop: spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.margin,
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
   },
   sectionTitle: { ...typography.titleLg, color: colors.onBackground },
-  seeAll: { ...typography.labelMd, color: colors.secondary },
+  groupCount: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  feedCount: { ...typography.labelSm, color: colors.onSurfaceVariant },
   groupsRow: { paddingHorizontal: spacing.margin, gap: spacing.sm, paddingBottom: spacing.sm },
   groupCard: {
-    width: 160, backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii.xl, overflow: 'hidden', ...shadows.card,
+    width: 158,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: radii.xl,
+    overflow: 'hidden',
+    ...shadows.card,
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerLow,
   },
   groupBanner: {
-    height: 70, justifyContent: 'center', alignItems: 'center',
+    height: 76,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  groupInfo: { padding: spacing.sm, gap: spacing.xs, flex: 1 },
-  groupName: { ...typography.labelMd, color: colors.onSurface },
-  groupMeta: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  groupInfo: { padding: spacing.sm, gap: spacing.xs },
+  groupName: { ...typography.labelMd, color: colors.onSurface, lineHeight: 18 },
+  groupMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   groupMetaText: { ...typography.labelSm, color: colors.onSurfaceVariant },
   joinBtn: {
-    marginHorizontal: spacing.sm, marginBottom: spacing.sm, paddingVertical: spacing.xs,
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.lg, alignItems: 'center',
-    borderWidth: 1, borderColor: colors.outlineVariant,
+    marginHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.lg,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
   },
-  joinBtnActive: { backgroundColor: colors.primaryFixed, borderColor: colors.primaryFixed },
-  joinBtnText: { ...typography.labelMd, color: colors.primaryContainer },
+  joinBtnActive: { backgroundColor: colors.primaryFixed, borderColor: colors.primaryFixedDim },
+  joinBtnText: { ...typography.labelMd, color: colors.primaryContainer, fontSize: 13 },
   joinBtnTextActive: { color: colors.primaryContainer },
   createPost: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
     backgroundColor: colors.surfaceContainerLowest,
-    marginHorizontal: spacing.margin, padding: spacing.md,
-    borderRadius: radii.xl, ...shadows.card,
-    borderWidth: 1, borderColor: colors.surfaceVariant,
+    marginHorizontal: spacing.margin,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    ...shadows.card,
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerLow,
   },
-  createAvatar: { width: 40, height: 40, borderRadius: radii.full, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  createAvatarText: { ...typography.titleLg, color: colors.primaryContainer },
-  createInput: {
-    flex: 1, ...typography.bodyMd, color: colors.onSurface,
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.DEFAULT,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
-    maxHeight: 100,
-  },
-  sendBtn: {
-    width: 36, height: 36, borderRadius: radii.full,
-    backgroundColor: colors.primaryContainer, justifyContent: 'center', alignItems: 'center',
+  createAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
     flexShrink: 0,
   },
+  createAvatarText: { ...typography.titleLg, color: colors.primaryContainer, fontSize: 16 },
+  createInput: {
+    ...typography.bodyMd,
+    color: colors.onSurface,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    minHeight: 44,
+    maxHeight: 100,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.full,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+    ...shadows.button,
+  },
+  sendBtnDisabled: { backgroundColor: colors.surfaceContainerHigh, shadowOpacity: 0, elevation: 0 },
   postCard: {
     backgroundColor: colors.surfaceContainerLowest,
-    marginHorizontal: spacing.margin, padding: spacing.md,
-    borderRadius: radii.xl, marginBottom: spacing.sm, ...shadows.card,
-    borderWidth: 1, borderColor: colors.surfaceVariant,
+    marginHorizontal: spacing.margin,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    marginBottom: spacing.sm,
+    ...shadows.card,
+    borderWidth: 1,
+    borderColor: colors.surfaceContainerLow,
   },
   postHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
   postAvatar: { width: 44, height: 44, borderRadius: radii.full, justifyContent: 'center', alignItems: 'center' },
-  postAvatarText: { ...typography.titleLg, color: colors.primaryContainer },
+  postAvatarText: { ...typography.titleLg, color: colors.primaryContainer, fontSize: 16 },
   postAuthor: { ...typography.labelMd, color: colors.onSurface },
   postTime: { ...typography.labelSm, color: colors.onSurfaceVariant },
   moreBtn: { padding: spacing.xs },
@@ -233,7 +322,17 @@ const styles = StyleSheet.create({
   postDivider: { height: 1, backgroundColor: colors.surfaceContainerHighest, marginBottom: spacing.sm },
   postActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  actionText: { ...typography.labelMd, color: colors.onSurfaceVariant },
+  actionText: { ...typography.labelMd, color: colors.onSurfaceVariant, fontSize: 13 },
   empty: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
-  emptyText: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  emptyIllustration: {
+    width: 80,
+    height: 80,
+    borderRadius: radii.full,
+    backgroundColor: colors.primaryFixed,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  emptyTitle: { ...typography.titleLg, color: colors.onBackground },
+  emptyText: { ...typography.bodyMd, color: colors.onSurfaceVariant, textAlign: 'center', fontSize: 14 },
 });

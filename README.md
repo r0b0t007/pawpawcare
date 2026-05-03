@@ -68,9 +68,14 @@ cp .env.example .env
 
 # Start the API server
 python run_dev.py
-# → Running at http://localhost:8000
+# → Running at http://0.0.0.0:8000
 # → Docs at  http://localhost:8000/docs
 ```
+
+> **Windows firewall:** If other devices need to reach the backend, allow port 8000 in an Admin PowerShell:
+> ```powershell
+> New-NetFirewallRule -DisplayName "PawPawCare Backend" -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow
+> ```
 
 ### 2. Frontend
 
@@ -80,17 +85,42 @@ cd frontend
 # Install dependencies
 npm install
 
-# Set the backend URL for your device
-# Edit src/config.js:
-#   Android emulator → http://10.0.2.2:8000
-#   iOS simulator    → http://localhost:8000
-#   Physical device  → http://<your-LAN-IP>:8000
-#   Find your LAN IP: run `ipconfig` (Windows) or `ifconfig` (Mac/Linux)
-
 # Start Expo
 npx expo start
 # → Scan the QR code with Expo Go on your phone
 ```
+
+### 3. Connecting a physical Android/iOS device
+
+Android 9+ blocks plain HTTP (`http://`) in apps. You must expose the backend over **HTTPS** using a tunnel.
+
+**Step 1 — expose the backend via HTTPS tunnel** (in a separate terminal, while backend is running):
+
+```bash
+npx localtunnel --port 8000
+# → your url is: https://some-name.loca.lt
+```
+
+**Step 2 — update `frontend/src/config.js`** with the tunnel URL:
+
+```js
+export const API_URL = 'https://some-name.loca.lt';
+```
+
+**Step 3 — unblock the tunnel on your phone:** open `https://some-name.loca.lt` in your phone's browser once. If a "tunnel reminder" page appears, click **"Click to Continue"**. This whitelists your device IP for the session.
+
+**Step 4 — reload the app** — press `r` in the Expo terminal.
+
+> **Note:** The tunnel URL changes every time you restart `localtunnel`. Update `config.js` each session.
+> `config.js` is gitignored — no risk of accidentally committing a stale URL.
+
+#### Other environments
+
+| Target | `API_URL` value |
+|---|---|
+| Android emulator | `http://10.0.2.2:8000` |
+| iOS simulator | `http://localhost:8000` |
+| Physical device | HTTPS tunnel (see above) |
 
 ---
 
@@ -105,7 +135,7 @@ npx expo start
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token lifetime |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `30` | Refresh token lifetime |
 
-To use PostgreSQL instead of SQLite, change `DATABASE_URL` to:
+To use PostgreSQL instead of SQLite, set:
 ```
 DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/pawpawcare
 ```
@@ -114,7 +144,7 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/pawpawcare
 
 | Variable | Description |
 |---|---|
-| `API_URL` | Base URL of the running backend |
+| `API_URL` | Base URL of the running backend (see table above) |
 
 ---
 

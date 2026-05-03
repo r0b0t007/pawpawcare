@@ -46,6 +46,11 @@ export const colors = {
   errorContainer: '#ffdad6',
   onErrorContainer: '#93000a',
   deepCharcoal: '#151c27',
+  // Status colors
+  dueSoonBg: '#fff3d0',
+  dueSoonFg: '#7a5c00',
+  successBg: '#d3f2e0',
+  successFg: '#1a6b3a',
 };
 
 export const typography = {
@@ -100,41 +105,56 @@ export const spacing = {
   sm: 12,
   gutter: 16,
   md: 24,
-  margin: 24,
+  margin: 20,
   lg: 40,
   xl: 64,
 };
 
 export const radii = {
-  sm: 4,
-  DEFAULT: 8,
-  md: 12,
-  lg: 16,
+  sm: 6,
+  DEFAULT: 10,
+  md: 14,
+  lg: 18,
   xl: 24,
+  xxl: 32,
   full: 9999,
 };
 
 export const shadows = {
   card: {
-    shadowColor: '#855300',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 15,
+    shadowColor: '#5a3500',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
     elevation: 3,
   },
+  medium: {
+    shadowColor: '#5a3500',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 5,
+  },
   strong: {
-    shadowColor: '#855300',
+    shadowColor: '#5a3500',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 6,
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    elevation: 8,
   },
   nav: {
-    shadowColor: '#855300',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowColor: '#5a3500',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  button: {
+    shadowColor: '#5a3500',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 6,
   },
 };
 
