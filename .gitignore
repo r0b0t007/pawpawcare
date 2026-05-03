@@ -3,8 +3,6 @@ frontend/node_modules/
 frontend/.expo/
 frontend/dist/
 frontend/web-build/
-frontend/src/config.js
-
 # Backend
 backend/__pycache__/
 backend/*.pyc
@@ -26,6 +24,7 @@ frontend/google-service-account.json
 # Environment variables
 .env
 .env.local
+frontend/.env.local
 backend/.env
 
 # AI editor / assistant tool directories (personal, not team config)
