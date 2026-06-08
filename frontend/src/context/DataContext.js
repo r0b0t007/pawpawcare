@@ -53,7 +53,20 @@ const toAct = (a) => ({
 
 const toFood = (f) => ({ id: f.id, name: f.name });
 
-const toPet = (apiPet, vaccinations = [], activities = [], foods = [], index = 0) => ({
+const toMed = (m) => ({
+  id: m.id,
+  name: m.name,
+  dosage: m.dosage || null,
+  frequency: m.frequency || 'daily',
+  times: Array.isArray(m.times) ? m.times : [],
+  startDate: m.start_date || null,
+  endDate: m.end_date || null,
+  notes: m.notes || null,
+  active: m.active !== false,
+  lastAdministeredAt: m.last_administered_at || null,
+});
+
+const toPet = (apiPet, vaccinations = [], activities = [], foods = [], medications = [], index = 0) => ({
   id: apiPet.id,
   ownerId: apiPet.owner_id,
   name: apiPet.name,
@@ -69,6 +82,7 @@ const toPet = (apiPet, vaccinations = [], activities = [], foods = [], index = 0
   vaccinations: vaccinations.map(toVax),
   activities: activities.map(toAct),
   favoriteFoods: foods.map(toFood),
+  medications: medications.map(toMed),
   healthStats: {
     heartRate: apiPet.heart_rate || 0,
     weightStatus: apiPet.weight ? 'Ideal' : 'Unknown',
@@ -156,12 +170,13 @@ export function DataProvider({ children }) {
       // Load each pet's sub-resources in parallel
       const petsWithData = await Promise.all(
         apiPets.map(async (apiPet, i) => {
-          const [vax, acts, foods] = await Promise.all([
+          const [vax, acts, foods, meds] = await Promise.all([
             get(`/pets/${apiPet.id}/vaccinations`),
             get(`/pets/${apiPet.id}/activities`),
             get(`/pets/${apiPet.id}/foods`),
+            get(`/pets/${apiPet.id}/medications`),
           ]);
-          return toPet(apiPet, vax, acts, foods, i);
+          return toPet(apiPet, vax, acts, foods, meds, i);
         })
       );
 
@@ -253,7 +268,7 @@ export function DataProvider({ children }) {
         microchipped: petData.microchipped || false,
         color: PET_COLORS[state.pets.length % PET_COLORS.length],
       });
-      const newPet = toPet(apiPet, [], [], [], state.pets.length);
+      const newPet = toPet(apiPet, [], [], [], [], state.pets.length);
       dispatch({ type: 'ADD_PET', payload: newPet });
       return newPet;
     } catch (err) {
@@ -278,7 +293,10 @@ export function DataProvider({ children }) {
       if (Object.keys(apiUpdate).length > 0) {
         const updated = await patch(`/pets/${petId}`, apiUpdate);
         const existing = state.pets.find((p) => p.id === petId);
-        dispatch({ type: 'UPDATE_PET', payload: { ...existing, ...toPet(updated, existing.vaccinations.map(v => ({ ...v, due_date: v.dueDate })), existing.activities, existing.favoriteFoods) } });
+        const merged = { ...existing, ...toPet(updated, existing.vaccinations.map(v => ({ ...v, due_date: v.dueDate })), existing.activities, existing.favoriteFoods) };
+        // Preserve sub-resources that toPet would otherwise re-map from frontend shape.
+        merged.medications = existing.medications || [];
+        dispatch({ type: 'UPDATE_PET', payload: merged });
       }
     } catch (err) {
       handleApiError(err);
@@ -374,6 +392,68 @@ export function DataProvider({ children }) {
     }
   };
 
+  // ── Medications ──
+
+  const addMedication = async (petId, med) => {
+    try {
+      const apiMed = await post(`/pets/${petId}/medications`, {
+        name: med.name,
+        dosage: med.dosage || null,
+        frequency: med.frequency || 'daily',
+        times: med.times && med.times.length ? med.times : ['09:00'],
+        notes: med.notes || null,
+      });
+      const newMed = toMed(apiMed);
+      const pet = state.pets.find((p) => p.id === petId);
+      dispatch({ type: 'UPDATE_PET', payload: { ...pet, medications: [...(pet.medications || []), newMed] } });
+      refreshReminders(); // a medication schedules dose reminders
+      return newMed;
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  const updateMedication = async (petId, medId, updates) => {
+    try {
+      const apiMed = await patch(`/pets/${petId}/medications/${medId}`, updates);
+      const updated = toMed(apiMed);
+      const pet = state.pets.find((p) => p.id === petId);
+      dispatch({ type: 'UPDATE_PET', payload: { ...pet, medications: (pet.medications || []).map((m) => (m.id === medId ? updated : m)) } });
+      refreshReminders();
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  const deleteMedication = async (petId, medId) => {
+    try {
+      await del(`/pets/${petId}/medications/${medId}`);
+      const pet = state.pets.find((p) => p.id === petId);
+      dispatch({ type: 'UPDATE_PET', payload: { ...pet, medications: (pet.medications || []).filter((m) => m.id !== medId) } });
+      refreshReminders();
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  const logMedicationDose = async (petId, medId) => {
+    try {
+      const log = await post(`/pets/${petId}/medications/${medId}/log`, {});
+      const pet = state.pets.find((p) => p.id === petId);
+      dispatch({
+        type: 'UPDATE_PET',
+        payload: {
+          ...pet,
+          medications: (pet.medications || []).map((m) =>
+            m.id === medId ? { ...m, lastAdministeredAt: log?.administered_at || new Date().toISOString() } : m
+          ),
+        },
+      });
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
   // ── Community ──
 
   const addPost = async (content) => {
@@ -421,6 +501,10 @@ export function DataProvider({ children }) {
         addFavoriteFood,
         removeFavoriteFood,
         addActivity,
+        addMedication,
+        updateMedication,
+        deleteMedication,
+        logMedicationDose,
         addPost,
         togglePaw,
         toggleGroupMembership,
