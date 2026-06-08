@@ -115,6 +115,23 @@ const toGroup = (g) => ({
   isJoined: g.is_member,
 });
 
+const toLostPet = (r) => ({
+  id: r.id,
+  petId: r.pet_id,
+  petName: r.pet_name || 'A pet',
+  petType: r.pet_type,
+  petColor: r.pet_color,
+  status: r.status,
+  reporterName: r.reporter_name,
+  reportedBy: r.reported_by,
+  lastSeenLocation: r.last_seen_location,
+  lastSeenAt: r.last_seen_at,
+  description: r.description,
+  contactPhone: r.contact_phone,
+  photoUrl: r.photo_url,
+  createdAt: r.created_at,
+});
+
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
 function dataReducer(state, action) {
@@ -130,6 +147,8 @@ function dataReducer(state, action) {
     case 'UPDATE_GROUP': return { ...state, groups: state.groups.map((g) => (g.id === action.payload.id ? action.payload : g)) };
     case 'SET_REMINDERS':     return { ...state, reminders: action.payload };
     case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload.notifications || [], unreadCount: action.payload.unread_count || 0 };
+    case 'SET_LOST_PETS':     return { ...state, lostPets: action.payload };
+    case 'SET_MY_REPORTS':    return { ...state, myReports: action.payload };
     default:           return state;
   }
 }
@@ -139,6 +158,7 @@ function dataReducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
+    lostPets: [], myReports: [],
   });
   const { user, logout } = useAuth();
 
@@ -150,6 +170,8 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_POSTS', payload: [] });
       dispatch({ type: 'SET_REMINDERS', payload: [] });
       dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: [], unread_count: 0 } });
+      dispatch({ type: 'SET_LOST_PETS', payload: [] });
+      dispatch({ type: 'SET_MY_REPORTS', payload: [] });
     }
   }, [user?.id]);
 
@@ -159,12 +181,13 @@ export function DataProvider({ children }) {
 
   const loadData = async () => {
     try {
-      const [apiPets, apiPosts, apiGroups, apiReminders, apiNotifications] = await Promise.all([
+      const [apiPets, apiPosts, apiGroups, apiReminders, apiNotifications, apiMyReports] = await Promise.all([
         get('/pets'),
         get('/community/posts'),
         get('/community/groups'),
         get('/reminders'),
         get('/notifications'),
+        get('/lost-pets/mine'),
       ]);
 
       // Load each pet's sub-resources in parallel
@@ -185,6 +208,7 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_GROUPS', payload: apiGroups.map(toGroup) });
       dispatch({ type: 'SET_REMINDERS', payload: apiReminders });
       dispatch({ type: 'SET_NOTIFICATIONS', payload: apiNotifications });
+      dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
 
       // Mirror server reminders onto on-device local notifications (primary delivery).
       scheduleLocalReminders(apiReminders);
@@ -454,6 +478,42 @@ export function DataProvider({ children }) {
     }
   };
 
+  // ── Lost pets ──
+
+  const refreshPosts = async () => {
+    try {
+      const apiPosts = await get('/community/posts');
+      dispatch({ type: 'SET_POSTS', payload: apiPosts.map(toPost) });
+    } catch (err) { handleApiError(err); }
+  };
+
+  const refreshLostPets = async () => {
+    try {
+      const [board, mine] = await Promise.all([get('/lost-pets'), get('/lost-pets/mine')]);
+      dispatch({ type: 'SET_LOST_PETS', payload: board.map(toLostPet) });
+      dispatch({ type: 'SET_MY_REPORTS', payload: mine.map(toLostPet) });
+    } catch (err) { handleApiError(err); }
+  };
+
+  const reportPetLost = async (petId, details) => {
+    try {
+      await post(`/pets/${petId}/lost-report`, {
+        last_seen_location: details.lastSeenLocation || null,
+        description: details.description || null,
+        contact_phone: details.contactPhone || null,
+      });
+      // Refresh the board/reports and the feed (the broadcast post) — not all pets.
+      await Promise.all([refreshLostPets(), refreshPosts()]);
+    } catch (err) { handleApiError(err); }
+  };
+
+  const resolveLostPet = async (reportId, note) => {
+    try {
+      await patch(`/lost-pets/${reportId}/resolve`, { resolution_note: note || null });
+      await Promise.all([refreshLostPets(), refreshPosts()]);
+    } catch (err) { handleApiError(err); }
+  };
+
   // ── Community ──
 
   const addPost = async (content) => {
@@ -492,6 +552,8 @@ export function DataProvider({ children }) {
         reminders: state.reminders,
         notifications: state.notifications,
         unreadCount: state.unreadCount,
+        lostPets: state.lostPets,
+        myReports: state.myReports,
         addPet,
         updatePet,
         deletePet,
@@ -505,6 +567,9 @@ export function DataProvider({ children }) {
         updateMedication,
         deleteMedication,
         logMedicationDose,
+        refreshLostPets,
+        reportPetLost,
+        resolveLostPet,
         addPost,
         togglePaw,
         toggleGroupMembership,

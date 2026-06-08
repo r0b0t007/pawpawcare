@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\LostPetController;
 use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PetController;
@@ -56,6 +57,12 @@ Route::middleware('auth.jwt')->group(function () {
     // Favorite foods
     Route::get('/pets/{pet}/foods', [PetController::class, 'listFoods']);
     Route::post('/pets/{pet}/foods', [PetController::class, 'addFood']);
+
+    // Lost pets (community alerts)
+    Route::get('/lost-pets', [LostPetController::class, 'index']);
+    Route::get('/lost-pets/mine', [LostPetController::class, 'mine']);
+    Route::post('/pets/{pet}/lost-report', [LostPetController::class, 'report'])->middleware('throttle:10,1');
+    Route::patch('/lost-pets/{report}/resolve', [LostPetController::class, 'resolve']);
     Route::delete('/pets/{pet}/foods/{food}', [PetController::class, 'deleteFood']);
 
     // Community

@@ -30,9 +30,9 @@ const GROUP_COLORS = [
   { bg: '#ffd6e7', accent: '#8b1a4a', icon: 'paw' },
 ];
 
-export default function CommunityScreen() {
+export default function CommunityScreen({ navigation }) {
   const { user } = useAuth();
-  const { posts, groups, togglePaw, addPost, toggleGroupMembership } = useData();
+  const { posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets } = useData();
   const [draft, setDraft] = useState('');
 
   const handlePost = async () => {
@@ -54,6 +54,26 @@ export default function CommunityScreen() {
             <MaterialCommunityIcons name="account-group-outline" size={22} color={colors.primaryContainer} />
           </View>
         </View>
+
+        {/* Lost Pets board entry */}
+        <TouchableOpacity
+          style={styles.lostBanner}
+          activeOpacity={0.9}
+          onPress={() => navigation.navigate('LostPets')}
+        >
+          <View style={styles.lostBannerIcon}>
+            <MaterialCommunityIcons name="map-marker-alert-outline" size={22} color={colors.onErrorContainer} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.lostBannerTitle}>Lost Pets Board</Text>
+            <Text style={styles.lostBannerSub}>
+              {lostPets && lostPets.length > 0
+                ? `${lostPets.length} pet${lostPets.length > 1 ? 's' : ''} missing nearby — help reunite them`
+                : 'Report a missing pet or help reunite one'}
+            </Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={22} color={colors.onErrorContainer} />
+        </TouchableOpacity>
 
         {/* Join the Pack */}
         <View style={styles.sectionHeader}>
@@ -212,6 +232,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  lostBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.margin,
+    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radii.xl,
+    backgroundColor: '#fff1f0',
+    borderWidth: 1,
+    borderColor: colors.errorContainer,
+  },
+  lostBannerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.full,
+    backgroundColor: colors.errorContainer,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lostBannerTitle: { ...typography.labelMd, color: colors.onSurface },
+  lostBannerSub: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 1 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
