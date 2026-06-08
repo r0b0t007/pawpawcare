@@ -1,11 +1,12 @@
 import React from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { resolveAsset } from '../../config';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 function getGreeting() {
@@ -97,7 +98,11 @@ export default function DashboardScreen({ navigation }) {
               activeOpacity={0.88}
             >
               <View style={[styles.petAvatar, { backgroundColor: pet.color || colors.primaryFixed }]}>
-                <Text style={styles.petAvatarText}>{pet.name[0]}</Text>
+                {pet.avatarUrl ? (
+                  <Image source={{ uri: resolveAsset(pet.avatarUrl) }} style={styles.petAvatarImg} />
+                ) : (
+                  <Text style={styles.petAvatarText}>{pet.name[0]}</Text>
+                )}
               </View>
               <Text style={styles.petName} numberOfLines={1}>{pet.name}</Text>
               <Text style={styles.petBreed} numberOfLines={1}>{pet.type}</Text>
@@ -338,7 +343,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.xs,
+    overflow: 'hidden',
   },
+  petAvatarImg: { width: '100%', height: '100%' },
   petAvatarText: { ...typography.headlineMd, color: colors.primaryContainer, fontSize: 22 },
   petName: { ...typography.labelMd, color: colors.onSurface, fontSize: 12 },
   petBreed: { ...typography.labelSm, color: colors.onSurfaceVariant, textAlign: 'center', textTransform: 'capitalize' },

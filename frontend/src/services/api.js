@@ -117,3 +117,32 @@ export const get  = (path, opts) => request('GET',    path, undefined, opts);
 export const post = (path, body, opts) => request('POST',   path, body, opts);
 export const patch = (path, body, opts) => request('PATCH',  path, body, opts);
 export const del  = (path, opts) => request('DELETE', path, undefined, opts);
+
+// ── Image upload (multipart) ──────────────────────────────────────────────────
+
+export async function uploadImage(localUri) {
+  const { access } = await getTokens();
+  const name = (localUri.split('/').pop() || 'photo.jpg').split('?')[0];
+  const ext = (/\.(\w+)$/.exec(name)?.[1] || 'jpg').toLowerCase();
+  const type = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const form = new FormData();
+  form.append('file', { uri: localUri, name, type });
+
+  const res = await fetch(`${API_URL}/uploads`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'bypass-tunnel-reminder': 'true',
+      ...(access ? { Authorization: `Bearer ${access}` } : {}),
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.detail || `Image upload failed (${res.status})`);
+  }
+  const data = await res.json();
+  return data.url; // relative /storage/... path, resolved client-side
+}

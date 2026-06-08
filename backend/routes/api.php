@@ -9,6 +9,7 @@ use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PetController;
 use App\Http\Controllers\ReminderController;
+use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +26,9 @@ Route::middleware('throttle:20,1')->group(function () {
 
 // ── Authenticated ───────────────────────────────────────────────────────────
 Route::middleware('auth.jwt')->group(function () {
+    // Uploads (images)
+    Route::post('/uploads', [UploadController::class, 'store'])->middleware('throttle:30,1');
+
     // Users
     Route::get('/users/me', [UserController::class, 'me']);
     Route::patch('/users/me', [UserController::class, 'update']);

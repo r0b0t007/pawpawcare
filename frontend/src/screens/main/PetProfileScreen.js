@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Modal, Alert, KeyboardAvoidingView, Platform,
+  TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { resolveAsset } from '../../config';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 export default function PetProfileScreen({ navigation, route }) {
@@ -115,7 +116,11 @@ export default function PetProfileScreen({ navigation, route }) {
           <View style={styles.heroContent}>
             <View style={styles.heroAvatarWrap}>
               <View style={[styles.heroAvatar, { backgroundColor: 'rgba(255,255,255,0.35)' }]}>
-                <Text style={styles.heroAvatarText}>{pet.name[0]}</Text>
+                {pet.avatarUrl ? (
+                  <Image source={{ uri: resolveAsset(pet.avatarUrl) }} style={styles.heroAvatarImg} />
+                ) : (
+                  <Text style={styles.heroAvatarText}>{pet.name[0]}</Text>
+                )}
               </View>
               {pet.gender && (
                 <View style={[styles.genderBadge, { backgroundColor: pet.gender === 'female' ? '#fce4ec' : '#e3f2fd' }]}>
@@ -606,7 +611,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 4,
     borderColor: 'rgba(255,255,255,0.5)',
+    overflow: 'hidden',
   },
+  heroAvatarImg: { width: '100%', height: '100%' },
   heroAvatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 40, color: colors.primaryContainer },
   genderBadge: {
     position: 'absolute',
