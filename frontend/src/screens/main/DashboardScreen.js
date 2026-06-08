@@ -24,11 +24,13 @@ function timeAgo(iso) {
 
 export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
-  const { pets, posts } = useData();
+  const { pets, posts, unreadCount } = useData();
 
   const upcomingVax = pets.flatMap((p) =>
     (p.vaccinations || []).filter((v) => v.status === 'upcoming' || v.status === 'due_soon' || v.status === 'overdue')
   );
+
+  const bellCount = unreadCount || upcomingVax.length;
 
   const firstName = user?.name?.split(' ')[0] || 'Friend';
 
@@ -40,11 +42,15 @@ export default function DashboardScreen({ navigation }) {
           <Text style={styles.greeting}>{getGreeting()},</Text>
           <Text style={styles.name}>{firstName}</Text>
         </View>
-        <TouchableOpacity style={styles.bell} activeOpacity={0.88}>
+        <TouchableOpacity
+          style={styles.bell}
+          activeOpacity={0.88}
+          onPress={() => navigation.navigate('Notifications')}
+        >
           <MaterialCommunityIcons name="bell-outline" size={22} color={colors.primaryContainer} />
-          {upcomingVax.length > 0 && (
+          {bellCount > 0 && (
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>{Math.min(upcomingVax.length, 9)}</Text>
+              <Text style={styles.badgeText}>{Math.min(bellCount, 9)}</Text>
             </View>
           )}
         </TouchableOpacity>

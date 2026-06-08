@@ -1,0 +1,40 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class UserController extends Controller
+{
+    public function me(Request $request): JsonResponse
+    {
+        return response()->json($request->user()->toApi());
+    }
+
+    public function update(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'sometimes|string|min:1|max:100',
+            'bio' => 'sometimes|nullable|string',
+            'avatar_url' => 'sometimes|nullable|string',
+            'timezone' => 'sometimes|nullable|string|max:64',
+        ]);
+
+        $user = $request->user();
+
+        // Mirror the previous backend: only apply provided, non-null fields.
+        foreach (['name', 'bio', 'avatar_url'] as $field) {
+            if (array_key_exists($field, $data) && $data[$field] !== null) {
+                $user->{$field} = $data[$field];
+            }
+        }
+        // Timezone is validated against the IANA list before applying.
+        if (! empty($data['timezone']) && in_array($data['timezone'], timezone_identifiers_list(), true)) {
+            $user->timezone = $data['timezone'];
+        }
+        $user->save();
+
+        return response()->json($user->toApi());
+    }
+}

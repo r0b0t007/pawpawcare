@@ -17,6 +17,8 @@ import AddPetScreen from '../screens/main/AddPetScreen';
 import VaccinationTrackerScreen from '../screens/main/VaccinationTrackerScreen';
 import CommunityScreen from '../screens/main/CommunityScreen';
 import ScheduleScreen from '../screens/main/ScheduleScreen';
+import NotificationsScreen from '../screens/main/NotificationsScreen';
+import RemindersScreen from '../screens/main/RemindersScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -27,6 +29,16 @@ function AuthStack() {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function DashboardStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.background } }}>
+      <Stack.Screen name="Home" component={DashboardScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Reminders" component={RemindersScreen} />
     </Stack.Navigator>
   );
 }
@@ -85,7 +97,7 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Dashboard" component={DashboardStack} options={{ tabBarLabel: 'Home' }} />
       <Tab.Screen name="Pets" component={PetsStack} options={{ tabBarLabel: 'Pets' }} />
       <Tab.Screen name="Community" component={CommunityScreen} options={{ tabBarLabel: 'Community' }} />
       <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ tabBarLabel: 'Profile' }} />

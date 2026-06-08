@@ -1,0 +1,260 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Activity;
+use App\Models\FavoriteFood;
+use App\Models\Pet;
+use App\Models\Vaccination;
+use App\Services\ReminderScheduler;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+
+class PetController extends Controller
+{
+    // ── Pets CRUD ──────────────────────────────────────────────────────────
+
+    public function index(Request $request): JsonResponse
+    {
+        $pets = Pet::where('owner_id', $request->user()->id)->get();
+
+        return response()->json($pets->map->toApi());
+    }
+
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|min:1|max:100',
+            'type' => 'sometimes|string|max:50',
+            'breed' => 'sometimes|nullable|string|max:100',
+            'age' => 'sometimes|nullable|numeric',
+            'birthday' => 'sometimes|nullable|date',
+            'weight' => 'sometimes|nullable|numeric',
+            'weight_unit' => 'sometimes|string|max:5',
+            'gender' => 'sometimes|nullable|string|max:20',
+            'microchipped' => 'sometimes|boolean',
+            'color' => 'sometimes|nullable|string|max:30',
+            'avatar_url' => 'sometimes|nullable|string',
+            'heart_rate' => 'sometimes|nullable|integer',
+            'activity_level' => 'sometimes|nullable|string|max:30',
+        ]);
+
+        $pet = Pet::create(array_merge($data, ['owner_id' => $request->user()->id]));
+
+        return response()->json($pet->toApi(), 201);
+    }
+
+    public function show(Request $request, string $petId): JsonResponse
+    {
+        return response()->json($this->petOr404($request, $petId)->toApi());
+    }
+
+    public function update(Request $request, string $petId): JsonResponse
+    {
+        $pet = $this->petOr404($request, $petId);
+
+        $data = $request->validate([
+            'name' => 'sometimes|string|min:1|max:100',
+            'type' => 'sometimes|nullable|string|max:50',
+            'breed' => 'sometimes|nullable|string|max:100',
+            'age' => 'sometimes|nullable|numeric',
+            'birthday' => 'sometimes|nullable|date',
+            'weight' => 'sometimes|nullable|numeric',
+            'weight_unit' => 'sometimes|nullable|string|max:5',
+            'gender' => 'sometimes|nullable|string|max:20',
+            'microchipped' => 'sometimes|nullable|boolean',
+            'color' => 'sometimes|nullable|string|max:30',
+            'avatar_url' => 'sometimes|nullable|string',
+            'heart_rate' => 'sometimes|nullable|integer',
+            'activity_level' => 'sometimes|nullable|string|max:30',
+        ]);
+
+        // Mirror the previous backend: only apply provided, non-null fields.
+        foreach ($data as $field => $value) {
+            if ($value !== null) {
+                $pet->{$field} = $value;
+            }
+        }
+        $pet->save();
+
+        return response()->json($pet->toApi());
+    }
+
+    public function destroy(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId)->delete();
+
+        return response()->json(null, 204);
+    }
+
+    // ── Vaccinations ───────────────────────────────────────────────────────
+
+    public function listVaccinations(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $vaccinations = Vaccination::where('pet_id', $petId)->get();
+        $today = Carbon::today();
+
+        foreach ($vaccinations as $vax) {
+            if ($vax->status === 'upcoming' && $vax->due_date->lt($today)) {
+                $vax->status = 'overdue';
+                $vax->save();
+            }
+        }
+
+        return response()->json($vaccinations->map->toApi());
+    }
+
+    public function addVaccination(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $data = $request->validate([
+            'name' => 'required|string|min:1|max:150',
+            'due_date' => 'required|date',
+            'notes' => 'sometimes|nullable|string',
+        ]);
+
+        $vax = Vaccination::create(array_merge($data, ['pet_id' => $petId]));
+
+        // Auto-create a reminder (default: 7 days before due date at 09:00 local).
+        ReminderScheduler::syncVaccinationReminder($vax);
+
+        return response()->json($vax->toApi(), 201);
+    }
+
+    public function completeVaccination(Request $request, string $petId, string $vaxId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $data = $request->validate([
+            'administered_date' => 'sometimes|nullable|date',
+            'notes' => 'sometimes|nullable|string',
+        ]);
+
+        $vax = Vaccination::where('id', $vaxId)->where('pet_id', $petId)->first();
+        if (! $vax) {
+            abort(404, 'Vaccination not found');
+        }
+
+        $vax->status = 'completed';
+        $vax->administered_date = $data['administered_date'] ?? Carbon::today()->format('Y-m-d');
+        if (! empty($data['notes'])) {
+            $vax->notes = $data['notes'];
+        }
+        $vax->save();
+
+        // Once administered, the due-date reminder is no longer needed.
+        ReminderScheduler::cancelVaccinationReminder($vax);
+
+        return response()->json($vax->toApi());
+    }
+
+    public function deleteVaccination(Request $request, string $petId, string $vaxId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $vax = Vaccination::where('id', $vaxId)->where('pet_id', $petId)->first();
+        if (! $vax) {
+            abort(404, 'Vaccination not found');
+        }
+        ReminderScheduler::cancelVaccinationReminder($vax);
+        $vax->delete();
+
+        return response()->json(null, 204);
+    }
+
+    // ── Activities ─────────────────────────────────────────────────────────
+
+    public function listActivities(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        return response()->json(
+            Activity::where('pet_id', $petId)->get()->map->toApi()
+        );
+    }
+
+    public function addActivity(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $data = $request->validate([
+            'name' => 'required|string|min:1|max:150',
+            'duration' => 'sometimes|nullable|string|max:50',
+            'time_of_day' => 'sometimes|nullable|string|max:20',
+            'icon' => 'sometimes|nullable|string|max:50',
+        ]);
+
+        $activity = Activity::create(array_merge($data, ['pet_id' => $petId]));
+
+        return response()->json($activity->toApi(), 201);
+    }
+
+    public function deleteActivity(Request $request, string $petId, string $activityId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $activity = Activity::where('id', $activityId)->where('pet_id', $petId)->first();
+        if (! $activity) {
+            abort(404, 'Activity not found');
+        }
+        $activity->delete();
+
+        return response()->json(null, 204);
+    }
+
+    // ── Favorite foods ─────────────────────────────────────────────────────
+
+    public function listFoods(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        return response()->json(
+            FavoriteFood::where('pet_id', $petId)->get()->map->toApi()
+        );
+    }
+
+    public function addFood(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $data = $request->validate([
+            'name' => 'required|string|min:1|max:100',
+        ]);
+
+        $food = FavoriteFood::create(array_merge($data, ['pet_id' => $petId]));
+
+        return response()->json($food->toApi(), 201);
+    }
+
+    public function deleteFood(Request $request, string $petId, string $foodId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $food = FavoriteFood::where('id', $foodId)->where('pet_id', $petId)->first();
+        if (! $food) {
+            abort(404, 'Food not found');
+        }
+        $food->delete();
+
+        return response()->json(null, 204);
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    private function petOr404(Request $request, string $petId): Pet
+    {
+        $pet = Pet::where('id', $petId)
+            ->where('owner_id', $request->user()->id)
+            ->first();
+
+        if (! $pet) {
+            abort(404, 'Pet not found');
+        }
+
+        return $pet;
+    }
+}
