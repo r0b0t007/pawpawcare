@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Uploads;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -14,6 +15,16 @@ class User extends Model
     protected $keyType = 'string';
 
     public $incrementing = false;
+
+    protected static function booted(): void
+    {
+        // Delete the old avatar file when it's replaced or cleared.
+        static::updating(function (User $user) {
+            if ($user->isDirty('avatar_url')) {
+                Uploads::deleteByUrl($user->getOriginal('avatar_url'));
+            }
+        });
+    }
 
     protected $fillable = [
         'name', 'email', 'hashed_password', 'avatar_url', 'bio', 'is_active', 'timezone',
