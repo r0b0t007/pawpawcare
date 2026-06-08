@@ -76,4 +76,37 @@ class WeightLogTest extends TestCase
         $this->withToken($otherToken)->getJson("/pets/{$pet->id}/weights")->assertNotFound();
         $this->withToken($otherToken)->postJson("/pets/{$pet->id}/weights", ['weight' => 10])->assertNotFound();
     }
+
+    public function test_creating_a_pet_with_weight_seeds_a_log(): void
+    {
+        [, $token] = $this->userWithPet();
+
+        $petId = $this->withToken($token)->postJson('/pets', [
+            'name' => 'New', 'weight' => 12.0, 'weight_unit' => 'kg',
+        ])->assertCreated()->json('id');
+
+        $this->assertSame(1, WeightLog::where('pet_id', $petId)->count());
+    }
+
+    public function test_editing_pet_weight_records_a_log_but_other_edits_do_not(): void
+    {
+        [, $token, $pet] = $this->userWithPet();
+
+        $this->withToken($token)->patchJson("/pets/{$pet->id}", ['name' => 'Renamed'])->assertOk();
+        $this->assertSame(0, WeightLog::where('pet_id', $pet->id)->count());
+
+        $this->withToken($token)->patchJson("/pets/{$pet->id}", ['weight' => 15.5])->assertOk();
+        $this->assertSame(1, WeightLog::where('pet_id', $pet->id)->count());
+        $this->assertEqualsWithDelta(15.5, $pet->fresh()->weight, 0.001);
+    }
+
+    public function test_rejects_a_future_dated_weight(): void
+    {
+        [, $token, $pet] = $this->userWithPet();
+
+        $this->withToken($token)->postJson("/pets/{$pet->id}/weights", [
+            'weight' => 20,
+            'logged_at' => now()->addDays(5)->format('Y-m-d'),
+        ])->assertStatus(422);
+    }
 }

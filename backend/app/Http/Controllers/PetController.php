@@ -43,6 +43,9 @@ class PetController extends Controller
 
         $pet = Pet::create(array_merge($data, ['owner_id' => $request->user()->id]));
 
+        // Seed the weight history so the tracker and the profile agree from day one.
+        $this->recordCurrentWeightLog($pet);
+
         return response()->json($pet->toApi(), 201);
     }
 
@@ -71,6 +74,8 @@ class PetController extends Controller
             'activity_level' => 'sometimes|nullable|string|max:30',
         ]);
 
+        $oldWeight = $pet->weight;
+
         // Mirror the previous backend: only apply provided, non-null fields.
         foreach ($data as $field => $value) {
             if ($value !== null) {
@@ -78,6 +83,13 @@ class PetController extends Controller
             }
         }
         $pet->save();
+
+        // A weight change from the edit form flows into the history too, so the
+        // profile pill and the weight tracker never disagree.
+        if (array_key_exists('weight', $data) && $data['weight'] !== null
+            && (float) $data['weight'] !== (float) $oldWeight) {
+            $this->recordCurrentWeightLog($pet);
+        }
 
         return response()->json($pet->toApi());
     }
@@ -266,7 +278,7 @@ class PetController extends Controller
         $data = $request->validate([
             'weight' => 'required|numeric|min:0|max:1000',
             'unit' => 'sometimes|in:kg,lbs',
-            'logged_at' => 'sometimes|nullable|date',
+            'logged_at' => 'sometimes|nullable|date|before_or_equal:today',
             'notes' => 'sometimes|nullable|string|max:200',
         ]);
 
@@ -296,6 +308,19 @@ class PetController extends Controller
         $this->syncCurrentWeight($pet);
 
         return response()->json(null, 204);
+    }
+
+    /** Record (or update) today's weight log to match the pet's current weight. */
+    private function recordCurrentWeightLog(Pet $pet): void
+    {
+        if ($pet->weight === null) {
+            return;
+        }
+
+        WeightLog::updateOrCreate(
+            ['pet_id' => $pet->id, 'logged_at' => Carbon::today()->format('Y-m-d')],
+            ['weight' => $pet->weight, 'unit' => $pet->weight_unit ?: 'kg'],
+        );
     }
 
     /** Keep pet.weight in sync with the most recent logged entry. */

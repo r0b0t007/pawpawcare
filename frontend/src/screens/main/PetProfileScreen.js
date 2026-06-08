@@ -224,7 +224,7 @@ export default function PetProfileScreen({ navigation, route }) {
             <>
               <View style={styles.weightHeadRow}>
                 <Text style={styles.weightCurrent}>
-                  {latestWeight.weight}<Text style={styles.weightUnit}> {latestWeight.unit}</Text>
+                  {Number(latestWeight.weight).toFixed(1)}<Text style={styles.weightUnit}> {latestWeight.unit}</Text>
                 </Text>
                 {weightTrend !== null && (
                   <View style={styles.trendPill}>
@@ -242,9 +242,15 @@ export default function PetProfileScreen({ navigation, route }) {
               <WeightChart weights={weights} />
               {[...weights].reverse().slice(0, 4).map((w) => (
                 <View key={w.id} style={styles.weightRow}>
-                  <Text style={styles.weightRowVal}>{w.weight} {w.unit}</Text>
+                  <Text style={styles.weightRowVal}>{Number(w.weight).toFixed(1)} {w.unit}</Text>
                   <Text style={styles.weightRowDate}>{fullDate(w.loggedAt)}</Text>
-                  <TouchableOpacity onPress={() => deleteWeight(petId, w.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <TouchableOpacity
+                    onPress={() => Alert.alert('Delete entry', `Remove the ${Number(w.weight).toFixed(1)} ${w.unit} entry?`, [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Delete', style: 'destructive', onPress: () => deleteWeight(petId, w.id) },
+                    ])}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
                     <MaterialCommunityIcons name="close" size={16} color={colors.outline} />
                   </TouchableOpacity>
                 </View>
@@ -623,7 +629,7 @@ function WeightChart({ weights }) {
         const h = 18 + ((d.weight - min) / range) * 78;
         return (
           <View key={d.id} style={styles.chartCol}>
-            <Text style={styles.chartVal}>{d.weight}</Text>
+            <Text style={styles.chartVal}>{Number(d.weight).toFixed(1)}</Text>
             <View style={[styles.chartBar, { height: h }]} />
             <Text style={styles.chartDate} numberOfLines={1}>{shortDate(d.loggedAt)}</Text>
           </View>
