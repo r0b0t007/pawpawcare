@@ -98,7 +98,7 @@ export default function LostPetsScreen({ navigation }) {
                   {r.contactPhone ? (
                     <TouchableOpacity
                       style={styles.contactBtn}
-                      onPress={() => Linking.openURL(`tel:${r.contactPhone}`)}
+                      onPress={() => Linking.openURL(`tel:${r.contactPhone}`).catch(() => {})}
                       activeOpacity={0.88}
                     >
                       <MaterialCommunityIcons name="phone" size={15} color={colors.onPrimary} />

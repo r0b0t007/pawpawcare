@@ -480,6 +480,13 @@ export function DataProvider({ children }) {
 
   // ── Lost pets ──
 
+  const refreshPosts = async () => {
+    try {
+      const apiPosts = await get('/community/posts');
+      dispatch({ type: 'SET_POSTS', payload: apiPosts.map(toPost) });
+    } catch (err) { handleApiError(err); }
+  };
+
   const refreshLostPets = async () => {
     try {
       const [board, mine] = await Promise.all([get('/lost-pets'), get('/lost-pets/mine')]);
@@ -495,14 +502,15 @@ export function DataProvider({ children }) {
         description: details.description || null,
         contact_phone: details.contactPhone || null,
       });
-      await Promise.all([refreshLostPets(), loadData()]); // refresh feed (broadcast post) + reports
+      // Refresh the board/reports and the feed (the broadcast post) — not all pets.
+      await Promise.all([refreshLostPets(), refreshPosts()]);
     } catch (err) { handleApiError(err); }
   };
 
   const resolveLostPet = async (reportId, note) => {
     try {
       await patch(`/lost-pets/${reportId}/resolve`, { resolution_note: note || null });
-      await Promise.all([refreshLostPets(), loadData()]);
+      await Promise.all([refreshLostPets(), refreshPosts()]);
     } catch (err) { handleApiError(err); }
   };
 

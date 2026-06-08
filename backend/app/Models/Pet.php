@@ -15,6 +15,18 @@ class Pet extends Model
 
     public $incrementing = false;
 
+    protected static function booted(): void
+    {
+        // DB-level FK cascades bypass Eloquent events, so clean up the lost-pet
+        // broadcast posts here before the pet (and its reports) are removed.
+        static::deleting(function (Pet $pet) {
+            $postIds = $pet->lostPetReports()->whereNotNull('post_id')->pluck('post_id');
+            if ($postIds->isNotEmpty()) {
+                Post::whereIn('id', $postIds)->delete();
+            }
+        });
+    }
+
     protected $fillable = [
         'owner_id', 'name', 'type', 'breed', 'age', 'birthday', 'weight',
         'weight_unit', 'gender', 'microchipped', 'color', 'avatar_url',

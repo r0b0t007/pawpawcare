@@ -61,7 +61,7 @@ Route::middleware('auth.jwt')->group(function () {
     // Lost pets (community alerts)
     Route::get('/lost-pets', [LostPetController::class, 'index']);
     Route::get('/lost-pets/mine', [LostPetController::class, 'mine']);
-    Route::post('/pets/{pet}/lost-report', [LostPetController::class, 'report']);
+    Route::post('/pets/{pet}/lost-report', [LostPetController::class, 'report'])->middleware('throttle:10,1');
     Route::patch('/lost-pets/{report}/resolve', [LostPetController::class, 'resolve']);
     Route::delete('/pets/{pet}/foods/{food}', [PetController::class, 'deleteFood']);
 

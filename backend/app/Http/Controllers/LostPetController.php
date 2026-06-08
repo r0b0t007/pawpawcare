@@ -62,7 +62,7 @@ class LostPetController extends Controller
         $report->status = 'active';
         $report->save();
 
-        // Broadcast into the community feed (reusing posts) the first time.
+        // Broadcast into the community feed (reusing posts); keep it in sync on re-report.
         if ($isNew) {
             $post = Post::create([
                 'author_id' => $request->user()->id,
@@ -70,6 +70,10 @@ class LostPetController extends Controller
             ]);
             $report->post_id = $post->id;
             $report->save();
+        } elseif ($report->post_id) {
+            Post::where('id', $report->post_id)->update([
+                'content' => $this->broadcastContent($pet, $report),
+            ]);
         }
 
         $report->load(['pet', 'reporter']);
@@ -90,6 +94,10 @@ class LostPetController extends Controller
 
         if (! $report) {
             abort(404, 'Report not found');
+        }
+
+        if ($report->status !== 'active') {
+            abort(409, 'Report already resolved');
         }
 
         if ($report->post_id) {

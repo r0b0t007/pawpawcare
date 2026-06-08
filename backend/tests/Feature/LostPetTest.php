@@ -115,4 +115,36 @@ class LostPetTest extends TestCase
         $this->assertCount(1, $mine);
         $this->assertSame($pet->id, $mine[0]['pet_id']);
     }
+
+    public function test_deleting_pet_removes_its_broadcast_post(): void
+    {
+        [, $token, $pet] = $this->userWithPet();
+        $this->withToken($token)->postJson("/pets/{$pet->id}/lost-report", ['last_seen_location' => 'X'])->assertCreated();
+        $this->assertSame(1, Post::count());
+
+        $this->withToken($token)->deleteJson("/pets/{$pet->id}")->assertNoContent();
+
+        // No orphaned "LOST PET" post left behind in the feed.
+        $this->assertSame(0, Post::count());
+        $this->assertSame(0, LostPetReport::count());
+    }
+
+    public function test_reporting_again_updates_the_broadcast_post(): void
+    {
+        [, $token, $pet] = $this->userWithPet();
+        $this->withToken($token)->postJson("/pets/{$pet->id}/lost-report", ['last_seen_location' => 'Alpha'])->assertCreated();
+        $this->withToken($token)->postJson("/pets/{$pet->id}/lost-report", ['last_seen_location' => 'Beta'])->assertOk();
+
+        $this->assertSame(1, Post::count());
+        $this->assertStringContainsString('Beta', Post::first()->content);
+    }
+
+    public function test_resolving_an_already_resolved_report_conflicts(): void
+    {
+        [, $token, $pet] = $this->userWithPet();
+        $id = $this->withToken($token)->postJson("/pets/{$pet->id}/lost-report", [])->json('id');
+
+        $this->withToken($token)->patchJson("/lost-pets/{$id}/resolve", [])->assertOk();
+        $this->withToken($token)->patchJson("/lost-pets/{$id}/resolve", [])->assertStatus(409);
+    }
 }

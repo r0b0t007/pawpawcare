@@ -27,6 +27,16 @@ class LostPetReport extends Model
         'longitude' => 'float',
     ];
 
+    protected static function booted(): void
+    {
+        // Defensive: an explicit report delete also removes its broadcast post.
+        static::deleting(function (LostPetReport $report) {
+            if ($report->post_id) {
+                Post::where('id', $report->post_id)->delete();
+            }
+        });
+    }
+
     public function pet(): BelongsTo
     {
         return $this->belongsTo(Pet::class);
