@@ -20,6 +20,17 @@ const EXPENSE_CATEGORIES = [
 ];
 const catMeta = (id) => EXPENSE_CATEGORIES.find((c) => c.id === id) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
 
+const KG_PER_LB = 0.45359237;
+// Convert a logged weight to the pet's current display unit so the chart/trend
+// never mix kg and lbs (even if the pet's unit changed after some logs).
+const convertWeight = (value, from, to) => {
+  const n = Number(value) || 0;
+  if (!from || from === to) return n;
+  if (from === 'kg' && to === 'lbs') return n / KG_PER_LB;
+  if (from === 'lbs' && to === 'kg') return n * KG_PER_LB;
+  return n;
+};
+
 export default function PetProfileScreen({ navigation, route }) {
   const { petId } = route.params;
   const {
@@ -39,7 +50,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const [newActivity, setNewActivity] = useState({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
   const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
   const [lostForm, setLostForm] = useState({ lastSeenLocation: '', description: '', contactPhone: '' });
-  const [newWeight, setNewWeight] = useState({ value: '', unit: pet?.weightUnit || 'kg' });
+  const [newWeight, setNewWeight] = useState({ value: '' });
   const [expenseModal, setExpenseModal] = useState(false);
   const [newExpense, setNewExpense] = useState({ category: 'vet', amount: '', notes: '' });
 
@@ -110,8 +121,8 @@ export default function PetProfileScreen({ navigation, route }) {
   const handleAddWeight = async () => {
     const v = parseFloat(newWeight.value);
     if (!v || v <= 0) return;
-    await addWeight(petId, { weight: v, unit: newWeight.unit });
-    setNewWeight({ value: '', unit: pet.weightUnit || 'kg' });
+    await addWeight(petId, { weight: v }); // unit is locked to the pet's unit server-side
+    setNewWeight({ value: '' });
     setWeightModal(false);
   };
 
@@ -128,9 +139,16 @@ export default function PetProfileScreen({ navigation, route }) {
   const petColor = pet.color || colors.primaryFixed;
 
   const weights = pet.weights || [];
-  const latestWeight = weights[weights.length - 1];
-  const prevWeight = weights.length >= 2 ? weights[weights.length - 2] : null;
-  const weightTrend = latestWeight && prevWeight ? latestWeight.weight - prevWeight.weight : null;
+  const wUnit = pet.weightUnit || 'kg';
+  // Normalize every entry to the pet's current unit before charting/trend.
+  const normWeights = weights.map((w) => ({
+    id: w.id,
+    loggedAt: w.loggedAt,
+    value: convertWeight(w.weight, w.unit, wUnit),
+  }));
+  const latestWeight = normWeights[normWeights.length - 1];
+  const prevWeight = normWeights.length >= 2 ? normWeights[normWeights.length - 2] : null;
+  const weightTrend = latestWeight && prevWeight ? latestWeight.value - prevWeight.value : null;
 
   const expenses = pet.expenses || [];
   const monthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
@@ -251,7 +269,7 @@ export default function PetProfileScreen({ navigation, route }) {
             <>
               <View style={styles.weightHeadRow}>
                 <Text style={styles.weightCurrent}>
-                  {Number(latestWeight.weight).toFixed(1)}<Text style={styles.weightUnit}> {latestWeight.unit}</Text>
+                  {latestWeight.value.toFixed(1)}<Text style={styles.weightUnit}> {wUnit}</Text>
                 </Text>
                 {weightTrend !== null && (
                   <View style={styles.trendPill}>
@@ -261,18 +279,18 @@ export default function PetProfileScreen({ navigation, route }) {
                       color={colors.secondary}
                     />
                     <Text style={styles.trendText}>
-                      {weightTrend > 0 ? '+' : ''}{weightTrend.toFixed(1)} {latestWeight.unit}
+                      {weightTrend > 0 ? '+' : ''}{weightTrend.toFixed(1)} {wUnit}
                     </Text>
                   </View>
                 )}
               </View>
-              <WeightChart weights={weights} />
-              {[...weights].reverse().slice(0, 4).map((w) => (
+              <WeightChart weights={normWeights} />
+              {[...normWeights].reverse().slice(0, 4).map((w) => (
                 <View key={w.id} style={styles.weightRow}>
-                  <Text style={styles.weightRowVal}>{Number(w.weight).toFixed(1)} {w.unit}</Text>
+                  <Text style={styles.weightRowVal}>{w.value.toFixed(1)} {wUnit}</Text>
                   <Text style={styles.weightRowDate}>{fullDate(w.loggedAt)}</Text>
                   <TouchableOpacity
-                    onPress={() => Alert.alert('Delete entry', `Remove the ${Number(w.weight).toFixed(1)} ${w.unit} entry?`, [
+                    onPress={() => Alert.alert('Delete entry', `Remove the ${w.value.toFixed(1)} ${wUnit} entry?`, [
                       { text: 'Cancel', style: 'cancel' },
                       { text: 'Delete', style: 'destructive', onPress: () => deleteWeight(petId, w.id) },
                     ])}
@@ -661,19 +679,15 @@ export default function PetProfileScreen({ navigation, route }) {
                 placeholder="e.g. 22.5"
                 placeholderTextColor={colors.outlineVariant}
                 value={newWeight.value}
-                onChangeText={(v) => setNewWeight({ ...newWeight, value: v })}
+                onChangeText={(v) => setNewWeight({ value: v })}
                 keyboardType="decimal-pad"
                 autoFocus
               />
-              <TouchableOpacity
-                style={styles.unitToggle}
-                onPress={() => setNewWeight({ ...newWeight, unit: newWeight.unit === 'kg' ? 'lbs' : 'kg' })}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.unitToggleText}>{newWeight.unit}</Text>
-                <MaterialCommunityIcons name="swap-horizontal" size={16} color={colors.primaryContainer} />
-              </TouchableOpacity>
+              <View style={styles.unitToggle}>
+                <Text style={styles.unitToggleText}>{wUnit}</Text>
+              </View>
             </View>
+            <Text style={styles.modalHint}>Logged in {wUnit} — change the unit in Edit Pet.</Text>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setWeightModal(false)} activeOpacity={0.88}>
                 <Text style={styles.modalCancelText}>Cancel</Text>
@@ -749,7 +763,7 @@ function WeightChart({ weights }) {
   if (data.length < 2) {
     return <Text style={styles.chartHint}>Add another entry to see the trend.</Text>;
   }
-  const vals = data.map((d) => d.weight);
+  const vals = data.map((d) => d.value);
   const min = Math.min(...vals);
   const max = Math.max(...vals);
   const range = max - min || 1;
@@ -757,10 +771,10 @@ function WeightChart({ weights }) {
   return (
     <View style={styles.chart}>
       {data.map((d) => {
-        const h = 18 + ((d.weight - min) / range) * 78;
+        const h = 18 + ((d.value - min) / range) * 78;
         return (
           <View key={d.id} style={styles.chartCol}>
-            <Text style={styles.chartVal}>{Number(d.weight).toFixed(1)}</Text>
+            <Text style={styles.chartVal}>{d.value.toFixed(1)}</Text>
             <View style={[styles.chartBar, { height: h }]} />
             <Text style={styles.chartDate} numberOfLines={1}>{shortDate(d.loggedAt)}</Text>
           </View>

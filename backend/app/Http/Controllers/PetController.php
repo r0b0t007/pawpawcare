@@ -278,7 +278,6 @@ class PetController extends Controller
 
         $data = $request->validate([
             'weight' => 'required|numeric|min:0|max:1000',
-            'unit' => 'sometimes|in:kg,lbs',
             'logged_at' => 'sometimes|nullable|date|before_or_equal:today',
             'notes' => 'sometimes|nullable|string|max:200',
         ]);
@@ -286,7 +285,8 @@ class PetController extends Controller
         $log = WeightLog::create([
             'pet_id' => $pet->id,
             'weight' => $data['weight'],
-            'unit' => $data['unit'] ?? ($pet->weight_unit ?: 'kg'),
+            // A pet's logs are always in the pet's unit, so the history can't mix kg/lbs.
+            'unit' => $pet->weight_unit ?: 'kg',
             'logged_at' => $data['logged_at'] ?? Carbon::today()->format('Y-m-d'),
             'notes' => $data['notes'] ?? null,
         ]);

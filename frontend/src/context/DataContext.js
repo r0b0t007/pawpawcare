@@ -484,7 +484,6 @@ export function DataProvider({ children }) {
     try {
       const apiW = await post(`/pets/${petId}/weights`, {
         weight: parseFloat(entry.weight),
-        unit: entry.unit || undefined,
         logged_at: entry.loggedAt || undefined,
       });
       const newW = toWeight(apiW);
