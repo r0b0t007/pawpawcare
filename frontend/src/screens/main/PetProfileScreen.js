@@ -11,17 +11,20 @@ import { colors, typography, spacing, radii, shadows } from '../../theme';
 export default function PetProfileScreen({ navigation, route }) {
   const { petId } = route.params;
   const {
-    pets, addFavoriteFood, removeFavoriteFood, addActivity,
-    addMedication, deleteMedication, logMedicationDose,
+    pets, myReports, addFavoriteFood, removeFavoriteFood, addActivity,
+    addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
   } = useData();
   const pet = pets.find((p) => p.id === petId);
+  const activeReport = (myReports || []).find((r) => r.petId === petId && r.status === 'active');
 
   const [foodModal, setFoodModal] = useState(false);
   const [activityModal, setActivityModal] = useState(false);
   const [medModal, setMedModal] = useState(false);
+  const [lostModal, setLostModal] = useState(false);
   const [newFood, setNewFood] = useState('');
   const [newActivity, setNewActivity] = useState({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
   const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
+  const [lostForm, setLostForm] = useState({ lastSeenLocation: '', description: '', contactPhone: '' });
 
   if (!pet) {
     return (
@@ -71,6 +74,20 @@ export default function PetProfileScreen({ navigation, route }) {
       ...m,
       times: m.times.includes(t) ? m.times.filter((x) => x !== t) : [...m.times, t],
     }));
+  };
+
+  const handleReportLost = async () => {
+    await reportPetLost(petId, lostForm);
+    setLostForm({ lastSeenLocation: '', description: '', contactPhone: '' });
+    setLostModal(false);
+  };
+
+  const handleMarkFound = () => {
+    if (!activeReport) return;
+    Alert.alert('Mark as found', `Has ${pet.name} been found safe?`, [
+      { text: 'Not yet', style: 'cancel' },
+      { text: 'Found!', onPress: () => resolveLostPet(activeReport.id) },
+    ]);
   };
 
   const upcoming = (pet.vaccinations || []).filter((v) => v.status !== 'completed');
@@ -128,6 +145,25 @@ export default function PetProfileScreen({ navigation, route }) {
         <View style={[styles.heroTail, { backgroundColor: petColor }]}>
           <View style={styles.heroTailCurve} />
         </View>
+
+        {/* Lost-pet status / report */}
+        {activeReport ? (
+          <TouchableOpacity style={styles.lostActiveBanner} onPress={handleMarkFound} activeOpacity={0.9}>
+            <View style={styles.lostActiveIcon}>
+              <MaterialCommunityIcons name="map-marker-alert" size={20} color={colors.onErrorContainer} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.lostActiveTitle}>{pet.name} is reported lost</Text>
+              <Text style={styles.lostActiveSub}>Shared to the community board · tap to mark found</Text>
+            </View>
+            <MaterialCommunityIcons name="check-circle-outline" size={22} color={colors.successFg} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.reportLostBtn} onPress={() => setLostModal(true)} activeOpacity={0.88}>
+            <MaterialCommunityIcons name="map-marker-alert-outline" size={18} color={colors.error} />
+            <Text style={styles.reportLostText}>Report {pet.name} as lost</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Health Stats */}
         {pet.healthStats && (
@@ -408,6 +444,49 @@ export default function PetProfileScreen({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalAdd} onPress={handleAddMedication} activeOpacity={0.88}>
                 <Text style={styles.modalAddText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Report Lost Modal */}
+      <Modal visible={lostModal} transparent animationType="slide">
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalTitle}>Report {pet.name} as lost</Text>
+            <Text style={styles.modalHint}>This shares an alert to the community Lost Pets board.</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Last seen location (e.g. Riverside Park)"
+              placeholderTextColor={colors.outlineVariant}
+              value={lostForm.lastSeenLocation}
+              onChangeText={(v) => setLostForm({ ...lostForm, lastSeenLocation: v })}
+              autoFocus
+            />
+            <TextInput
+              style={[styles.modalInput, { marginTop: spacing.sm, minHeight: 70 }]}
+              placeholder="Details (color, collar, temperament…)"
+              placeholderTextColor={colors.outlineVariant}
+              value={lostForm.description}
+              onChangeText={(v) => setLostForm({ ...lostForm, description: v })}
+              multiline
+            />
+            <TextInput
+              style={[styles.modalInput, { marginTop: spacing.sm }]}
+              placeholder="Contact phone"
+              placeholderTextColor={colors.outlineVariant}
+              value={lostForm.contactPhone}
+              onChangeText={(v) => setLostForm({ ...lostForm, contactPhone: v })}
+              keyboardType="phone-pad"
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setLostModal(false)} activeOpacity={0.88}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalAdd, { backgroundColor: colors.error }]} onPress={handleReportLost} activeOpacity={0.88}>
+                <Text style={styles.modalAddText}>Report Lost</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -715,6 +794,43 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
   },
   freqChipText: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'capitalize' },
+  reportLostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginHorizontal: spacing.margin,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    borderWidth: 1.5,
+    borderColor: colors.errorContainer,
+    backgroundColor: '#fff1f0',
+  },
+  reportLostText: { ...typography.labelMd, color: colors.error },
+  lostActiveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.margin,
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radii.xl,
+    backgroundColor: '#fff1f0',
+    borderWidth: 1.5,
+    borderColor: colors.error,
+  },
+  lostActiveIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.full,
+    backgroundColor: colors.errorContainer,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lostActiveTitle: { ...typography.labelMd, color: colors.onSurface },
+  lostActiveSub: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 1 },
+  modalHint: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: -spacing.sm, marginBottom: spacing.sm },
   foodsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   foodChip: {
     flexDirection: 'row',

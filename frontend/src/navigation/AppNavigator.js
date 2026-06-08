@@ -19,6 +19,7 @@ import CommunityScreen from '../screens/main/CommunityScreen';
 import ScheduleScreen from '../screens/main/ScheduleScreen';
 import NotificationsScreen from '../screens/main/NotificationsScreen';
 import RemindersScreen from '../screens/main/RemindersScreen';
+import LostPetsScreen from '../screens/main/LostPetsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,6 +40,15 @@ function DashboardStack() {
       <Stack.Screen name="Home" component={DashboardScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Reminders" component={RemindersScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function CommunityStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.background } }}>
+      <Stack.Screen name="CommunityFeed" component={CommunityScreen} />
+      <Stack.Screen name="LostPets" component={LostPetsScreen} />
     </Stack.Navigator>
   );
 }
@@ -99,7 +109,7 @@ function MainTabs() {
     >
       <Tab.Screen name="Dashboard" component={DashboardStack} options={{ tabBarLabel: 'Home' }} />
       <Tab.Screen name="Pets" component={PetsStack} options={{ tabBarLabel: 'Pets' }} />
-      <Tab.Screen name="Community" component={CommunityScreen} options={{ tabBarLabel: 'Community' }} />
+      <Tab.Screen name="Community" component={CommunityStack} options={{ tabBarLabel: 'Community' }} />
       <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );
