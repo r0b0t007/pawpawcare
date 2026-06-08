@@ -76,10 +76,14 @@ export async function scheduleLocalReminders(reminders = []) {
     await Notifications.cancelAllScheduledNotificationsAsync();
 
     const now = Date.now();
-    for (const r of reminders) {
-      if (!r?.enabled || !r?.next_fire_at) continue;
+    // iOS caps pending local notifications at ~64 — schedule the soonest ones.
+    const upcoming = reminders
+      .filter((r) => r?.enabled && r?.next_fire_at && new Date(r.next_fire_at).getTime() > now)
+      .sort((a, b) => new Date(a.next_fire_at) - new Date(b.next_fire_at))
+      .slice(0, 60);
+
+    for (const r of upcoming) {
       const when = new Date(r.next_fire_at).getTime();
-      if (Number.isNaN(when) || when <= now) continue;
 
       await Notifications.scheduleNotificationAsync({
         identifier: `${r.id}:${r.next_fire_at}`,

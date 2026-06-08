@@ -30,7 +30,8 @@ export default function DashboardScreen({ navigation }) {
     (p.vaccinations || []).filter((v) => v.status === 'upcoming' || v.status === 'due_soon' || v.status === 'overdue')
   );
 
-  const bellCount = unreadCount || upcomingVax.length;
+  // Badge reflects unread notifications specifically (not "things due").
+  const bellCount = unreadCount;
 
   const firstName = user?.name?.split(' ')[0] || 'Friend';
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,10 +31,18 @@ class UserController extends Controller
             }
         }
         // Timezone is validated against the IANA list before applying.
-        if (! empty($data['timezone']) && in_array($data['timezone'], timezone_identifiers_list(), true)) {
+        $tzChanged = false;
+        if (! empty($data['timezone'])
+            && in_array($data['timezone'], timezone_identifiers_list(), true)
+            && $user->timezone !== $data['timezone']) {
             $user->timezone = $data['timezone'];
+            $tzChanged = true;
         }
         $user->save();
+
+        if ($tzChanged) {
+            ReminderScheduler::recomputeForUser($user);
+        }
 
         return response()->json($user->toApi());
     }

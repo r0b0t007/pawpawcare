@@ -27,7 +27,7 @@ class ReminderController extends Controller
             'title' => 'required|string|min:1|max:150',
             'body' => 'sometimes|nullable|string|max:255',
             'schedule_type' => 'required|in:one_time,recurring',
-            'fire_at' => 'required_if:schedule_type,one_time|nullable|date',
+            'fire_at' => 'required_if:schedule_type,one_time|nullable|date|after:now',
             'recurrence' => 'required_if:schedule_type,recurring|nullable|in:daily,weekly,monthly',
             'time_of_day' => 'sometimes|nullable|date_format:H:i',
             'lead_time_days' => 'sometimes|nullable|integer|min:0|max:365',

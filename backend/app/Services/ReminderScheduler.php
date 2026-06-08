@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Reminder;
+use App\Models\User;
 use App\Models\Vaccination;
 use Illuminate\Support\Carbon;
 
@@ -62,7 +63,7 @@ class ReminderScheduler
 
         $user = $pet->owner;
         $tz = $user->timezone ?: 'UTC';
-        $fireAt = Carbon::parse($vax->due_date->format('Y-m-d'), $tz)->setTime(9, 0, 0)->utc();
+        $fireAt = self::eventFireAt($vax->due_date->format('Y-m-d'), '09:00', $tz);
 
         $reminder = Reminder::updateOrCreate(
             ['related_type' => 'vaccination', 'related_id' => $vax->id],
@@ -94,6 +95,48 @@ class ReminderScheduler
         Reminder::where('related_type', 'vaccination')
             ->where('related_id', $vax->id)
             ->update(['enabled' => false, 'next_fire_at' => null]);
+    }
+
+    /**
+     * Re-pin a user's enabled reminders to their (changed) timezone and recompute
+     * fire times. Vaccination reminders re-derive their event time from the due
+     * date; recurring reminders re-anchor their local time-of-day. Custom one-time
+     * reminders keep their absolute instant (a calendar appointment doesn't move).
+     */
+    public static function recomputeForUser(User $user): void
+    {
+        $tz = $user->timezone ?: 'UTC';
+
+        Reminder::where('user_id', $user->id)
+            ->where('enabled', true)
+            ->where('timezone', '!=', $tz)
+            ->chunkById(200, function ($reminders) use ($tz) {
+                foreach ($reminders as $r) {
+                    $r->timezone = $tz;
+
+                    if ($r->type === 'vaccination' && $r->related_type === 'vaccination' && $r->related_id) {
+                        $vax = Vaccination::find($r->related_id);
+                        if ($vax && $vax->due_date) {
+                            $r->fire_at = self::eventFireAt(
+                                $vax->due_date->format('Y-m-d'),
+                                $r->time_of_day ?: '09:00',
+                                $tz,
+                            );
+                        }
+                    }
+
+                    $r->next_fire_at = self::computeNextFireAt($r);
+                    $r->save();
+                }
+            });
+    }
+
+    /** Absolute (UTC) instant for a local date + HH:MM in a timezone. */
+    private static function eventFireAt(string $dueDateYmd, string $timeOfDay, string $tz): Carbon
+    {
+        [$h, $m] = array_pad(explode(':', $timeOfDay ?: '09:00'), 2, '0');
+
+        return Carbon::parse($dueDateYmd, $tz)->setTime((int) $h, (int) $m, 0)->utc();
     }
 
     private static function advance(Carbon $dt, ?string $recurrence): Carbon

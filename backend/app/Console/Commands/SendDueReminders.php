@@ -29,6 +29,11 @@ class SendDueReminders extends Command
 
         $delivered = 0;
 
+        // Fetch every relevant device once, grouped by user (avoids 2 queries per reminder).
+        $devicesByUser = DeviceToken::whereIn('user_id', $due->pluck('user_id')->unique())
+            ->get()
+            ->groupBy('user_id');
+
         foreach ($due as $reminder) {
             $occurrence = $reminder->next_fire_at->copy();
 
@@ -39,15 +44,15 @@ class SendDueReminders extends Command
             );
 
             if ($delivery->status !== 'sent') {
+                $devices = $devicesByUser->get($reminder->user_id, collect());
+
                 // Backstop dedup: push only when overdue past the grace window, or when the
                 // user has no device that handles its own local notifications.
-                $hasLocalDevice = DeviceToken::where('user_id', $reminder->user_id)
-                    ->where('prefers_local', true)
-                    ->exists();
+                $hasLocalDevice = $devices->where('prefers_local', true)->isNotEmpty();
                 $pastGrace = $occurrence->lt($now->copy()->subMinutes(self::GRACE_MINUTES));
 
                 if ($pastGrace || ! $hasLocalDevice) {
-                    $tokens = DeviceToken::where('user_id', $reminder->user_id)->pluck('token');
+                    $tokens = $devices->pluck('token');
                     $push->send($tokens->map(fn ($t) => [
                         'to' => $t,
                         'title' => $reminder->title,

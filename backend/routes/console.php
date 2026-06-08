@@ -11,3 +11,6 @@ Artisan::command('inspire', function () {
 // Scan for due reminders every minute. Requires a cron entry running
 // `php artisan schedule:run` in production (or `php artisan schedule:work` in dev).
 Schedule::command('reminders:send')->everyMinute()->withoutOverlapping();
+
+// Keep the refresh_tokens table from growing without bound.
+Schedule::command('auth:prune-tokens')->daily();

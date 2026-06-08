@@ -13,11 +13,13 @@ use Illuminate\Support\Facades\Route;
 // ── Health ──────────────────────────────────────────────────────────────────
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'version' => '1.0.0']));
 
-// ── Auth (public) ───────────────────────────────────────────────────────────
-Route::post('/auth/signup', [AuthController::class, 'signup']);
-Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/auth/refresh', [AuthController::class, 'refresh']);
-Route::post('/auth/logout', [AuthController::class, 'logout']);
+// ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
+Route::middleware('throttle:20,1')->group(function () {
+    Route::post('/auth/signup', [AuthController::class, 'signup']);
+    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/refresh', [AuthController::class, 'refresh']);
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+});
 
 // ── Authenticated ───────────────────────────────────────────────────────────
 Route::middleware('auth.jwt')->group(function () {

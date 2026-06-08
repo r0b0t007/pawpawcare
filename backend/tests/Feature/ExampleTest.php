@@ -8,12 +8,12 @@ use Tests\TestCase;
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * The API health check responds (this is an API-only app, no web root).
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_the_health_check_returns_a_successful_response(): void
     {
-        $response = $this->get('/');
+        $response = $this->getJson('/health');
 
-        $response->assertStatus(200);
+        $response->assertStatus(200)->assertJson(['status' => 'ok']);
     }
 }

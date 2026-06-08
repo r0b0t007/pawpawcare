@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DeviceToken;
+use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,10 +31,12 @@ class DeviceController extends Controller
             ],
         );
 
-        // Keep the user's default timezone fresh so reminders compute correctly.
+        // Keep the user's default timezone fresh so reminders compute correctly,
+        // and re-pin any existing reminders to the new zone.
         if (! empty($data['timezone']) && $user->timezone !== $tz) {
             $user->timezone = $tz;
             $user->save();
+            ReminderScheduler::recomputeForUser($user);
         }
 
         return response()->json(['status' => 'ok']);
