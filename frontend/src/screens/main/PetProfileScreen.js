@@ -14,6 +14,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const {
     pets, myReports, addFavoriteFood, removeFavoriteFood, addActivity,
     addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
+    addWeight, deleteWeight,
   } = useData();
   const pet = pets.find((p) => p.id === petId);
   const activeReport = (myReports || []).find((r) => r.petId === petId && r.status === 'active');
@@ -22,10 +23,12 @@ export default function PetProfileScreen({ navigation, route }) {
   const [activityModal, setActivityModal] = useState(false);
   const [medModal, setMedModal] = useState(false);
   const [lostModal, setLostModal] = useState(false);
+  const [weightModal, setWeightModal] = useState(false);
   const [newFood, setNewFood] = useState('');
   const [newActivity, setNewActivity] = useState({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
   const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
   const [lostForm, setLostForm] = useState({ lastSeenLocation: '', description: '', contactPhone: '' });
+  const [newWeight, setNewWeight] = useState({ value: '', unit: pet?.weightUnit || 'kg' });
 
   if (!pet) {
     return (
@@ -91,9 +94,22 @@ export default function PetProfileScreen({ navigation, route }) {
     ]);
   };
 
+  const handleAddWeight = async () => {
+    const v = parseFloat(newWeight.value);
+    if (!v || v <= 0) return;
+    await addWeight(petId, { weight: v, unit: newWeight.unit });
+    setNewWeight({ value: '', unit: pet.weightUnit || 'kg' });
+    setWeightModal(false);
+  };
+
   const upcoming = (pet.vaccinations || []).filter((v) => v.status !== 'completed');
   const nextVax = upcoming[0];
   const petColor = pet.color || colors.primaryFixed;
+
+  const weights = pet.weights || [];
+  const latestWeight = weights[weights.length - 1];
+  const prevWeight = weights.length >= 2 ? weights[weights.length - 2] : null;
+  const weightTrend = latestWeight && prevWeight ? latestWeight.weight - prevWeight.weight : null;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -186,6 +202,56 @@ export default function PetProfileScreen({ navigation, route }) {
             </View>
           </View>
         )}
+
+        {/* Weight */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Weight</Text>
+            <TouchableOpacity
+              onPress={() => setWeightModal(true)}
+              style={styles.addIconBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="plus" size={18} color={colors.onPrimary} />
+            </TouchableOpacity>
+          </View>
+          {weights.length === 0 ? (
+            <TouchableOpacity style={styles.emptyState} onPress={() => setWeightModal(true)} activeOpacity={0.88}>
+              <MaterialCommunityIcons name="scale-bathroom" size={24} color={colors.primaryContainer} />
+              <Text style={styles.emptyStateText}>Track {pet.name}'s weight</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <View style={styles.weightHeadRow}>
+                <Text style={styles.weightCurrent}>
+                  {latestWeight.weight}<Text style={styles.weightUnit}> {latestWeight.unit}</Text>
+                </Text>
+                {weightTrend !== null && (
+                  <View style={styles.trendPill}>
+                    <MaterialCommunityIcons
+                      name={weightTrend > 0 ? 'trending-up' : weightTrend < 0 ? 'trending-down' : 'trending-neutral'}
+                      size={14}
+                      color={colors.secondary}
+                    />
+                    <Text style={styles.trendText}>
+                      {weightTrend > 0 ? '+' : ''}{weightTrend.toFixed(1)} {latestWeight.unit}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <WeightChart weights={weights} />
+              {[...weights].reverse().slice(0, 4).map((w) => (
+                <View key={w.id} style={styles.weightRow}>
+                  <Text style={styles.weightRowVal}>{w.weight} {w.unit}</Text>
+                  <Text style={styles.weightRowDate}>{fullDate(w.loggedAt)}</Text>
+                  <TouchableOpacity onPress={() => deleteWeight(petId, w.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                    <MaterialCommunityIcons name="close" size={16} color={colors.outline} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
+        </View>
 
         {/* Vaccinations */}
         <View style={styles.section}>
@@ -497,7 +563,73 @@ export default function PetProfileScreen({ navigation, route }) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Add Weight Modal */}
+      <Modal visible={weightModal} transparent animationType="slide">
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalTitle}>Log {pet.name}'s weight</Text>
+            <View style={styles.weightInputRow}>
+              <TextInput
+                style={[styles.modalInput, { flex: 1 }]}
+                placeholder="e.g. 22.5"
+                placeholderTextColor={colors.outlineVariant}
+                value={newWeight.value}
+                onChangeText={(v) => setNewWeight({ ...newWeight, value: v })}
+                keyboardType="decimal-pad"
+                autoFocus
+              />
+              <TouchableOpacity
+                style={styles.unitToggle}
+                onPress={() => setNewWeight({ ...newWeight, unit: newWeight.unit === 'kg' ? 'lbs' : 'kg' })}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.unitToggleText}>{newWeight.unit}</Text>
+                <MaterialCommunityIcons name="swap-horizontal" size={16} color={colors.primaryContainer} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setWeightModal(false)} activeOpacity={0.88}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalAdd} onPress={handleAddWeight} activeOpacity={0.88}>
+                <Text style={styles.modalAddText}>Log Weight</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+const shortDate = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
+const fullDate = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+
+function WeightChart({ weights }) {
+  const data = weights.slice(-10);
+  if (data.length < 2) {
+    return <Text style={styles.chartHint}>Add another entry to see the trend.</Text>;
+  }
+  const vals = data.map((d) => d.weight);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const range = max - min || 1;
+
+  return (
+    <View style={styles.chart}>
+      {data.map((d) => {
+        const h = 18 + ((d.weight - min) / range) * 78;
+        return (
+          <View key={d.id} style={styles.chartCol}>
+            <Text style={styles.chartVal}>{d.weight}</Text>
+            <View style={[styles.chartBar, { height: h }]} />
+            <Text style={styles.chartDate} numberOfLines={1}>{shortDate(d.loggedAt)}</Text>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -838,6 +970,56 @@ const styles = StyleSheet.create({
   lostActiveTitle: { ...typography.labelMd, color: colors.onSurface },
   lostActiveSub: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 1 },
   modalHint: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: -spacing.sm, marginBottom: spacing.sm },
+  weightHeadRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  weightCurrent: { ...typography.headlineMd, color: colors.onSurface, fontSize: 26 },
+  weightUnit: { ...typography.titleLg, color: colors.onSurfaceVariant, fontSize: 16 },
+  trendPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: colors.secondaryFixed,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+  },
+  trendText: { ...typography.labelSm, color: colors.secondary, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  chart: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-around',
+    gap: spacing.xs,
+    height: 140,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  chartCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
+  chartVal: { ...typography.labelSm, color: colors.onSurfaceVariant, fontSize: 10 },
+  chartBar: { width: '70%', maxWidth: 22, borderRadius: radii.sm, backgroundColor: colors.primaryFixedDim },
+  chartDate: { ...typography.labelSm, color: colors.outline, fontSize: 9 },
+  chartHint: { ...typography.bodyMd, fontSize: 13, color: colors.onSurfaceVariant, paddingVertical: spacing.sm },
+  weightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceContainerLow,
+  },
+  weightRowVal: { ...typography.labelMd, color: colors.onSurface, width: 90 },
+  weightRowDate: { ...typography.labelSm, color: colors.onSurfaceVariant, flex: 1 },
+  weightInputRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
+  unitToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceContainerLow,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+  },
+  unitToggleText: { ...typography.labelMd, color: colors.primaryContainer },
   foodsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   foodChip: {
     flexDirection: 'row',

@@ -6,6 +6,7 @@ use App\Models\Activity;
 use App\Models\FavoriteFood;
 use App\Models\Pet;
 use App\Models\Vaccination;
+use App\Models\WeightLog;
 use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -241,6 +242,75 @@ class PetController extends Controller
         $food->delete();
 
         return response()->json(null, 204);
+    }
+
+    // ── Weight history ─────────────────────────────────────────────────────
+
+    public function listWeights(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        return response()->json(
+            WeightLog::where('pet_id', $petId)
+                ->orderBy('logged_at')
+                ->orderBy('created_at')
+                ->get()
+                ->map->toApi()
+        );
+    }
+
+    public function addWeight(Request $request, string $petId): JsonResponse
+    {
+        $pet = $this->petOr404($request, $petId);
+
+        $data = $request->validate([
+            'weight' => 'required|numeric|min:0|max:1000',
+            'unit' => 'sometimes|in:kg,lbs',
+            'logged_at' => 'sometimes|nullable|date',
+            'notes' => 'sometimes|nullable|string|max:200',
+        ]);
+
+        $log = WeightLog::create([
+            'pet_id' => $pet->id,
+            'weight' => $data['weight'],
+            'unit' => $data['unit'] ?? ($pet->weight_unit ?: 'kg'),
+            'logged_at' => $data['logged_at'] ?? Carbon::today()->format('Y-m-d'),
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        $this->syncCurrentWeight($pet);
+
+        return response()->json($log->toApi(), 201);
+    }
+
+    public function deleteWeight(Request $request, string $petId, string $weightId): JsonResponse
+    {
+        $pet = $this->petOr404($request, $petId);
+
+        $log = WeightLog::where('id', $weightId)->where('pet_id', $petId)->first();
+        if (! $log) {
+            abort(404, 'Weight entry not found');
+        }
+        $log->delete();
+
+        $this->syncCurrentWeight($pet);
+
+        return response()->json(null, 204);
+    }
+
+    /** Keep pet.weight in sync with the most recent logged entry. */
+    private function syncCurrentWeight(Pet $pet): void
+    {
+        $latest = WeightLog::where('pet_id', $pet->id)
+            ->orderByDesc('logged_at')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($latest) {
+            $pet->weight = $latest->weight;
+            $pet->weight_unit = $latest->unit;
+            $pet->save();
+        }
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
