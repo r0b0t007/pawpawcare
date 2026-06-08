@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Activity;
+use App\Models\Expense;
 use App\Models\FavoriteFood;
 use App\Models\Pet;
 use App\Models\Vaccination;
@@ -336,6 +337,56 @@ class PetController extends Controller
             $pet->weight_unit = $latest->unit;
             $pet->save();
         }
+    }
+
+    // ── Expenses ───────────────────────────────────────────────────────────
+
+    public function listExpenses(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        return response()->json(
+            Expense::where('pet_id', $petId)
+                ->orderByDesc('incurred_on')
+                ->orderByDesc('created_at')
+                ->get()
+                ->map->toApi()
+        );
+    }
+
+    public function addExpense(Request $request, string $petId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $data = $request->validate([
+            'category' => 'sometimes|in:vet,food,grooming,medication,supplies,insurance,other',
+            'amount' => 'required|numeric|min:0|max:1000000',
+            'incurred_on' => 'sometimes|nullable|date|before_or_equal:today',
+            'notes' => 'sometimes|nullable|string|max:200',
+        ]);
+
+        $expense = Expense::create([
+            'pet_id' => $petId,
+            'category' => $data['category'] ?? 'other',
+            'amount' => $data['amount'],
+            'incurred_on' => $data['incurred_on'] ?? Carbon::today()->format('Y-m-d'),
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        return response()->json($expense->toApi(), 201);
+    }
+
+    public function deleteExpense(Request $request, string $petId, string $expenseId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $expense = Expense::where('id', $expenseId)->where('pet_id', $petId)->first();
+        if (! $expense) {
+            abort(404, 'Expense not found');
+        }
+        $expense->delete();
+
+        return response()->json(null, 204);
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
