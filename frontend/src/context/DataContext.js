@@ -79,6 +79,7 @@ const toPet = (apiPet, vaccinations = [], activities = [], foods = [], medicatio
   gender: apiPet.gender,
   microchipped: apiPet.microchipped,
   color: apiPet.color || PET_COLORS[index % PET_COLORS.length],
+  avatarUrl: apiPet.avatar_url || null,
   vaccinations: vaccinations.map(toVax),
   activities: activities.map(toAct),
   favoriteFoods: foods.map(toFood),
@@ -102,6 +103,7 @@ const toPost = (p) => ({
   pawedBy: p.pawed_by_me ? ['me'] : [],
   pawedByMe: p.pawed_by_me,
   comments: p.comment_count ?? 0,
+  imageUrl: p.image_url || null,
   createdAt: p.created_at,
 });
 
@@ -291,6 +293,7 @@ export function DataProvider({ children }) {
         gender: petData.gender || null,
         microchipped: petData.microchipped || false,
         color: PET_COLORS[state.pets.length % PET_COLORS.length],
+        avatar_url: petData.avatarUrl || null,
       });
       const newPet = toPet(apiPet, [], [], [], [], state.pets.length);
       dispatch({ type: 'ADD_PET', payload: newPet });
@@ -313,6 +316,7 @@ export function DataProvider({ children }) {
       if (updates.gender !== undefined)      apiUpdate.gender = updates.gender;
       if (updates.microchipped !== undefined) apiUpdate.microchipped = updates.microchipped;
       if (updates.color !== undefined)       apiUpdate.color = updates.color;
+      if (updates.avatarUrl !== undefined)   apiUpdate.avatar_url = updates.avatarUrl || null;
 
       if (Object.keys(apiUpdate).length > 0) {
         const updated = await patch(`/pets/${petId}`, apiUpdate);
@@ -516,9 +520,9 @@ export function DataProvider({ children }) {
 
   // ── Community ──
 
-  const addPost = async (content) => {
+  const addPost = async (content, imageUrl) => {
     try {
-      const apiPost = await post('/community/posts', { content });
+      const apiPost = await post('/community/posts', { content, image_url: imageUrl || null });
       dispatch({ type: 'ADD_POST', payload: toPost(apiPost) });
     } catch (err) {
       handleApiError(err);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Uploads;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,9 +18,18 @@ class Pet extends Model
 
     protected static function booted(): void
     {
-        // DB-level FK cascades bypass Eloquent events, so clean up the lost-pet
-        // broadcast posts here before the pet (and its reports) are removed.
+        // Delete the old avatar file when it's replaced or cleared.
+        static::updating(function (Pet $pet) {
+            if ($pet->isDirty('avatar_url')) {
+                Uploads::deleteByUrl($pet->getOriginal('avatar_url'));
+            }
+        });
+
         static::deleting(function (Pet $pet) {
+            Uploads::deleteByUrl($pet->avatar_url);
+
+            // DB-level FK cascades bypass Eloquent events, so clean up the lost-pet
+            // broadcast posts here before the pet (and its reports) are removed.
             $postIds = $pet->lostPetReports()->whereNotNull('post_id')->pluck('post_id');
             if ($postIds->isNotEmpty()) {
                 Post::whereIn('id', $postIds)->delete();

@@ -14,3 +14,6 @@ Schedule::command('reminders:send')->everyMinute()->withoutOverlapping();
 
 // Keep the refresh_tokens table from growing without bound.
 Schedule::command('auth:prune-tokens')->daily();
+
+// Sweep uploaded images that are no longer referenced (e.g. abandoned picks).
+Schedule::command('uploads:prune')->daily();

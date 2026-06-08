@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Uploads;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +16,17 @@ class Post extends Model
     protected $keyType = 'string';
 
     public $incrementing = false;
+
+    protected static function booted(): void
+    {
+        static::updating(function (Post $post) {
+            if ($post->isDirty('image_url')) {
+                Uploads::deleteByUrl($post->getOriginal('image_url'));
+            }
+        });
+
+        static::deleting(fn (Post $post) => Uploads::deleteByUrl($post->image_url));
+    }
 
     protected $fillable = ['author_id', 'content', 'image_url', 'group_id'];
 

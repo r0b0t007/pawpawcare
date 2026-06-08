@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, KeyboardAvoidingView, Platform, Alert, Switch, Modal,
+  ScrollView, KeyboardAvoidingView, Platform, Alert, Switch, Modal, Image, ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { pickAndUploadImage } from '../../services/imagePicker';
+import { resolveAsset } from '../../config';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 const PET_TYPES = [
@@ -38,10 +40,21 @@ export default function AddPetScreen({ navigation, route }) {
     weightUnit: existing?.weightUnit || 'kg',
     gender: existing?.gender || 'male',
     microchipped: existing?.microchipped || false,
+    avatarUrl: existing?.avatarUrl || null,
   });
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const pickAvatar = async () => {
+    setUploading(true);
+    const res = await pickAndUploadImage({ aspect: [1, 1] });
+    setUploading(false);
+    if (res.url) set('avatarUrl', res.url);
+    else if (res.error === 'permission') Alert.alert('Permission needed', 'Allow photo access to set a pet photo.');
+    else if (res.error) Alert.alert('Upload failed', 'Could not upload that image. Please try again.');
+  };
 
   const birthdayDate = form.birthday ? new Date(form.birthday + 'T12:00:00') : new Date();
 
@@ -75,6 +88,7 @@ export default function AddPetScreen({ navigation, route }) {
       weightUnit: form.weightUnit,
       gender: form.gender,
       microchipped: form.microchipped,
+      avatarUrl: form.avatarUrl,
     };
     if (isEdit) {
       await updatePet(petId, data);
@@ -100,16 +114,23 @@ export default function AddPetScreen({ navigation, route }) {
             <View style={{ width: 40 }} />
           </View>
 
-          {/* Avatar preview */}
+          {/* Avatar picker */}
           <View style={styles.avatarArea}>
-            <View style={[styles.bigAvatar, { backgroundColor: existing?.color || colors.primaryFixed }]}>
-              <MaterialCommunityIcons
-                name={selectedType?.icon || 'paw'}
-                size={48}
-                color={colors.primaryContainer}
-              />
-            </View>
-            <Text style={styles.avatarHint}>Avatar is auto-generated</Text>
+            <TouchableOpacity onPress={pickAvatar} activeOpacity={0.85} disabled={uploading} style={styles.avatarTap}>
+              <View style={[styles.bigAvatar, { backgroundColor: existing?.color || colors.primaryFixed }]}>
+                {uploading ? (
+                  <ActivityIndicator color={colors.primaryContainer} />
+                ) : form.avatarUrl ? (
+                  <Image source={{ uri: resolveAsset(form.avatarUrl) }} style={styles.bigAvatarImg} />
+                ) : (
+                  <MaterialCommunityIcons name={selectedType?.icon || 'paw'} size={48} color={colors.primaryContainer} />
+                )}
+              </View>
+              <View style={styles.cameraBadge}>
+                <MaterialCommunityIcons name="camera" size={15} color={colors.onPrimary} />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.avatarHint}>{form.avatarUrl ? 'Tap to change photo' : 'Tap to add a photo'}</Text>
           </View>
 
           {/* Pet type */}
@@ -345,13 +366,29 @@ const styles = StyleSheet.create({
   },
   pageTitle: { ...typography.titleLg, color: colors.onBackground },
   avatarArea: { alignItems: 'center', paddingVertical: spacing.md },
+  avatarTap: { position: 'relative' },
   bigAvatar: {
     width: 104,
     height: 104,
     borderRadius: radii.xxl,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
     ...shadows.medium,
+  },
+  bigAvatarImg: { width: '100%', height: '100%' },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 34,
+    height: 34,
+    borderRadius: radii.full,
+    backgroundColor: colors.primaryContainer,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: colors.background,
   },
   avatarHint: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: spacing.sm },
   section: { marginBottom: spacing.sm },

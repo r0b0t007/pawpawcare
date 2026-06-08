@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert,
+  TextInput, Alert, Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { pickAndUploadImage } from '../../services/imagePicker';
+import { resolveAsset } from '../../config';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 function timeAgo(iso) {
@@ -37,11 +39,23 @@ export default function CommunityScreen({ navigation }) {
     getComments, addComment, deleteComment,
   } = useData();
   const [draft, setDraft] = useState('');
+  const [draftImage, setDraftImage] = useState(null);
+  const [attaching, setAttaching] = useState(false);
+
+  const attachImage = async () => {
+    setAttaching(true);
+    const res = await pickAndUploadImage({ aspect: [4, 3] });
+    setAttaching(false);
+    if (res.url) setDraftImage(res.url);
+    else if (res.error === 'permission') Alert.alert('Permission needed', 'Allow photo access to attach a picture.');
+    else if (res.error) Alert.alert('Upload failed', 'Could not upload that image. Please try again.');
+  };
 
   const handlePost = async () => {
     if (!draft.trim()) return;
-    await addPost(draft.trim());
+    await addPost(draft.trim(), draftImage);
     setDraft('');
+    setDraftImage(null);
   };
 
   return (
@@ -108,6 +122,16 @@ export default function CommunityScreen({ navigation }) {
             />
           </View>
           <TouchableOpacity
+            style={styles.attachBtn}
+            onPress={attachImage}
+            disabled={attaching}
+            activeOpacity={0.85}
+          >
+            {attaching
+              ? <ActivityIndicator size="small" color={colors.primaryContainer} />
+              : <MaterialCommunityIcons name="image-plus" size={19} color={colors.primaryContainer} />}
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.sendBtn, !draft.trim() && styles.sendBtnDisabled]}
             onPress={handlePost}
             disabled={!draft.trim()}
@@ -116,6 +140,19 @@ export default function CommunityScreen({ navigation }) {
             <MaterialCommunityIcons name="send" size={17} color={colors.onPrimary} />
           </TouchableOpacity>
         </View>
+
+        {draftImage && (
+          <View style={styles.draftPreview}>
+            <Image source={{ uri: resolveAsset(draftImage) }} style={styles.draftPreviewImg} />
+            <TouchableOpacity
+              style={styles.draftRemove}
+              onPress={() => setDraftImage(null)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <MaterialCommunityIcons name="close" size={16} color={colors.onError} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Feed */}
         <View style={styles.sectionHeader}>
@@ -241,6 +278,9 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment 
         </TouchableOpacity>
       </View>
       <Text style={styles.postContent}>{post.content}</Text>
+      {post.imageUrl ? (
+        <Image source={{ uri: resolveAsset(post.imageUrl) }} style={styles.postImage} resizeMode="cover" />
+      ) : null}
       <View style={styles.postDivider} />
       <View style={styles.postActions}>
         <TouchableOpacity style={styles.actionBtn} onPress={onPaw} activeOpacity={0.85}>
@@ -512,6 +552,40 @@ const styles = StyleSheet.create({
     backgroundColor: colors.secondary,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  attachBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.full,
+    backgroundColor: colors.primaryFixed,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  draftPreview: {
+    marginHorizontal: spacing.margin,
+    marginBottom: spacing.sm,
+    borderRadius: radii.lg,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  draftPreviewImg: { width: '100%', height: 160, borderRadius: radii.lg },
+  draftRemove: {
+    position: 'absolute',
+    top: spacing.xs,
+    right: spacing.xs,
+    width: 28,
+    height: 28,
+    borderRadius: radii.full,
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  postImage: {
+    width: '100%',
+    height: 220,
+    borderRadius: radii.lg,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surfaceContainerLow,
   },
   empty: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
   emptyIllustration: {

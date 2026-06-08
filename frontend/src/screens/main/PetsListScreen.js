@@ -1,10 +1,11 @@
 import React from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, Alert,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { resolveAsset } from '../../config';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 function statusBadge(vax) {
@@ -44,7 +45,11 @@ export default function PetsListScreen({ navigation }) {
         <View style={[styles.colorStrip, { backgroundColor: pet.color || colors.primaryFixed }]} />
         <View style={styles.cardContent}>
           <View style={[styles.avatar, { backgroundColor: pet.color || colors.primaryFixed }]}>
-            <Text style={styles.avatarText}>{pet.name[0]}</Text>
+            {pet.avatarUrl ? (
+              <Image source={{ uri: resolveAsset(pet.avatarUrl) }} style={styles.avatarImg} />
+            ) : (
+              <Text style={styles.avatarText}>{pet.name[0]}</Text>
+            )}
           </View>
           <View style={styles.info}>
             <View style={styles.nameRow}>
@@ -174,8 +179,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.8)',
+    overflow: 'hidden',
     ...shadows.card,
   },
+  avatarImg: { width: '100%', height: '100%' },
   avatarText: { ...typography.headlineMd, color: colors.primaryContainer, fontSize: 28 },
   info: { flex: 1, gap: spacing.sm },
   nameRow: {

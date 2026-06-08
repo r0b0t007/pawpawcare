@@ -79,6 +79,9 @@ php artisan key:generate
 # Run migrations + seed the default community groups
 php artisan migrate --seed
 
+# Link public storage so uploaded images (pet photos, post images) are served
+php artisan storage:link
+
 # Start the API server (bind 0.0.0.0 so devices/emulators can reach it)
 php artisan serve --host=0.0.0.0 --port=8000
 # → Running at http://0.0.0.0:8000

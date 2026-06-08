@@ -117,3 +117,46 @@ export const get  = (path, opts) => request('GET',    path, undefined, opts);
 export const post = (path, body, opts) => request('POST',   path, body, opts);
 export const patch = (path, body, opts) => request('PATCH',  path, body, opts);
 export const del  = (path, opts) => request('DELETE', path, undefined, opts);
+
+// ── Image upload (multipart) ──────────────────────────────────────────────────
+
+export async function uploadImage(localUri) {
+  const name = (localUri.split('/').pop() || 'photo.jpg').split('?')[0];
+  const ext = (/\.(\w+)$/.exec(name)?.[1] || 'jpg').toLowerCase();
+  const type = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const send = (token) => {
+    const form = new FormData();
+    form.append('file', { uri: localUri, name, type });
+    return fetch(`${API_URL}/uploads`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'bypass-tunnel-reminder': 'true',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: form,
+    });
+  };
+
+  const { access } = await getTokens();
+  let res = await send(access);
+
+  // Share the request() refresh path: retry once with a fresh token on 401.
+  if (res.status === 401) {
+    let newToken;
+    try {
+      newToken = await refreshAccessToken();
+    } catch {
+      throw new Error('SESSION_EXPIRED');
+    }
+    res = await send(newToken);
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.detail || `Image upload failed (${res.status})`);
+  }
+  const data = await res.json();
+  return data.url; // relative /storage/... path, resolved client-side
+}
