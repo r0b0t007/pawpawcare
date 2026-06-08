@@ -68,6 +68,11 @@ Route::middleware('auth.jwt')->group(function () {
     Route::post('/pets/{pet}/weights', [PetController::class, 'addWeight']);
     Route::delete('/pets/{pet}/weights/{weight}', [PetController::class, 'deleteWeight']);
 
+    // Expenses
+    Route::get('/pets/{pet}/expenses', [PetController::class, 'listExpenses']);
+    Route::post('/pets/{pet}/expenses', [PetController::class, 'addExpense']);
+    Route::delete('/pets/{pet}/expenses/{expense}', [PetController::class, 'deleteExpense']);
+
     // Lost pets (community alerts)
     Route::get('/lost-pets', [LostPetController::class, 'index']);
     Route::get('/lost-pets/mine', [LostPetController::class, 'mine']);

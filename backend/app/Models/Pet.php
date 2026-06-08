@@ -92,6 +92,11 @@ class Pet extends Model
         return $this->hasMany(WeightLog::class);
     }
 
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(Expense::class);
+    }
+
     /** Serialize to the public `PetOut` shape. */
     public function toApi(): array
     {

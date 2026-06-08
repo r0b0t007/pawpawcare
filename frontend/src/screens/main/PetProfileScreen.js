@@ -9,12 +9,23 @@ import { useData } from '../../context/DataContext';
 import { resolveAsset } from '../../config';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
+const EXPENSE_CATEGORIES = [
+  { id: 'vet', label: 'Vet', icon: 'medical-bag' },
+  { id: 'food', label: 'Food', icon: 'food-drumstick' },
+  { id: 'grooming', label: 'Grooming', icon: 'content-cut' },
+  { id: 'medication', label: 'Meds', icon: 'pill' },
+  { id: 'supplies', label: 'Supplies', icon: 'package-variant' },
+  { id: 'insurance', label: 'Insurance', icon: 'shield-check' },
+  { id: 'other', label: 'Other', icon: 'tag-outline' },
+];
+const catMeta = (id) => EXPENSE_CATEGORIES.find((c) => c.id === id) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
+
 export default function PetProfileScreen({ navigation, route }) {
   const { petId } = route.params;
   const {
     pets, myReports, addFavoriteFood, removeFavoriteFood, addActivity,
     addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
-    addWeight, deleteWeight,
+    addWeight, deleteWeight, addExpense, deleteExpense,
   } = useData();
   const pet = pets.find((p) => p.id === petId);
   const activeReport = (myReports || []).find((r) => r.petId === petId && r.status === 'active');
@@ -29,6 +40,8 @@ export default function PetProfileScreen({ navigation, route }) {
   const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
   const [lostForm, setLostForm] = useState({ lastSeenLocation: '', description: '', contactPhone: '' });
   const [newWeight, setNewWeight] = useState({ value: '', unit: pet?.weightUnit || 'kg' });
+  const [expenseModal, setExpenseModal] = useState(false);
+  const [newExpense, setNewExpense] = useState({ category: 'vet', amount: '', notes: '' });
 
   if (!pet) {
     return (
@@ -102,6 +115,14 @@ export default function PetProfileScreen({ navigation, route }) {
     setWeightModal(false);
   };
 
+  const handleAddExpense = async () => {
+    const amt = parseFloat(newExpense.amount);
+    if (!amt || amt <= 0) return;
+    await addExpense(petId, { category: newExpense.category, amount: amt, notes: newExpense.notes.trim() || null });
+    setNewExpense({ category: 'vet', amount: '', notes: '' });
+    setExpenseModal(false);
+  };
+
   const upcoming = (pet.vaccinations || []).filter((v) => v.status !== 'completed');
   const nextVax = upcoming[0];
   const petColor = pet.color || colors.primaryFixed;
@@ -110,6 +131,12 @@ export default function PetProfileScreen({ navigation, route }) {
   const latestWeight = weights[weights.length - 1];
   const prevWeight = weights.length >= 2 ? weights[weights.length - 2] : null;
   const weightTrend = latestWeight && prevWeight ? latestWeight.weight - prevWeight.weight : null;
+
+  const expenses = pet.expenses || [];
+  const monthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const thisMonthSpend = expenses
+    .filter((e) => (e.incurredOn || '').startsWith(monthPrefix))
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -326,6 +353,58 @@ export default function PetProfileScreen({ navigation, route }) {
                 ])}
               />
             ))
+          )}
+        </View>
+
+        {/* Expenses */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Expenses</Text>
+            <TouchableOpacity
+              onPress={() => setExpenseModal(true)}
+              style={styles.addIconBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="plus" size={18} color={colors.onPrimary} />
+            </TouchableOpacity>
+          </View>
+          {expenses.length === 0 ? (
+            <TouchableOpacity style={styles.emptyState} onPress={() => setExpenseModal(true)} activeOpacity={0.88}>
+              <MaterialCommunityIcons name="cash-multiple" size={24} color={colors.primaryContainer} />
+              <Text style={styles.emptyStateText}>Track {pet.name}'s expenses</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <View style={styles.spendCard}>
+                <Text style={styles.spendLabel}>This month</Text>
+                <Text style={styles.spendValue}>{thisMonthSpend.toFixed(2)}</Text>
+              </View>
+              {expenses.slice(0, 5).map((e) => {
+                const m = catMeta(e.category);
+                return (
+                  <View key={e.id} style={styles.expenseRow}>
+                    <View style={styles.expenseIcon}>
+                      <MaterialCommunityIcons name={m.icon} size={16} color={colors.primaryContainer} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.expenseCat}>{m.label}{e.notes ? <Text style={styles.expenseNote}>  ·  {e.notes}</Text> : null}</Text>
+                      <Text style={styles.expenseDate}>{fullDate(e.incurredOn)}</Text>
+                    </View>
+                    <Text style={styles.expenseAmount}>{Number(e.amount).toFixed(2)}</Text>
+                    <TouchableOpacity
+                      onPress={() => Alert.alert('Delete expense', `Remove this ${m.label.toLowerCase()} expense?`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => deleteExpense(petId, e.id) },
+                      ])}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      style={{ paddingLeft: spacing.xs }}
+                    >
+                      <MaterialCommunityIcons name="close" size={15} color={colors.outline} />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </>
           )}
         </View>
 
@@ -601,6 +680,58 @@ export default function PetProfileScreen({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalAdd} onPress={handleAddWeight} activeOpacity={0.88}>
                 <Text style={styles.modalAddText}>Log Weight</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Add Expense Modal */}
+      <Modal visible={expenseModal} transparent animationType="slide">
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalTitle}>Add expense for {pet.name}</Text>
+            <Text style={styles.fieldLabel}>Category</Text>
+            <View style={styles.catWrap}>
+              {EXPENSE_CATEGORIES.map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  style={[styles.catChip, newExpense.category === c.id && styles.timeChipActive]}
+                  onPress={() => setNewExpense({ ...newExpense, category: c.id })}
+                  activeOpacity={0.88}
+                >
+                  <MaterialCommunityIcons
+                    name={c.icon}
+                    size={14}
+                    color={newExpense.category === c.id ? colors.onPrimary : colors.onSurfaceVariant}
+                  />
+                  <Text style={[styles.catChipText, newExpense.category === c.id && { color: colors.onPrimary }]}>{c.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={[styles.modalInput, { marginTop: spacing.md }]}
+              placeholder="Amount (e.g. 45.00)"
+              placeholderTextColor={colors.outlineVariant}
+              value={newExpense.amount}
+              onChangeText={(v) => setNewExpense({ ...newExpense, amount: v })}
+              keyboardType="decimal-pad"
+              autoFocus
+            />
+            <TextInput
+              style={[styles.modalInput, { marginTop: spacing.sm }]}
+              placeholder="Note (optional)"
+              placeholderTextColor={colors.outlineVariant}
+              value={newExpense.notes}
+              onChangeText={(v) => setNewExpense({ ...newExpense, notes: v })}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setExpenseModal(false)} activeOpacity={0.88}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalAdd} onPress={handleAddExpense} activeOpacity={0.88}>
+                <Text style={styles.modalAddText}>Add Expense</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1026,6 +1157,50 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
   },
   unitToggleText: { ...typography.labelMd, color: colors.primaryContainer },
+  spendCard: {
+    backgroundColor: colors.secondaryFixed,
+    borderRadius: radii.lg,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  spendLabel: { ...typography.labelMd, color: colors.onSecondaryFixed || colors.secondary },
+  spendValue: { ...typography.headlineMd, color: colors.secondary, fontSize: 22 },
+  expenseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceContainerLow,
+  },
+  expenseIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: radii.full,
+    backgroundColor: colors.primaryFixed,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  expenseCat: { ...typography.labelMd, color: colors.onSurface },
+  expenseNote: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  expenseDate: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 1 },
+  expenseAmount: { ...typography.labelMd, color: colors.onSurface, fontFamily: 'PlusJakartaSans_700Bold' },
+  catWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  catChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radii.full,
+    backgroundColor: colors.surfaceContainerLow,
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+  },
+  catChipText: { ...typography.labelSm, color: colors.onSurfaceVariant },
   foodsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   foodChip: {
     flexDirection: 'row',

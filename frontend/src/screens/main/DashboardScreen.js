@@ -34,6 +34,12 @@ export default function DashboardScreen({ navigation }) {
   // Badge reflects unread notifications specifically (not "things due").
   const bellCount = unreadCount;
 
+  const monthPrefix = new Date().toISOString().slice(0, 7);
+  const monthSpend = pets
+    .flatMap((p) => p.expenses || [])
+    .filter((e) => (e.incurredOn || '').startsWith(monthPrefix))
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
   const firstName = user?.name?.split(' ')[0] || 'Friend';
 
   return (
@@ -86,6 +92,23 @@ export default function DashboardScreen({ navigation }) {
             iconBg="rgba(8,90,192,0.12)"
           />
         </View>
+
+        {monthSpend > 0 && (
+          <TouchableOpacity
+            style={styles.spendBanner}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('Pets')}
+          >
+            <View style={styles.spendIcon}>
+              <MaterialCommunityIcons name="wallet-outline" size={20} color={colors.secondary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.spendLabel}>Spent on pets this month</Text>
+              <Text style={styles.spendValue}>{monthSpend.toFixed(2)}</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
+          </TouchableOpacity>
+        )}
 
         {/* My Pets */}
         <SectionHeader title="My Pets" onPress={() => navigation.navigate('Pets')} />
@@ -280,6 +303,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.margin,
     marginBottom: spacing.md,
   },
+  spendBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.margin,
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surfaceContainerLowest,
+    ...shadows.card,
+    borderWidth: 1,
+    borderColor: colors.secondaryFixed,
+  },
+  spendIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.full,
+    backgroundColor: colors.secondaryFixed,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  spendLabel: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  spendValue: { ...typography.headlineMd, color: colors.secondary, fontSize: 20 },
   statCard: {
     flex: 1,
     padding: spacing.sm,

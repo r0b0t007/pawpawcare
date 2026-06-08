@@ -61,6 +61,14 @@ const toWeight = (w) => ({
   notes: w.notes || null,
 });
 
+const toExpense = (e) => ({
+  id: e.id,
+  category: e.category || 'other',
+  amount: e.amount,
+  incurredOn: e.incurred_on,
+  notes: e.notes || null,
+});
+
 const toMed = (m) => ({
   id: m.id,
   name: m.name,
@@ -76,7 +84,7 @@ const toMed = (m) => ({
 
 const toPet = (apiPet, opts = {}) => {
   const {
-    vaccinations = [], activities = [], foods = [], medications = [], weights = [], index = 0,
+    vaccinations = [], activities = [], foods = [], medications = [], weights = [], expenses = [], index = 0,
   } = opts;
   return {
   id: apiPet.id,
@@ -97,6 +105,7 @@ const toPet = (apiPet, opts = {}) => {
   favoriteFoods: foods.map(toFood),
   medications: medications.map(toMed),
   weights: weights.map(toWeight),
+  expenses: expenses.map(toExpense),
   healthStats: {
     heartRate: apiPet.heart_rate || 0,
     weightStatus: apiPet.weight ? 'Ideal' : 'Unknown',
@@ -209,14 +218,15 @@ export function DataProvider({ children }) {
       // Load each pet's sub-resources in parallel
       const petsWithData = await Promise.all(
         apiPets.map(async (apiPet, i) => {
-          const [vax, acts, foods, meds, weights] = await Promise.all([
+          const [vax, acts, foods, meds, weights, expenses] = await Promise.all([
             get(`/pets/${apiPet.id}/vaccinations`),
             get(`/pets/${apiPet.id}/activities`),
             get(`/pets/${apiPet.id}/foods`),
             get(`/pets/${apiPet.id}/medications`),
             get(`/pets/${apiPet.id}/weights`),
+            get(`/pets/${apiPet.id}/expenses`),
           ]);
-          return toPet(apiPet, { vaccinations: vax, activities: acts, foods, medications: meds, weights, index: i });
+          return toPet(apiPet, { vaccinations: vax, activities: acts, foods, medications: meds, weights, expenses, index: i });
         })
       );
 
@@ -508,6 +518,35 @@ export function DataProvider({ children }) {
     }
   };
 
+  // ── Expenses ──
+
+  const addExpense = async (petId, entry) => {
+    try {
+      const apiE = await post(`/pets/${petId}/expenses`, {
+        category: entry.category || 'other',
+        amount: parseFloat(entry.amount),
+        incurred_on: entry.incurredOn || undefined,
+        notes: entry.notes || undefined,
+      });
+      const newE = toExpense(apiE);
+      const pet = state.pets.find((p) => p.id === petId);
+      dispatch({ type: 'UPDATE_PET', payload: { ...pet, expenses: [newE, ...(pet.expenses || [])] } });
+      return newE;
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  const deleteExpense = async (petId, expenseId) => {
+    try {
+      await del(`/pets/${petId}/expenses/${expenseId}`);
+      const pet = state.pets.find((p) => p.id === petId);
+      dispatch({ type: 'UPDATE_PET', payload: { ...pet, expenses: (pet.expenses || []).filter((e) => e.id !== expenseId) } });
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
   // ── Medications ──
 
   const addMedication = async (petId, med) => {
@@ -687,6 +726,8 @@ export function DataProvider({ children }) {
         addActivity,
         addWeight,
         deleteWeight,
+        addExpense,
+        deleteExpense,
         addMedication,
         updateMedication,
         deleteMedication,
