@@ -101,4 +101,23 @@ class CommentTest extends TestCase
         $this->withToken($token)->deleteJson("/community/posts/{$post->id}")->assertNoContent();
         $this->assertSame(0, Comment::count());
     }
+
+    public function test_empty_comment_is_rejected(): void
+    {
+        [$author, $token] = $this->user();
+        $post = $this->makePost($author);
+
+        $this->withToken($token)->postJson("/community/posts/{$post->id}/comments", ['content' => ''])
+            ->assertStatus(422);
+    }
+
+    public function test_overlong_comment_is_rejected(): void
+    {
+        [$author, $token] = $this->user();
+        $post = $this->makePost($author);
+
+        $this->withToken($token)->postJson("/community/posts/{$post->id}/comments", [
+            'content' => str_repeat('a', 2001),
+        ])->assertStatus(422);
+    }
 }

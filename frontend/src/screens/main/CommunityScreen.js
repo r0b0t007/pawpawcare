@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput,
+  TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -32,7 +32,10 @@ const GROUP_COLORS = [
 
 export default function CommunityScreen({ navigation }) {
   const { user } = useAuth();
-  const { posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets } = useData();
+  const {
+    posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets,
+    getComments, addComment, deleteComment,
+  } = useData();
   const [draft, setDraft] = useState('');
 
   const handlePost = async () => {
@@ -122,7 +125,15 @@ export default function CommunityScreen({ navigation }) {
           )}
         </View>
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} userId={user?.id} onPaw={() => togglePaw(post.id)} />
+          <PostCard
+            key={post.id}
+            post={post}
+            userId={user?.id}
+            onPaw={() => togglePaw(post.id)}
+            getComments={getComments}
+            addComment={addComment}
+            deleteComment={deleteComment}
+          />
         ))}
         {posts.length === 0 && (
           <View style={styles.empty}>
@@ -169,21 +180,21 @@ function GroupCard({ group, palette, onToggle }) {
   );
 }
 
-function PostCard({ post, userId, onPaw }) {
+function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment }) {
   const hasPawed = !!post.pawedByMe;
   const bg = avatarColor(post.authorName);
-  const { getComments, addComment, deleteComment } = useData();
 
   const [expanded, setExpanded] = useState(false);
-  const [comments, setComments] = useState(null); // null = not loaded yet
+  const [comments, setComments] = useState(null); // null = never loaded
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
 
   const toggleComments = async () => {
     const next = !expanded;
     setExpanded(next);
-    if (next && comments === null) {
-      setLoading(true);
+    if (next) {
+      // Reload on every expand so comments from others appear; spinner only first time.
+      if (comments === null) setLoading(true);
       setComments(await getComments(post.id));
       setLoading(false);
     }
@@ -194,12 +205,25 @@ function PostCard({ post, userId, onPaw }) {
     if (!text) return;
     setDraft('');
     const c = await addComment(post.id, text);
-    if (c) setComments((prev) => [...(prev || []), c]);
+    if (c) {
+      setComments((prev) => [...(prev || []), c]);
+    } else {
+      setDraft(text); // restore the typed comment if the request failed
+    }
   };
 
-  const removeComment = async (id) => {
-    await deleteComment(post.id, id);
-    setComments((prev) => (prev || []).filter((c) => c.id !== id));
+  const removeComment = (id) => {
+    Alert.alert('Delete comment', 'Remove this comment?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteComment(post.id, id);
+          setComments((prev) => (prev || []).filter((c) => c.id !== id));
+        },
+      },
+    ]);
   };
 
   return (

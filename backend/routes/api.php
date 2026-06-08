@@ -71,7 +71,7 @@ Route::middleware('auth.jwt')->group(function () {
     Route::delete('/community/posts/{post}', [CommunityController::class, 'deletePost']);
     Route::post('/community/posts/{post}/paw', [CommunityController::class, 'togglePaw']);
     Route::get('/community/posts/{post}/comments', [CommunityController::class, 'listComments']);
-    Route::post('/community/posts/{post}/comments', [CommunityController::class, 'addComment']);
+    Route::post('/community/posts/{post}/comments', [CommunityController::class, 'addComment'])->middleware('throttle:30,1');
     Route::delete('/community/posts/{post}/comments/{comment}', [CommunityController::class, 'deleteComment']);
     Route::get('/community/groups', [CommunityController::class, 'listGroups']);
     Route::post('/community/groups/{group}/join', [CommunityController::class, 'toggleGroup']);
