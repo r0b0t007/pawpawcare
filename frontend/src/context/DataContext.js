@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { PET_COLORS } from '../theme';
 import { get, post, patch, del } from '../services/api';
+import { scheduleLocalReminders } from '../services/notifications';
 
 const DataContext = createContext(null);
 
@@ -113,6 +114,8 @@ function dataReducer(state, action) {
     case 'UPDATE_POST':return { ...state, posts: state.posts.map((p) => (p.id === action.payload.id ? action.payload : p)) };
     case 'SET_GROUPS':   return { ...state, groups: action.payload };
     case 'UPDATE_GROUP': return { ...state, groups: state.groups.map((g) => (g.id === action.payload.id ? action.payload : g)) };
+    case 'SET_REMINDERS':     return { ...state, reminders: action.payload };
+    case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload.notifications || [], unreadCount: action.payload.unread_count || 0 };
     default:           return state;
   }
 }
@@ -120,7 +123,9 @@ function dataReducer(state, action) {
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function DataProvider({ children }) {
-  const [state, dispatch] = useReducer(dataReducer, { pets: [], posts: [], groups: [] });
+  const [state, dispatch] = useReducer(dataReducer, {
+    pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
+  });
   const { user, logout } = useAuth();
 
   useEffect(() => {
@@ -129,6 +134,8 @@ export function DataProvider({ children }) {
     } else {
       dispatch({ type: 'SET_PETS', payload: [] });
       dispatch({ type: 'SET_POSTS', payload: [] });
+      dispatch({ type: 'SET_REMINDERS', payload: [] });
+      dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: [], unread_count: 0 } });
     }
   }, [user?.id]);
 
@@ -138,10 +145,12 @@ export function DataProvider({ children }) {
 
   const loadData = async () => {
     try {
-      const [apiPets, apiPosts, apiGroups] = await Promise.all([
+      const [apiPets, apiPosts, apiGroups, apiReminders, apiNotifications] = await Promise.all([
         get('/pets'),
         get('/community/posts'),
         get('/community/groups'),
+        get('/reminders'),
+        get('/notifications'),
       ]);
 
       // Load each pet's sub-resources in parallel
@@ -159,9 +168,73 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_PETS',   payload: petsWithData });
       dispatch({ type: 'SET_POSTS',  payload: apiPosts.map(toPost) });
       dispatch({ type: 'SET_GROUPS', payload: apiGroups.map(toGroup) });
+      dispatch({ type: 'SET_REMINDERS', payload: apiReminders });
+      dispatch({ type: 'SET_NOTIFICATIONS', payload: apiNotifications });
+
+      // Mirror server reminders onto on-device local notifications (primary delivery).
+      scheduleLocalReminders(apiReminders);
     } catch (err) {
       handleApiError(err);
     }
+  };
+
+  // ── Reminders & notifications ──
+
+  const refreshReminders = async () => {
+    try {
+      const reminders = await get('/reminders');
+      dispatch({ type: 'SET_REMINDERS', payload: reminders });
+      scheduleLocalReminders(reminders);
+    } catch (err) { handleApiError(err); }
+  };
+
+  const refreshNotifications = async () => {
+    try {
+      const data = await get('/notifications');
+      dispatch({ type: 'SET_NOTIFICATIONS', payload: data });
+    } catch (err) { handleApiError(err); }
+  };
+
+  const addReminder = async (payload) => {
+    try {
+      await post('/reminders', payload);
+      await refreshReminders();
+    } catch (err) { handleApiError(err); }
+  };
+
+  const updateReminder = async (id, updates) => {
+    try {
+      await patch(`/reminders/${id}`, updates);
+      await refreshReminders();
+    } catch (err) { handleApiError(err); }
+  };
+
+  const deleteReminder = async (id) => {
+    try {
+      await del(`/reminders/${id}`);
+      await refreshReminders();
+    } catch (err) { handleApiError(err); }
+  };
+
+  const markNotificationRead = async (id) => {
+    try {
+      await post(`/notifications/${id}/read`);
+      await refreshNotifications();
+    } catch (err) { handleApiError(err); }
+  };
+
+  const snoozeNotification = async (id, minutes = 60) => {
+    try {
+      await post(`/notifications/${id}/snooze`, { minutes });
+      await Promise.all([refreshNotifications(), refreshReminders()]);
+    } catch (err) { handleApiError(err); }
+  };
+
+  const dismissNotification = async (id) => {
+    try {
+      await post(`/notifications/${id}/dismiss`);
+      await refreshNotifications();
+    } catch (err) { handleApiError(err); }
   };
 
   // ── Pet CRUD ──
@@ -336,6 +409,9 @@ export function DataProvider({ children }) {
         pets: state.pets,
         posts: state.posts,
         groups: state.groups,
+        reminders: state.reminders,
+        notifications: state.notifications,
+        unreadCount: state.unreadCount,
         addPet,
         updatePet,
         deletePet,
@@ -348,6 +424,14 @@ export function DataProvider({ children }) {
         addPost,
         togglePaw,
         toggleGroupMembership,
+        refreshReminders,
+        refreshNotifications,
+        addReminder,
+        updateReminder,
+        deleteReminder,
+        markNotificationRead,
+        snoozeNotification,
+        dismissNotification,
       }}
     >
       {children}

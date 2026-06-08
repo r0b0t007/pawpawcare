@@ -1,6 +1,6 @@
 # PawPawCare
 
-A mobile app for managing pet health — vaccinations, activities, favorite foods, and a community feed. Built with React Native (Expo) and a Python FastAPI backend.
+A mobile app for managing pet health — vaccinations, activities, favorite foods, and a community feed. Built with React Native (Expo) and a Laravel 13 REST API backend.
 
 ---
 
@@ -21,18 +21,21 @@ pawpawcare/
 │   ├── eas.json            # Build profiles (dev / preview / production)
 │   └── scripts/
 │       └── bump-version.js # Version bump helper
-├── backend/                # Python FastAPI REST API
+├── backend/                # Laravel 13 REST API
 │   ├── app/
-│   │   ├── main.py         # App entry point, CORS, routers
-│   │   ├── models.py       # SQLAlchemy models
-│   │   ├── schemas.py      # Pydantic request/response schemas
-│   │   ├── security.py     # JWT + bcrypt
-│   │   ├── seed.py         # Default community groups
-│   │   └── routers/        # auth / users / pets / community / dashboard
-│   ├── requirements.txt
+│   │   ├── Http/
+│   │   │   ├── Controllers/ # Auth / User / Pet / Community / Dashboard
+│   │   │   └── Middleware/   # JwtAuth (Bearer token guard)
+│   │   ├── Models/          # Eloquent models (User, Pet, Vaccination, …)
+│   │   └── Services/        # JwtService (access + refresh tokens)
+│   ├── routes/api.php       # All API routes (mounted at root, no /api prefix)
+│   ├── database/
+│   │   ├── migrations/      # Schema
+│   │   └── seeders/         # Default community groups
+│   ├── config/jwt.php       # Token settings
+│   ├── composer.json
 │   ├── Dockerfile
-│   ├── docker-compose.yml
-│   └── run_dev.py          # Local dev runner (SQLite, no Docker needed)
+│   └── docker-compose.yml   # MySQL + API
 ├── design/                 # Original HTML mockups and design specs
 └── .github/workflows/      # CI/CD pipelines
     ├── ota-update.yml      # Push to main → OTA update (no store review)
@@ -47,7 +50,9 @@ pawpawcare/
 | Tool | Version | Install |
 |---|---|---|
 | Node.js | 20+ | [nodejs.org](https://nodejs.org) |
-| Python | 3.12+ | [python.org](https://python.org) |
+| PHP | 8.2+ | [php.net](https://php.net) (or [XAMPP](https://www.apachefriends.org)) |
+| Composer | 2+ | [getcomposer.org](https://getcomposer.org) |
+| MySQL / MariaDB | 8+ / 10.4+ | bundled with XAMPP, or [mysql.com](https://mysql.com) |
 | Expo Go | latest | App Store / Google Play |
 | EAS CLI | latest | `npm install -g eas-cli` |
 
@@ -60,17 +65,45 @@ pawpawcare/
 ```bash
 cd backend
 
-# Install dependencies
-pip install -r requirements.txt
+# Install PHP dependencies
+composer install
 
-# Configure environment (SQLite by default — no database install needed)
+# Configure environment
 cp .env.example .env
+php artisan key:generate
 
-# Start the API server
-python run_dev.py
+# Create the database (MySQL/MariaDB). With XAMPP running:
+#   mysql -u root -e "CREATE DATABASE pawpawcare CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+# Then adjust DB_* values in .env if your credentials differ.
+
+# Run migrations + seed the default community groups
+php artisan migrate --seed
+
+# Start the API server (bind 0.0.0.0 so devices/emulators can reach it)
+php artisan serve --host=0.0.0.0 --port=8000
 # → Running at http://0.0.0.0:8000
-# → Docs at  http://localhost:8000/docs
+# → Health check at http://localhost:8000/health
 ```
+
+#### Reminders scheduler
+
+Vaccination & custom reminders are delivered primarily as on-device local
+notifications, with a server-side push backstop. The backstop needs the Laravel
+scheduler running:
+
+```bash
+# Local dev — run alongside the server:
+php artisan schedule:work
+
+# Production — add ONE cron entry:
+# * * * * * cd /path/to/backend && php artisan schedule:run >> /dev/null 2>&1
+```
+
+> **Push on real devices:** remote push requires an Expo **development build**
+> (`npm run build:dev`) — Expo Go (SDK 53+) doesn't support it. Local
+> notifications work in Expo Go, so reminders are testable without a build.
+> Run `php artisan reminders:backfill-vaccinations` once to create reminders for
+> vaccinations that already existed before this feature.
 
 > **Windows firewall:** If other devices need to reach the backend, allow port 8000 in an Admin PowerShell:
 > ```powershell
@@ -130,15 +163,17 @@ export const API_URL = 'https://some-name.loca.lt';
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | `sqlite+aiosqlite:///./pawpawcare.db` | SQLite (dev) or PostgreSQL (prod) |
-| `SECRET_KEY` | `local-dev-secret-key-...` | JWT signing key — **change in production** |
+| `DB_CONNECTION` | `mysql` | Database driver (`mysql`, or `sqlite` for zero-setup dev) |
+| `DB_HOST` / `DB_PORT` | `127.0.0.1` / `3306` | Database host & port |
+| `DB_DATABASE` | `pawpawcare` | Database name |
+| `DB_USERNAME` / `DB_PASSWORD` | `root` / *(empty)* | Database credentials |
+| `SECRET_KEY` | `change-me-...` | JWT signing key — **change in production** |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token lifetime |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `30` | Refresh token lifetime |
+| `ALLOWED_ORIGINS` | *(wildcard)* | Comma-separated CORS origins (lock down in prod) |
 
-To use PostgreSQL instead of SQLite, set:
-```
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/pawpawcare
-```
+To use SQLite instead of MySQL (no DB server needed), set `DB_CONNECTION=sqlite`
+and run `touch database/database.sqlite` before migrating.
 
 ### Frontend — `frontend/src/config.js`
 
@@ -148,12 +183,13 @@ DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/pawpawcare
 
 ---
 
-## Running with Docker (PostgreSQL)
+## Running with Docker (MySQL)
 
 ```bash
 cd backend
 cp .env.example .env        # set a strong SECRET_KEY
-docker compose up --build   # starts PostgreSQL + API
+php artisan key:generate    # or set APP_KEY in .env
+docker compose up --build   # starts MySQL + API (auto-migrates + seeds)
 # → API at http://localhost:8000
 ```
 
@@ -161,10 +197,13 @@ docker compose up --build   # starts PostgreSQL + API
 
 ## API reference
 
-Interactive docs are available when the backend is running:
+A health check is available when the backend is running:
 
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
+- Health: `http://localhost:8000/health` → `{"status":"ok","version":"1.0.0"}`
+
+All responses are JSON with snake_case fields; errors return `{"detail": "..."}`.
+Authentication is via `Authorization: Bearer <access_token>` (JWT), with refresh-token
+rotation at `POST /auth/refresh`.
 
 ### Endpoints summary
 

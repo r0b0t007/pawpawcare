@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { get, post, patch, storeTokens, clearTokens } from '../services/api';
+import { get, post, patch, request, storeTokens, clearTokens } from '../services/api';
+import {
+  registerForPushNotificationsAsync,
+  deviceTimezone,
+  cancelAllLocalReminders,
+} from '../services/notifications';
+
+const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
 
 const AuthContext = createContext(null);
 
@@ -19,10 +26,37 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { loadUser(); }, []);
 
+  // Register this device's push token + timezone with the backend so reminders
+  // fire at the right local time. Safe to call repeatedly (idempotent upsert).
+  const syncDevice = async () => {
+    const tz = deviceTimezone();
+    // Always tell the server the timezone — needed even when push is unavailable.
+    patch('/users/me', { timezone: tz }).catch(() => {});
+    try {
+      const reg = await registerForPushNotificationsAsync();
+      if (reg?.token) {
+        await post('/devices', { token: reg.token, platform: reg.platform, timezone: tz }).catch(() => {});
+        await AsyncStorage.setItem(PUSH_TOKEN_KEY, reg.token);
+      }
+    } catch (_) {}
+  };
+
+  const deregisterDevice = async () => {
+    try {
+      const token = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
+      if (token) {
+        await request('DELETE', '/devices', { token }).catch(() => {});
+        await AsyncStorage.removeItem(PUSH_TOKEN_KEY);
+      }
+    } catch (_) {}
+    await cancelAllLocalReminders();
+  };
+
   const loadUser = async () => {
     try {
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
+      syncDevice();
     } catch (err) {
       if (err.message === 'SESSION_EXPIRED') await clearTokens();
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -36,6 +70,7 @@ export function AuthProvider({ children }) {
       await storeTokens(tokens.access_token, tokens.refresh_token);
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
+      syncDevice();
       return true;
     } catch (err) {
       dispatch({ type: 'SET_ERROR', payload: err.message || 'Something went wrong. Please try again.' });
@@ -50,6 +85,7 @@ export function AuthProvider({ children }) {
       await storeTokens(tokens.access_token, tokens.refresh_token);
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
+      syncDevice();
       return true;
     } catch (err) {
       dispatch({ type: 'SET_ERROR', payload: err.message || 'Invalid email or password.' });
@@ -63,6 +99,7 @@ export function AuthProvider({ children }) {
         .then((p) => ({ refresh: p[0][1] }));
       if (refresh) await post('/auth/logout', { refresh_token: refresh }).catch(() => {});
     } catch (_) {}
+    await deregisterDevice();
     await clearTokens();
     dispatch({ type: 'LOGOUT' });
   };

@@ -1,0 +1,16 @@
+<?php
+
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
+
+Artisan::command('inspire', function () {
+    $this->comment(Inspiring::quote());
+})->purpose('Display an inspiring quote');
+
+// Scan for due reminders every minute. Requires a cron entry running
+// `php artisan schedule:run` in production (or `php artisan schedule:work` in dev).
+Schedule::command('reminders:send')->everyMinute()->withoutOverlapping();
+
+// Keep the refresh_tokens table from growing without bound.
+Schedule::command('auth:prune-tokens')->daily();
