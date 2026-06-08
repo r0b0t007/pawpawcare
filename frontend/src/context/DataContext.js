@@ -53,6 +53,14 @@ const toAct = (a) => ({
 
 const toFood = (f) => ({ id: f.id, name: f.name });
 
+const toWeight = (w) => ({
+  id: w.id,
+  weight: w.weight,
+  unit: w.unit || 'kg',
+  loggedAt: w.logged_at,
+  notes: w.notes || null,
+});
+
 const toMed = (m) => ({
   id: m.id,
   name: m.name,
@@ -66,7 +74,11 @@ const toMed = (m) => ({
   lastAdministeredAt: m.last_administered_at || null,
 });
 
-const toPet = (apiPet, vaccinations = [], activities = [], foods = [], medications = [], index = 0) => ({
+const toPet = (apiPet, opts = {}) => {
+  const {
+    vaccinations = [], activities = [], foods = [], medications = [], weights = [], index = 0,
+  } = opts;
+  return {
   id: apiPet.id,
   ownerId: apiPet.owner_id,
   name: apiPet.name,
@@ -84,6 +96,7 @@ const toPet = (apiPet, vaccinations = [], activities = [], foods = [], medicatio
   activities: activities.map(toAct),
   favoriteFoods: foods.map(toFood),
   medications: medications.map(toMed),
+  weights: weights.map(toWeight),
   healthStats: {
     heartRate: apiPet.heart_rate || 0,
     weightStatus: apiPet.weight ? 'Ideal' : 'Unknown',
@@ -92,7 +105,8 @@ const toPet = (apiPet, vaccinations = [], activities = [], foods = [], medicatio
     nextVax: 'Not set',
   },
   createdAt: apiPet.created_at,
-});
+  };
+};
 
 const toPost = (p) => ({
   id: p.id,
@@ -195,13 +209,14 @@ export function DataProvider({ children }) {
       // Load each pet's sub-resources in parallel
       const petsWithData = await Promise.all(
         apiPets.map(async (apiPet, i) => {
-          const [vax, acts, foods, meds] = await Promise.all([
+          const [vax, acts, foods, meds, weights] = await Promise.all([
             get(`/pets/${apiPet.id}/vaccinations`),
             get(`/pets/${apiPet.id}/activities`),
             get(`/pets/${apiPet.id}/foods`),
             get(`/pets/${apiPet.id}/medications`),
+            get(`/pets/${apiPet.id}/weights`),
           ]);
-          return toPet(apiPet, vax, acts, foods, meds, i);
+          return toPet(apiPet, { vaccinations: vax, activities: acts, foods, medications: meds, weights, index: i });
         })
       );
 
@@ -295,8 +310,10 @@ export function DataProvider({ children }) {
         color: PET_COLORS[state.pets.length % PET_COLORS.length],
         avatar_url: petData.avatarUrl || null,
       });
-      const newPet = toPet(apiPet, [], [], [], [], state.pets.length);
+      const newPet = toPet(apiPet, { index: state.pets.length });
       dispatch({ type: 'ADD_PET', payload: newPet });
+      // Creating a pet with a weight seeds a server-side log — reflect it.
+      if (petData.weight) refreshPetWeights(newPet.id);
       return newPet;
     } catch (err) {
       handleApiError(err);
@@ -321,10 +338,20 @@ export function DataProvider({ children }) {
       if (Object.keys(apiUpdate).length > 0) {
         const updated = await patch(`/pets/${petId}`, apiUpdate);
         const existing = state.pets.find((p) => p.id === petId);
-        const merged = { ...existing, ...toPet(updated, existing.vaccinations.map(v => ({ ...v, due_date: v.dueDate })), existing.activities, existing.favoriteFoods) };
+        const merged = {
+          ...existing,
+          ...toPet(updated, {
+            vaccinations: existing.vaccinations.map((v) => ({ ...v, due_date: v.dueDate })),
+            activities: existing.activities,
+            foods: existing.favoriteFoods,
+          }),
+        };
         // Preserve sub-resources that toPet would otherwise re-map from frontend shape.
         merged.medications = existing.medications || [];
+        merged.weights = existing.weights || [];
         dispatch({ type: 'UPDATE_PET', payload: merged });
+        // A weight edit creates a server-side log; refetch so the tracker stays in sync.
+        if (updates.weight !== undefined) refreshPetWeights(petId);
       }
     } catch (err) {
       handleApiError(err);
@@ -415,6 +442,67 @@ export function DataProvider({ children }) {
       const newAct = toAct(apiAct);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, activities: [...pet.activities, newAct] } });
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  // ── Weight history ──
+
+  const refreshPetWeights = async (petId) => {
+    try {
+      const apiWeights = await get(`/pets/${petId}/weights`);
+      const weights = apiWeights.map(toWeight);
+      const latest = weights.length ? weights[weights.length - 1] : null;
+      const pet = state.pets.find((p) => p.id === petId);
+      if (pet) {
+        dispatch({
+          type: 'UPDATE_PET',
+          payload: {
+            ...pet,
+            weights,
+            ...(latest ? { weight: String(latest.weight), weightUnit: latest.unit } : {}),
+          },
+        });
+      }
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  const addWeight = async (petId, entry) => {
+    try {
+      const apiW = await post(`/pets/${petId}/weights`, {
+        weight: parseFloat(entry.weight),
+        unit: entry.unit || undefined,
+        logged_at: entry.loggedAt || undefined,
+      });
+      const newW = toWeight(apiW);
+      const pet = state.pets.find((p) => p.id === petId);
+      const weights = [...(pet.weights || []), newW].sort((a, b) => (a.loggedAt || '').localeCompare(b.loggedAt || ''));
+      const latest = weights[weights.length - 1];
+      dispatch({ type: 'UPDATE_PET', payload: { ...pet, weights, weight: String(latest.weight), weightUnit: latest.unit } });
+      return newW;
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  const deleteWeight = async (petId, weightId) => {
+    try {
+      await del(`/pets/${petId}/weights/${weightId}`);
+      const pet = state.pets.find((p) => p.id === petId);
+      const weights = (pet.weights || []).filter((w) => w.id !== weightId);
+      const latest = weights.length ? weights[weights.length - 1] : null;
+      dispatch({
+        type: 'UPDATE_PET',
+        payload: {
+          ...pet,
+          weights,
+          weight: latest ? String(latest.weight) : pet.weight,
+          weightUnit: latest ? latest.unit : pet.weightUnit,
+        },
+      });
     } catch (err) {
       handleApiError(err);
     }
@@ -597,6 +685,8 @@ export function DataProvider({ children }) {
         addFavoriteFood,
         removeFavoriteFood,
         addActivity,
+        addWeight,
+        deleteWeight,
         addMedication,
         updateMedication,
         deleteMedication,
