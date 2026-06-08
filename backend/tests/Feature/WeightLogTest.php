@@ -109,4 +109,17 @@ class WeightLogTest extends TestCase
             'logged_at' => now()->addDays(5)->format('Y-m-d'),
         ])->assertStatus(422);
     }
+
+    public function test_weight_log_unit_is_locked_to_the_pet_unit(): void
+    {
+        [$user, $token] = $this->userWithPet();
+        $pet = Pet::create(['owner_id' => $user->id, 'name' => 'Pounds', 'weight_unit' => 'lbs']);
+
+        // The client tries to log in kg, but a pet's history stays in the pet's unit.
+        $log = $this->withToken($token)->postJson("/pets/{$pet->id}/weights", [
+            'weight' => 50, 'unit' => 'kg',
+        ])->assertCreated()->json();
+
+        $this->assertSame('lbs', $log['unit']);
+    }
 }
