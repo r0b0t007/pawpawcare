@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput,
+  TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -32,7 +32,10 @@ const GROUP_COLORS = [
 
 export default function CommunityScreen({ navigation }) {
   const { user } = useAuth();
-  const { posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets } = useData();
+  const {
+    posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets,
+    getComments, addComment, deleteComment,
+  } = useData();
   const [draft, setDraft] = useState('');
 
   const handlePost = async () => {
@@ -122,7 +125,15 @@ export default function CommunityScreen({ navigation }) {
           )}
         </View>
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} userId={user?.id} onPaw={() => togglePaw(post.id)} />
+          <PostCard
+            key={post.id}
+            post={post}
+            userId={user?.id}
+            onPaw={() => togglePaw(post.id)}
+            getComments={getComments}
+            addComment={addComment}
+            deleteComment={deleteComment}
+          />
         ))}
         {posts.length === 0 && (
           <View style={styles.empty}>
@@ -169,9 +180,51 @@ function GroupCard({ group, palette, onToggle }) {
   );
 }
 
-function PostCard({ post, userId, onPaw }) {
+function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment }) {
   const hasPawed = !!post.pawedByMe;
   const bg = avatarColor(post.authorName);
+
+  const [expanded, setExpanded] = useState(false);
+  const [comments, setComments] = useState(null); // null = never loaded
+  const [draft, setDraft] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const toggleComments = async () => {
+    const next = !expanded;
+    setExpanded(next);
+    if (next) {
+      // Reload on every expand so comments from others appear; spinner only first time.
+      if (comments === null) setLoading(true);
+      setComments(await getComments(post.id));
+      setLoading(false);
+    }
+  };
+
+  const submit = async () => {
+    const text = draft.trim();
+    if (!text) return;
+    setDraft('');
+    const c = await addComment(post.id, text);
+    if (c) {
+      setComments((prev) => [...(prev || []), c]);
+    } else {
+      setDraft(text); // restore the typed comment if the request failed
+    }
+  };
+
+  const removeComment = (id) => {
+    Alert.alert('Delete comment', 'Remove this comment?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteComment(post.id, id);
+          setComments((prev) => (prev || []).filter((c) => c.id !== id));
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.postCard}>
@@ -200,14 +253,68 @@ function PostCard({ post, userId, onPaw }) {
             {post.paws} {post.paws === 1 ? 'Paw' : 'Paws'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} activeOpacity={0.85}>
-          <MaterialCommunityIcons name="comment-outline" size={18} color={colors.onSurfaceVariant} />
-          <Text style={styles.actionText}>{post.comments}</Text>
+        <TouchableOpacity style={styles.actionBtn} onPress={toggleComments} activeOpacity={0.85}>
+          <MaterialCommunityIcons
+            name={expanded ? 'comment' : 'comment-outline'}
+            size={18}
+            color={expanded ? colors.secondary : colors.onSurfaceVariant}
+          />
+          <Text style={[styles.actionText, expanded && { color: colors.secondary }]}>{post.comments}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionBtn, { marginLeft: 'auto' }]} activeOpacity={0.85}>
           <MaterialCommunityIcons name="share-outline" size={18} color={colors.onSurfaceVariant} />
         </TouchableOpacity>
       </View>
+
+      {expanded && (
+        <View style={styles.commentsWrap}>
+          {loading && comments === null ? (
+            <Text style={styles.commentEmpty}>Loading…</Text>
+          ) : comments && comments.length === 0 ? (
+            <Text style={styles.commentEmpty}>No comments yet — say something nice!</Text>
+          ) : (
+            (comments || []).map((c) => {
+              const canDelete = c.author_id === userId || post.authorId === userId;
+              return (
+                <View key={c.id} style={styles.commentRow}>
+                  <View style={[styles.commentAvatar, { backgroundColor: avatarColor(c.author_name) }]}>
+                    <Text style={styles.commentAvatarText}>{(c.author_name || '?')[0]}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.commentAuthor}>
+                      {c.author_name} <Text style={styles.commentTime}>· {timeAgo(c.created_at)}</Text>
+                    </Text>
+                    <Text style={styles.commentText}>{c.content}</Text>
+                  </View>
+                  {canDelete && (
+                    <TouchableOpacity onPress={() => removeComment(c.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <MaterialCommunityIcons name="close" size={14} color={colors.outline} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })
+          )}
+          <View style={styles.commentInputRow}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Add a comment…"
+              placeholderTextColor={colors.outlineVariant}
+              value={draft}
+              onChangeText={setDraft}
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.commentSend, !draft.trim() && styles.sendBtnDisabled]}
+              onPress={submit}
+              disabled={!draft.trim()}
+              activeOpacity={0.88}
+            >
+              <MaterialCommunityIcons name="send" size={15} color={colors.onPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -365,6 +472,47 @@ const styles = StyleSheet.create({
   postActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   actionText: { ...typography.labelMd, color: colors.onSurfaceVariant, fontSize: 13 },
+  commentsWrap: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.surfaceContainerHighest,
+    gap: spacing.sm,
+  },
+  commentEmpty: { ...typography.labelSm, color: colors.onSurfaceVariant, paddingVertical: spacing.xs },
+  commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  commentAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: radii.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  commentAvatarText: { ...typography.labelSm, color: colors.primaryContainer, fontSize: 12 },
+  commentAuthor: { ...typography.labelMd, color: colors.onSurface, fontSize: 13 },
+  commentTime: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  commentText: { ...typography.bodyMd, fontSize: 14, color: colors.onSurface, marginTop: 1 },
+  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginTop: spacing.xs },
+  commentInput: {
+    flex: 1,
+    ...typography.bodyMd,
+    fontSize: 14,
+    color: colors.onSurface,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    maxHeight: 90,
+  },
+  commentSend: {
+    width: 34,
+    height: 34,
+    borderRadius: radii.full,
+    backgroundColor: colors.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   empty: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
   emptyIllustration: {
     width: 80,

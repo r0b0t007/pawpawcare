@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Comment;
 use App\Models\Group;
 use App\Models\Post;
 use Illuminate\Http\JsonResponse;
@@ -18,6 +19,7 @@ class CommunityController extends Controller
         $userId = $request->user()->id;
 
         $posts = Post::with(['author', 'pawedBy'])
+            ->withCount('comments')
             ->orderByDesc('created_at')
             ->skip($skip)
             ->take($limit)
@@ -56,7 +58,7 @@ class CommunityController extends Controller
 
     public function togglePaw(Request $request, string $postId): JsonResponse
     {
-        $post = Post::with(['author', 'pawedBy'])->find($postId);
+        $post = Post::with(['author', 'pawedBy'])->withCount('comments')->find($postId);
         if (! $post) {
             abort(404, 'Post not found');
         }
@@ -71,6 +73,64 @@ class CommunityController extends Controller
         $post->load('pawedBy');
 
         return response()->json($post->toApi($userId));
+    }
+
+    // ── Comments ───────────────────────────────────────────────────────────
+
+    public function listComments(Request $request, string $postId): JsonResponse
+    {
+        $this->postOr404($postId);
+
+        $comments = Comment::with('author')
+            ->where('post_id', $postId)
+            ->orderBy('created_at')
+            ->get();
+
+        return response()->json($comments->map->toApi());
+    }
+
+    public function addComment(Request $request, string $postId): JsonResponse
+    {
+        $this->postOr404($postId);
+
+        $data = $request->validate([
+            'content' => 'required|string|min:1|max:2000',
+        ]);
+
+        $comment = Comment::create([
+            'post_id' => $postId,
+            'author_id' => $request->user()->id,
+            'content' => $data['content'],
+        ]);
+        $comment->load('author');
+
+        return response()->json($comment->toApi(), 201);
+    }
+
+    public function deleteComment(Request $request, string $postId, string $commentId): JsonResponse
+    {
+        $comment = Comment::where('id', $commentId)->where('post_id', $postId)->first();
+        if (! $comment) {
+            abort(404, 'Comment not found');
+        }
+        // The comment's author, or the post's owner, may delete it.
+        $post = Post::find($postId);
+        if ($comment->author_id !== $request->user()->id && $post?->author_id !== $request->user()->id) {
+            abort(403, 'Not allowed');
+        }
+        $comment->delete();
+
+        return response()->json(null, 204);
+    }
+
+    private function postOr404(string $postId): Post
+    {
+        $post = Post::find($postId);
+        if (! $post) {
+            abort(404, 'Post not found');
+        }
+
+        return $post;
     }
 
     // ── Groups ─────────────────────────────────────────────────────────────

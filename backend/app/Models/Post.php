@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Post extends Model
 {
@@ -32,6 +33,11 @@ class Post extends Model
         return $this->belongsToMany(User::class, 'post_paws', 'post_id', 'user_id');
     }
 
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
+    }
+
     /** Serialize to the public `PostOut` shape, relative to the current user. */
     public function toApi(string $currentUserId): array
     {
@@ -45,6 +51,7 @@ class Post extends Model
             'group_id' => $this->group_id,
             'paw_count' => $pawedIds->count(),
             'pawed_by_me' => $pawedIds->contains($currentUserId),
+            'comment_count' => $this->comments_count ?? $this->comments()->count(),
             'author_name' => $this->author?->name ?? '',
             'author_avatar' => $this->author?->avatar_url,
             'created_at' => $this->created_at?->toISOString(),

@@ -101,7 +101,7 @@ const toPost = (p) => ({
   paws: p.paw_count,
   pawedBy: p.pawed_by_me ? ['me'] : [],
   pawedByMe: p.pawed_by_me,
-  comments: 0,
+  comments: p.comment_count ?? 0,
   createdAt: p.created_at,
 });
 
@@ -543,6 +543,36 @@ export function DataProvider({ children }) {
     }
   };
 
+  const getComments = async (postId) => {
+    try {
+      return await get(`/community/posts/${postId}/comments`);
+    } catch (err) {
+      handleApiError(err);
+      return [];
+    }
+  };
+
+  const addComment = async (postId, content) => {
+    try {
+      const apiComment = await post(`/community/posts/${postId}/comments`, { content });
+      const p = state.posts.find((x) => x.id === postId);
+      if (p) dispatch({ type: 'UPDATE_POST', payload: { ...p, comments: (p.comments || 0) + 1 } });
+      return apiComment;
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  const deleteComment = async (postId, commentId) => {
+    try {
+      await del(`/community/posts/${postId}/comments/${commentId}`);
+      const p = state.posts.find((x) => x.id === postId);
+      if (p) dispatch({ type: 'UPDATE_POST', payload: { ...p, comments: Math.max(0, (p.comments || 0) - 1) } });
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -572,6 +602,9 @@ export function DataProvider({ children }) {
         resolveLostPet,
         addPost,
         togglePaw,
+        getComments,
+        addComment,
+        deleteComment,
         toggleGroupMembership,
         refreshReminders,
         refreshNotifications,
