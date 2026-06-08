@@ -10,13 +10,18 @@ import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 export default function PetProfileScreen({ navigation, route }) {
   const { petId } = route.params;
-  const { pets, addFavoriteFood, removeFavoriteFood, addActivity } = useData();
+  const {
+    pets, addFavoriteFood, removeFavoriteFood, addActivity,
+    addMedication, deleteMedication, logMedicationDose,
+  } = useData();
   const pet = pets.find((p) => p.id === petId);
 
   const [foodModal, setFoodModal] = useState(false);
   const [activityModal, setActivityModal] = useState(false);
+  const [medModal, setMedModal] = useState(false);
   const [newFood, setNewFood] = useState('');
   const [newActivity, setNewActivity] = useState({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
+  const [newMed, setNewMed] = useState({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
 
   if (!pet) {
     return (
@@ -45,6 +50,27 @@ export default function PetProfileScreen({ navigation, route }) {
     });
     setNewActivity({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
     setActivityModal(false);
+  };
+
+  const handleAddMedication = async () => {
+    if (!newMed.name.trim()) return;
+    const asNeeded = newMed.frequency === 'as_needed';
+    await addMedication(petId, {
+      name: newMed.name.trim(),
+      dosage: newMed.dosage.trim() || null,
+      frequency: newMed.frequency,
+      times: asNeeded ? [] : (newMed.times.length ? [...newMed.times].sort() : ['08:00']),
+      notes: newMed.notes.trim() || null,
+    });
+    setNewMed({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
+    setMedModal(false);
+  };
+
+  const toggleMedTime = (t) => {
+    setNewMed((m) => ({
+      ...m,
+      times: m.times.includes(t) ? m.times.filter((x) => x !== t) : [...m.times, t],
+    }));
   };
 
   const upcoming = (pet.vaccinations || []).filter((v) => v.status !== 'completed');
@@ -156,6 +182,38 @@ export default function PetProfileScreen({ navigation, route }) {
             <MaterialCommunityIcons name="needle" size={16} color={colors.tertiary} />
             <Text style={styles.outlineBtnText}>Manage Vaccinations</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Medications */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Medications</Text>
+            <TouchableOpacity
+              onPress={() => setMedModal(true)}
+              style={styles.addIconBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="plus" size={18} color={colors.onPrimary} />
+            </TouchableOpacity>
+          </View>
+          {(pet.medications || []).length === 0 ? (
+            <TouchableOpacity style={styles.emptyState} onPress={() => setMedModal(true)} activeOpacity={0.88}>
+              <MaterialCommunityIcons name="pill" size={24} color={colors.primaryContainer} />
+              <Text style={styles.emptyStateText}>Add a medication</Text>
+            </TouchableOpacity>
+          ) : (
+            pet.medications.map((med) => (
+              <MedicationRow
+                key={med.id}
+                med={med}
+                onLog={() => logMedicationDose(petId, med.id)}
+                onDelete={() => Alert.alert('Remove medication', `Remove ${med.name}?`, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Remove', style: 'destructive', onPress: () => deleteMedication(petId, med.id) },
+                ])}
+              />
+            ))
+          )}
         </View>
 
         {/* Activities */}
@@ -290,7 +348,103 @@ export default function PetProfileScreen({ navigation, route }) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Add Medication Modal */}
+      <Modal visible={medModal} transparent animationType="slide">
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalTitle}>Add Medication</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Name (e.g. Apoquel)"
+              placeholderTextColor={colors.outlineVariant}
+              value={newMed.name}
+              onChangeText={(v) => setNewMed({ ...newMed, name: v })}
+              autoFocus
+            />
+            <TextInput
+              style={[styles.modalInput, { marginTop: spacing.sm }]}
+              placeholder="Dosage (e.g. 5mg, 1 tablet)"
+              placeholderTextColor={colors.outlineVariant}
+              value={newMed.dosage}
+              onChangeText={(v) => setNewMed({ ...newMed, dosage: v })}
+            />
+            <Text style={styles.fieldLabel}>Frequency</Text>
+            <View style={styles.timeRow}>
+              {['daily', 'weekly', 'monthly', 'as_needed'].map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.freqChip, newMed.frequency === f && styles.timeChipActive]}
+                  onPress={() => setNewMed({ ...newMed, frequency: f })}
+                  activeOpacity={0.88}
+                >
+                  <Text style={[styles.freqChipText, newMed.frequency === f && { color: colors.onPrimary }]}>
+                    {f === 'as_needed' ? 'As needed' : f}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {newMed.frequency !== 'as_needed' && (
+              <>
+                <Text style={styles.fieldLabel}>Dose times</Text>
+                <View style={styles.timeRow}>
+                  {[['Morning', '08:00'], ['Noon', '12:00'], ['Evening', '18:00'], ['Night', '22:00']].map(([label, t]) => (
+                    <TouchableOpacity
+                      key={t}
+                      style={[styles.freqChip, newMed.times.includes(t) && styles.timeChipActive]}
+                      onPress={() => toggleMedTime(t)}
+                      activeOpacity={0.88}
+                    >
+                      <Text style={[styles.freqChipText, newMed.times.includes(t) && { color: colors.onPrimary }]}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => setMedModal(false)} activeOpacity={0.88}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalAdd} onPress={handleAddMedication} activeOpacity={0.88}>
+                <Text style={styles.modalAddText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+function MedicationRow({ med, onLog, onDelete }) {
+  const freqLabel = med.frequency === 'as_needed'
+    ? 'As needed'
+    : `${med.frequency.charAt(0).toUpperCase() + med.frequency.slice(1)}${med.times?.length ? ` · ${med.times.join(', ')}` : ''}`;
+  const lastGiven = med.lastAdministeredAt
+    ? new Date(med.lastAdministeredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    : null;
+
+  return (
+    <View style={[styles.medRow, !med.active && { opacity: 0.55 }]}>
+      <View style={styles.medIcon}>
+        <MaterialCommunityIcons name="pill" size={18} color={colors.primaryContainer} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.medName}>
+          {med.name}{med.dosage ? <Text style={styles.medDosage}>  ·  {med.dosage}</Text> : null}
+        </Text>
+        <Text style={styles.medFreq}>{freqLabel}</Text>
+        {lastGiven && <Text style={styles.medLast}>Last given: {lastGiven}</Text>}
+      </View>
+      <TouchableOpacity style={styles.logBtn} onPress={onLog} activeOpacity={0.85}>
+        <MaterialCommunityIcons name="check" size={14} color={colors.onPrimary} />
+        <Text style={styles.logBtnText}>Log</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }} style={{ paddingLeft: spacing.xs }}>
+        <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.error} />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -520,6 +674,47 @@ const styles = StyleSheet.create({
   actIcon: { width: 38, height: 38, borderRadius: radii.full, justifyContent: 'center', alignItems: 'center' },
   actName: { ...typography.labelMd, color: colors.onSurface },
   actDetail: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'capitalize' },
+  medRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceContainerLow,
+  },
+  medIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radii.full,
+    backgroundColor: colors.primaryFixed,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  medName: { ...typography.labelMd, color: colors.onSurface },
+  medDosage: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  medFreq: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 1, textTransform: 'capitalize' },
+  medLast: { ...typography.labelSm, color: colors.tertiary, marginTop: 1 },
+  logBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.primaryContainer,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.full,
+  },
+  logBtnText: { ...typography.labelSm, color: colors.onPrimary },
+  fieldLabel: { ...typography.labelMd, color: colors.onSurfaceVariant, marginTop: spacing.md, marginBottom: spacing.xs },
+  freqChip: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceContainerLow,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.outlineVariant,
+  },
+  freqChipText: { ...typography.labelSm, color: colors.onSurfaceVariant, textTransform: 'capitalize' },
   foodsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   foodChip: {
     flexDirection: 'row',

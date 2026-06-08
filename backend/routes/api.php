@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PetController;
 use App\Http\Controllers\ReminderController;
@@ -39,6 +40,13 @@ Route::middleware('auth.jwt')->group(function () {
     Route::post('/pets/{pet}/vaccinations', [PetController::class, 'addVaccination']);
     Route::patch('/pets/{pet}/vaccinations/{vax}/complete', [PetController::class, 'completeVaccination']);
     Route::delete('/pets/{pet}/vaccinations/{vax}', [PetController::class, 'deleteVaccination']);
+
+    // Medications
+    Route::get('/pets/{pet}/medications', [MedicationController::class, 'index']);
+    Route::post('/pets/{pet}/medications', [MedicationController::class, 'store']);
+    Route::patch('/pets/{pet}/medications/{medication}', [MedicationController::class, 'update']);
+    Route::delete('/pets/{pet}/medications/{medication}', [MedicationController::class, 'destroy']);
+    Route::post('/pets/{pet}/medications/{medication}/log', [MedicationController::class, 'logDose']);
 
     // Activities
     Route::get('/pets/{pet}/activities', [PetController::class, 'listActivities']);

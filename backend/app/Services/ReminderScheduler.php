@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Medication;
 use App\Models\Reminder;
 use App\Models\User;
 use App\Models\Vaccination;
@@ -95,6 +96,57 @@ class ReminderScheduler
         Reminder::where('related_type', 'vaccination')
             ->where('related_id', $vax->id)
             ->update(['enabled' => false, 'next_fire_at' => null]);
+    }
+
+    /**
+     * Rebuild the recurring reminders for a medication — one per dose time. A
+     * medication can have several daily/weekly doses, so we replace rather than
+     * upsert. `as_needed` or inactive medications get no reminders.
+     */
+    public static function syncMedicationReminder(Medication $med): void
+    {
+        // Replace any existing reminders for this medication.
+        Reminder::where('related_type', 'medication')->where('related_id', $med->id)->delete();
+
+        if (! $med->active || $med->frequency === 'as_needed') {
+            return;
+        }
+
+        $pet = $med->pet()->with('owner')->first();
+        if (! $pet || ! $pet->owner) {
+            return;
+        }
+
+        $user = $pet->owner;
+        $tz = $user->timezone ?: 'UTC';
+        $times = (is_array($med->times) && count($med->times)) ? $med->times : ['09:00'];
+        $recurrence = in_array($med->frequency, ['daily', 'weekly', 'monthly'], true) ? $med->frequency : 'daily';
+
+        foreach ($times as $time) {
+            $reminder = Reminder::create([
+                'user_id' => $user->id,
+                'pet_id' => $pet->id,
+                'type' => 'medication',
+                'related_type' => 'medication',
+                'related_id' => $med->id,
+                'title' => 'Medication: '.$med->name,
+                'body' => $pet->name.($med->dosage ? ' — '.$med->dosage : ''),
+                'schedule_type' => 'recurring',
+                'recurrence' => $recurrence,
+                'time_of_day' => $time,
+                'lead_time_days' => 0,
+                'timezone' => $tz,
+                'enabled' => true,
+            ]);
+            $reminder->next_fire_at = self::computeNextFireAt($reminder);
+            $reminder->save();
+        }
+    }
+
+    /** Remove the reminders tied to a medication. */
+    public static function cancelMedicationReminder(Medication $med): void
+    {
+        Reminder::where('related_type', 'medication')->where('related_id', $med->id)->delete();
     }
 
     /**

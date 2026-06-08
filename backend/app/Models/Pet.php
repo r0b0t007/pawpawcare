@@ -55,6 +55,11 @@ class Pet extends Model
         return $this->hasMany(FavoriteFood::class);
     }
 
+    public function medications(): HasMany
+    {
+        return $this->hasMany(Medication::class);
+    }
+
     /** Serialize to the public `PetOut` shape. */
     public function toApi(): array
     {
