@@ -19,7 +19,7 @@ class PetController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $pets = Pet::where('owner_id', $request->user()->id)->get();
+        $pets = Pet::accessibleBy($request->user()->id)->get();
 
         return response()->json($pets->map->toApi());
     }
@@ -97,7 +97,13 @@ class PetController extends Controller
 
     public function destroy(Request $request, string $petId): JsonResponse
     {
-        $this->petOr404($request, $petId)->delete();
+        $pet = $this->petOr404($request, $petId);
+
+        // Deleting a pet is destructive and owner-only; co-owners can only `leave`.
+        if ($pet->owner_id !== $request->user()->id) {
+            abort(403, 'Only the owner can delete this pet');
+        }
+        $pet->delete();
 
         return response()->json(null, 204);
     }
@@ -393,8 +399,8 @@ class PetController extends Controller
 
     private function petOr404(Request $request, string $petId): Pet
     {
-        $pet = Pet::where('id', $petId)
-            ->where('owner_id', $request->user()->id)
+        $pet = Pet::accessibleBy($request->user()->id)
+            ->where('id', $petId)
             ->first();
 
         if (! $pet) {

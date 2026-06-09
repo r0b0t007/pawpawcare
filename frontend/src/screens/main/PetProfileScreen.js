@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image,
@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { resolveAsset } from '../../config';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
@@ -37,9 +38,12 @@ export default function PetProfileScreen({ navigation, route }) {
     pets, myReports, addFavoriteFood, removeFavoriteFood, addActivity,
     addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
     addWeight, deleteWeight, addExpense, deleteExpense,
+    getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
   } = useData();
+  const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
   const activeReport = (myReports || []).find((r) => r.petId === petId && r.status === 'active');
+  const isOwner = !!pet && pet.ownerId === user?.id;
 
   const [foodModal, setFoodModal] = useState(false);
   const [activityModal, setActivityModal] = useState(false);
@@ -53,6 +57,18 @@ export default function PetProfileScreen({ navigation, route }) {
   const [newWeight, setNewWeight] = useState({ value: '' });
   const [expenseModal, setExpenseModal] = useState(false);
   const [newExpense, setNewExpense] = useState({ category: 'vet', amount: '', notes: '' });
+  const [share, setShare] = useState(null); // { owner, members, invites }
+  const [shareModal, setShareModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteError, setInviteError] = useState(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+
+  const loadShare = useCallback(async () => {
+    const data = await getPetShare(petId);
+    if (data) setShare(data);
+  }, [getPetShare, petId]);
+
+  useEffect(() => { loadShare(); }, [loadShare]);
 
   if (!pet) {
     return (
@@ -132,6 +148,57 @@ export default function PetProfileScreen({ navigation, route }) {
     await addExpense(petId, { category: newExpense.category, amount: amt, notes: newExpense.notes.trim() || null });
     setNewExpense({ category: 'vet', amount: '', notes: '' });
     setExpenseModal(false);
+  };
+
+  const handleInvite = async () => {
+    const email = inviteEmail.trim();
+    if (!email) return;
+    setInviteBusy(true);
+    setInviteError(null);
+    try {
+      await invitePetMember(petId, email);
+      setInviteEmail('');
+      setShareModal(false);
+      await loadShare();
+    } catch (err) {
+      // Surface the server message (already a member, invalid email, …).
+      setInviteError(err.message || 'Could not send the invitation.');
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
+  const handleRemoveMember = (member) => {
+    Alert.alert('Remove co-owner', `Remove ${member.name} from ${pet.name}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => { await removePetMember(petId, member.id); await loadShare(); },
+      },
+    ]);
+  };
+
+  const handleCancelInvite = (invite) => {
+    Alert.alert('Cancel invitation', `Withdraw the invite to ${invite.email}?`, [
+      { text: 'Keep', style: 'cancel' },
+      {
+        text: 'Withdraw',
+        style: 'destructive',
+        onPress: async () => { await cancelPetInvite(petId, invite.id); await loadShare(); },
+      },
+    ]);
+  };
+
+  const handleLeave = () => {
+    Alert.alert('Leave pet', `Stop co-owning ${pet.name}? You'll lose access to its records.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Leave',
+        style: 'destructive',
+        onPress: async () => { await leavePet(petId); navigation.goBack(); },
+      },
+    ]);
   };
 
   const upcoming = (pet.vaccinations || []).filter((v) => v.status !== 'completed');
@@ -483,6 +550,94 @@ export default function PetProfileScreen({ navigation, route }) {
             )}
           </View>
         </View>
+
+        {/* Sharing (co-owners) */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Sharing</Text>
+            {isOwner && (
+              <TouchableOpacity
+                onPress={() => { setInviteError(null); setShareModal(true); }}
+                style={styles.addIconBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialCommunityIcons name="account-plus" size={16} color={colors.onPrimary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {!isOwner && (
+            <Text style={styles.shareNote}>
+              Shared with you{share?.owner ? ` by ${share.owner.name}` : ''}. You can view and update {pet.name}'s records.
+            </Text>
+          )}
+
+          {/* Owner */}
+          {share?.owner && (
+            <View style={styles.shareRow}>
+              <View style={styles.shareAvatar}>
+                <Text style={styles.shareAvatarText}>{(share.owner.name || '?')[0].toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.shareName}>{share.owner.name}{share.owner.id === user?.id ? ' (You)' : ''}</Text>
+                <Text style={styles.shareEmail}>{share.owner.email}</Text>
+              </View>
+              <View style={styles.ownerBadge}>
+                <Text style={styles.ownerBadgeText}>Owner</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Co-owners */}
+          {(share?.members || []).map((m) => (
+            <View key={m.id} style={styles.shareRow}>
+              <View style={[styles.shareAvatar, { backgroundColor: colors.secondaryFixed }]}>
+                <Text style={[styles.shareAvatarText, { color: colors.secondary }]}>{(m.name || '?')[0].toUpperCase()}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.shareName}>{m.name}{m.id === user?.id ? ' (You)' : ''}</Text>
+                <Text style={styles.shareEmail}>{m.email}</Text>
+              </View>
+              {isOwner ? (
+                <TouchableOpacity onPress={() => handleRemoveMember(m)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <MaterialCommunityIcons name="account-remove-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.memberBadge}><Text style={styles.memberBadgeText}>Co-owner</Text></View>
+              )}
+            </View>
+          ))}
+
+          {/* Pending invites (owner only) */}
+          {isOwner && (share?.invites || []).map((inv) => (
+            <View key={inv.id} style={styles.shareRow}>
+              <View style={[styles.shareAvatar, { backgroundColor: colors.surfaceContainerHigh }]}>
+                <MaterialCommunityIcons name="email-outline" size={18} color={colors.outline} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.shareName}>{inv.email}</Text>
+                <Text style={styles.shareEmail}>Invitation pending</Text>
+              </View>
+              <TouchableOpacity onPress={() => handleCancelInvite(inv)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <MaterialCommunityIcons name="close" size={18} color={colors.outline} />
+              </TouchableOpacity>
+            </View>
+          ))}
+
+          {isOwner && (share?.members || []).length === 0 && (share?.invites || []).length === 0 && (
+            <TouchableOpacity style={styles.emptyState} onPress={() => { setInviteError(null); setShareModal(true); }} activeOpacity={0.88}>
+              <MaterialCommunityIcons name="account-multiple-plus-outline" size={24} color={colors.primaryContainer} />
+              <Text style={styles.emptyStateText}>Invite a family member to co-own {pet.name}</Text>
+            </TouchableOpacity>
+          )}
+
+          {!isOwner && (
+            <TouchableOpacity style={styles.leaveBtn} onPress={handleLeave} activeOpacity={0.88}>
+              <MaterialCommunityIcons name="exit-to-app" size={16} color={colors.error} />
+              <Text style={styles.leaveBtnText}>Leave this pet</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </ScrollView>
 
       {/* Add Food Modal */}
@@ -746,6 +901,48 @@ export default function PetProfileScreen({ navigation, route }) {
               </TouchableOpacity>
               <TouchableOpacity style={styles.modalAdd} onPress={handleAddExpense} activeOpacity={0.88}>
                 <Text style={styles.modalAddText}>Add Expense</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Invite Co-owner Modal */}
+      <Modal visible={shareModal} transparent animationType="slide">
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalTitle}>Share {pet.name}</Text>
+            <Text style={styles.modalHint}>
+              Invite someone by email to co-own {pet.name}. They'll be able to view and update its records, but only you can delete the pet.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="family@example.com"
+              placeholderTextColor={colors.outlineVariant}
+              value={inviteEmail}
+              onChangeText={(v) => { setInviteEmail(v); setInviteError(null); }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+            />
+            {!!inviteError && <Text style={styles.inviteError}>{inviteError}</Text>}
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => { setShareModal(false); setInviteEmail(''); setInviteError(null); }}
+                activeOpacity={0.88}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalAdd, inviteBusy && { opacity: 0.6 }]}
+                onPress={handleInvite}
+                disabled={inviteBusy}
+                activeOpacity={0.88}
+              >
+                <Text style={styles.modalAddText}>Send Invite</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1215,6 +1412,54 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
   },
   catChipText: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  shareNote: { ...typography.bodyMd, fontSize: 13, color: colors.onSurfaceVariant, marginBottom: spacing.sm, lineHeight: 19 },
+  shareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceContainerLow,
+  },
+  shareAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: radii.full,
+    backgroundColor: colors.primaryFixed,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  shareAvatarText: { ...typography.titleLg, color: colors.primaryContainer, fontSize: 16 },
+  shareName: { ...typography.labelMd, color: colors.onSurface },
+  shareEmail: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 1 },
+  ownerBadge: {
+    backgroundColor: colors.primaryFixed,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+  },
+  ownerBadgeText: { ...typography.labelSm, color: colors.primaryContainer },
+  memberBadge: {
+    backgroundColor: colors.secondaryFixed,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radii.full,
+  },
+  memberBadgeText: { ...typography.labelSm, color: colors.secondary },
+  leaveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.lg,
+    borderWidth: 1.5,
+    borderColor: colors.errorContainer,
+    backgroundColor: '#fff1f0',
+  },
+  leaveBtnText: { ...typography.labelMd, color: colors.error },
+  inviteError: { ...typography.labelSm, color: colors.error, marginTop: spacing.xs },
   foodsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   foodChip: {
     flexDirection: 'row',

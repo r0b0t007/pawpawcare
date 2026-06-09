@@ -135,7 +135,7 @@ class LostPetController extends Controller
 
     private function petOr404(Request $request, string $petId): Pet
     {
-        $pet = Pet::where('id', $petId)->where('owner_id', $request->user()->id)->first();
+        $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
             abort(404, 'Pet not found');
         }

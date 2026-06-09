@@ -20,6 +20,7 @@ import ScheduleScreen from '../screens/main/ScheduleScreen';
 import NotificationsScreen from '../screens/main/NotificationsScreen';
 import RemindersScreen from '../screens/main/RemindersScreen';
 import LostPetsScreen from '../screens/main/LostPetsScreen';
+import InvitesScreen from '../screens/main/InvitesScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -40,6 +41,7 @@ function DashboardStack() {
       <Stack.Screen name="Home" component={DashboardScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Reminders" component={RemindersScreen} />
+      <Stack.Screen name="Invites" component={InvitesScreen} />
     </Stack.Navigator>
   );
 }
