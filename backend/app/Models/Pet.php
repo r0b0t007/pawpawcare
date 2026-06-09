@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use App\Support\Uploads;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Pet extends Model
@@ -60,6 +62,30 @@ class Pet extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /** Co-owners granted access in addition to the owner. */
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'pet_members')
+            ->withPivot('role', 'created_at');
+    }
+
+    public function invites(): HasMany
+    {
+        return $this->hasMany(PetInvite::class);
+    }
+
+    /**
+     * Limit a query to pets the given user can access — ones they own outright
+     * or have been added to as a co-owner.
+     */
+    public function scopeAccessibleBy(Builder $query, string $userId): Builder
+    {
+        return $query->where(function (Builder $q) use ($userId) {
+            $q->where('owner_id', $userId)
+                ->orWhereHas('members', fn (Builder $m) => $m->where('users.id', $userId));
+        });
     }
 
     public function vaccinations(): HasMany

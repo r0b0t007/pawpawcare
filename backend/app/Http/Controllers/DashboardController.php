@@ -15,7 +15,7 @@ class DashboardController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $pets = Pet::where('owner_id', $request->user()->id)->get();
+        $pets = Pet::accessibleBy($request->user()->id)->get();
         $petIds = $pets->pluck('id');
 
         $today = Carbon::today();

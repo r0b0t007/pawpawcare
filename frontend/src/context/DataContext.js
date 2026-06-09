@@ -157,6 +157,19 @@ const toLostPet = (r) => ({
   createdAt: r.created_at,
 });
 
+// An invitation addressed to me (someone shared their pet with my email).
+const toInvite = (i) => ({
+  id: i.id,
+  petId: i.pet_id,
+  petName: i.pet?.name || 'a pet',
+  petType: i.pet?.type || null,
+  petColor: i.pet?.color || null,
+  email: i.email,
+  inviterName: i.inviter?.name || 'Someone',
+  inviterEmail: i.inviter?.email || null,
+  createdAt: i.created_at,
+});
+
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
 function dataReducer(state, action) {
@@ -174,6 +187,7 @@ function dataReducer(state, action) {
     case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload.notifications || [], unreadCount: action.payload.unread_count || 0 };
     case 'SET_LOST_PETS':     return { ...state, lostPets: action.payload };
     case 'SET_MY_REPORTS':    return { ...state, myReports: action.payload };
+    case 'SET_INVITES':       return { ...state, invites: action.payload };
     default:           return state;
   }
 }
@@ -183,7 +197,7 @@ function dataReducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
-    lostPets: [], myReports: [],
+    lostPets: [], myReports: [], invites: [],
   });
   const { user, logout } = useAuth();
 
@@ -197,6 +211,7 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: [], unread_count: 0 } });
       dispatch({ type: 'SET_LOST_PETS', payload: [] });
       dispatch({ type: 'SET_MY_REPORTS', payload: [] });
+      dispatch({ type: 'SET_INVITES', payload: [] });
     }
   }, [user?.id]);
 
@@ -206,13 +221,14 @@ export function DataProvider({ children }) {
 
   const loadData = async () => {
     try {
-      const [apiPets, apiPosts, apiGroups, apiReminders, apiNotifications, apiMyReports] = await Promise.all([
+      const [apiPets, apiPosts, apiGroups, apiReminders, apiNotifications, apiMyReports, apiInvites] = await Promise.all([
         get('/pets'),
         get('/community/posts'),
         get('/community/groups'),
         get('/reminders'),
         get('/notifications'),
         get('/lost-pets/mine'),
+        get('/invites'),
       ]);
 
       // Load each pet's sub-resources in parallel
@@ -236,6 +252,7 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_REMINDERS', payload: apiReminders });
       dispatch({ type: 'SET_NOTIFICATIONS', payload: apiNotifications });
       dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
+      dispatch({ type: 'SET_INVITES', payload: apiInvites.map(toInvite) });
 
       // Mirror server reminders onto on-device local notifications (primary delivery).
       scheduleLocalReminders(apiReminders);
@@ -644,6 +661,67 @@ export function DataProvider({ children }) {
     } catch (err) { handleApiError(err); }
   };
 
+  // ── Sharing (co-owners) ──
+
+  const refreshInvites = async () => {
+    try {
+      const apiInvites = await get('/invites');
+      dispatch({ type: 'SET_INVITES', payload: apiInvites.map(toInvite) });
+    } catch (err) { handleApiError(err); }
+  };
+
+  // Owner-side: the roster (owner + members + pending invites) for one pet.
+  const getPetShare = async (petId) => {
+    try {
+      return await get(`/pets/${petId}/members`);
+    } catch (err) {
+      handleApiError(err);
+      return null;
+    }
+  };
+
+  const invitePetMember = async (petId, email) => {
+    // Surface validation errors (already a member, etc.) to the caller.
+    return post(`/pets/${petId}/invites`, { email });
+  };
+
+  const cancelPetInvite = async (petId, inviteId) => {
+    try {
+      await del(`/pets/${petId}/invites/${inviteId}`);
+    } catch (err) { handleApiError(err); }
+  };
+
+  const removePetMember = async (petId, userId) => {
+    try {
+      await del(`/pets/${petId}/members/${userId}`);
+    } catch (err) { handleApiError(err); }
+  };
+
+  // Member-side: leave a pet I was shared into → drop it from my list.
+  const leavePet = async (petId) => {
+    try {
+      await post(`/pets/${petId}/leave`);
+      dispatch({ type: 'DELETE_PET', payload: petId });
+    } catch (err) { handleApiError(err); }
+  };
+
+  const acceptInvite = async (inviteId) => {
+    try {
+      await post(`/invites/${inviteId}/accept`);
+      // Drop the resolved invite, then reload so the shared pet (and its
+      // sub-resources) appear in the list.
+      dispatch({ type: 'SET_INVITES', payload: state.invites.filter((i) => i.id !== inviteId) });
+      await loadData();
+    } catch (err) { handleApiError(err); }
+  };
+
+  const declineInvite = async (inviteId) => {
+    try {
+      await post(`/invites/${inviteId}/decline`);
+      dispatch({ type: 'SET_INVITES', payload: state.invites.filter((i) => i.id !== inviteId) });
+    } catch (err) { handleApiError(err); }
+  };
+
   // ── Community ──
 
   const addPost = async (content, imageUrl) => {
@@ -714,6 +792,7 @@ export function DataProvider({ children }) {
         unreadCount: state.unreadCount,
         lostPets: state.lostPets,
         myReports: state.myReports,
+        invites: state.invites,
         addPet,
         updatePet,
         deletePet,
@@ -734,6 +813,14 @@ export function DataProvider({ children }) {
         refreshLostPets,
         reportPetLost,
         resolveLostPet,
+        refreshInvites,
+        getPetShare,
+        invitePetMember,
+        cancelPetInvite,
+        removePetMember,
+        leavePet,
+        acceptInvite,
+        declineInvite,
         addPost,
         togglePaw,
         getComments,

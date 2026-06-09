@@ -8,6 +8,7 @@ use App\Http\Controllers\LostPetController;
 use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PetController;
+use App\Http\Controllers\PetSharingController;
 use App\Http\Controllers\ReminderController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
@@ -72,6 +73,18 @@ Route::middleware('auth.jwt')->group(function () {
     Route::get('/pets/{pet}/expenses', [PetController::class, 'listExpenses']);
     Route::post('/pets/{pet}/expenses', [PetController::class, 'addExpense']);
     Route::delete('/pets/{pet}/expenses/{expense}', [PetController::class, 'deleteExpense']);
+
+    // Pet sharing (co-owners)
+    Route::get('/pets/{pet}/members', [PetSharingController::class, 'members']);
+    Route::post('/pets/{pet}/invites', [PetSharingController::class, 'invite'])->middleware('throttle:20,1');
+    Route::delete('/pets/{pet}/invites/{invite}', [PetSharingController::class, 'cancelInvite']);
+    Route::delete('/pets/{pet}/members/{member}', [PetSharingController::class, 'removeMember']);
+    Route::post('/pets/{pet}/leave', [PetSharingController::class, 'leave']);
+
+    // Invitations addressed to the current user
+    Route::get('/invites', [PetSharingController::class, 'listInvites']);
+    Route::post('/invites/{invite}/accept', [PetSharingController::class, 'accept']);
+    Route::post('/invites/{invite}/decline', [PetSharingController::class, 'decline']);
 
     // Lost pets (community alerts)
     Route::get('/lost-pets', [LostPetController::class, 'index']);

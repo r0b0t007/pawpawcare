@@ -25,7 +25,7 @@ function timeAgo(iso) {
 
 export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
-  const { pets, posts, unreadCount } = useData();
+  const { pets, posts, unreadCount, invites } = useData();
 
   const upcomingVax = pets.flatMap((p) =>
     (p.vaccinations || []).filter((v) => v.status === 'upcoming' || v.status === 'due_soon' || v.status === 'overdue')
@@ -65,6 +65,30 @@ export default function DashboardScreen({ navigation }) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        {/* Pending co-owner invitations */}
+        {invites.length > 0 && (
+          <TouchableOpacity
+            style={styles.inviteBanner}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('Invites')}
+          >
+            <View style={styles.inviteIcon}>
+              <MaterialCommunityIcons name="email-heart-outline" size={20} color={colors.primaryContainer} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.inviteTitle}>
+                {invites.length === 1 ? 'Pet sharing invitation' : `${invites.length} pet invitations`}
+              </Text>
+              <Text style={styles.inviteSub} numberOfLines={1}>
+                {invites.length === 1
+                  ? `${invites[0].inviterName} wants to share ${invites[0].petName}`
+                  : 'Tap to review who wants to share with you'}
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
+          </TouchableOpacity>
+        )}
+
         {/* Stats row */}
         <View style={styles.statsRow}>
           <StatCard
@@ -297,6 +321,29 @@ const styles = StyleSheet.create({
   },
   badgeText: { ...typography.labelSm, color: colors.onError, fontSize: 9 },
   scroll: { paddingBottom: spacing.xl },
+  inviteBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.margin,
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surfaceContainerLowest,
+    ...shadows.card,
+    borderWidth: 1,
+    borderColor: colors.primaryFixedDim,
+  },
+  inviteIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.full,
+    backgroundColor: colors.primaryFixed,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inviteTitle: { ...typography.labelMd, color: colors.onSurface },
+  inviteSub: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 2 },
   statsRow: {
     flexDirection: 'row',
     gap: spacing.sm,

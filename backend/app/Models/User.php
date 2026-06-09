@@ -41,6 +41,13 @@ class User extends Model
         return $this->hasMany(Pet::class, 'owner_id');
     }
 
+    /** Pets this user co-owns (shared with them), excluding ones they own. */
+    public function memberPets(): BelongsToMany
+    {
+        return $this->belongsToMany(Pet::class, 'pet_members')
+            ->withPivot('role', 'created_at');
+    }
+
     public function posts(): HasMany
     {
         return $this->hasMany(Post::class, 'author_id');

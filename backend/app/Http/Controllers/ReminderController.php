@@ -36,7 +36,7 @@ class ReminderController extends Controller
         $user = $request->user();
 
         if (! empty($data['pet_id'])
-            && ! Pet::where('id', $data['pet_id'])->where('owner_id', $user->id)->exists()) {
+            && ! Pet::accessibleBy($user->id)->where('id', $data['pet_id'])->exists()) {
             abort(404, 'Pet not found');
         }
 
