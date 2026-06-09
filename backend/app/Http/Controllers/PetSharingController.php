@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pet;
 use App\Models\PetInvite;
 use App\Models\User;
+use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -59,10 +60,12 @@ class PetSharingController extends Controller
     {
         $pet = $this->ownedPetOr404($request, $petId);
 
-        if (! $pet->members()->where('users.id', $userId)->exists()) {
+        $member = $pet->members()->where('users.id', $userId)->first();
+        if (! $member) {
             abort(404, 'Member not found');
         }
         $pet->members()->detach($userId);
+        ReminderScheduler::purgeForMember($pet, $member);
 
         return response()->json(null, 204);
     }
@@ -87,12 +90,13 @@ class PetSharingController extends Controller
     /** A co-owner removes themselves from a pet they were shared into. */
     public function leave(Request $request, string $petId): JsonResponse
     {
-        $userId = $request->user()->id;
+        $user = $request->user();
         $pet = Pet::where('id', $petId)->first();
-        if (! $pet || ! $pet->members()->where('users.id', $userId)->exists()) {
+        if (! $pet || ! $pet->members()->where('users.id', $user->id)->exists()) {
             abort(404, 'Pet not found');
         }
-        $pet->members()->detach($userId);
+        $pet->members()->detach($user->id);
+        ReminderScheduler::purgeForMember($pet, $user);
 
         return response()->json(null, 204);
     }
@@ -126,6 +130,8 @@ class PetSharingController extends Controller
             $pet->members()->syncWithoutDetaching([
                 $user->id => ['role' => 'member', 'created_at' => now()],
             ]);
+            // Give the new co-owner their own copy of the pet's care reminders.
+            ReminderScheduler::backfillForMember($pet, $user);
         }
 
         return response()->json($pet ? $pet->toApi() : null);

@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\Medication;
+use App\Models\Pet;
 use App\Models\Reminder;
 use App\Models\User;
 use App\Models\Vaccination;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class ReminderScheduler
 {
@@ -52,24 +54,38 @@ class ReminderScheduler
     }
 
     /**
-     * Create or update the vaccination reminder for a given vaccination.
-     * Default: notify 7 days before the due date at 09:00 in the owner's timezone.
+     * Create or update the vaccination reminder for everyone who can see the pet
+     * (owner + co-owners), each in their own timezone. Default: notify 7 days
+     * before the due date at 09:00 local.
      */
-    public static function syncVaccinationReminder(Vaccination $vax): ?Reminder
+    public static function syncVaccinationReminder(Vaccination $vax): void
     {
-        $pet = $vax->pet()->with('owner')->first();
+        $pet = $vax->pet()->with(['owner', 'members'])->first();
         if (! $pet || ! $pet->owner) {
-            return null;
+            return;
         }
 
-        $user = $pet->owner;
+        $recipients = self::petRecipients($pet);
+        foreach ($recipients as $user) {
+            self::upsertVaccinationReminderFor($vax, $pet, $user);
+        }
+
+        // Drop reminders for anyone no longer sharing the pet.
+        Reminder::where('related_type', 'vaccination')
+            ->where('related_id', $vax->id)
+            ->whereNotIn('user_id', $recipients->pluck('id'))
+            ->delete();
+    }
+
+    /** Upsert one user's reminder for a vaccination (keyed per user). */
+    private static function upsertVaccinationReminderFor(Vaccination $vax, Pet $pet, User $user): void
+    {
         $tz = $user->timezone ?: 'UTC';
         $fireAt = self::eventFireAt($vax->due_date->format('Y-m-d'), '09:00', $tz);
 
         $reminder = Reminder::updateOrCreate(
-            ['related_type' => 'vaccination', 'related_id' => $vax->id],
+            ['related_type' => 'vaccination', 'related_id' => $vax->id, 'user_id' => $user->id],
             [
-                'user_id' => $user->id,
                 'pet_id' => $pet->id,
                 'type' => 'vaccination',
                 'title' => 'Vaccination due: '.$vax->name,
@@ -86,8 +102,6 @@ class ReminderScheduler
 
         $reminder->next_fire_at = self::computeNextFireAt($reminder);
         $reminder->save();
-
-        return $reminder;
     }
 
     /** Disable the reminder(s) tied to a vaccination (e.g. once administered/deleted). */
@@ -112,12 +126,24 @@ class ReminderScheduler
             return;
         }
 
-        $pet = $med->pet()->with('owner')->first();
+        $pet = $med->pet()->with(['owner', 'members'])->first();
         if (! $pet || ! $pet->owner) {
             return;
         }
 
-        $user = $pet->owner;
+        // One set of dose reminders per person who can see the pet, in their tz.
+        foreach (self::petRecipients($pet) as $user) {
+            self::createMedicationRemindersFor($med, $pet, $user);
+        }
+    }
+
+    /** Create one user's recurring dose reminders for a medication. */
+    private static function createMedicationRemindersFor(Medication $med, Pet $pet, User $user): void
+    {
+        if (! $med->active || $med->frequency === 'as_needed') {
+            return;
+        }
+
         $tz = $user->timezone ?: 'UTC';
         $times = (is_array($med->times) && count($med->times)) ? $med->times : ['09:00'];
         $recurrence = in_array($med->frequency, ['daily', 'weekly', 'monthly'], true) ? $med->frequency : 'daily';
@@ -141,6 +167,45 @@ class ReminderScheduler
             $reminder->next_fire_at = self::computeNextFireAt($reminder);
             $reminder->save();
         }
+    }
+
+    /** Owner + co-owners of a pet, unique by id. */
+    public static function petRecipients(Pet $pet): Collection
+    {
+        $pet->loadMissing('owner', 'members');
+
+        return collect([$pet->owner])
+            ->filter()
+            ->concat($pet->members)
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * Give a freshly-added co-owner their own copy of the pet's active
+     * vaccination + medication reminders. Starts from a clean slate so a
+     * re-accept can't duplicate.
+     */
+    public static function backfillForMember(Pet $pet, User $user): void
+    {
+        self::purgeForMember($pet, $user);
+
+        $pet->loadMissing('vaccinations', 'medications');
+
+        foreach ($pet->vaccinations as $vax) {
+            if ($vax->status !== 'completed') {
+                self::upsertVaccinationReminderFor($vax, $pet, $user);
+            }
+        }
+        foreach ($pet->medications as $med) {
+            self::createMedicationRemindersFor($med, $pet, $user);
+        }
+    }
+
+    /** Remove a user's reminders for a pet (e.g. when they leave / are removed). */
+    public static function purgeForMember(Pet $pet, User $user): void
+    {
+        Reminder::where('user_id', $user->id)->where('pet_id', $pet->id)->delete();
     }
 
     /** Remove the reminders tied to a medication. */

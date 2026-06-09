@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Pet;
 use App\Models\PetInvite;
+use App\Models\Reminder;
 use App\Models\User;
 use App\Services\JwtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -216,6 +217,80 @@ class PetSharingTest extends TestCase
 
         $this->withToken($ownerToken)->deleteJson("/pets/{$pet->id}/invites/{$inviteId}")->assertNoContent();
         $this->withToken($inviteeToken)->getJson('/invites')->assertJsonCount(0);
+    }
+
+    private function reminderCount(string $userId, string $petId): int
+    {
+        return Reminder::where('user_id', $userId)->where('pet_id', $petId)->count();
+    }
+
+    public function test_accepting_an_invite_backfills_care_reminders(): void
+    {
+        [$owner, $ownerToken] = $this->user();
+        [$invitee, $inviteeToken] = $this->user();
+        $pet = $this->pet($owner);
+
+        // The pet already has a vaccination (a reminder exists for the owner).
+        $this->withToken($ownerToken)->postJson("/pets/{$pet->id}/vaccinations", [
+            'name' => 'Rabies', 'due_date' => '2026-12-01',
+        ])->assertCreated();
+        $this->assertSame(1, $this->reminderCount($owner->id, $pet->id));
+        $this->assertSame(0, $this->reminderCount($invitee->id, $pet->id));
+
+        $this->share($pet, $ownerToken, $invitee, $inviteeToken);
+
+        // The new co-owner gets their own copy of the care reminders.
+        $this->assertSame(1, $this->reminderCount($invitee->id, $pet->id));
+    }
+
+    public function test_new_vaccination_fans_out_to_co_owners(): void
+    {
+        [$owner, $ownerToken] = $this->user();
+        [$invitee, $inviteeToken] = $this->user();
+        $pet = $this->pet($owner);
+        $this->share($pet, $ownerToken, $invitee, $inviteeToken);
+
+        // Adding a vaccination after sharing reminds the owner and the co-owner.
+        $this->withToken($ownerToken)->postJson("/pets/{$pet->id}/vaccinations", [
+            'name' => 'Distemper', 'due_date' => '2026-11-01',
+        ])->assertCreated();
+
+        $this->assertSame(1, $this->reminderCount($owner->id, $pet->id));
+        $this->assertSame(1, $this->reminderCount($invitee->id, $pet->id));
+    }
+
+    public function test_leaving_purges_the_members_reminders(): void
+    {
+        [$owner, $ownerToken] = $this->user();
+        [$invitee, $inviteeToken] = $this->user();
+        $pet = $this->pet($owner);
+        $this->withToken($ownerToken)->postJson("/pets/{$pet->id}/vaccinations", [
+            'name' => 'Rabies', 'due_date' => '2026-12-01',
+        ])->assertCreated();
+        $this->share($pet, $ownerToken, $invitee, $inviteeToken);
+        $this->assertSame(1, $this->reminderCount($invitee->id, $pet->id));
+
+        $this->withToken($inviteeToken)->postJson("/pets/{$pet->id}/leave")->assertNoContent();
+
+        // The departing co-owner's reminders go; the owner's stay.
+        $this->assertSame(0, $this->reminderCount($invitee->id, $pet->id));
+        $this->assertSame(1, $this->reminderCount($owner->id, $pet->id));
+    }
+
+    public function test_removing_a_member_purges_their_reminders(): void
+    {
+        [$owner, $ownerToken] = $this->user();
+        [$invitee, $inviteeToken] = $this->user();
+        $pet = $this->pet($owner);
+        $this->withToken($ownerToken)->postJson("/pets/{$pet->id}/vaccinations", [
+            'name' => 'Rabies', 'due_date' => '2026-12-01',
+        ])->assertCreated();
+        $this->share($pet, $ownerToken, $invitee, $inviteeToken);
+        $this->assertSame(1, $this->reminderCount($invitee->id, $pet->id));
+
+        $this->withToken($ownerToken)->deleteJson("/pets/{$pet->id}/members/{$invitee->id}")->assertNoContent();
+
+        $this->assertSame(0, $this->reminderCount($invitee->id, $pet->id));
     }
 
     public function test_members_listing_reports_owner_members_and_invites(): void

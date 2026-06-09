@@ -196,7 +196,9 @@ export default function PetProfileScreen({ navigation, route }) {
       {
         text: 'Leave',
         style: 'destructive',
-        onPress: async () => { await leavePet(petId); navigation.goBack(); },
+        // Navigate away first so the pet vanishing from state can't flash a
+        // "Pet not found" frame; the detach then completes in the background.
+        onPress: () => { navigation.goBack(); leavePet(petId); },
       },
     ]);
   };
