@@ -36,6 +36,12 @@ class Pet extends Model
             if ($postIds->isNotEmpty()) {
                 Post::whereIn('id', $postIds)->delete();
             }
+
+            // Likewise, the DB cascade would drop document rows without firing their
+            // model hook — delete the underlying files here so nothing is orphaned.
+            foreach ($pet->documents()->pluck('file_url') as $url) {
+                Uploads::deleteByUrl($url);
+            }
         });
     }
 
@@ -121,6 +127,21 @@ class Pet extends Model
     public function expenses(): HasMany
     {
         return $this->hasMany(Expense::class);
+    }
+
+    public function clinics(): HasMany
+    {
+        return $this->hasMany(Clinic::class);
+    }
+
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class);
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
     }
 
     /** Serialize to the public `PetOut` shape. */

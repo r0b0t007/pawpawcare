@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { PET_COLORS } from '../theme';
-import { get, post, patch, del } from '../services/api';
+import { get, post, patch, del, uploadDocument } from '../services/api';
 import { scheduleLocalReminders } from '../services/notifications';
 
 const DataContext = createContext(null);
@@ -168,6 +168,42 @@ const toInvite = (i) => ({
   inviterName: i.inviter?.name || 'Someone',
   inviterEmail: i.inviter?.email || null,
   createdAt: i.created_at,
+});
+
+// Medical records vault — lazy-loaded per pet, not kept in global pet state.
+const toClinic = (c) => ({
+  id: c.id,
+  petId: c.pet_id,
+  name: c.name,
+  vetName: c.vet_name || null,
+  phone: c.phone || null,
+  email: c.email || null,
+  address: c.address || null,
+  notes: c.notes || null,
+});
+
+const toAppointment = (a) => ({
+  id: a.id,
+  petId: a.pet_id,
+  clinicId: a.clinic_id || null,
+  clinicName: a.clinic_name || null,
+  title: a.title,
+  scheduledAt: a.scheduled_at,
+  status: a.status,
+  notes: a.notes || null,
+});
+
+const toDocument = (d) => ({
+  id: d.id,
+  petId: d.pet_id,
+  appointmentId: d.appointment_id || null,
+  clinicId: d.clinic_id || null,
+  title: d.title,
+  category: d.category || 'other',
+  fileUrl: d.file_url,
+  mime: d.mime || null,
+  sizeBytes: d.size_bytes || null,
+  createdAt: d.created_at,
 });
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
@@ -722,6 +758,61 @@ export function DataProvider({ children }) {
     } catch (err) { handleApiError(err); }
   };
 
+  // ── Medical records vault ──
+
+  // Lazy-load a pet's clinics, appointments, and documents together. Returns
+  // mapped lists (or null on error) for the records screen to hold locally.
+  const getPetRecords = async (petId) => {
+    try {
+      const [clinics, appointments, documents] = await Promise.all([
+        get(`/pets/${petId}/clinics`),
+        get(`/pets/${petId}/appointments`),
+        get(`/pets/${petId}/documents`),
+      ]);
+      return {
+        clinics: clinics.map(toClinic),
+        appointments: appointments.map(toAppointment),
+        documents: documents.map(toDocument),
+      };
+    } catch (err) {
+      handleApiError(err);
+      return null;
+    }
+  };
+
+  const addClinic = async (petId, data) => {
+    const c = await post(`/pets/${petId}/clinics`, data);
+    return toClinic(c);
+  };
+  const updateClinic = async (petId, id, data) => {
+    const c = await patch(`/pets/${petId}/clinics/${id}`, data);
+    return toClinic(c);
+  };
+  const deleteClinic = async (petId, id) => {
+    try { await del(`/pets/${petId}/clinics/${id}`); } catch (err) { handleApiError(err); }
+  };
+
+  const addAppointment = async (petId, data) => {
+    const a = await post(`/pets/${petId}/appointments`, data);
+    return toAppointment(a);
+  };
+  const updateAppointment = async (petId, id, data) => {
+    const a = await patch(`/pets/${petId}/appointments/${id}`, data);
+    return toAppointment(a);
+  };
+  const deleteAppointment = async (petId, id) => {
+    try { await del(`/pets/${petId}/appointments/${id}`); } catch (err) { handleApiError(err); }
+  };
+
+  // file = { uri, name }; fields = { title, category, appointment_id?, clinic_id? }
+  const addDocument = async (petId, file, fields) => {
+    const d = await uploadDocument(petId, file, fields);
+    return toDocument(d);
+  };
+  const deleteDocument = async (petId, id) => {
+    try { await del(`/pets/${petId}/documents/${id}`); } catch (err) { handleApiError(err); }
+  };
+
   // ── Community ──
 
   const addPost = async (content, imageUrl) => {
@@ -821,6 +912,15 @@ export function DataProvider({ children }) {
         leavePet,
         acceptInvite,
         declineInvite,
+        getPetRecords,
+        addClinic,
+        updateClinic,
+        deleteClinic,
+        addAppointment,
+        updateAppointment,
+        deleteAppointment,
+        addDocument,
+        deleteDocument,
         addPost,
         togglePaw,
         getComments,

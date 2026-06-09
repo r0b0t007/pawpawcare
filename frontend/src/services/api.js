@@ -160,3 +160,48 @@ export async function uploadImage(localUri) {
   const data = await res.json();
   return data.url; // relative /storage/... path, resolved client-side
 }
+
+// ── Document upload (multipart: file + metadata in one request) ───────────────
+
+export async function uploadDocument(petId, file, fields = {}) {
+  const name = (file.name || file.uri.split('/').pop() || 'document.jpg').split('?')[0];
+  const ext = (/\.(\w+)$/.exec(name)?.[1] || 'jpg').toLowerCase();
+  const type = ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+  const send = (token) => {
+    const form = new FormData();
+    form.append('file', { uri: file.uri, name, type });
+    Object.entries(fields).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') form.append(k, String(v));
+    });
+    return fetch(`${API_URL}/pets/${petId}/documents`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'bypass-tunnel-reminder': 'true',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: form,
+    });
+  };
+
+  const { access } = await getTokens();
+  let res = await send(access);
+
+  // Retry once with a fresh token on 401 (mirrors uploadImage).
+  if (res.status === 401) {
+    let newToken;
+    try {
+      newToken = await refreshAccessToken();
+    } catch {
+      throw new Error('SESSION_EXPIRED');
+    }
+    res = await send(newToken);
+  }
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.detail || `Document upload failed (${res.status})`);
+  }
+  return data; // the created document record
+}

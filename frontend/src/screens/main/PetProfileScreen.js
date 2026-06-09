@@ -317,6 +317,22 @@ export default function PetProfileScreen({ navigation, route }) {
           </View>
         )}
 
+        {/* Medical Records vault */}
+        <TouchableOpacity
+          style={styles.recordsBtn}
+          onPress={() => navigation.navigate('MedicalRecords', { petId, petName: pet.name })}
+          activeOpacity={0.9}
+        >
+          <View style={styles.recordsIcon}>
+            <MaterialCommunityIcons name="folder-heart-outline" size={20} color={colors.tertiary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.recordsTitle}>Medical Records</Text>
+            <Text style={styles.recordsSub}>Vet clinics, appointments & documents</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
+        </TouchableOpacity>
+
         {/* Weight */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -1414,6 +1430,29 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
   },
   catChipText: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  recordsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.margin,
+    marginBottom: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radii.xl,
+    backgroundColor: colors.surfaceContainerLowest,
+    ...shadows.card,
+    borderWidth: 1,
+    borderColor: colors.tertiaryFixed,
+  },
+  recordsIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: radii.full,
+    backgroundColor: colors.tertiaryFixed,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recordsTitle: { ...typography.labelMd, color: colors.onSurface },
+  recordsSub: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 1 },
   shareNote: { ...typography.bodyMd, fontSize: 13, color: colors.onSurfaceVariant, marginBottom: spacing.sm, lineHeight: 19 },
   shareRow: {
     flexDirection: 'row',
