@@ -200,7 +200,6 @@ const toDocument = (d) => ({
   clinicId: d.clinic_id || null,
   title: d.title,
   category: d.category || 'other',
-  fileUrl: d.file_url,
   mime: d.mime || null,
   sizeBytes: d.size_bytes || null,
   createdAt: d.created_at,
@@ -812,6 +811,13 @@ export function DataProvider({ children }) {
   const deleteDocument = async (petId, id) => {
     try { await del(`/pets/${petId}/documents/${id}`); } catch (err) { handleApiError(err); }
   };
+  // Mint a short-lived signed URL to view a document (files aren't public).
+  const getDocumentUrl = async (petId, id) => {
+    try {
+      const { url } = await get(`/pets/${petId}/documents/${id}/url`);
+      return url;
+    } catch (err) { handleApiError(err); return null; }
+  };
 
   // ── Community ──
 
@@ -921,6 +927,7 @@ export function DataProvider({ children }) {
         deleteAppointment,
         addDocument,
         deleteDocument,
+        getDocumentUrl,
         addPost,
         togglePaw,
         getComments,

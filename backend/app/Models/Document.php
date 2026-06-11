@@ -20,12 +20,12 @@ class Document extends Model
         // Remove the stored file when the record is deleted via Eloquent.
         // (DB-level cascades on pet delete are handled in Pet::booted.)
         static::deleting(function (Document $doc) {
-            Uploads::deleteByUrl($doc->file_url);
+            Uploads::deletePrivate($doc->file_path);
         });
     }
 
     protected $fillable = [
-        'pet_id', 'appointment_id', 'clinic_id', 'title', 'category', 'file_url', 'mime', 'size_bytes',
+        'pet_id', 'appointment_id', 'clinic_id', 'title', 'category', 'file_path', 'mime', 'size_bytes',
     ];
 
     protected $attributes = [
@@ -43,6 +43,8 @@ class Document extends Model
 
     public function toApi(): array
     {
+        // Note: the raw file_path is intentionally never exposed. Clients fetch a
+        // short-lived signed URL from the `/documents/{id}/url` endpoint to view it.
         return [
             'id' => $this->id,
             'pet_id' => $this->pet_id,
@@ -50,7 +52,6 @@ class Document extends Model
             'clinic_id' => $this->clinic_id,
             'title' => $this->title,
             'category' => $this->category,
-            'file_url' => $this->file_url,
             'mime' => $this->mime,
             'size_bytes' => $this->size_bytes,
             'created_at' => $this->created_at?->toISOString(),

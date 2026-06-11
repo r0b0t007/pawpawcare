@@ -9,6 +9,9 @@ use App\Models\Pet;
 use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DocumentController extends Controller
 {
@@ -52,9 +55,10 @@ class DocumentController extends Controller
 
         $file = $request->file('file');
         $isPdf = $file->getMimeType() === 'application/pdf';
-        $url = $isPdf
-            ? Uploads::storePdf($file, 'documents')
-            : Uploads::storeImage($file, 'documents');
+        // Stored on the PRIVATE disk — never web-accessible without a signed URL.
+        $path = $isPdf
+            ? Uploads::storePrivatePdf($file, 'documents')
+            : Uploads::storePrivateImage($file, 'documents');
 
         $doc = Document::create([
             'pet_id' => $petId,
@@ -62,12 +66,50 @@ class DocumentController extends Controller
             'clinic_id' => $data['clinic_id'] ?? null,
             'title' => $data['title'],
             'category' => $data['category'] ?? 'other',
-            'file_url' => $url,
+            'file_path' => $path,
             'mime' => $isPdf ? 'application/pdf' : $file->getMimeType(),
-            'size_bytes' => $file->getSize(),
+            // Record the actual stored size (images are re-encoded, so it differs).
+            'size_bytes' => Storage::disk(Uploads::PRIVATE_DISK)->size($path),
         ]);
 
         return response()->json($doc->toApi(), 201);
+    }
+
+    /**
+     * Mint a short-lived signed URL for viewing a document. Requires access to the
+     * pet (this route is JWT-guarded); the returned URL authorizes the actual file
+     * fetch via its signature + expiry, so it works in a browser / external viewer.
+     */
+    public function url(Request $request, string $petId, string $documentId): JsonResponse
+    {
+        $this->petOr404($request, $petId);
+
+        $doc = Document::where('id', $documentId)->where('pet_id', $petId)->first();
+        if (! $doc) {
+            abort(404, 'Document not found');
+        }
+
+        $url = URL::temporarySignedRoute('documents.raw', now()->addMinutes(5), ['document' => $doc->id]);
+
+        return response()->json(['url' => $url]);
+    }
+
+    /**
+     * Stream the file behind a valid signed URL. This route is NOT JWT-guarded
+     * (a browser can't send the token) — the signature, minted only for an
+     * authorized user and valid for minutes, is the authorization.
+     */
+    public function raw(string $documentId): StreamedResponse
+    {
+        $doc = Document::find($documentId);
+        $disk = Storage::disk(Uploads::PRIVATE_DISK);
+        if (! $doc || ! $disk->exists($doc->file_path)) {
+            abort(404, 'Document not found');
+        }
+
+        return $disk->response($doc->file_path, $doc->title, [
+            'Content-Type' => $doc->mime ?: 'application/octet-stream',
+        ]);
     }
 
     public function destroy(Request $request, string $petId, string $documentId): JsonResponse

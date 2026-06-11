@@ -39,8 +39,8 @@ class Pet extends Model
 
             // Likewise, the DB cascade would drop document rows without firing their
             // model hook — delete the underlying files here so nothing is orphaned.
-            foreach ($pet->documents()->pluck('file_url') as $url) {
-                Uploads::deleteByUrl($url);
+            foreach ($pet->documents()->pluck('file_path') as $path) {
+                Uploads::deletePrivate($path);
             }
         });
     }

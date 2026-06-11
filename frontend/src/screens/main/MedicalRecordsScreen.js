@@ -7,7 +7,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useData } from '../../context/DataContext';
-import { resolveAsset } from '../../config';
 import { pickRecordImage } from '../../services/imagePicker';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
@@ -41,7 +40,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const { petId, petName } = route.params;
   const {
     getPetRecords, addClinic, deleteClinic,
-    addAppointment, deleteAppointment, addDocument, deleteDocument,
+    addAppointment, deleteAppointment, addDocument, deleteDocument, getDocumentUrl,
   } = useData();
 
   const [records, setRecords] = useState(null);
@@ -67,9 +66,11 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const appointments = records?.appointments || [];
   const documents = records?.documents || [];
 
-  const openDocument = (doc) => {
-    const url = resolveAsset(doc.fileUrl);
-    if (url) Linking.openURL(url).catch(() => Alert.alert('Could not open', 'This file could not be opened.'));
+  const openDocument = async (doc) => {
+    // Files live on a private disk — fetch a short-lived signed URL to view.
+    const url = await getDocumentUrl(petId, doc.id);
+    if (!url) { Alert.alert('Could not open', 'This file could not be opened.'); return; }
+    Linking.openURL(url).catch(() => Alert.alert('Could not open', 'This file could not be opened.'));
   };
 
   const confirmDelete = (label, fn) =>

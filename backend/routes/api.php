@@ -20,6 +20,13 @@ use Illuminate\Support\Facades\Route;
 // ── Health ──────────────────────────────────────────────────────────────────
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'version' => '1.0.0']));
 
+// ── Signed document delivery (no JWT — the signature is the authorization) ────
+// The URL is minted only for users with pet access via /pets/{pet}/documents/{id}/url
+// and expires within minutes, so a leaked link can't grant lasting access.
+Route::get('/documents/{document}/raw', [DocumentController::class, 'raw'])
+    ->middleware('signed')
+    ->name('documents.raw');
+
 // ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
 Route::middleware('throttle:20,1')->group(function () {
     Route::post('/auth/signup', [AuthController::class, 'signup']);
@@ -102,6 +109,7 @@ Route::middleware('auth.jwt')->group(function () {
 
     Route::get('/pets/{pet}/documents', [DocumentController::class, 'index']);
     Route::post('/pets/{pet}/documents', [DocumentController::class, 'store'])->middleware('throttle:30,1');
+    Route::get('/pets/{pet}/documents/{document}/url', [DocumentController::class, 'url']);
     Route::delete('/pets/{pet}/documents/{document}', [DocumentController::class, 'destroy']);
 
     // Lost pets (community alerts)

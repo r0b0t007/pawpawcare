@@ -9,7 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         // Uploaded records (lab results, prescriptions, invoices, scans…). The file
-        // lives on the public disk; `file_url` is the relative /storage/... path.
+        // lives on the PRIVATE disk; `file_path` is its disk-relative path. It's
+        // never served directly — clients mint a short-lived signed URL to view it.
         Schema::create('documents', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('pet_id')->constrained('pets')->cascadeOnDelete();
@@ -17,7 +18,7 @@ return new class extends Migration
             $table->foreignUuid('clinic_id')->nullable()->constrained('clinics')->nullOnDelete();
             $table->string('title', 150);
             $table->string('category', 20)->default('other'); // lab, vaccination, prescription, invoice, imaging, insurance, other
-            $table->string('file_url');
+            $table->string('file_path');
             $table->string('mime', 100)->nullable();
             $table->unsignedBigInteger('size_bytes')->nullable();
             $table->timestamps();
