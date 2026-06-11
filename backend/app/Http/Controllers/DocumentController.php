@@ -136,6 +136,11 @@ class DocumentController extends Controller
         if ($doc->extraction_status === 'pending') {
             abort(409, 'Extraction already in progress');
         }
+        // Capability gate before any tokens are spent — e.g. OpenAI-compatible
+        // providers read images but not PDFs (no rasterization step).
+        if (! $extractor->supports($doc)) {
+            abort(422, 'The configured AI provider cannot read this document type.');
+        }
 
         // Columns are guarded (not fillable) — set explicitly, never from input.
         $doc->forceFill(['extraction_status' => 'pending'])->save();

@@ -2,21 +2,25 @@
 
 namespace App\Services;
 
-use Anthropic\Client;
 use App\Models\Document;
 use App\Models\Pet;
+use App\Services\Extraction\ExtractionClient;
 use App\Support\Uploads;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Reads a vault document (PDF or image) with the Claude API and returns
+ * Reads a vault document (PDF or image) with a vision LLM and returns
  * structured suggestions — vaccinations, medications, weight, clinic, cost —
  * for the user to review before anything is saved.
  *
- * The structured-output schema guarantees the response SHAPE; the values are
- * still untrusted (a model can misread a date), so everything passes through
- * sanitize() and the user-facing review step before touching real records.
+ * Provider-agnostic: the prompt, schema, and sanitation live here; the wire
+ * call lives behind ExtractionClient (Anthropic by default, any OpenAI-
+ * compatible vision provider via EXTRACTION_PROVIDER — see AppServiceProvider).
+ *
+ * Model output is untrusted regardless of provider (a model can misread a
+ * date), so everything passes through sanitize() and the user-facing review
+ * step before touching real records.
  */
 class DocumentExtractor
 {
@@ -25,9 +29,12 @@ class DocumentExtractor
 
     private const FREQUENCIES = ['daily', 'weekly', 'monthly', 'as_needed'];
 
-    public function __construct(private ?Client $client = null)
+    public function __construct(private ExtractionClient $client) {}
+
+    /** Whether the configured provider can read this document at all. */
+    public function supports(Document $doc): bool
     {
-        $this->client ??= new Client(apiKey: (string) config('services.anthropic.key'));
+        return $this->client->supportsMime($doc->mime ?: 'application/pdf');
     }
 
     /**
@@ -36,41 +43,18 @@ class DocumentExtractor
      */
     public function extract(Document $doc, Pet $pet): array
     {
-        $bytes = Storage::disk(Uploads::PRIVATE_DISK)->get($doc->file_path);
-        $source = [
-            'type' => 'base64',
-            'mediaType' => $doc->mime ?: 'application/pdf',
-            'data' => base64_encode($bytes),
-        ];
-        $block = $doc->mime === 'application/pdf'
-            ? ['type' => 'document', 'source' => $source]
-            : ['type' => 'image', 'source' => $source];
-
-        $message = $this->client->messages->create(
-            model: (string) config('services.anthropic.model'),
-            maxTokens: 4096,
-            thinking: ['type' => 'adaptive'],
-            system: $this->systemPrompt($pet),
-            messages: [[
-                'role' => 'user',
-                'content' => [
-                    $block,
-                    ['type' => 'text', 'text' => 'Extract all veterinary medical information from this document.'],
-                ],
-            ]],
-            outputConfig: ['format' => ['type' => 'json_schema', 'schema' => $this->schema()]],
-            requestOptions: ['timeout' => 90],
+        $raw = $this->client->extract(
+            $doc->mime ?: 'application/pdf',
+            Storage::disk(Uploads::PRIVATE_DISK)->get($doc->file_path),
+            $this->systemPrompt($pet),
+            'Extract all veterinary medical information from this document.',
+            $this->schema(),
         );
 
-        $json = '';
-        foreach ($message->content as $content) {
-            if ($content->type === 'text') {
-                $json = $content->text;
-                break;
-            }
-        }
+        $clean = $this->sanitize($raw);
+        $clean['_meta'] = $this->client->meta();
 
-        return $this->sanitize((array) json_decode($json, true));
+        return $clean;
     }
 
     private function systemPrompt(Pet $pet): string

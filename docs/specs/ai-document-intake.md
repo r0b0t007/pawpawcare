@@ -81,6 +81,32 @@ Not `$fillable` — set server-side only. `toApi()` exposes `extraction_status` 
   documents with no medical data
 - DataContext: merge records returned by Apply (no refetch)
 
+## Provider abstraction
+
+The wire call is isolated behind `App\Services\Extraction\ExtractionClient`
+(selected in `AppServiceProvider` from `EXTRACTION_PROVIDER`). `DocumentExtractor`
+owns everything provider-agnostic — prompt, schema, sanitation, `_meta` stamping.
+
+| Driver | Covers | Images | PDFs | Schema enforcement |
+|---|---|---|---|---|
+| `AnthropicDriver` (default) | Claude | ✅ | ✅ native | ✅ structured outputs |
+| `OpenAiCompatibleDriver` | Qwen (DashScope), Kimi/Moonshot, OpenAI, OpenRouter… | ✅ data-URL | ❌ (no rasterization step — deliberate) | json_object + schema-in-prompt + fence-strip + one retry |
+
+Switching providers is an `.env` change:
+
+```
+EXTRACTION_PROVIDER=openai-compatible
+EXTRACTION_BASE_URL=https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+EXTRACTION_MODEL=qwen3-vl-plus
+EXTRACTION_API_KEY=sk-…
+```
+
+Capability gaps surface as a 422 from the extract endpoint *before* any tokens are
+spent (`DocumentExtractor::supports()`), e.g. PDFs on an images-only provider.
+Note DeepSeek exposes no vision models on its public API, so it cannot read
+documents at all regardless of driver. Each stored extraction carries
+`_meta.provider/model` so quality issues are attributable when comparing providers.
+
 ## Cost & model
 
 Per document ≈ 2–4K input tokens + 500–800 output:

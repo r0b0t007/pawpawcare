@@ -7,11 +7,13 @@ use App\Models\Pet;
 use App\Models\PetInvite;
 use App\Models\User;
 use App\Services\DocumentExtractor;
+use App\Services\Extraction\ExtractionClient;
 use App\Services\JwtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class ExtractionTest extends TestCase
@@ -64,6 +66,15 @@ class ExtractionTest extends TestCase
         ];
     }
 
+    /** Mock the extractor; the capability gate passes unless a test says otherwise. */
+    private function mockExtractor(): MockInterface
+    {
+        $mock = $this->mock(DocumentExtractor::class);
+        $mock->allows('supports')->andReturnTrue();
+
+        return $mock;
+    }
+
     // ── Extract endpoint ─────────────────────────────────────────────────────
 
     public function test_extracts_a_document_and_stores_the_suggestions(): void
@@ -73,7 +84,7 @@ class ExtractionTest extends TestCase
         $pet = $this->pet($owner);
         $docId = $this->uploadDocument($token, $pet);
 
-        $this->mock(DocumentExtractor::class)
+        $this->mockExtractor()
             ->shouldReceive('extract')->once()->andReturn($this->payload());
 
         $doc = $this->withToken($token)
@@ -93,7 +104,7 @@ class ExtractionTest extends TestCase
         $docId = $this->uploadDocument($token, $pet);
 
         // `once` proves the second request never reaches the model.
-        $this->mock(DocumentExtractor::class)
+        $this->mockExtractor()
             ->shouldReceive('extract')->once()->andReturn($this->payload());
 
         $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$docId}/extract")->assertOk();
@@ -108,7 +119,7 @@ class ExtractionTest extends TestCase
         $pet = $this->pet($owner);
         $docId = $this->uploadDocument($token, $pet);
 
-        $this->mock(DocumentExtractor::class)
+        $this->mockExtractor()
             ->shouldReceive('extract')->once()->andThrow(new \RuntimeException('API down'));
 
         $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$docId}/extract")
@@ -119,7 +130,7 @@ class ExtractionTest extends TestCase
         $this->assertNull($doc->extraction);
 
         // A failed document can be retried (status is not stuck on pending).
-        $this->mock(DocumentExtractor::class)
+        $this->mockExtractor()
             ->shouldReceive('extract')->once()->andReturn($this->payload());
         $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$docId}/extract")
             ->assertOk()->assertJsonPath('extraction_status', 'done');
@@ -135,7 +146,7 @@ class ExtractionTest extends TestCase
         $pet = $this->pet($owner);
         $docId = $this->uploadDocument($ownerToken, $pet);
 
-        $this->mock(DocumentExtractor::class)->shouldReceive('extract')->never();
+        $this->mockExtractor()->shouldReceive('extract')->never();
 
         $this->withToken($outsiderToken)
             ->postJson("/pets/{$pet->id}/documents/{$docId}/extract")
@@ -155,7 +166,7 @@ class ExtractionTest extends TestCase
         $inviteId = PetInvite::where('pet_id', $pet->id)->first()->id;
         $this->withToken($memberToken)->postJson("/invites/{$inviteId}/accept")->assertOk();
 
-        $this->mock(DocumentExtractor::class)
+        $this->mockExtractor()
             ->shouldReceive('extract')->once()->andReturn($this->payload());
 
         $this->withToken($memberToken)
@@ -180,6 +191,67 @@ class ExtractionTest extends TestCase
 
         $this->assertSame('none', $doc['extraction_status']);
         $this->assertNull($doc['extraction']);
+    }
+
+    // ── Provider abstraction ─────────────────────────────────────────────────
+
+    /** A stub provider driver, configurable for capability and output. */
+    private function bindStubClient(bool $supports = true, array $returns = []): void
+    {
+        $this->app->bind(ExtractionClient::class, fn () => new class($supports, $returns) implements ExtractionClient
+        {
+            public function __construct(private bool $supports, private array $returns) {}
+
+            public function supportsMime(string $mime): bool
+            {
+                return $this->supports;
+            }
+
+            public function extract(string $mime, string $bytes, string $systemPrompt, string $userPrompt, array $schema): array
+            {
+                return $this->returns;
+            }
+
+            public function meta(): array
+            {
+                return ['provider' => 'stub', 'model' => 'stub-1'];
+            }
+        });
+    }
+
+    public function test_unsupported_document_type_returns_422_before_calling_the_model(): void
+    {
+        Storage::fake('local');
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+        $docId = $this->uploadDocument($token, $pet);
+
+        // Real DocumentExtractor, stub provider that can't read anything.
+        $this->bindStubClient(supports: false);
+
+        $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$docId}/extract")
+            ->assertStatus(422);
+        $this->assertSame('none', Document::find($docId)->extraction_status);
+    }
+
+    public function test_extraction_is_stamped_with_provider_meta(): void
+    {
+        Storage::fake('local');
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+        $docId = $this->uploadDocument($token, $pet);
+
+        // Real DocumentExtractor + sanitize, stub provider output.
+        $this->bindStubClient(returns: [
+            'document_type' => 'vaccination',
+            'vaccinations' => [['name' => 'Rabies', 'administered_date' => '2026-05-12']],
+        ]);
+
+        $doc = $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$docId}/extract")
+            ->assertOk()->json();
+
+        $this->assertSame('stub', $doc['extraction']['_meta']['provider']);
+        $this->assertSame('Rabies', $doc['extraction']['vaccinations'][0]['name']);
     }
 
     // ── Sanitization (model output is untrusted input) ───────────────────────
