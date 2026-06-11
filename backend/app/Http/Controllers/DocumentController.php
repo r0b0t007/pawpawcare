@@ -6,9 +6,11 @@ use App\Models\Appointment;
 use App\Models\Clinic;
 use App\Models\Document;
 use App\Models\Pet;
+use App\Services\DocumentExtractor;
 use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -110,6 +112,49 @@ class DocumentController extends Controller
         return $disk->response($doc->file_path, $doc->title, [
             'Content-Type' => $doc->mime ?: 'application/octet-stream',
         ]);
+    }
+
+    /**
+     * AI document intake: read the file with Claude and store structured
+     * suggestions on the document. Nothing is written to real records here —
+     * the user reviews and applies via a separate endpoint. Idempotent: a
+     * completed extraction is returned as-is rather than re-running (and
+     * re-paying for) the API call.
+     */
+    public function extract(Request $request, string $petId, string $documentId, DocumentExtractor $extractor): JsonResponse
+    {
+        $pet = $this->petOr404($request, $petId);
+
+        $doc = Document::where('id', $documentId)->where('pet_id', $petId)->first();
+        if (! $doc) {
+            abort(404, 'Document not found');
+        }
+
+        if ($doc->extraction_status === 'done' && $doc->extraction) {
+            return response()->json($doc->toApi());
+        }
+        if ($doc->extraction_status === 'pending') {
+            abort(409, 'Extraction already in progress');
+        }
+
+        // Columns are guarded (not fillable) — set explicitly, never from input.
+        $doc->forceFill(['extraction_status' => 'pending'])->save();
+
+        try {
+            $extraction = $extractor->extract($doc, $pet);
+        } catch (\Throwable $e) {
+            Log::warning('Document extraction failed', ['document_id' => $doc->id, 'error' => $e->getMessage()]);
+            $doc->forceFill(['extraction_status' => 'failed'])->save();
+            abort(502, 'Could not read the document. Please try again.');
+        }
+
+        $doc->forceFill([
+            'extraction_status' => 'done',
+            'extraction' => $extraction,
+            'extracted_at' => now(),
+        ])->save();
+
+        return response()->json($doc->toApi());
     }
 
     public function destroy(Request $request, string $petId, string $documentId): JsonResponse
