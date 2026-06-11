@@ -203,6 +203,11 @@ const toDocument = (d) => ({
   mime: d.mime || null,
   sizeBytes: d.size_bytes || null,
   createdAt: d.created_at,
+  // AI intake — `extraction` keeps the raw snake_case suggestion payload as
+  // stored server-side (the review sheet builds the apply request from it).
+  extractionStatus: d.extraction_status || 'none',
+  extraction: d.extraction || null,
+  extractedAt: d.extracted_at || null,
 });
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
@@ -819,6 +824,21 @@ export function DataProvider({ children }) {
     } catch (err) { handleApiError(err); return null; }
   };
 
+  // ── AI document intake ──
+  // Read a document with the AI and store structured suggestions on it.
+  // Throws on failure so the screen can show why (timeout, unsupported type…).
+  const extractDocument = async (petId, id) => {
+    const d = await post(`/pets/${petId}/documents/${id}/extract`);
+    return toDocument(d);
+  };
+  // Apply the user's reviewed subset. The created records live in global pet
+  // state (vaccinations, meds, weight…), so reload it in the background.
+  const applyExtraction = async (petId, id, payload) => {
+    const result = await post(`/pets/${petId}/documents/${id}/apply`, payload);
+    loadData();
+    return result;
+  };
+
   // ── Community ──
 
   const addPost = async (content, imageUrl) => {
@@ -928,6 +948,8 @@ export function DataProvider({ children }) {
         addDocument,
         deleteDocument,
         getDocumentUrl,
+        extractDocument,
+        applyExtraction,
         addPost,
         togglePaw,
         getComments,
