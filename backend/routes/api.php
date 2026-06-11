@@ -112,6 +112,7 @@ Route::middleware('auth.jwt')->group(function () {
     Route::get('/pets/{pet}/documents/{document}/url', [DocumentController::class, 'url']);
     // AI intake — expensive model call, so throttled tighter than other routes.
     Route::post('/pets/{pet}/documents/{document}/extract', [DocumentController::class, 'extract'])->middleware('throttle:10,1');
+    Route::post('/pets/{pet}/documents/{document}/apply', [DocumentController::class, 'applyExtraction']);
     Route::delete('/pets/{pet}/documents/{document}', [DocumentController::class, 'destroy']);
 
     // Lost pets (community alerts)
