@@ -29,7 +29,11 @@ backend/.env
 
 # AI editor / assistant tool directories (personal, not team config)
 .agents/
-.claude/
+# .claude/ is personal by default, but a few files are shared team config.
+.claude/*
+!.claude/settings.json
+!.claude/agents/
+!.claude/hooks/
 .junie/
 .kiro/
 .qwen/
