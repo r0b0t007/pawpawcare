@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-8'),
+    ],
+
+    // AI document intake provider. `anthropic` (default) uses the block above;
+    // `openai-compatible` points the three settings below at any Chat
+    // Completions vision endpoint (Qwen/DashScope, Kimi/Moonshot, OpenRouter…).
+    'extraction' => [
+        'provider' => env('EXTRACTION_PROVIDER', 'anthropic'),
+        'base_url' => env('EXTRACTION_BASE_URL'),
+        'model' => env('EXTRACTION_MODEL'),
+        'key' => env('EXTRACTION_API_KEY'),
+    ],
+
 ];

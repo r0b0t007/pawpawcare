@@ -34,6 +34,8 @@ class Document extends Model
 
     protected $casts = [
         'size_bytes' => 'integer',
+        'extraction' => 'array',
+        'extracted_at' => 'datetime',
     ];
 
     public function pet(): BelongsTo
@@ -54,6 +56,9 @@ class Document extends Model
             'category' => $this->category,
             'mime' => $this->mime,
             'size_bytes' => $this->size_bytes,
+            'extraction_status' => $this->extraction_status ?? 'none',
+            'extraction' => $this->extraction,
+            'extracted_at' => $this->extracted_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

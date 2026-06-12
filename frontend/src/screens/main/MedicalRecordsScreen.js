@@ -41,6 +41,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const {
     getPetRecords, addClinic, deleteClinic,
     addAppointment, deleteAppointment, addDocument, deleteDocument, getDocumentUrl,
+    extractDocument, applyExtraction,
   } = useData();
 
   const [records, setRecords] = useState(null);
@@ -48,6 +49,8 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const [clinicModal, setClinicModal] = useState(false);
   const [apptModal, setApptModal] = useState(false);
   const [docModal, setDocModal] = useState(false);
+  const [extractingId, setExtractingId] = useState(null);
+  const [reviewDoc, setReviewDoc] = useState(null);
 
   const load = useCallback(async () => {
     const data = await getPetRecords(petId);
@@ -78,6 +81,36 @@ export default function MedicalRecordsScreen({ navigation, route }) {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: fn },
     ]);
+
+  // AI intake: extract once (the backend caches a completed extraction),
+  // then open the review sheet. Re-opening a reviewed document is free.
+  const startExtraction = async (doc) => {
+    if (doc.extractionStatus === 'done' && doc.extraction) { setReviewDoc(doc); return; }
+    setExtractingId(doc.id);
+    try {
+      const updated = await extractDocument(petId, doc.id);
+      setReviewDoc(updated);
+      load();
+    } catch (e) {
+      Alert.alert('Could not read document', e.message || 'Please try again.');
+    } finally {
+      setExtractingId(null);
+    }
+  };
+
+  const onApplied = (result) => {
+    setReviewDoc(null);
+    const added =
+      (result.vaccinations?.length || 0) + (result.medications?.length || 0) +
+      (result.weight ? 1 : 0) + (result.expense ? 1 : 0) + (result.clinic ? 1 : 0);
+    const skipped = result.skipped?.length || 0;
+    Alert.alert(
+      'Records added',
+      `${added} record${added === 1 ? '' : 's'} added to ${petName || 'your pet'}'s profile.` +
+        (skipped ? ` ${skipped} skipped (already existed).` : ''),
+    );
+    load();
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -171,6 +204,17 @@ export default function MedicalRecordsScreen({ navigation, route }) {
                         {m.label}{d.sizeBytes ? ` · ${fmtSize(d.sizeBytes)}` : ''} · {fmtDate(d.createdAt)}
                       </Text>
                     </View>
+                    {extractingId === d.id ? (
+                      <ActivityIndicator size="small" color={colors.tertiary} style={styles.rowAction} />
+                    ) : (
+                      <TouchableOpacity onPress={() => startExtraction(d)} hitSlop={hit} style={styles.rowAction}>
+                        <MaterialCommunityIcons
+                          name={d.extraction?._applied_at ? 'check-decagram' : 'creation'}
+                          size={18}
+                          color={d.extraction?._applied_at ? colors.secondary : colors.tertiary}
+                        />
+                      </TouchableOpacity>
+                    )}
                     <MaterialCommunityIcons name="open-in-new" size={16} color={colors.outlineVariant} />
                     <TouchableOpacity onPress={() => confirmDelete('document', () => deleteDocument(petId, d.id).then(load))} hitSlop={hit} style={styles.rowAction}>
                       <MaterialCommunityIcons name="close" size={16} color={colors.outline} />
@@ -201,6 +245,14 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         onClose={() => setDocModal(false)}
         onSave={(file, fields) => addDocument(petId, file, fields)}
         onDone={load}
+      />
+      <ExtractionSheet
+        visible={!!reviewDoc}
+        doc={reviewDoc}
+        petName={petName}
+        onClose={() => setReviewDoc(null)}
+        onApply={(payload) => applyExtraction(petId, reviewDoc.id, payload)}
+        onDone={onApplied}
       />
     </SafeAreaView>
   );
@@ -430,6 +482,247 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
   );
 }
 
+// ── AI extraction review ───────────────────────────────────────────────────────
+// Shows the AI's suggestions from a document. Every item is opt-out-able and
+// editable inline; nothing is saved until the user taps Apply. Dates are typed
+// as YYYY-MM-DD strings — anything else is sent as null (fill in later).
+
+const dateOrNull = (s) => (/^\d{4}-\d{2}-\d{2}$/.test((s || '').trim()) ? s.trim() : null);
+
+function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
+  const ex = doc?.extraction;
+  const [sel, setSel] = useState(null);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  // Build an editable working copy whenever a (new) document is opened.
+  useEffect(() => {
+    if (!visible || !ex) return;
+    setSel({
+      vaccinations: (ex.vaccinations || []).map((v) => ({
+        included: true, name: v.name || '',
+        administered: v.administered_date || '', due: v.due_date || '', notes: v.notes || '',
+      })),
+      medications: (ex.medications || []).map((m) => ({
+        included: true, name: m.name || '', dosage: m.dosage || '',
+        frequency: m.frequency || null, start: m.start_date || '', end: m.end_date || '', notes: m.notes || '',
+      })),
+      weight: ex.weight
+        ? { included: true, value: String(ex.weight.value), unit: ex.weight.unit || 'kg', date: ex.weight.date || '' }
+        : null,
+      // Costs are opt-in — not everyone tracks expenses.
+      expense: ex.total_cost
+        ? { included: false, amount: String(ex.total_cost), date: ex.document_date || '' }
+        : null,
+      clinic: ex.clinic?.name
+        ? { included: true, name: ex.clinic.name, phone: ex.clinic.phone || '' }
+        : null,
+      setTitle: !!ex.suggested_title,
+      setCategory: !!ex.document_type && ex.document_type !== 'other',
+    });
+    setError(null);
+  }, [visible, doc?.id]);
+
+  if (!visible || !ex || !sel) return null;
+
+  const setVax = (i, patch) =>
+    setSel({ ...sel, vaccinations: sel.vaccinations.map((v, j) => (j === i ? { ...v, ...patch } : v)) });
+  const setMed = (i, patch) =>
+    setSel({ ...sel, medications: sel.medications.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
+
+  const count =
+    sel.vaccinations.filter((v) => v.included && v.name.trim()).length +
+    sel.medications.filter((m) => m.included && m.name.trim()).length +
+    (sel.weight?.included && parseFloat(sel.weight.value) > 0 ? 1 : 0) +
+    (sel.expense?.included && parseFloat(sel.expense.amount) > 0 ? 1 : 0) +
+    (sel.clinic?.included && sel.clinic.name.trim() ? 1 : 0);
+
+  const nothingFound =
+    !sel.vaccinations.length && !sel.medications.length && !sel.weight && !sel.expense && !sel.clinic;
+
+  const buildPayload = () => {
+    const p = { set_title: sel.setTitle, set_category: sel.setCategory };
+    const vax = sel.vaccinations.filter((v) => v.included && v.name.trim());
+    if (vax.length) {
+      p.vaccinations = vax.map((v) => ({
+        name: v.name.trim(),
+        administered_date: dateOrNull(v.administered),
+        due_date: dateOrNull(v.due),
+        notes: v.notes.trim() || null,
+      }));
+    }
+    const meds = sel.medications.filter((m) => m.included && m.name.trim());
+    if (meds.length) {
+      p.medications = meds.map((m) => ({
+        name: m.name.trim(),
+        dosage: m.dosage.trim() || null,
+        frequency: m.frequency,
+        start_date: dateOrNull(m.start),
+        end_date: dateOrNull(m.end),
+        notes: m.notes.trim() || null,
+      }));
+    }
+    if (sel.weight?.included && parseFloat(sel.weight.value) > 0) {
+      p.weight = { value: parseFloat(sel.weight.value), unit: sel.weight.unit, date: dateOrNull(sel.weight.date) };
+    }
+    if (sel.expense?.included && parseFloat(sel.expense.amount) > 0) {
+      p.expense = { amount: parseFloat(sel.expense.amount), date: dateOrNull(sel.expense.date) };
+    }
+    if (sel.clinic?.included && sel.clinic.name.trim()) {
+      p.clinic = { name: sel.clinic.name.trim(), phone: sel.clinic.phone.trim() || null };
+    }
+    return p;
+  };
+
+  const apply = async () => {
+    setBusy(true); setError(null);
+    try {
+      const result = await onApply(buildPayload());
+      onDone(result);
+    } catch (e) { setError(e.message || 'Could not apply the records.'); } finally { setBusy(false); }
+  };
+
+  return (
+    <Sheet
+      visible={visible}
+      title="Review extracted info"
+      onClose={onClose}
+      onSave={apply}
+      busy={busy}
+      saveLabel={count > 0 ? `Apply ${count}` : 'Apply'}
+      saveDisabled={count === 0 && !sel.setTitle && !sel.setCategory}
+      error={error}
+    >
+      {ex.matches_pet === false && (
+        <Banner icon="alert" color={colors.error} text={`This document may belong to a different pet than ${petName || 'this one'}. Double-check before applying.`} />
+      )}
+      {!!ex.notes_for_owner && <Banner icon="information" color={colors.tertiary} text={ex.notes_for_owner} />}
+
+      {nothingFound ? (
+        <Text style={styles.exEmpty}>No medical data was found in this document.</Text>
+      ) : (
+        <>
+          {sel.vaccinations.length > 0 && <ExGroup icon="needle" label="Vaccinations" />}
+          {sel.vaccinations.map((v, i) => (
+            <PickRow key={`vax-${i}`} included={v.included} onToggle={() => setVax(i, { included: !v.included })}>
+              <TextInput style={styles.exInput} value={v.name} placeholder="Vaccine name" placeholderTextColor={colors.outlineVariant} onChangeText={(t) => setVax(i, { name: t })} />
+              <View style={styles.exDates}>
+                <ExDate label="Given" value={v.administered} onChange={(t) => setVax(i, { administered: t })} />
+                <ExDate label="Next due" value={v.due} onChange={(t) => setVax(i, { due: t })} />
+              </View>
+            </PickRow>
+          ))}
+
+          {sel.medications.length > 0 && <ExGroup icon="pill" label="Medications" />}
+          {sel.medications.map((m, i) => (
+            <PickRow key={`med-${i}`} included={m.included} onToggle={() => setMed(i, { included: !m.included })}>
+              <TextInput style={styles.exInput} value={m.name} placeholder="Medication name" placeholderTextColor={colors.outlineVariant} onChangeText={(t) => setMed(i, { name: t })} />
+              <View style={styles.exDates}>
+                <TextInput style={[styles.exInput, { flex: 1 }]} value={m.dosage} placeholder="Dosage" placeholderTextColor={colors.outlineVariant} onChangeText={(t) => setMed(i, { dosage: t })} />
+                {!!m.frequency && <Text style={styles.exHint}>{m.frequency.replace('_', ' ')}</Text>}
+              </View>
+            </PickRow>
+          ))}
+
+          {sel.weight && (
+            <>
+              <ExGroup icon="scale-bathroom" label="Weight" />
+              <PickRow included={sel.weight.included} onToggle={() => setSel({ ...sel, weight: { ...sel.weight, included: !sel.weight.included } })}>
+                <View style={styles.exDates}>
+                  <TextInput style={[styles.exInput, { flex: 1 }]} value={sel.weight.value} keyboardType="decimal-pad" onChangeText={(t) => setSel({ ...sel, weight: { ...sel.weight, value: t } })} />
+                  <Text style={styles.exHint}>{sel.weight.unit}</Text>
+                  <ExDate label="On" value={sel.weight.date} onChange={(t) => setSel({ ...sel, weight: { ...sel.weight, date: t } })} />
+                </View>
+              </PickRow>
+            </>
+          )}
+
+          {sel.expense && (
+            <>
+              <ExGroup icon="cash" label="Expense" />
+              <PickRow included={sel.expense.included} onToggle={() => setSel({ ...sel, expense: { ...sel.expense, included: !sel.expense.included } })}>
+                <View style={styles.exDates}>
+                  <TextInput style={[styles.exInput, { flex: 1 }]} value={sel.expense.amount} keyboardType="decimal-pad" onChangeText={(t) => setSel({ ...sel, expense: { ...sel.expense, amount: t } })} />
+                  <ExDate label="On" value={sel.expense.date} onChange={(t) => setSel({ ...sel, expense: { ...sel.expense, date: t } })} />
+                </View>
+              </PickRow>
+            </>
+          )}
+
+          {sel.clinic && (
+            <>
+              <ExGroup icon="hospital-building" label="Clinic" />
+              <PickRow included={sel.clinic.included} onToggle={() => setSel({ ...sel, clinic: { ...sel.clinic, included: !sel.clinic.included } })}>
+                <TextInput style={styles.exInput} value={sel.clinic.name} placeholder="Clinic name" placeholderTextColor={colors.outlineVariant} onChangeText={(t) => setSel({ ...sel, clinic: { ...sel.clinic, name: t } })} />
+              </PickRow>
+            </>
+          )}
+        </>
+      )}
+
+      {!!ex.suggested_title && (
+        <PickRow included={sel.setTitle} onToggle={() => setSel({ ...sel, setTitle: !sel.setTitle })}>
+          <Text style={styles.exToggleText} numberOfLines={2}>Rename document to “{ex.suggested_title}”</Text>
+        </PickRow>
+      )}
+      {!!ex.document_type && ex.document_type !== 'other' && (
+        <PickRow included={sel.setCategory} onToggle={() => setSel({ ...sel, setCategory: !sel.setCategory })}>
+          <Text style={styles.exToggleText}>Set category to {docMeta(ex.document_type).label}</Text>
+        </PickRow>
+      )}
+    </Sheet>
+  );
+}
+
+function Banner({ icon, color, text }) {
+  return (
+    <View style={[styles.exBanner, { borderColor: `${color}55`, backgroundColor: `${color}14` }]}>
+      <MaterialCommunityIcons name={icon} size={16} color={color} />
+      <Text style={[styles.exBannerText, { color }]}>{text}</Text>
+    </View>
+  );
+}
+
+function ExGroup({ icon, label }) {
+  return (
+    <View style={styles.exGroup}>
+      <MaterialCommunityIcons name={icon} size={15} color={colors.onSurfaceVariant} />
+      <Text style={styles.exGroupText}>{label}</Text>
+    </View>
+  );
+}
+
+function PickRow({ included, onToggle, children }) {
+  return (
+    <View style={[styles.exRow, !included && { opacity: 0.45 }]}>
+      <TouchableOpacity onPress={onToggle} hitSlop={hit} style={styles.exCheck}>
+        <MaterialCommunityIcons
+          name={included ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
+          size={22}
+          color={included ? colors.secondary : colors.outlineVariant}
+        />
+      </TouchableOpacity>
+      <View style={{ flex: 1, gap: spacing.xs }}>{children}</View>
+    </View>
+  );
+}
+
+function ExDate({ label, value, onChange }) {
+  return (
+    <View style={styles.exDateWrap}>
+      <Text style={styles.exHint}>{label}</Text>
+      <TextInput
+        style={[styles.exInput, styles.exDateInput]}
+        value={value}
+        placeholder="YYYY-MM-DD"
+        placeholderTextColor={colors.outlineVariant}
+        onChangeText={onChange}
+        autoCapitalize="none"
+      />
+    </View>
+  );
+}
+
 function Chip({ label, icon, active, onPress, capitalize }) {
   return (
     <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress} activeOpacity={0.85}>
@@ -555,4 +848,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, alignItems: 'center', minHeight: 48, justifyContent: 'center', ...shadows.button,
   },
   modalAddText: { ...typography.labelMd, color: colors.onPrimary },
+
+  // AI extraction review sheet
+  exBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    padding: spacing.sm, borderRadius: radii.md, borderWidth: 1, marginBottom: spacing.sm,
+  },
+  exBannerText: { ...typography.labelSm, flex: 1 },
+  exGroup: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md, marginBottom: spacing.xs },
+  exGroupText: { ...typography.labelMd, color: colors.onSurfaceVariant },
+  exRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
+    paddingVertical: spacing.xs, marginTop: spacing.xs,
+  },
+  exCheck: { paddingTop: 6 },
+  exInput: {
+    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.md,
+    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
+    borderWidth: 1, borderColor: colors.outlineVariant,
+    ...typography.bodyMd, color: colors.onSurface, minHeight: 40,
+  },
+  exDates: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  exDateWrap: { flex: 1, gap: 2 },
+  exDateInput: { minHeight: 36, paddingVertical: 4 },
+  exHint: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  exToggleText: { ...typography.labelMd, color: colors.onSurface, paddingTop: 8 },
+  exEmpty: { ...typography.bodyMd, color: colors.onSurfaceVariant, paddingVertical: spacing.md, textAlign: 'center' },
 });
