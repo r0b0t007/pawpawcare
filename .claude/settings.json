@@ -1,0 +1,20 @@
+{
+  "enabledPlugins": {
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "php \"$CLAUDE_PROJECT_DIR/.claude/hooks/pint-format.php\"",
+            "timeout": 30,
+            "statusMessage": "Running Pint…"
+          }
+        ]
+      }
+    ]
+  }
+}

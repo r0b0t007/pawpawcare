@@ -24,3 +24,22 @@ export async function pickAndUploadImage({ aspect = [1, 1] } = {}) {
     return { error: e?.message || 'upload_failed' };
   }
 }
+
+/**
+ * Pick a photo of a record WITHOUT uploading (the caller attaches a title /
+ * category and posts it to the documents endpoint). Resolves to:
+ *   { uri, name } · { canceled: true } · { error }
+ */
+export async function pickRecordImage() {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) return { error: 'permission' };
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    quality: 0.7,
+  });
+  if (result.canceled) return { canceled: true };
+
+  const asset = result.assets[0];
+  return { uri: asset.uri, name: asset.fileName || (asset.uri.split('/').pop() || 'document.jpg') };
+}

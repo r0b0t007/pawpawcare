@@ -23,9 +23,9 @@
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/stack": "^6.3.29",
-    "expo": "~54.0.0",
+    "expo": "~54.0.35",
     "expo-device": "~8.0.10",
-    "expo-font": "~14.0.11",
+    "expo-font": "~14.0.12",
     "expo-image-picker": "~17.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-notifications": "~0.32.17",
@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
-    "babel-preset-expo": "^55.0.18"
+    "babel-preset-expo": "~54.0.10"
   },
   "private": true
 }

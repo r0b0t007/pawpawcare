@@ -21,6 +21,7 @@ import NotificationsScreen from '../screens/main/NotificationsScreen';
 import RemindersScreen from '../screens/main/RemindersScreen';
 import LostPetsScreen from '../screens/main/LostPetsScreen';
 import InvitesScreen from '../screens/main/InvitesScreen';
+import MedicalRecordsScreen from '../screens/main/MedicalRecordsScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -62,6 +63,7 @@ function PetsStack() {
       <Stack.Screen name="PetProfile" component={PetProfileScreen} />
       <Stack.Screen name="AddPet" component={AddPetScreen} />
       <Stack.Screen name="VaccinationTracker" component={VaccinationTrackerScreen} />
+      <Stack.Screen name="MedicalRecords" component={MedicalRecordsScreen} />
     </Stack.Navigator>
   );
 }

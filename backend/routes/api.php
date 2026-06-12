@@ -1,9 +1,12 @@
 <?php
 
+use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ClinicController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\LostPetController;
 use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\NotificationController;
@@ -16,6 +19,13 @@ use Illuminate\Support\Facades\Route;
 
 // ── Health ──────────────────────────────────────────────────────────────────
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'version' => '1.0.0']));
+
+// ── Signed document delivery (no JWT — the signature is the authorization) ────
+// The URL is minted only for users with pet access via /pets/{pet}/documents/{id}/url
+// and expires within minutes, so a leaked link can't grant lasting access.
+Route::get('/documents/{document}/raw', [DocumentController::class, 'raw'])
+    ->middleware('signed')
+    ->name('documents.raw');
 
 // ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
 Route::middleware('throttle:20,1')->group(function () {
@@ -85,6 +95,22 @@ Route::middleware('auth.jwt')->group(function () {
     Route::get('/invites', [PetSharingController::class, 'listInvites']);
     Route::post('/invites/{invite}/accept', [PetSharingController::class, 'accept']);
     Route::post('/invites/{invite}/decline', [PetSharingController::class, 'decline']);
+
+    // Medical records vault — clinics, appointments, documents
+    Route::get('/pets/{pet}/clinics', [ClinicController::class, 'index']);
+    Route::post('/pets/{pet}/clinics', [ClinicController::class, 'store']);
+    Route::patch('/pets/{pet}/clinics/{clinic}', [ClinicController::class, 'update']);
+    Route::delete('/pets/{pet}/clinics/{clinic}', [ClinicController::class, 'destroy']);
+
+    Route::get('/pets/{pet}/appointments', [AppointmentController::class, 'index']);
+    Route::post('/pets/{pet}/appointments', [AppointmentController::class, 'store']);
+    Route::patch('/pets/{pet}/appointments/{appointment}', [AppointmentController::class, 'update']);
+    Route::delete('/pets/{pet}/appointments/{appointment}', [AppointmentController::class, 'destroy']);
+
+    Route::get('/pets/{pet}/documents', [DocumentController::class, 'index']);
+    Route::post('/pets/{pet}/documents', [DocumentController::class, 'store'])->middleware('throttle:30,1');
+    Route::get('/pets/{pet}/documents/{document}/url', [DocumentController::class, 'url']);
+    Route::delete('/pets/{pet}/documents/{document}', [DocumentController::class, 'destroy']);
 
     // Lost pets (community alerts)
     Route::get('/lost-pets', [LostPetController::class, 'index']);
