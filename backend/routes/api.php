@@ -11,6 +11,7 @@ use App\Http\Controllers\LostPetController;
 use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PetController;
+use App\Http\Controllers\PetShareController;
 use App\Http\Controllers\PetSharingController;
 use App\Http\Controllers\ReminderController;
 use App\Http\Controllers\UploadController;
@@ -26,6 +27,13 @@ Route::get('/health', fn () => response()->json(['status' => 'ok', 'version' => 
 Route::get('/documents/{document}/raw', [DocumentController::class, 'raw'])
     ->middleware('signed')
     ->name('documents.raw');
+
+// ── Vet share page (no JWT — same signed-URL trust model as documents.raw) ────
+// A read-only medical summary a vet opens in a browser. Minted only by users
+// with pet access via POST /pets/{pet}/share-link, expiring in hours/days.
+Route::get('/share/{pet}', [PetShareController::class, 'show'])
+    ->middleware('signed')
+    ->name('pets.share');
 
 // ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
 Route::middleware('throttle:20,1')->group(function () {
@@ -50,6 +58,10 @@ Route::middleware('auth.jwt')->group(function () {
     Route::get('/pets/{pet}', [PetController::class, 'show']);
     Route::patch('/pets/{pet}', [PetController::class, 'update']);
     Route::delete('/pets/{pet}', [PetController::class, 'destroy']);
+
+    // Vet share link (read-only medical summary for a browser)
+    Route::post('/pets/{pet}/share-link', [PetShareController::class, 'create'])->middleware('throttle:20,1');
+    Route::delete('/pets/{pet}/share-link', [PetShareController::class, 'revoke']);
 
     // Vaccinations
     Route::get('/pets/{pet}/vaccinations', [PetController::class, 'listVaccinations']);

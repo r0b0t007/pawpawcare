@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image,
+  TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -39,6 +39,7 @@ export default function PetProfileScreen({ navigation, route }) {
     addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
     addWeight, deleteWeight, addExpense, deleteExpense,
     getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
+    createShareLink, revokeShareLinks,
   } = useData();
   const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
@@ -59,6 +60,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const [newExpense, setNewExpense] = useState({ category: 'vet', amount: '', notes: '' });
   const [share, setShare] = useState(null); // { owner, members, invites }
   const [shareModal, setShareModal] = useState(false);
+  const [vetShareModal, setVetShareModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteError, setInviteError] = useState(null);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -329,6 +331,22 @@ export default function PetProfileScreen({ navigation, route }) {
           <View style={{ flex: 1 }}>
             <Text style={styles.recordsTitle}>Medical Records</Text>
             <Text style={styles.recordsSub}>Vet clinics, appointments & documents</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
+        </TouchableOpacity>
+
+        {/* Share with vet */}
+        <TouchableOpacity
+          style={styles.recordsBtn}
+          onPress={() => setVetShareModal(true)}
+          activeOpacity={0.9}
+        >
+          <View style={[styles.recordsIcon, { backgroundColor: colors.secondaryFixed }]}>
+            <MaterialCommunityIcons name="share-variant-outline" size={20} color={colors.secondary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.recordsTitle}>Share with vet</Text>
+            <Text style={styles.recordsSub}>A read-only link to {pet.name}'s health summary</Text>
           </View>
           <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
         </TouchableOpacity>
@@ -966,7 +984,136 @@ export default function PetProfileScreen({ navigation, route }) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <VetShareModal
+        visible={vetShareModal}
+        petName={pet.name}
+        onClose={() => setVetShareModal(false)}
+        onCreate={(expiresIn) => createShareLink(petId, expiresIn)}
+        onRevoke={() => revokeShareLinks(petId)}
+      />
     </SafeAreaView>
+  );
+}
+
+const VET_EXPIRIES = [
+  { id: '1h', label: '1 hour' },
+  { id: '24h', label: '24 hours' },
+  { id: '7d', label: '7 days' },
+];
+
+// Generate a vet share link, hand it to the OS share sheet, and offer to
+// revoke all outstanding links. The link itself is never persisted client-side
+// — it's shared straight from the create response.
+function VetShareModal({ visible, petName, onClose, onCreate, onRevoke }) {
+  const [expiresIn, setExpiresIn] = useState('24h');
+  const [link, setLink] = useState(null); // { url, expires_at }
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const reset = () => { setExpiresIn('24h'); setLink(null); setError(null); setBusy(false); };
+  const close = () => { reset(); onClose(); };
+
+  const create = async () => {
+    setBusy(true); setError(null);
+    try {
+      const result = await onCreate(expiresIn);
+      setLink(result);
+      try {
+        await Share.share({
+          message: `${petName}'s medical summary (read-only, link expires soon):\n${result.url}`,
+        });
+      } catch { /* user dismissed the share sheet — link is still shown below */ }
+    } catch (e) {
+      setError(e.message || 'Could not create the link.');
+    } finally { setBusy(false); }
+  };
+
+  const reshare = () => {
+    if (link) Share.share({ message: `${petName}'s medical summary:\n${link.url}` }).catch(() => {});
+  };
+
+  const revoke = () => {
+    Alert.alert('Revoke links', `Disable every share link for ${petName}? Anyone holding one will lose access.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Revoke', style: 'destructive',
+        onPress: async () => {
+          setBusy(true); setError(null);
+          try { await onRevoke(); setLink(null); Alert.alert('Done', 'All share links have been revoked.'); }
+          catch (e) { setError(e.message || 'Could not revoke links.'); }
+          finally { setBusy(false); }
+        },
+      },
+    ]);
+  };
+
+  const expiry = (iso) => {
+    if (!iso) return '';
+    return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalSheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.modalTitle}>Share with vet</Text>
+          <Text style={styles.modalHint}>
+            Creates a read-only web link to {petName}'s vaccinations, medications, weight, and recent documents. No account needed to open it.
+          </Text>
+
+          {!link ? (
+            <>
+              <Text style={styles.vetLabel}>Link expires after</Text>
+              <View style={styles.vetChips}>
+                {VET_EXPIRIES.map((e) => (
+                  <TouchableOpacity
+                    key={e.id}
+                    style={[styles.vetChip, expiresIn === e.id && styles.vetChipActive]}
+                    onPress={() => setExpiresIn(e.id)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.vetChipText, expiresIn === e.id && { color: colors.onPrimary }]}>{e.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {!!error && <Text style={styles.inviteError}>{error}</Text>}
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancel} onPress={close} activeOpacity={0.88}>
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalAdd, busy && { opacity: 0.6 }]} onPress={create} disabled={busy} activeOpacity={0.88}>
+                  <Text style={styles.modalAddText}>{busy ? 'Creating…' : 'Create & Share'}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.vetLinkBox}>
+                <MaterialCommunityIcons name="link-variant" size={16} color={colors.secondary} />
+                <Text style={styles.vetLinkText} numberOfLines={1}>{link.url}</Text>
+              </View>
+              <Text style={styles.vetExpiryNote}>Expires {expiry(link.expires_at)}</Text>
+              {!!error && <Text style={styles.inviteError}>{error}</Text>}
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalCancel} onPress={reshare} activeOpacity={0.88}>
+                  <Text style={styles.modalCancelText}>Share again</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalAdd} onPress={close} activeOpacity={0.88}>
+                  <Text style={styles.modalAddText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          <TouchableOpacity style={styles.vetRevoke} onPress={revoke} disabled={busy} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="link-off" size={15} color={colors.error} />
+            <Text style={styles.vetRevokeText}>Revoke all active links</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1576,4 +1723,26 @@ const styles = StyleSheet.create({
     ...shadows.button,
   },
   modalAddText: { ...typography.labelMd, color: colors.onPrimary },
+
+  // Vet share modal
+  vetLabel: { ...typography.labelMd, color: colors.onSurfaceVariant, marginBottom: spacing.xs },
+  vetChips: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
+  vetChip: {
+    flex: 1, alignItems: 'center', paddingVertical: spacing.sm, borderRadius: radii.full,
+    backgroundColor: colors.surfaceContainerLow, borderWidth: 1.5, borderColor: colors.outlineVariant,
+  },
+  vetChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  vetChipText: { ...typography.labelMd, color: colors.onSurfaceVariant },
+  vetLinkBox: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.md,
+    paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, marginBottom: spacing.xs,
+  },
+  vetLinkText: { ...typography.labelSm, color: colors.onSurface, flex: 1 },
+  vetExpiryNote: { ...typography.labelSm, color: colors.onSurfaceVariant, marginBottom: spacing.sm },
+  vetRevoke: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs,
+    marginTop: spacing.md, paddingVertical: spacing.xs,
+  },
+  vetRevokeText: { ...typography.labelSm, color: colors.error },
 });
