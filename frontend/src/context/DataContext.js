@@ -839,6 +839,14 @@ export function DataProvider({ children }) {
     return result;
   };
 
+  // ── Vet share links ──
+  // Mint a read-only web link to the pet's medical summary. Throws so the
+  // screen can surface failures. Returns { url, expires_at }.
+  const createShareLink = async (petId, expiresIn = '24h') =>
+    post(`/pets/${petId}/share-link`, { expires_in: expiresIn });
+  // Revoke every outstanding link by rotating the pet's share token.
+  const revokeShareLinks = async (petId) => { await del(`/pets/${petId}/share-link`); };
+
   // ── Community ──
 
   const addPost = async (content, imageUrl) => {
@@ -950,6 +958,8 @@ export function DataProvider({ children }) {
         getDocumentUrl,
         extractDocument,
         applyExtraction,
+        createShareLink,
+        revokeShareLinks,
         addPost,
         togglePaw,
         getComments,
