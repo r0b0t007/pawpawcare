@@ -17,8 +17,9 @@ try {
   posthog = null;
 }
 
-/** The raw client (or null). Pass to <PostHogProvider> for hook access. */
-export const posthogClient = posthog;
+// No PostHogProvider is mounted (manual events only); the core client persists
+// its queue to storage and flushes on its own timer/count, so events survive a
+// backgrounded app. Call the helpers below directly.
 
 /** Capture a product event. Keep props non-sensitive — no names or record content. */
 export const track = (event, props) => {
