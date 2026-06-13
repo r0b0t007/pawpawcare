@@ -6,6 +6,7 @@ import {
   deviceTimezone,
   cancelAllLocalReminders,
 } from '../services/notifications';
+import { identifyUser, resetAnalytics, track } from '../services/analytics';
 
 const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
 
@@ -56,6 +57,7 @@ export function AuthProvider({ children }) {
     try {
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
+      identifyUser(user); // tie analytics to the restored session
       syncDevice();
     } catch (err) {
       if (err.message === 'SESSION_EXPIRED') await clearTokens();
@@ -70,6 +72,8 @@ export function AuthProvider({ children }) {
       await storeTokens(tokens.access_token, tokens.refresh_token);
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
+      identifyUser(user);
+      track('user_signed_up');
       syncDevice();
       return true;
     } catch (err) {
@@ -85,6 +89,8 @@ export function AuthProvider({ children }) {
       await storeTokens(tokens.access_token, tokens.refresh_token);
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
+      identifyUser(user);
+      track('user_logged_in');
       syncDevice();
       return true;
     } catch (err) {
@@ -101,6 +107,7 @@ export function AuthProvider({ children }) {
     } catch (_) {}
     await deregisterDevice();
     await clearTokens();
+    resetAnalytics(); // clear identity so the next user starts fresh
     dispatch({ type: 'LOGOUT' });
   };
 
