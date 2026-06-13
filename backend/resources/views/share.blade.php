@@ -31,6 +31,11 @@
   .badge.due { background:var(--amber-bg); color:var(--amber); }
   .chart { padding:14px 16px 6px; }
   .chart svg { width:100%; height:auto; display:block; }
+  .trend { display:flex; align-items:center; gap:8px; padding:14px 16px 4px; }
+  .trend-arrow { font-size:13px; }
+  .trend-up { color:var(--amber); } .trend-down { color:var(--green); } .trend-stable { color:var(--sub); }
+  .trend-text { font-weight:600; }
+  .trend-flag { padding:0 16px 12px; color:var(--amber); font-size:13px; }
   .empty { padding:14px 16px; color:var(--sub); }
   a.doc { color:var(--accent); text-decoration:none; font-weight:600; }
   .foot { margin-top:32px; text-align:center; color:var(--sub); font-size:12.5px; }
@@ -94,6 +99,17 @@
 
   <h2>Weight</h2>
   <div class="card">
+    @if ($weightInsight)
+      <div class="trend">
+        <span class="trend-arrow trend-{{ $weightInsight['direction'] }}">
+          {{ ['up' => '▲', 'down' => '▼', 'stable' => '▬'][$weightInsight['direction']] }}
+        </span>
+        <span class="trend-text">{{ $weightInsight['summary'] }}</span>
+      </div>
+      @if ($weightInsight['notable'])
+        <div class="trend-flag">Notable change — worth discussing at the visit.</div>
+      @endif
+    @endif
     @if ($weightPath)
       <div class="chart">
         <svg viewBox="0 0 280 72" preserveAspectRatio="none" aria-hidden="true">

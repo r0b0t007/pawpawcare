@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image, Share,
@@ -30,6 +30,32 @@ const convertWeight = (value, from, to) => {
   if (from === 'kg' && to === 'lbs') return n / KG_PER_LB;
   if (from === 'lbs' && to === 'kg') return n * KG_PER_LB;
   return n;
+};
+
+// Plain-language weight trend over the full history — direction, magnitude,
+// span, and a non-diagnostic "notable change" flag. Mirrors the backend
+// App\Support\WeightInsight (keep the 3% / 10% thresholds in sync). `points`
+// are already normalized to the pet's display unit; returns null under 2 logs.
+const WEIGHT_STABLE_PCT = 3.0;
+const WEIGHT_NOTABLE_PCT = 10.0;
+const weightInsight = (points, unit) => {
+  if (!points || points.length < 2) return null;
+  const sorted = [...points].sort((a, b) => new Date(a.loggedAt) - new Date(b.loggedAt));
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const changeAbs = Math.round((last.value - first.value) * 100) / 100;
+  const changePct = first.value > 0 ? Math.round((changeAbs / first.value) * 1000) / 10 : 0;
+  const days = Math.max(1, Math.round((new Date(last.loggedAt) - new Date(first.loggedAt)) / 86400000));
+  const direction = Math.abs(changePct) < WEIGHT_STABLE_PCT ? 'stable' : changeAbs > 0 ? 'up' : 'down';
+  const span = days < 14 ? `${days} day${days === 1 ? '' : 's'}`
+    : days < 60 ? `${Math.round(days / 7)} weeks`
+      : `${Math.round(days / 30)} months`;
+  const mag = Math.abs(changeAbs).toFixed(1).replace(/\.0$/, '');
+  const summary = direction === 'stable'
+    ? `Stable over the last ${span}`
+    // "Down" already conveys the sign — show the percent unsigned.
+    : `${direction === 'up' ? 'Up' : 'Down'} ${mag} ${unit} (${Math.abs(changePct)}%) over the last ${span}`;
+  return { current: last.value, changeAbs, changePct, days, direction, notable: Math.abs(changePct) >= WEIGHT_NOTABLE_PCT, summary };
 };
 
 export default function PetProfileScreen({ navigation, route }) {
@@ -212,14 +238,12 @@ export default function PetProfileScreen({ navigation, route }) {
   const weights = pet.weights || [];
   const wUnit = pet.weightUnit || 'kg';
   // Normalize every entry to the pet's current unit before charting/trend.
-  const normWeights = weights.map((w) => ({
-    id: w.id,
-    loggedAt: w.loggedAt,
-    value: convertWeight(w.weight, w.unit, wUnit),
-  }));
+  const normWeights = useMemo(
+    () => weights.map((w) => ({ id: w.id, loggedAt: w.loggedAt, value: convertWeight(w.weight, w.unit, wUnit) })),
+    [weights, wUnit],
+  );
   const latestWeight = normWeights[normWeights.length - 1];
-  const prevWeight = normWeights.length >= 2 ? normWeights[normWeights.length - 2] : null;
-  const weightTrend = latestWeight && prevWeight ? latestWeight.value - prevWeight.value : null;
+  const wInsight = useMemo(() => weightInsight(normWeights, wUnit), [normWeights, wUnit]);
 
   const expenses = pet.expenses || [];
   const monthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
@@ -374,19 +398,35 @@ export default function PetProfileScreen({ navigation, route }) {
                 <Text style={styles.weightCurrent}>
                   {latestWeight.value.toFixed(1)}<Text style={styles.weightUnit}> {wUnit}</Text>
                 </Text>
-                {weightTrend !== null && (
+                {wInsight && wInsight.direction !== 'stable' && (
                   <View style={styles.trendPill}>
                     <MaterialCommunityIcons
-                      name={weightTrend > 0 ? 'trending-up' : weightTrend < 0 ? 'trending-down' : 'trending-neutral'}
+                      name={wInsight.direction === 'up' ? 'trending-up' : 'trending-down'}
                       size={14}
                       color={colors.secondary}
                     />
                     <Text style={styles.trendText}>
-                      {weightTrend > 0 ? '+' : ''}{weightTrend.toFixed(1)} {wUnit}
+                      {wInsight.changeAbs > 0 ? '+' : ''}{wInsight.changeAbs.toFixed(1)} {wUnit}
                     </Text>
                   </View>
                 )}
               </View>
+              {wInsight && (
+                <View style={styles.insightRow}>
+                  <MaterialCommunityIcons
+                    name={wInsight.direction === 'up' ? 'trending-up' : wInsight.direction === 'down' ? 'trending-down' : 'trending-neutral'}
+                    size={14}
+                    color={colors.onSurfaceVariant}
+                  />
+                  <Text style={styles.insightText}>{wInsight.summary}</Text>
+                </View>
+              )}
+              {wInsight?.notable && (
+                <View style={styles.insightFlag}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={14} color={colors.tertiary} />
+                  <Text style={styles.insightFlagText}>Notable change — worth a vet check.</Text>
+                </View>
+              )}
               <WeightChart weights={normWeights} />
               {[...normWeights].reverse().slice(0, 4).map((w) => (
                 <View key={w.id} style={styles.weightRow}>
@@ -1496,6 +1536,14 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
   },
   trendText: { ...typography.labelSm, color: colors.secondary, fontFamily: 'PlusJakartaSans_600SemiBold' },
+  insightRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.sm },
+  insightText: { ...typography.labelSm, color: colors.onSurfaceVariant, flex: 1 },
+  insightFlag: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
+    backgroundColor: colors.tertiaryFixed, borderRadius: radii.md,
+    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, marginBottom: spacing.sm,
+  },
+  insightFlagText: { ...typography.labelSm, color: colors.tertiary, flex: 1 },
   chart: {
     flexDirection: 'row',
     alignItems: 'flex-end',
