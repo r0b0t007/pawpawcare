@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useData } from '../../context/DataContext';
 import { pickRecordImage } from '../../services/imagePicker';
+import { buildExtractionPayload, extractionCount } from '../../utils/extraction';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 const DOC_CATEGORIES = [
@@ -487,8 +488,6 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
 // editable inline; nothing is saved until the user taps Apply. Dates are typed
 // as YYYY-MM-DD strings — anything else is sent as null (fill in later).
 
-const dateOrNull = (s) => (/^\d{4}-\d{2}-\d{2}$/.test((s || '').trim()) ? s.trim() : null);
-
 function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
   const ex = doc?.extraction;
   const [sel, setSel] = useState(null);
@@ -530,54 +529,15 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
   const setMed = (i, patch) =>
     setSel({ ...sel, medications: sel.medications.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
 
-  const count =
-    sel.vaccinations.filter((v) => v.included && v.name.trim()).length +
-    sel.medications.filter((m) => m.included && m.name.trim()).length +
-    (sel.weight?.included && parseFloat(sel.weight.value) > 0 ? 1 : 0) +
-    (sel.expense?.included && parseFloat(sel.expense.amount) > 0 ? 1 : 0) +
-    (sel.clinic?.included && sel.clinic.name.trim() ? 1 : 0);
+  const count = extractionCount(sel);
 
   const nothingFound =
     !sel.vaccinations.length && !sel.medications.length && !sel.weight && !sel.expense && !sel.clinic;
 
-  const buildPayload = () => {
-    const p = { set_title: sel.setTitle, set_category: sel.setCategory };
-    const vax = sel.vaccinations.filter((v) => v.included && v.name.trim());
-    if (vax.length) {
-      p.vaccinations = vax.map((v) => ({
-        name: v.name.trim(),
-        administered_date: dateOrNull(v.administered),
-        due_date: dateOrNull(v.due),
-        notes: v.notes.trim() || null,
-      }));
-    }
-    const meds = sel.medications.filter((m) => m.included && m.name.trim());
-    if (meds.length) {
-      p.medications = meds.map((m) => ({
-        name: m.name.trim(),
-        dosage: m.dosage.trim() || null,
-        frequency: m.frequency,
-        start_date: dateOrNull(m.start),
-        end_date: dateOrNull(m.end),
-        notes: m.notes.trim() || null,
-      }));
-    }
-    if (sel.weight?.included && parseFloat(sel.weight.value) > 0) {
-      p.weight = { value: parseFloat(sel.weight.value), unit: sel.weight.unit, date: dateOrNull(sel.weight.date) };
-    }
-    if (sel.expense?.included && parseFloat(sel.expense.amount) > 0) {
-      p.expense = { amount: parseFloat(sel.expense.amount), date: dateOrNull(sel.expense.date) };
-    }
-    if (sel.clinic?.included && sel.clinic.name.trim()) {
-      p.clinic = { name: sel.clinic.name.trim(), phone: sel.clinic.phone.trim() || null };
-    }
-    return p;
-  };
-
   const apply = async () => {
     setBusy(true); setError(null);
     try {
-      const result = await onApply(buildPayload());
+      const result = await onApply(buildExtractionPayload(sel));
       onDone(result);
     } catch (e) { setError(e.message || 'Could not apply the records.'); } finally { setBusy(false); }
   };
