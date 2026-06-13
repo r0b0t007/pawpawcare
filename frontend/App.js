@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
@@ -16,9 +16,13 @@ import { StatusBar } from 'expo-status-bar';
 
 import { AuthProvider } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
+import { trackScreen } from './src/services/analytics';
 import AppNavigator from './src/navigation/AppNavigator';
 
 export default function App() {
+  const navRef = useNavigationContainerRef();
+  const routeNameRef = useRef(null);
+
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
@@ -40,7 +44,19 @@ export default function App() {
       <SafeAreaProvider>
         <AuthProvider>
           <DataProvider>
-            <NavigationContainer>
+            <NavigationContainer
+              ref={navRef}
+              onReady={() => {
+                routeNameRef.current = navRef.getCurrentRoute()?.name;
+                trackScreen(routeNameRef.current);
+              }}
+              onStateChange={() => {
+                // Manual screen tracking: route NAMES only, never params/content.
+                const current = navRef.getCurrentRoute()?.name;
+                if (current && current !== routeNameRef.current) trackScreen(current);
+                routeNameRef.current = current;
+              }}
+            >
               <StatusBar style="dark" backgroundColor="#fff8f4" />
               <AppNavigator />
             </NavigationContainer>

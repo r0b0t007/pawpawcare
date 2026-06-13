@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext';
 import { PET_COLORS } from '../theme';
 import { get, post, patch, del, uploadDocument } from '../services/api';
 import { scheduleLocalReminders } from '../services/notifications';
+import { track } from '../services/analytics';
 
 const DataContext = createContext(null);
 
@@ -379,6 +380,7 @@ export function DataProvider({ children }) {
       });
       const newPet = toPet(apiPet, { index: state.pets.length });
       dispatch({ type: 'ADD_PET', payload: newPet });
+      track('pet_added', { type: newPet.type, pet_count: state.pets.length + 1 });
       // Creating a pet with a weight seeds a server-side log — reflect it.
       if (petData.weight) refreshPetWeights(newPet.id);
       return newPet;
@@ -829,12 +831,20 @@ export function DataProvider({ children }) {
   // Throws on failure so the screen can show why (timeout, unsupported type…).
   const extractDocument = async (petId, id) => {
     const d = await post(`/pets/${petId}/documents/${id}/extract`);
+    track('document_extracted', { category: d.category });
     return toDocument(d);
   };
   // Apply the user's reviewed subset. The created records live in global pet
   // state (vaccinations, meds, weight…), so reload it in the background.
   const applyExtraction = async (petId, id, payload) => {
     const result = await post(`/pets/${petId}/documents/${id}/apply`, payload);
+    // Counts only — never the record content itself.
+    track('extraction_applied', {
+      vaccinations: result.vaccinations?.length || 0,
+      medications: result.medications?.length || 0,
+      weight: !!result.weight,
+      expense: !!result.expense,
+    });
     loadData();
     return result;
   };
@@ -842,8 +852,11 @@ export function DataProvider({ children }) {
   // ── Vet share links ──
   // Mint a read-only web link to the pet's medical summary. Throws so the
   // screen can surface failures. Returns { url, expires_at }.
-  const createShareLink = async (petId, expiresIn = '24h') =>
-    post(`/pets/${petId}/share-link`, { expires_in: expiresIn });
+  const createShareLink = async (petId, expiresIn = '24h') => {
+    const result = await post(`/pets/${petId}/share-link`, { expires_in: expiresIn });
+    track('share_link_created', { expires_in: expiresIn });
+    return result;
+  };
   // Revoke every outstanding link by rotating the pet's share token.
   const revokeShareLinks = async (petId) => { await del(`/pets/${petId}/share-link`); };
 
