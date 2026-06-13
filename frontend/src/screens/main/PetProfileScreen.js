@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image, Share,
@@ -53,7 +53,8 @@ const weightInsight = (points, unit) => {
   const mag = Math.abs(changeAbs).toFixed(1).replace(/\.0$/, '');
   const summary = direction === 'stable'
     ? `Stable over the last ${span}`
-    : `${direction === 'up' ? 'Up' : 'Down'} ${mag} ${unit} (${changePct}%) over the last ${span}`;
+    // "Down" already conveys the sign — show the percent unsigned.
+    : `${direction === 'up' ? 'Up' : 'Down'} ${mag} ${unit} (${Math.abs(changePct)}%) over the last ${span}`;
   return { current: last.value, changeAbs, changePct, days, direction, notable: Math.abs(changePct) >= WEIGHT_NOTABLE_PCT, summary };
 };
 
@@ -237,13 +238,12 @@ export default function PetProfileScreen({ navigation, route }) {
   const weights = pet.weights || [];
   const wUnit = pet.weightUnit || 'kg';
   // Normalize every entry to the pet's current unit before charting/trend.
-  const normWeights = weights.map((w) => ({
-    id: w.id,
-    loggedAt: w.loggedAt,
-    value: convertWeight(w.weight, w.unit, wUnit),
-  }));
+  const normWeights = useMemo(
+    () => weights.map((w) => ({ id: w.id, loggedAt: w.loggedAt, value: convertWeight(w.weight, w.unit, wUnit) })),
+    [weights, wUnit],
+  );
   const latestWeight = normWeights[normWeights.length - 1];
-  const wInsight = weightInsight(normWeights, wUnit);
+  const wInsight = useMemo(() => weightInsight(normWeights, wUnit), [normWeights, wUnit]);
 
   const expenses = pet.expenses || [];
   const monthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM

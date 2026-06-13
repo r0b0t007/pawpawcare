@@ -73,8 +73,10 @@ class WeightInsight
 
         $word = $dir === 'up' ? 'Up' : 'Down';
         $mag = rtrim(rtrim(number_format(abs($abs), 1), '0'), '.');
+        // "Down" already conveys the sign — show the magnitude unsigned.
+        $pctMag = rtrim(rtrim(number_format(abs($pct), 1), '0'), '.');
 
-        return "{$word} {$mag} {$unit} ({$pct}%) over the last {$span}";
+        return "{$word} {$mag} {$unit} ({$pctMag}%) over the last {$span}";
     }
 
     private static function humanizeSpan(int $days): string

@@ -211,6 +211,26 @@ class ShareLinkTest extends TestCase
         $res->assertDontSee($owner->id);
     }
 
+    public function test_share_trend_spans_full_history_not_just_recent_logs(): void
+    {
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+
+        // One old light log + 12 recent heavier ones. Over only the eager-loaded
+        // recent-12 the trend would read "stable"; over the full history it's a
+        // clear gain — so this guards the unbounded-query fix.
+        WeightLog::create(['pet_id' => $pet->id, 'weight' => 4.0, 'unit' => 'kg',
+            'logged_at' => Carbon::today()->subMonths(8)->format('Y-m-d')]);
+        for ($i = 12; $i >= 1; $i--) {
+            WeightLog::create(['pet_id' => $pet->id, 'weight' => 4.8, 'unit' => 'kg',
+                'logged_at' => Carbon::today()->subDays($i)->format('Y-m-d')]);
+        }
+
+        $res = $this->get($this->mintUrl($token, $pet))->assertOk();
+        $res->assertSee('Up 0.8 kg (20%)');
+        $res->assertSee('months');
+    }
+
     public function test_share_page_renders_with_no_records(): void
     {
         [$owner, $token] = $this->user();

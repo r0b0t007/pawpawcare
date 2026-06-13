@@ -48,7 +48,36 @@ class WeightInsightTest extends TestCase
         $this->assertSame(-0.5, $insight['change_abs']);
         $this->assertSame(-10.0, $insight['change_pct']);
         $this->assertTrue($insight['notable']);
-        $this->assertStringContainsString('Down 0.5 kg (-10%)', $insight['summary']);
+        // "Down" carries the sign — the percent is shown unsigned.
+        $this->assertStringContainsString('Down 0.5 kg (10%)', $insight['summary']);
+    }
+
+    public function test_the_stable_threshold_is_exclusive(): void
+    {
+        // Exactly 3% is NOT stable (stable is |change| < 3%).
+        $insight = WeightInsight::for([
+            $this->log(4.00, 'kg', '2026-01-01'),
+            $this->log(4.12, 'kg', '2026-03-01'),
+        ], 'kg');
+
+        $this->assertSame(3.0, $insight['change_pct']);
+        $this->assertSame('up', $insight['direction']);
+    }
+
+    public function test_span_crosses_from_weeks_to_months_at_sixty_days(): void
+    {
+        // 59 days → weeks, 60 days → months.
+        $weeks = WeightInsight::for([
+            $this->log(4.0, 'kg', '2026-01-01'),
+            $this->log(4.0, 'kg', '2026-03-01'), // 59 days
+        ], 'kg');
+        $months = WeightInsight::for([
+            $this->log(4.0, 'kg', '2026-01-01'),
+            $this->log(4.0, 'kg', '2026-03-02'), // 60 days
+        ], 'kg');
+
+        $this->assertStringContainsString('weeks', $weeks['summary']);
+        $this->assertStringContainsString('months', $months['summary']);
     }
 
     public function test_small_changes_are_stable_and_not_notable(): void
