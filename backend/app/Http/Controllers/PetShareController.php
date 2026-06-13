@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\Pet;
+use App\Support\WeightInsight;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -106,6 +107,7 @@ class PetShareController extends Controller
                 'pet' => $pet,
                 'documents' => $documents,
                 'weightPath' => $this->weightSvgPath($pet),
+                'weightInsight' => WeightInsight::for($pet->weightLogs, $pet->weight_unit ?: 'kg'),
                 'expiresAt' => $expiresAt,
             ])
             // Medical data behind a capability URL — keep crawlers away.

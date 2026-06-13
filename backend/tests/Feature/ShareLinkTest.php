@@ -192,6 +192,8 @@ class ShareLinkTest extends TestCase
         $res->assertSee('Simparica');
         $res->assertSee('40mg');
         $res->assertSee('4.8');
+        // Weight trend insight (4.6 → 4.8 = +0.2 kg, 4.3%).
+        $res->assertSee('Up 0.2 kg (4.3%)');
         // Inactive medications are not shared.
         $res->assertDontSee('Old Med');
         // Crawlers are told to stay away.
