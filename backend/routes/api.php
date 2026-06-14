@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CareController;
 use App\Http\Controllers\ClinicController;
 use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\DashboardController;
@@ -35,6 +36,13 @@ Route::get('/share/{pet}', [PetShareController::class, 'show'])
     ->middleware('signed')
     ->name('pets.share');
 
+// ── Caretaker page (no JWT — signed-URL trust model, independent care_token) ──
+// A read-only sitter handoff: care notes, feeding, active meds, emergency
+// contact. Minted via POST /pets/{pet}/care-link, expiring in days.
+Route::get('/care/{pet}', [CareController::class, 'page'])
+    ->middleware('signed')
+    ->name('pets.care');
+
 // ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
 Route::middleware('throttle:20,1')->group(function () {
     Route::post('/auth/signup', [AuthController::class, 'signup']);
@@ -62,6 +70,12 @@ Route::middleware('auth.jwt')->group(function () {
     // Vet share link (read-only medical summary for a browser)
     Route::post('/pets/{pet}/share-link', [PetShareController::class, 'create'])->middleware('throttle:20,1');
     Route::delete('/pets/{pet}/share-link', [PetShareController::class, 'revoke']);
+
+    // Caretaker mode — sitter handoff profile + time-limited caretaker link
+    Route::get('/pets/{pet}/care', [CareController::class, 'show']);
+    Route::put('/pets/{pet}/care', [CareController::class, 'update']);
+    Route::post('/pets/{pet}/care-link', [CareController::class, 'createLink'])->middleware('throttle:20,1');
+    Route::delete('/pets/{pet}/care-link', [CareController::class, 'revokeLink']);
 
     // Vaccinations
     Route::get('/pets/{pet}/vaccinations', [PetController::class, 'listVaccinations']);
