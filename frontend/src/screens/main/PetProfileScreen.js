@@ -1247,6 +1247,10 @@ function CaretakerModal({ visible, petName, onClose, onLoad, onSaveNotes, onCrea
               <TextInput style={[styles.modalInput, styles.careArea]} multiline placeholder="e.g. 1 cup of kibble at 8am & 6pm, fresh water daily" {...bind('feeding')} />
               <Text style={[styles.vetLabel, { marginTop: spacing.sm }]}>Instructions</Text>
               <TextInput style={[styles.modalInput, styles.careArea]} multiline placeholder="Litter box, walks, meds, quirks…" {...bind('instructions')} />
+              <View style={styles.careWarn}>
+                <MaterialCommunityIcons name="shield-alert-outline" size={13} color={colors.onSurfaceVariant} />
+                <Text style={styles.careWarnText}>Anyone with the link can read this — skip door codes or alarm PINs, or pick a short expiry.</Text>
+              </View>
               <Text style={[styles.vetLabel, { marginTop: spacing.sm }]}>Emergency contact</Text>
               <TextInput style={styles.modalInput} placeholder="Name (e.g. Dr. Meow at Happy Paws)" {...bind('emergency_name')} />
               <TextInput style={[styles.modalInput, { marginTop: spacing.xs }]} placeholder="Phone" keyboardType="phone-pad" {...bind('emergency_phone')} />
@@ -1939,4 +1943,6 @@ const styles = StyleSheet.create({
   vetRevokeText: { ...typography.labelSm, color: colors.error },
   careArea: { minHeight: 64, paddingTop: spacing.sm, textAlignVertical: 'top' },
   careSaved: { ...typography.labelSm, color: colors.secondary, marginTop: spacing.sm },
+  careWarn: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: spacing.xs },
+  careWarnText: { ...typography.labelSm, color: colors.onSurfaceVariant, flex: 1 },
 });
