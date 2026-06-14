@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { PET_COLORS } from '../theme';
-import { get, post, patch, del, uploadDocument } from '../services/api';
+import { get, post, patch, put, del, uploadDocument } from '../services/api';
 import { scheduleLocalReminders } from '../services/notifications';
 import { track } from '../services/analytics';
 
@@ -860,6 +860,19 @@ export function DataProvider({ children }) {
   // Revoke every outstanding link by rotating the pet's share token.
   const revokeShareLinks = async (petId) => { await del(`/pets/${petId}/share-link`); };
 
+  // ── Caretaker mode ──
+  // Owner-authored sitter handoff notes + a time-limited caretaker link.
+  const getCareProfile = async (petId) => {
+    try { return await get(`/pets/${petId}/care`); } catch (err) { handleApiError(err); return null; }
+  };
+  const saveCareProfile = async (petId, data) => put(`/pets/${petId}/care`, data);
+  const createCareLink = async (petId, expiresIn = '7d') => {
+    const result = await post(`/pets/${petId}/care-link`, { expires_in: expiresIn });
+    track('care_link_created', { expires_in: expiresIn });
+    return result;
+  };
+  const revokeCareLinks = async (petId) => { await del(`/pets/${petId}/care-link`); };
+
   // ── Community ──
 
   const addPost = async (content, imageUrl) => {
@@ -973,6 +986,10 @@ export function DataProvider({ children }) {
         applyExtraction,
         createShareLink,
         revokeShareLinks,
+        getCareProfile,
+        saveCareProfile,
+        createCareLink,
+        revokeCareLinks,
         addPost,
         togglePaw,
         getComments,

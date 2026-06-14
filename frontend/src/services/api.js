@@ -116,6 +116,7 @@ export async function request(method, path, body, { skipAuth = false } = {}) {
 export const get  = (path, opts) => request('GET',    path, undefined, opts);
 export const post = (path, body, opts) => request('POST',   path, body, opts);
 export const patch = (path, body, opts) => request('PATCH',  path, body, opts);
+export const put  = (path, body, opts) => request('PUT',    path, body, opts);
 export const del  = (path, opts) => request('DELETE', path, undefined, opts);
 
 // ── Image upload (multipart) ──────────────────────────────────────────────────

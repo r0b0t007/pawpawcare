@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image, Share,
+  TextInput, Modal, Alert, KeyboardAvoidingView, Platform, Image, Share, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -51,6 +51,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const [share, setShare] = useState(null); // { owner, members, invites }
   const [shareModal, setShareModal] = useState(false);
   const [vetShareModal, setVetShareModal] = useState(false);
+  const [caretakerModal, setCaretakerModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteError, setInviteError] = useState(null);
   const [inviteBusy, setInviteBusy] = useState(false);
@@ -335,6 +336,22 @@ export default function PetProfileScreen({ navigation, route }) {
           <View style={{ flex: 1 }}>
             <Text style={styles.recordsTitle}>Share with vet</Text>
             <Text style={styles.recordsSub}>A read-only link to {pet.name}'s health summary</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
+        </TouchableOpacity>
+
+        {/* Caretaker mode */}
+        <TouchableOpacity
+          style={styles.recordsBtn}
+          onPress={() => setCaretakerModal(true)}
+          activeOpacity={0.9}
+        >
+          <View style={[styles.recordsIcon, { backgroundColor: colors.primaryFixed }]}>
+            <MaterialCommunityIcons name="home-heart" size={20} color={colors.primaryContainer} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.recordsTitle}>Caretaker mode</Text>
+            <Text style={styles.recordsSub}>Sitter notes + a time-limited handoff link</Text>
           </View>
           <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
         </TouchableOpacity>
@@ -996,6 +1013,15 @@ export default function PetProfileScreen({ navigation, route }) {
         onCreate={(expiresIn) => createShareLink(petId, expiresIn)}
         onRevoke={() => revokeShareLinks(petId)}
       />
+      <CaretakerModal
+        visible={caretakerModal}
+        petName={pet.name}
+        onClose={() => setCaretakerModal(false)}
+        onLoad={() => getCareProfile(petId)}
+        onSaveNotes={(data) => saveCareProfile(petId, data)}
+        onCreate={(expiresIn) => createCareLink(petId, expiresIn)}
+        onRevoke={() => revokeCareLinks(petId)}
+      />
     </SafeAreaView>
   );
 }
@@ -1117,6 +1143,164 @@ function VetShareModal({ visible, petName, onClose, onCreate, onRevoke }) {
           </TouchableOpacity>
         </View>
       </View>
+    </Modal>
+  );
+}
+
+const CARE_EXPIRIES = [
+  { id: '1d', label: '1 day' },
+  { id: '3d', label: '3 days' },
+  { id: '7d', label: '1 week' },
+  { id: '14d', label: '2 weeks' },
+];
+
+// Caretaker mode: edit the sitter handoff notes, then generate a time-limited
+// read-only link and hand it to the OS share sheet. Notes are saved before
+// minting so the link always reflects the latest edits.
+function CaretakerModal({ visible, petName, onClose, onLoad, onSaveNotes, onCreate, onRevoke }) {
+  const [form, setForm] = useState({ feeding: '', instructions: '', emergency_name: '', emergency_phone: '' });
+  const [loading, setLoading] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+  const [expiresIn, setExpiresIn] = useState('7d');
+  const [link, setLink] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    setLink(null); setError(null); setSavedOk(false); setExpiresIn('7d');
+    setLoading(true);
+    onLoad()
+      .then((p) => {
+        if (p) setForm({
+          feeding: p.feeding || '', instructions: p.instructions || '',
+          emergency_name: p.emergency_name || '', emergency_phone: p.emergency_phone || '',
+        });
+      })
+      .finally(() => setLoading(false));
+  }, [visible]);
+
+  const close = () => { setLink(null); setError(null); onClose(); };
+
+  const bind = (key) => ({
+    value: form[key],
+    onChangeText: (v) => { setForm({ ...form, [key]: v }); setSavedOk(false); },
+    placeholderTextColor: colors.outlineVariant,
+  });
+
+  const payload = () => ({
+    feeding: form.feeding.trim() || null,
+    instructions: form.instructions.trim() || null,
+    emergency_name: form.emergency_name.trim() || null,
+    emergency_phone: form.emergency_phone.trim() || null,
+  });
+
+  const saveNotes = async () => {
+    setBusy(true); setError(null);
+    try { await onSaveNotes(payload()); setSavedOk(true); }
+    catch (e) { setError(e.message || 'Could not save notes.'); } finally { setBusy(false); }
+  };
+
+  const createAndShare = async () => {
+    setBusy(true); setError(null);
+    try {
+      await onSaveNotes(payload()); // persist edits so the link reflects them
+      const result = await onCreate(expiresIn);
+      setLink(result);
+      try { await Share.share({ message: `Caring for ${petName} — everything you need (link expires soon):\n${result.url}` }); } catch {}
+    } catch (e) { setError(e.message || 'Could not create the link.'); } finally { setBusy(false); }
+  };
+
+  const reshare = () => { if (link) Share.share({ message: `Caring for ${petName}:\n${link.url}` }).catch(() => {}); };
+
+  const revoke = () => {
+    Alert.alert('Revoke links', `Disable every caretaker link for ${petName}? Anyone holding one will lose access.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Revoke', style: 'destructive',
+        onPress: async () => {
+          setBusy(true); setError(null);
+          try { await onRevoke(); setLink(null); Alert.alert('Done', 'All caretaker links have been revoked.'); }
+          catch (e) { setError(e.message || 'Could not revoke links.'); } finally { setBusy(false); }
+        },
+      },
+    ]);
+  };
+
+  const expiry = (iso) => (iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.modalSheet}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.modalTitle}>Caretaker mode</Text>
+          <Text style={styles.modalHint}>
+            Notes for whoever looks after {petName}, plus a read-only link you can text them — no app needed.
+          </Text>
+
+          {loading ? (
+            <ActivityIndicator color={colors.primaryContainer} style={{ paddingVertical: spacing.lg }} />
+          ) : (
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <Text style={styles.vetLabel}>Feeding</Text>
+              <TextInput style={[styles.modalInput, styles.careArea]} multiline placeholder="e.g. 1 cup of kibble at 8am & 6pm, fresh water daily" {...bind('feeding')} />
+              <Text style={[styles.vetLabel, { marginTop: spacing.sm }]}>Instructions</Text>
+              <TextInput style={[styles.modalInput, styles.careArea]} multiline placeholder="Litter box, walks, meds, quirks…" {...bind('instructions')} />
+              <View style={styles.careWarn}>
+                <MaterialCommunityIcons name="shield-alert-outline" size={13} color={colors.onSurfaceVariant} />
+                <Text style={styles.careWarnText}>Anyone with the link can read this — skip door codes or alarm PINs, or pick a short expiry.</Text>
+              </View>
+              <Text style={[styles.vetLabel, { marginTop: spacing.sm }]}>Emergency contact</Text>
+              <TextInput style={styles.modalInput} placeholder="Name (e.g. Dr. Meow at Happy Paws)" {...bind('emergency_name')} />
+              <TextInput style={[styles.modalInput, { marginTop: spacing.xs }]} placeholder="Phone" keyboardType="phone-pad" {...bind('emergency_phone')} />
+
+              {link ? (
+                <>
+                  <View style={[styles.vetLinkBox, { marginTop: spacing.md }]}>
+                    <MaterialCommunityIcons name="link-variant" size={16} color={colors.secondary} />
+                    <Text style={styles.vetLinkText} numberOfLines={1}>{link.url}</Text>
+                  </View>
+                  <Text style={styles.vetExpiryNote}>Expires {expiry(link.expires_at)}</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.vetLabel, { marginTop: spacing.md }]}>Link expires after</Text>
+                  <View style={styles.vetChips}>
+                    {CARE_EXPIRIES.map((e) => (
+                      <TouchableOpacity key={e.id} style={[styles.vetChip, expiresIn === e.id && styles.vetChipActive]} onPress={() => setExpiresIn(e.id)} activeOpacity={0.85}>
+                        <Text style={[styles.vetChipText, expiresIn === e.id && { color: colors.onPrimary }]}>{e.label}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+              {!!error && <Text style={styles.inviteError}>{error}</Text>}
+              {savedOk && !link && <Text style={styles.careSaved}>Notes saved ✓</Text>}
+            </ScrollView>
+          )}
+
+          <View style={styles.modalActions}>
+            {link ? (
+              <>
+                <TouchableOpacity style={styles.modalCancel} onPress={reshare} activeOpacity={0.88}><Text style={styles.modalCancelText}>Share again</Text></TouchableOpacity>
+                <TouchableOpacity style={styles.modalAdd} onPress={close} activeOpacity={0.88}><Text style={styles.modalAddText}>Done</Text></TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity style={[styles.modalCancel, busy && { opacity: 0.6 }]} onPress={saveNotes} disabled={busy || loading} activeOpacity={0.88}><Text style={styles.modalCancelText}>{busy ? '…' : 'Save notes'}</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.modalAdd, busy && { opacity: 0.6 }]} onPress={createAndShare} disabled={busy || loading} activeOpacity={0.88}><Text style={styles.modalAddText}>{busy ? 'Working…' : 'Create & Share'}</Text></TouchableOpacity>
+              </>
+            )}
+          </View>
+          {!link && (
+            <TouchableOpacity style={styles.vetRevoke} onPress={revoke} disabled={busy} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="link-off" size={15} color={colors.error} />
+              <Text style={styles.vetRevokeText}>Revoke all active links</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -1757,4 +1941,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.md, paddingVertical: spacing.xs,
   },
   vetRevokeText: { ...typography.labelSm, color: colors.error },
+  careArea: { minHeight: 64, paddingTop: spacing.sm, textAlignVertical: 'top' },
+  careSaved: { ...typography.labelSm, color: colors.secondary, marginTop: spacing.sm },
+  careWarn: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginTop: spacing.xs },
+  careWarnText: { ...typography.labelSm, color: colors.onSurfaceVariant, flex: 1 },
 });
