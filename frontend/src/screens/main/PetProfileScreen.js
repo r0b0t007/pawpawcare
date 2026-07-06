@@ -30,6 +30,7 @@ export default function PetProfileScreen({ navigation, route }) {
     addWeight, deleteWeight, addExpense, deleteExpense,
     getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
     createShareLink, revokeShareLinks,
+    getCareProfile, saveCareProfile, createCareLink, revokeCareLinks,
   } = useData();
   const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
