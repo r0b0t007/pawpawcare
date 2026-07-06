@@ -8,6 +8,12 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/598e341a-f9a8-4117-a609-fcafc34e1dcd"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pawpawcare.app",

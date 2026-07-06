@@ -48,4 +48,4 @@ jobs:
       - name: Publish OTA update
         run: |
           MESSAGE="${{ github.event.inputs.message || github.event.head_commit.message }}"
-          eas update --auto --message "$MESSAGE" --non-interactive
+          eas update --channel production --message "$MESSAGE" --non-interactive
