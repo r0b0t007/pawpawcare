@@ -13,11 +13,18 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { StatusBar } from 'expo-status-bar';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { AuthProvider } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
 import { trackScreen } from './src/services/analytics';
 import AppNavigator from './src/navigation/AppNavigator';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 1000 * 60 * 5, retry: 2 },
+  },
+});
 
 export default function App() {
   const navRef = useNavigationContainerRef();
@@ -42,6 +49,7 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <DataProvider>
             <NavigationContainer
@@ -62,6 +70,7 @@ export default function App() {
             </NavigationContainer>
           </DataProvider>
         </AuthProvider>
+        </QueryClientProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

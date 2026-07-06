@@ -22,7 +22,7 @@ Invoke the matching skill BEFORE doing the work:
 | Adding any third-party library or service integration | `expo:expo-examples` + the Expo MCP `add_library` tool |
 | Any network request, API call, caching, offline, React Query work | `expo:native-data-fetching` |
 | Building/refactoring screens, navigation, animations, styling | `expo:building-native-ui` (+ `impeccable` for polish) |
-| Native-feeling controls (sheets, menus, pickers, settings forms) | `expo:expo-ui` |
+| Native-feeling controls (sheets, menus, pickers, settings forms) | `expo:expo-ui` — **@expo/ui has no SDK 54 release (stable starts at 56.x); blocked until the SDK upgrade** |
 | EAS builds, store submission, versioning, eas.json, TestFlight/Play | `expo:expo-deployment` + Expo MCP `build_*` tools |
 | Dev builds / Expo Go limitations | `expo:expo-dev-client` |
 | OTA update health, rollout monitoring, embedded-vs-OTA split | `expo:eas-update-insights` |
@@ -32,6 +32,15 @@ Invoke the matching skill BEFORE doing the work:
 
 **Not applicable to this repo** (don't reach for them): `add-app-clip`, `expo-brownfield`, `use-dom`, `web-to-native`, `expo-api-routes` (no expo-router), `expo-module`, `expo-tailwind-setup` (StyleSheet + theme tokens is the chosen styling system).
 
+## React Query migration (in progress)
+
+Data fetching is migrating from `DataContext` to `@tanstack/react-query`, one domain per PR. Pattern (pilot: pets / `PetsListScreen`):
+
+1. Query keys live in `frontend/src/hooks/queryKeys.js`; domain hooks in `frontend/src/hooks/` (see `usePets.js`) reuse the `services/api.js` client and the mappers exported from `DataContext.js`.
+2. **Reads** migrate to `useQuery`; **writes stay in `DataContext`** until every reader of that domain has migrated — DataContext mutations invalidate the matching query key to keep both stores in sync.
+3. Screens refetch on focus via `useRefetchOnFocus` to pick up edits from unmigrated screens.
+4. Consult `expo:native-data-fetching` before extending. Remaining domains: dashboard, reminders, notifications, community, lost pets, invites, medical vault.
+
 ## Backend changes
 
 After editing any backend controller, model, route, or migration, run the `security-reviewer` agent (IDOR, mass assignment, upload leaks, JWT bugs) — especially for pets, documents, vault, uploads, family sharing, or auth.
@@ -39,4 +48,4 @@ After editing any backend controller, model, route, or migration, run the `secur
 ## TODO
 
 - `frontend/eas.json` iOS submit credentials (`appleId`, `ascAppId`, `appleTeamId`) are placeholders — owner must fill them before the first `eas submit` to TestFlight.
-- `expo-observe` metrics: blocked on upgrading to Expo SDK 55+ (56+ and React Navigation v7 for per-route metrics). Use `expo:upgrading-expo` when tackling the upgrade, then `expo:expo-observe`.
+- Expo SDK upgrade (54 → 56+): unblocks both `expo-observe` metrics (needs 55+; 56+ and React Navigation v7 for per-route metrics) and `@expo/ui` native controls (stable starts at 56.x). Use `expo:upgrading-expo` when tackling it, then `expo:expo-observe` and `expo:expo-ui`.

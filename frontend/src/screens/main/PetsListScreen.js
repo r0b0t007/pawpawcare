@@ -1,10 +1,11 @@
 import React from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Image,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { usePetsQuery, useRefetchOnFocus } from '../../hooks/usePets';
 import { resolveAsset } from '../../config';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
@@ -20,7 +21,11 @@ function statusBadge(vax) {
 }
 
 export default function PetsListScreen({ navigation }) {
-  const { pets, deletePet } = useData();
+  // Reads come from React Query; writes still go through DataContext, which
+  // invalidates the pets query (see queryKeys.js) so this list refetches.
+  const { deletePet } = useData();
+  const { data: pets = [], isLoading, isError, refetch } = usePetsQuery();
+  useRefetchOnFocus(refetch);
 
   const confirmDelete = (pet) => {
     Alert.alert(
@@ -124,6 +129,29 @@ export default function PetsListScreen({ navigation }) {
     </TouchableOpacity>
   );
 
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>Couldn't load your pets.</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetch()} activeOpacity={0.88}>
+            <Text style={styles.retryBtnText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <FlatList
@@ -141,6 +169,15 @@ export default function PetsListScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md },
+  errorText: { ...typography.bodyMd, color: colors.onSurfaceVariant },
+  retryBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.xl,
+  },
+  retryBtnText: { ...typography.labelMd, color: colors.onPrimary },
   list: { padding: spacing.margin, gap: spacing.md, paddingBottom: spacing.xl },
   headerWrap: {
     flexDirection: 'row',

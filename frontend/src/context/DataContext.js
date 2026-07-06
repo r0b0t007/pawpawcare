@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { PET_COLORS } from '../theme';
 import { get, post, patch, put, del, uploadDocument } from '../services/api';
 import { scheduleLocalReminders } from '../services/notifications';
 import { track } from '../services/analytics';
+import { petsKeys } from '../hooks/queryKeys';
 
 const DataContext = createContext(null);
 
@@ -83,7 +85,7 @@ const toMed = (m) => ({
   lastAdministeredAt: m.last_administered_at || null,
 });
 
-const toPet = (apiPet, opts = {}) => {
+export const toPet = (apiPet, opts = {}) => {
   const {
     vaccinations = [], activities = [], foods = [], medications = [], weights = [], expenses = [], index = 0,
   } = opts;
@@ -241,11 +243,15 @@ export function DataProvider({ children }) {
     lostPets: [], myReports: [], invites: [],
   });
   const { user, logout } = useAuth();
+  // Bridge to React Query while domains migrate off this store: mutations here
+  // invalidate the matching query so migrated screens refetch (see queryKeys.js).
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (user) {
       loadData();
     } else {
+      queryClient.removeQueries({ queryKey: petsKeys.all });
       dispatch({ type: 'SET_PETS', payload: [] });
       dispatch({ type: 'SET_POSTS', payload: [] });
       dispatch({ type: 'SET_REMINDERS', payload: [] });
@@ -380,6 +386,7 @@ export function DataProvider({ children }) {
       });
       const newPet = toPet(apiPet, { index: state.pets.length });
       dispatch({ type: 'ADD_PET', payload: newPet });
+      queryClient.invalidateQueries({ queryKey: petsKeys.all });
       track('pet_added', { type: newPet.type, pet_count: state.pets.length + 1 });
       // Creating a pet with a weight seeds a server-side log — reflect it.
       if (petData.weight) refreshPetWeights(newPet.id);
@@ -419,6 +426,7 @@ export function DataProvider({ children }) {
         merged.medications = existing.medications || [];
         merged.weights = existing.weights || [];
         dispatch({ type: 'UPDATE_PET', payload: merged });
+        queryClient.invalidateQueries({ queryKey: petsKeys.all });
         // A weight edit creates a server-side log; refetch so the tracker stays in sync.
         if (updates.weight !== undefined) refreshPetWeights(petId);
       }
@@ -431,6 +439,7 @@ export function DataProvider({ children }) {
     try {
       await del(`/pets/${petId}`);
       dispatch({ type: 'DELETE_PET', payload: petId });
+      queryClient.invalidateQueries({ queryKey: petsKeys.all });
     } catch (err) {
       handleApiError(err);
     }
