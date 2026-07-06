@@ -30,6 +30,7 @@ export default function PetProfileScreen({ navigation, route }) {
     addWeight, deleteWeight, addExpense, deleteExpense,
     getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
     createShareLink, revokeShareLinks,
+    getCareProfile, saveCareProfile, createCareLink, revokeCareLinks,
   } = useData();
   const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
@@ -1160,16 +1161,17 @@ const CARE_EXPIRIES = [
 function CaretakerModal({ visible, petName, onClose, onLoad, onSaveNotes, onCreate, onRevoke }) {
   const [form, setForm] = useState({ feeding: '', instructions: '', emergency_name: '', emergency_phone: '' });
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
   const [expiresIn, setExpiresIn] = useState('7d');
   const [link, setLink] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (!visible) return;
-    setLink(null); setError(null); setSavedOk(false); setExpiresIn('7d');
-    setLoading(true);
+  // A failed load must not present an editable blank form — saving it would
+  // overwrite real notes with nulls. Editing stays locked until a load succeeds.
+  const load = () => {
+    setLoading(true); setLoadFailed(false);
     onLoad()
       .then((p) => {
         if (p) setForm({
@@ -1177,7 +1179,14 @@ function CaretakerModal({ visible, petName, onClose, onLoad, onSaveNotes, onCrea
           emergency_name: p.emergency_name || '', emergency_phone: p.emergency_phone || '',
         });
       })
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    setLink(null); setError(null); setSavedOk(false); setExpiresIn('7d');
+    load();
   }, [visible]);
 
   const close = () => { setLink(null); setError(null); onClose(); };
@@ -1241,6 +1250,13 @@ function CaretakerModal({ visible, petName, onClose, onLoad, onSaveNotes, onCrea
 
           {loading ? (
             <ActivityIndicator color={colors.primaryContainer} style={{ paddingVertical: spacing.lg }} />
+          ) : loadFailed ? (
+            <View style={{ paddingVertical: spacing.lg, alignItems: 'center', gap: spacing.sm }}>
+              <Text style={styles.inviteError}>Couldn't load the saved notes — editing is paused so they don't get overwritten.</Text>
+              <TouchableOpacity style={styles.modalCancel} onPress={load} activeOpacity={0.88}>
+                <Text style={styles.modalCancelText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <Text style={styles.vetLabel}>Feeding</Text>
@@ -1288,8 +1304,8 @@ function CaretakerModal({ visible, petName, onClose, onLoad, onSaveNotes, onCrea
               </>
             ) : (
               <>
-                <TouchableOpacity style={[styles.modalCancel, busy && { opacity: 0.6 }]} onPress={saveNotes} disabled={busy || loading} activeOpacity={0.88}><Text style={styles.modalCancelText}>{busy ? '…' : 'Save notes'}</Text></TouchableOpacity>
-                <TouchableOpacity style={[styles.modalAdd, busy && { opacity: 0.6 }]} onPress={createAndShare} disabled={busy || loading} activeOpacity={0.88}><Text style={styles.modalAddText}>{busy ? 'Working…' : 'Create & Share'}</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.modalCancel, (busy || loadFailed) && { opacity: 0.6 }]} onPress={saveNotes} disabled={busy || loading || loadFailed} activeOpacity={0.88}><Text style={styles.modalCancelText}>{busy ? '…' : 'Save notes'}</Text></TouchableOpacity>
+                <TouchableOpacity style={[styles.modalAdd, (busy || loadFailed) && { opacity: 0.6 }]} onPress={createAndShare} disabled={busy || loading || loadFailed} activeOpacity={0.88}><Text style={styles.modalAddText}>{busy ? 'Working…' : 'Create & Share'}</Text></TouchableOpacity>
               </>
             )}
           </View>
