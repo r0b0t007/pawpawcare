@@ -22,7 +22,7 @@ Invoke the matching skill BEFORE doing the work:
 | Adding any third-party library or service integration | `expo:expo-examples` + the Expo MCP `add_library` tool |
 | Any network request, API call, caching, offline, React Query work | `expo:native-data-fetching` |
 | Building/refactoring screens, navigation, animations, styling | `expo:building-native-ui` (+ `impeccable` for polish) |
-| Native-feeling controls (sheets, menus, pickers, settings forms) | `expo:expo-ui` — **@expo/ui has no SDK 54 release (stable starts at 56.x); blocked until the SDK upgrade** |
+| Native-feeling controls (sheets, menus, pickers, settings forms) | `expo:expo-ui` (in use: `@expo/ui/community/datetime-picker` replaced `@react-native-community/datetimepicker` on all four picker screens) |
 | EAS builds, store submission, versioning, eas.json, TestFlight/Play | `expo:expo-deployment` + Expo MCP `build_*` tools |
 | Dev builds / Expo Go limitations | `expo:expo-dev-client` |
 | OTA update health, rollout monitoring, embedded-vs-OTA split | `expo:eas-update-insights` |
