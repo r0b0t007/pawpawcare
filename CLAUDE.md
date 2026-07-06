@@ -27,7 +27,7 @@ Invoke the matching skill BEFORE doing the work:
 | Dev builds / Expo Go limitations | `expo:expo-dev-client` |
 | OTA update health, rollout monitoring, embedded-vs-OTA split | `expo:eas-update-insights` |
 | Running/testing on iOS (Windows dev machine — no local iOS simulator) | `expo:eas-simulator` |
-| App performance, launch time, TTI, per-route metrics | `expo:expo-observe` — **requires SDK 55+ (per-route metrics SDK 56+ and React Navigation v7); blocked until the SDK upgrade** |
+| App performance, launch time, TTI, per-route metrics | `expo:expo-observe` (wired: `ObserveRoot`/`ObserveNavigationContainer` in App.js, `markInteractive` on entry screens; query with `eas observe:*`) |
 | Expo docs lookup (don't guess API details from memory) | Expo MCP `learn` / `read_documentation` tools |
 
 **Not applicable to this repo** (don't reach for them): `add-app-clip`, `expo-brownfield`, `use-dom`, `web-to-native`, `expo-api-routes` (no expo-router), `expo-module`, `expo-tailwind-setup` (StyleSheet + theme tokens is the chosen styling system).
@@ -48,4 +48,3 @@ After editing any backend controller, model, route, or migration, run the `secur
 ## TODO
 
 - `frontend/eas.json` iOS submit credentials (`appleId`, `ascAppId`, `appleTeamId`) are placeholders — owner must fill them before the first `eas submit` to TestFlight.
-- Expo SDK upgrade (54 → 56+): unblocks both `expo-observe` metrics (needs 55+; 56+ and React Navigation v7 for per-route metrics) and `@expo/ui` native controls (stable starts at 56.x). Use `expo:upgrading-expo` when tackling it, then `expo:expo-observe` and `expo:expo-ui`.

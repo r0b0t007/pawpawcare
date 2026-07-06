@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useObserve } from 'expo-observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { resolveAsset } from '../../config';
@@ -25,7 +26,14 @@ function timeAgo(iso) {
 
 export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
-  const { pets, posts, unreadCount, invites } = useData();
+  const { dataLoaded, pets, posts, unreadCount, invites } = useData();
+
+  // TTI: the dashboard is the main entry screen — interactive once the initial
+  // data fan-out has rendered. Safe to call repeatedly; first call wins.
+  const { markInteractive } = useObserve();
+  useEffect(() => {
+    if (dataLoaded) markInteractive();
+  }, [dataLoaded, markInteractive]);
 
   const upcomingVax = pets.flatMap((p) =>
     (p.vaccinations || []).filter((v) => v.status === 'upcoming' || v.status === 'due_soon' || v.status === 'overdue')
