@@ -11,8 +11,9 @@ backend/venv/
 backend/*.db
 backend/*.sqlite3
 
-# Root node_modules
+# Root node_modules and .expo (leftovers from before the app moved to frontend/)
 node_modules/
+.expo/
 
 # Credentials — never commit these
 google-service-account.json
