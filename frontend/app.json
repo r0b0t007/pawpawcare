@@ -36,7 +36,8 @@
           "photosPermission": "Allow PawPawCare to access your photos to set pet pictures and share posts."
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {
