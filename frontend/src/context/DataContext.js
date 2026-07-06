@@ -877,7 +877,10 @@ export function DataProvider({ children }) {
   // ── Caretaker mode ──
   // Owner-authored sitter handoff notes + a time-limited caretaker link.
   const getCareProfile = async (petId) => {
-    try { return await get(`/pets/${petId}/care`); } catch (err) { handleApiError(err); return null; }
+    // The API returns an empty shell when no profile exists, so any failure is
+    // a real error — rethrow so callers can tell "failed" from "nothing saved"
+    // (a blank form on failure invites overwriting real notes with nulls).
+    try { return await get(`/pets/${petId}/care`); } catch (err) { handleApiError(err); throw err; }
   };
   const saveCareProfile = async (petId, data) => put(`/pets/${petId}/care`, data);
   const createCareLink = async (petId, expiresIn = '7d') => {
