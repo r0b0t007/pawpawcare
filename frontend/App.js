@@ -1,7 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import React, { useRef } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
+import { useNavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
@@ -14,11 +14,16 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Observe, ObserveRoot } from 'expo-observe';
+import { ObserveNavigationContainer } from 'expo-observe/integrations/react-navigation';
 
 import { AuthProvider } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
 import { trackScreen } from './src/services/analytics';
 import AppNavigator from './src/navigation/AppNavigator';
+
+// Must run at module scope, before any screen mounts.
+Observe.configure({ integrations: { 'react-navigation': true } });
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,7 +31,7 @@ const queryClient = new QueryClient({
   },
 });
 
-export default function App() {
+function App() {
   const navRef = useNavigationContainerRef();
   const routeNameRef = useRef(null);
 
@@ -52,7 +57,7 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <DataProvider>
-            <NavigationContainer
+            <ObserveNavigationContainer
               ref={navRef}
               onReady={() => {
                 routeNameRef.current = navRef.getCurrentRoute()?.name;
@@ -67,7 +72,7 @@ export default function App() {
             >
               <StatusBar style="dark" backgroundColor="#fff8f4" />
               <AppNavigator />
-            </NavigationContainer>
+            </ObserveNavigationContainer>
           </DataProvider>
         </AuthProvider>
         </QueryClientProvider>
@@ -75,3 +80,5 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
+
+export default ObserveRoot.wrap(App);

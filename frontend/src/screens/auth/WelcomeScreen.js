@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useObserve } from 'expo-observe';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 const { width } = Dimensions.get('window');
@@ -15,6 +16,12 @@ const FEATURES = [
 ];
 
 export default function WelcomeScreen({ navigation }) {
+  // TTI: entry screen for logged-out sessions — static, interactive on mount.
+  const { markInteractive } = useObserve();
+  useEffect(() => {
+    markInteractive();
+  }, [markInteractive]);
+
   return (
     <View style={styles.root}>
       <LinearGradient

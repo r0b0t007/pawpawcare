@@ -217,6 +217,7 @@ const toDocument = (d) => ({
 
 function dataReducer(state, action) {
   switch (action.type) {
+    case 'SET_DATA_LOADED': return { ...state, dataLoaded: action.payload };
     case 'SET_PETS':   return { ...state, pets: action.payload };
     case 'ADD_PET':    return { ...state, pets: [...state.pets, action.payload] };
     case 'UPDATE_PET': return { ...state, pets: state.pets.map((p) => (p.id === action.payload.id ? action.payload : p)) };
@@ -240,7 +241,7 @@ function dataReducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
-    lostPets: [], myReports: [], invites: [],
+    lostPets: [], myReports: [], invites: [], dataLoaded: false,
   });
   const { user, logout } = useAuth();
   // Bridge to React Query while domains migrate off this store: mutations here
@@ -252,6 +253,7 @@ export function DataProvider({ children }) {
       loadData();
     } else {
       queryClient.removeQueries({ queryKey: petsKeys.all });
+      dispatch({ type: 'SET_DATA_LOADED', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
       dispatch({ type: 'SET_POSTS', payload: [] });
       dispatch({ type: 'SET_REMINDERS', payload: [] });
@@ -305,6 +307,9 @@ export function DataProvider({ children }) {
       scheduleLocalReminders(apiReminders);
     } catch (err) {
       handleApiError(err);
+    } finally {
+      // Initial fan-out finished (even on error) — screens can report TTI.
+      dispatch({ type: 'SET_DATA_LOADED', payload: true });
     }
   };
 
@@ -944,6 +949,7 @@ export function DataProvider({ children }) {
   return (
     <DataContext.Provider
       value={{
+        dataLoaded: state.dataLoaded,
         pets: state.pets,
         posts: state.posts,
         groups: state.groups,
