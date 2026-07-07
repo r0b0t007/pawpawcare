@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useObserve } from 'expo-observe';
+import { useObserve } from '../../services/observe';
 import { colors, typography, spacing, radii, shadows } from '../../theme';
 
 const { width } = Dimensions.get('window');
