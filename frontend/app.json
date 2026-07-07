@@ -4,6 +4,7 @@
     "slug": "r0b0t0",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
@@ -17,13 +18,17 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pawpawcare.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.pawpawcare.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#fff8f4"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffddb8"
       }
     },
     "plugins": [
@@ -36,7 +41,15 @@
         }
       ],
       "expo-localization",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "backgroundColor": "#fff8f4"
+        }
+      ]
     ],
     "extra": {
       "eas": {
