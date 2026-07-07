@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useObserve } from 'expo-observe';
+import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { resolveAsset } from '../../config';

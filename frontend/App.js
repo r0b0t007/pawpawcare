@@ -14,8 +14,7 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Observe, ObserveRoot } from 'expo-observe';
-import { ObserveNavigationContainer } from 'expo-observe/integrations/react-navigation';
+import { ObserveRoot, ObserveNavigationContainer, configureObserve } from './src/services/observe';
 
 import { AuthProvider } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
@@ -23,7 +22,7 @@ import { trackScreen } from './src/services/analytics';
 import AppNavigator from './src/navigation/AppNavigator';
 
 // Must run at module scope, before any screen mounts.
-Observe.configure({ integrations: { 'react-navigation': true } });
+configureObserve({ integrations: { 'react-navigation': true } });
 
 const queryClient = new QueryClient({
   defaultOptions: {
