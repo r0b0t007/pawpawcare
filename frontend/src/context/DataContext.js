@@ -268,66 +268,74 @@ export function DataProvider({ children }) {
     if (err.message === 'SESSION_EXPIRED') logout();
   };
 
+  // Each domain loads and dispatches independently, so one failed request
+  // only loses that domain — a transient blip on any single endpoint used to
+  // discard the entire store (dashboard showed 0 pets until a full reload).
   const loadData = async () => {
-    try {
-      const [apiPets, apiPosts, apiGroups, apiReminders, apiNotifications, apiMyReports, apiInvites] = await Promise.all([
-        get('/pets'),
-        get('/community/posts'),
-        get('/community/groups'),
-        get('/reminders'),
-        get('/notifications'),
-        get('/lost-pets/mine'),
-        get('/invites'),
-      ]);
+    const loaders = [
+      async () => {
+        // Pets and my lost-pet reports land together: PetProfile derives its
+        // report-lost / mark-found actions from BOTH, and a half-loaded pair
+        // renders the wrong action (e.g. "report as lost" for a lost pet).
+        const [apiPets, apiMyReports] = await Promise.all([get('/pets'), get('/lost-pets/mine')]);
+        // Load each pet's sub-resources in parallel
+        const petsWithData = await Promise.all(
+          apiPets.map(async (apiPet, i) => {
+            const [vax, acts, foods, meds, weights, expenses] = await Promise.all([
+              get(`/pets/${apiPet.id}/vaccinations`),
+              get(`/pets/${apiPet.id}/activities`),
+              get(`/pets/${apiPet.id}/foods`),
+              get(`/pets/${apiPet.id}/medications`),
+              get(`/pets/${apiPet.id}/weights`),
+              get(`/pets/${apiPet.id}/expenses`),
+            ]);
+            return toPet(apiPet, { vaccinations: vax, activities: acts, foods, medications: meds, weights, expenses, index: i });
+          })
+        );
+        dispatch({ type: 'SET_PETS', payload: petsWithData });
+        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
+      },
+      () => refreshPosts({ rethrow: true }),
+      async () => {
+        const apiGroups = await get('/community/groups');
+        dispatch({ type: 'SET_GROUPS', payload: apiGroups.map(toGroup) });
+      },
+      () => refreshReminders({ rethrow: true }),
+      () => refreshNotifications({ rethrow: true }),
+      () => refreshInvites({ rethrow: true }),
+    ];
 
-      // Load each pet's sub-resources in parallel
-      const petsWithData = await Promise.all(
-        apiPets.map(async (apiPet, i) => {
-          const [vax, acts, foods, meds, weights, expenses] = await Promise.all([
-            get(`/pets/${apiPet.id}/vaccinations`),
-            get(`/pets/${apiPet.id}/activities`),
-            get(`/pets/${apiPet.id}/foods`),
-            get(`/pets/${apiPet.id}/medications`),
-            get(`/pets/${apiPet.id}/weights`),
-            get(`/pets/${apiPet.id}/expenses`),
-          ]);
-          return toPet(apiPet, { vaccinations: vax, activities: acts, foods, medications: meds, weights, expenses, index: i });
-        })
-      );
-
-      dispatch({ type: 'SET_PETS',   payload: petsWithData });
-      dispatch({ type: 'SET_POSTS',  payload: apiPosts.map(toPost) });
-      dispatch({ type: 'SET_GROUPS', payload: apiGroups.map(toGroup) });
-      dispatch({ type: 'SET_REMINDERS', payload: apiReminders });
-      dispatch({ type: 'SET_NOTIFICATIONS', payload: apiNotifications });
-      dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
-      dispatch({ type: 'SET_INVITES', payload: apiInvites.map(toInvite) });
-
-      // Mirror server reminders onto on-device local notifications (primary delivery).
-      scheduleLocalReminders(apiReminders);
-    } catch (err) {
-      handleApiError(err);
-    } finally {
-      // Initial fan-out finished (even on error) — screens can report TTI.
-      dispatch({ type: 'SET_DATA_LOADED', payload: true });
+    const results = await Promise.allSettled(loaders.map((load) => load()));
+    const failed = results.filter((r) => r.status === 'rejected');
+    // Log out once, however many loaders hit the expired session — logout()
+    // has no in-flight guard, so a per-failure handleApiError would fire it
+    // up to once per domain.
+    if (failed.some((r) => r.reason?.message === 'SESSION_EXPIRED')) logout();
+    if (failed.length) {
+      console.warn(`[data] ${failed.length}/${loaders.length} domains failed to load; kept previous state for those`);
     }
+    // Initial fan-out finished (even with failures) — screens can report TTI.
+    dispatch({ type: 'SET_DATA_LOADED', payload: true });
   };
 
   // ── Reminders & notifications ──
 
-  const refreshReminders = async () => {
+  // refresh* helpers swallow errors via handleApiError by default; loadData
+  // passes { rethrow: true } to own error handling itself (allSettled counts
+  // the failure and logs out at most once across all domains).
+  const refreshReminders = async ({ rethrow = false } = {}) => {
     try {
       const reminders = await get('/reminders');
       dispatch({ type: 'SET_REMINDERS', payload: reminders });
       scheduleLocalReminders(reminders);
-    } catch (err) { handleApiError(err); }
+    } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
-  const refreshNotifications = async () => {
+  const refreshNotifications = async ({ rethrow = false } = {}) => {
     try {
       const data = await get('/notifications');
       dispatch({ type: 'SET_NOTIFICATIONS', payload: data });
-    } catch (err) { handleApiError(err); }
+    } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
   const addReminder = async (payload) => {
@@ -683,11 +691,11 @@ export function DataProvider({ children }) {
 
   // ── Lost pets ──
 
-  const refreshPosts = async () => {
+  const refreshPosts = async ({ rethrow = false } = {}) => {
     try {
       const apiPosts = await get('/community/posts');
       dispatch({ type: 'SET_POSTS', payload: apiPosts.map(toPost) });
-    } catch (err) { handleApiError(err); }
+    } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
   const refreshLostPets = async () => {
@@ -719,11 +727,11 @@ export function DataProvider({ children }) {
 
   // ── Sharing (co-owners) ──
 
-  const refreshInvites = async () => {
+  const refreshInvites = async ({ rethrow = false } = {}) => {
     try {
       const apiInvites = await get('/invites');
       dispatch({ type: 'SET_INVITES', payload: apiInvites.map(toInvite) });
-    } catch (err) { handleApiError(err); }
+    } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
   // Owner-side: the roster (owner + members + pending invites) for one pet.
