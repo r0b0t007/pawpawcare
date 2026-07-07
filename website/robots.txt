@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://pawpawcare-app.netlify.app/sitemap.xml
+Sitemap: https://pawpawcare.app/sitemap.xml
