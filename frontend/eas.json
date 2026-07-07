@@ -38,9 +38,6 @@
       "android": {
         "buildType": "app-bundle"
       },
-      "ios": {
-        "enterpriseProvisioning": "universal"
-      },
       "env": {
         "ENVIRONMENT": "production"
       }
