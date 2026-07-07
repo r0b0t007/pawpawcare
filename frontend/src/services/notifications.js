@@ -1,22 +1,32 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
 
-// Show reminders as banners even when the app is foregrounded.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// expo-notifications wires its push-token machinery at import time, and since
+// remote push was removed from Expo Go (SDK 53) that import THROWS there on
+// Android — crashing the app before boot. Guard the require: dev/EAS builds
+// get full notifications, Expo Go runs with them disabled.
+let Notifications = null;
+try {
+  Notifications = require('expo-notifications');
+
+  // Show reminders as banners even when the app is foregrounded.
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+} catch (e) {
+  console.log('[push] expo-notifications unavailable (Expo Go) — notifications disabled');
+}
 
 const ANDROID_CHANNEL = 'reminders';
 
 export async function ensureAndroidChannel() {
-  if (Platform.OS === 'android') {
+  if (Notifications && Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
       name: 'Reminders',
       importance: Notifications.AndroidImportance.HIGH,
@@ -39,6 +49,8 @@ export const deviceTimezone = () => {
  * Returns { token, platform } or null (denied / simulator / Expo Go).
  */
 export async function registerForPushNotificationsAsync() {
+  if (!Notifications) return null; // Expo Go: no notifications module at all
+
   await ensureAndroidChannel();
 
   if (!Device.isDevice) return null; // push tokens require a physical device
@@ -71,6 +83,8 @@ export async function registerForPushNotificationsAsync() {
  * occurrences are skipped — the server push job handles those as a backstop.
  */
 export async function scheduleLocalReminders(reminders = []) {
+  if (!Notifications) return;
+
   try {
     await ensureAndroidChannel();
     await Notifications.cancelAllScheduledNotificationsAsync();
@@ -105,6 +119,7 @@ export async function scheduleLocalReminders(reminders = []) {
 }
 
 export async function cancelAllLocalReminders() {
+  if (!Notifications) return;
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
   } catch {
@@ -113,5 +128,6 @@ export async function cancelAllLocalReminders() {
 }
 
 export function addNotificationResponseListener(handler) {
+  if (!Notifications) return { remove: () => {} };
   return Notifications.addNotificationResponseReceivedListener(handler);
 }
