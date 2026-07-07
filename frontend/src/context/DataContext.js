@@ -274,7 +274,10 @@ export function DataProvider({ children }) {
   const loadData = async () => {
     const loaders = [
       async () => {
-        const apiPets = await get('/pets');
+        // Pets and my lost-pet reports land together: PetProfile derives its
+        // report-lost / mark-found actions from BOTH, and a half-loaded pair
+        // renders the wrong action (e.g. "report as lost" for a lost pet).
+        const [apiPets, apiMyReports] = await Promise.all([get('/pets'), get('/lost-pets/mine')]);
         // Load each pet's sub-resources in parallel
         const petsWithData = await Promise.all(
           apiPets.map(async (apiPet, i) => {
@@ -290,6 +293,7 @@ export function DataProvider({ children }) {
           })
         );
         dispatch({ type: 'SET_PETS', payload: petsWithData });
+        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
       },
       async () => {
         const apiPosts = await get('/community/posts');
@@ -310,10 +314,6 @@ export function DataProvider({ children }) {
         dispatch({ type: 'SET_NOTIFICATIONS', payload: apiNotifications });
       },
       async () => {
-        const apiMyReports = await get('/lost-pets/mine');
-        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
-      },
-      async () => {
         const apiInvites = await get('/invites');
         dispatch({ type: 'SET_INVITES', payload: apiInvites.map(toInvite) });
       },
@@ -321,7 +321,10 @@ export function DataProvider({ children }) {
 
     const results = await Promise.allSettled(loaders.map((load) => load()));
     const failed = results.filter((r) => r.status === 'rejected');
-    failed.forEach((r) => handleApiError(r.reason)); // logs out on SESSION_EXPIRED
+    // Log out once, however many loaders hit the expired session — logout()
+    // has no in-flight guard, so a per-failure handleApiError would fire it
+    // up to once per domain.
+    if (failed.some((r) => r.reason?.message === 'SESSION_EXPIRED')) logout();
     if (failed.length) {
       console.warn(`[data] ${failed.length}/${loaders.length} domains failed to load; kept previous state for those`);
     }
