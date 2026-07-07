@@ -295,28 +295,14 @@ export function DataProvider({ children }) {
         dispatch({ type: 'SET_PETS', payload: petsWithData });
         dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
       },
-      async () => {
-        const apiPosts = await get('/community/posts');
-        dispatch({ type: 'SET_POSTS', payload: apiPosts.map(toPost) });
-      },
+      () => refreshPosts({ rethrow: true }),
       async () => {
         const apiGroups = await get('/community/groups');
         dispatch({ type: 'SET_GROUPS', payload: apiGroups.map(toGroup) });
       },
-      async () => {
-        const apiReminders = await get('/reminders');
-        dispatch({ type: 'SET_REMINDERS', payload: apiReminders });
-        // Mirror server reminders onto on-device local notifications (primary delivery).
-        scheduleLocalReminders(apiReminders);
-      },
-      async () => {
-        const apiNotifications = await get('/notifications');
-        dispatch({ type: 'SET_NOTIFICATIONS', payload: apiNotifications });
-      },
-      async () => {
-        const apiInvites = await get('/invites');
-        dispatch({ type: 'SET_INVITES', payload: apiInvites.map(toInvite) });
-      },
+      () => refreshReminders({ rethrow: true }),
+      () => refreshNotifications({ rethrow: true }),
+      () => refreshInvites({ rethrow: true }),
     ];
 
     const results = await Promise.allSettled(loaders.map((load) => load()));
@@ -334,19 +320,22 @@ export function DataProvider({ children }) {
 
   // ── Reminders & notifications ──
 
-  const refreshReminders = async () => {
+  // refresh* helpers swallow errors via handleApiError by default; loadData
+  // passes { rethrow: true } to own error handling itself (allSettled counts
+  // the failure and logs out at most once across all domains).
+  const refreshReminders = async ({ rethrow = false } = {}) => {
     try {
       const reminders = await get('/reminders');
       dispatch({ type: 'SET_REMINDERS', payload: reminders });
       scheduleLocalReminders(reminders);
-    } catch (err) { handleApiError(err); }
+    } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
-  const refreshNotifications = async () => {
+  const refreshNotifications = async ({ rethrow = false } = {}) => {
     try {
       const data = await get('/notifications');
       dispatch({ type: 'SET_NOTIFICATIONS', payload: data });
-    } catch (err) { handleApiError(err); }
+    } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
   const addReminder = async (payload) => {
@@ -702,11 +691,11 @@ export function DataProvider({ children }) {
 
   // ── Lost pets ──
 
-  const refreshPosts = async () => {
+  const refreshPosts = async ({ rethrow = false } = {}) => {
     try {
       const apiPosts = await get('/community/posts');
       dispatch({ type: 'SET_POSTS', payload: apiPosts.map(toPost) });
-    } catch (err) { handleApiError(err); }
+    } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
   const refreshLostPets = async () => {
@@ -738,11 +727,11 @@ export function DataProvider({ children }) {
 
   // ── Sharing (co-owners) ──
 
-  const refreshInvites = async () => {
+  const refreshInvites = async ({ rethrow = false } = {}) => {
     try {
       const apiInvites = await get('/invites');
       dispatch({ type: 'SET_INVITES', payload: apiInvites.map(toInvite) });
-    } catch (err) { handleApiError(err); }
+    } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
   // Owner-side: the roster (owner + members + pending invites) for one pet.
