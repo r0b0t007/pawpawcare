@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
 
@@ -121,14 +122,26 @@ export const del  = (path, opts) => request('DELETE', path, undefined, opts);
 
 // ── Image upload (multipart) ──────────────────────────────────────────────────
 
+// React Native's FormData accepts a { uri, name, type } descriptor; the web
+// FormData stringifies it to "[object Object]" (the server 422s). On web the
+// picker returns a blob:/data: URI — fetch it and wrap the bytes in a File.
+async function asFormFile(uri, name, type) {
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(uri)).blob();
+    return new File([blob], name, { type: blob.type || type });
+  }
+  return { uri, name, type };
+}
+
 export async function uploadImage(localUri) {
   const name = (localUri.split('/').pop() || 'photo.jpg').split('?')[0];
   const ext = (/\.(\w+)$/.exec(name)?.[1] || 'jpg').toLowerCase();
   const type = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+  const filePart = await asFormFile(localUri, name, type);
 
   const send = (token) => {
     const form = new FormData();
-    form.append('file', { uri: localUri, name, type });
+    form.append('file', filePart);
     return fetch(`${API_URL}/uploads`, {
       method: 'POST',
       headers: {
@@ -168,10 +181,11 @@ export async function uploadDocument(petId, file, fields = {}) {
   const name = (file.name || file.uri.split('/').pop() || 'document.jpg').split('?')[0];
   const ext = (/\.(\w+)$/.exec(name)?.[1] || 'jpg').toLowerCase();
   const type = ext === 'pdf' ? 'application/pdf' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+  const filePart = await asFormFile(file.uri, name, type);
 
   const send = (token) => {
     const form = new FormData();
-    form.append('file', { uri: file.uri, name, type });
+    form.append('file', filePart);
     Object.entries(fields).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') form.append(k, String(v));
     });
