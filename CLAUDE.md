@@ -8,6 +8,10 @@ Pet health management app: **`frontend/`** is an Expo SDK 54 React Native app (R
 - Backend: `cd backend && composer dev` (serve + queue + logs), `php artisan test` (PHPUnit), Pint auto-formats PHP edits via hook.
 - Versioning: `cd frontend && npm run version:patch|minor|major` (syncs app.json).
 
+## Environments
+
+- Production API: **https://api.pawpawcare.app** (Laravel on Namecheap cPanel — see `docs/deploy-backend.md`). Marketing site: **https://pawpawcare.app** (Netlify, deployed from `website/`). Store/preview builds get the API URL from `eas.json` env; local dev uses `frontend/.env.local`.
+
 ## CI/CD
 
 **GitHub Actions in `.github/workflows/` is the canonical CI/CD — do not create `.eas/workflows/`.** `ci.yml` (tests), `ota-update.yml` (EAS Update on main), `preview-build.yml` (preview branch), `production-release.yml` (version tags). When editing the EAS steps in these workflows, consult the `expo:expo-cicd-workflows` skill for EAS CLI semantics only — output stays in GitHub Actions.
