@@ -29,7 +29,8 @@
         "simulator": false
       },
       "env": {
-        "ENVIRONMENT": "staging"
+        "ENVIRONMENT": "staging",
+        "EXPO_PUBLIC_API_URL": "https://api.pawpawcare.app"
       }
     },
     "production": {
@@ -39,7 +40,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "ENVIRONMENT": "production"
+        "ENVIRONMENT": "production",
+        "EXPO_PUBLIC_API_URL": "https://api.pawpawcare.app"
       }
     }
   },
