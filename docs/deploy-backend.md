@@ -117,7 +117,51 @@ If/when `QUEUE_CONNECTION=database` is enabled, add:
 * * * * * cd ~/pawpawcare/backend && php artisan queue:work --stop-when-empty --max-time=55 >> /dev/null 2>&1
 ```
 
-## 7. Deploying updates
+## 7. Deploying updates — automated via GitHub Actions
+
+`.github/workflows/deploy-backend.yml` deploys automatically on every push to
+`main` that touches `backend/`: PHPUnit runs first, then the workflow SSHes in,
+updates the checkout, installs prod dependencies, migrates, re-caches config/
+routes, and verifies `https://api.pawpawcare.app/health` returns ok. Manual
+runs: GitHub → Actions → "Deploy Backend" → Run workflow.
+
+### One-time setup
+
+1. **Enable SSH + authorize a deploy key.** On this machine:
+
+   ```sh
+   ssh-keygen -t ed25519 -f pawpaw-deploy -C "github-deploy" -N '""'
+   ```
+
+   cPanel → **SSH Access** → *Manage SSH Keys* → *Import Key* → paste the
+   contents of `pawpaw-deploy.pub` → back on the key list, **Manage →
+   Authorize** (an imported-but-unauthorized key is silently rejected).
+
+2. **GitHub secrets** (repo → Settings → Secrets → Actions, or `gh secret set`):
+
+   | Secret | Value |
+   |---|---|
+   | `DEPLOY_SSH_HOST` | server hostname or Shared IP (cPanel sidebar) |
+   | `DEPLOY_SSH_USER` | cPanel username |
+   | `DEPLOY_SSH_PORT` | `21098` (Namecheap shared SSH port — not 22) |
+   | `DEPLOY_SSH_KEY`  | contents of the **private** `pawpaw-deploy` file |
+
+3. **Optional GitHub variables** (Settings → Variables → Actions):
+   `DEPLOY_PATH` if the repo isn't at `~/pawpawcare`; `PHP_BIN` if the SSH
+   shell's default `php -v` is older than the domain's PHP (Namecheap CLI
+   binaries live at `/opt/alt/php85/usr/bin/php` and similar — run
+   `ls /opt/alt/ | grep php` over SSH to see what's installed).
+
+4. **Test the key from this machine before trusting CI:**
+
+   ```sh
+   ssh -i pawpaw-deploy -p 21098 <CPANEL_USER>@<HOST> 'php -v && cd ~/pawpawcare && git status'
+   ```
+
+Sections 1–6 (initial clone, subdomain, .env, cron) remain a one-time manual
+setup; the workflow only handles updates.
+
+### Manual fallback
 
 ```sh
 cd ~/pawpawcare && git pull
@@ -125,8 +169,6 @@ cd backend && composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan config:cache && php artisan route:cache
 ```
-
-(cPanel Git Version Control → "Pull or Deploy" does the git part with a click.)
 
 ## 8. Client configuration that depends on this API
 

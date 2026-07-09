@@ -1,0 +1,108 @@
+# Deploys the Laravel backend to the Namecheap cPanel host over SSH.
+# Triggered by pushes to main that touch backend/ (or manually).
+# Tests gate the deploy: PHPUnit runs first, SSH deploy only on green.
+#
+# Required GitHub secrets:
+#   DEPLOY_SSH_HOST  — server hostname or shared IP (cPanel sidebar)
+#   DEPLOY_SSH_USER  — cPanel username
+#   DEPLOY_SSH_KEY   — private key whose public half is authorized in
+#                      cPanel → SSH Access → Manage SSH Keys
+#   DEPLOY_SSH_PORT  — 21098 on Namecheap shared hosting (not 22)
+#
+# Optional GitHub variables (Settings → Variables → Actions):
+#   DEPLOY_PATH — repo path on the server (default: ~/pawpawcare)
+#   PHP_BIN     — PHP CLI to use remotely (default: php). On Namecheap this
+#                 may need e.g. /opt/alt/php85/usr/bin/php if the SSH shell's
+#                 default `php` is older than the domain's PHP version.
+
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    outputs:
+      deployable: ${{ steps.gate.outputs.deployable }}
+    steps:
+      - uses: actions/checkout@v5
+
+      # secrets aren't readable in job-level `if`, so surface the check here.
+      - name: Check deploy secrets exist
+        id: gate
+        run: echo "deployable=${{ secrets.DEPLOY_SSH_HOST != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_sqlite, mbstring, bcmath, zip, intl, gd
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v5
+        with:
+          path: backend/vendor
+          key: composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run tests
+        run: php artisan test
+
+  deploy:
+    name: SSH deploy to api.pawpawcare.app
+    needs: test
+    # Skips (instead of failing) until the SSH secrets are configured.
+    if: ${{ needs.test.outputs.deployable == 'true' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_SSH_HOST }}
+          username: ${{ secrets.DEPLOY_SSH_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_SSH_PORT }}
+          script_stop: true
+          script: |
+            export PHP_BIN="${{ vars.PHP_BIN || 'php' }}"
+            cd ${{ vars.DEPLOY_PATH || '~/pawpawcare' }}
+            git fetch origin main
+            git reset --hard origin/main
+            cd backend
+            "$PHP_BIN" "$(command -v composer || echo $HOME/bin/composer)" install --no-dev --optimize-autoloader --no-interaction
+            "$PHP_BIN" artisan migrate --force
+            "$PHP_BIN" artisan config:cache
+            "$PHP_BIN" artisan route:cache
+            "$PHP_BIN" artisan queue:restart || true
+
+      - name: Health check
+        run: |
+          sleep 5
+          status=$(curl -s -o /dev/null -w "%{http_code}" -m 20 https://api.pawpawcare.app/health)
+          body=$(curl -s -m 20 https://api.pawpawcare.app/health)
+          echo "GET /health -> $status $body"
+          test "$status" = "200" && echo "$body" | grep -q '"status":"ok"'
