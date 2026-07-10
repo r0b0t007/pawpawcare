@@ -28,11 +28,20 @@ const getItem = (key) =>
 const deleteItem = (key) =>
   useSecureStore ? SecureStore.deleteItemAsync(key) : AsyncStorage.removeItem(key);
 
+// Write-through cache: this module is the only writer, so after the first
+// disk read every getTokens() is memory-only (keychain IPC is per-call slow,
+// and request() calls this on every API hit). Also makes the legacy
+// migration single-flight under the startup request fan-out.
+let cached = null;
+let loadPromise = null;
+
 export async function storeTokens(accessToken, refreshToken) {
+  cached = { access: accessToken, refresh: refreshToken };
   await Promise.all([setItem(KEYS.ACCESS, accessToken), setItem(KEYS.REFRESH, refreshToken)]);
 }
 
 export async function clearTokens() {
+  cached = { access: null, refresh: null };
   await Promise.all([
     deleteItem(KEYS.ACCESS),
     deleteItem(KEYS.REFRESH),
@@ -51,11 +60,26 @@ async function migrateLegacyTokens() {
   return null;
 }
 
-export async function getTokens() {
+async function loadTokens() {
   const [access, refresh] = await Promise.all([getItem(KEYS.ACCESS), getItem(KEYS.REFRESH)]);
   if (access || refresh) return { access, refresh };
 
   // Nothing under the new keys — pick up a session stored before SecureStore.
   const migrated = await migrateLegacyTokens();
   return migrated ?? { access: null, refresh: null };
+}
+
+export async function getTokens() {
+  if (cached) return cached;
+  if (!loadPromise) {
+    loadPromise = loadTokens()
+      .then((tokens) => {
+        cached = tokens;
+        return tokens;
+      })
+      .finally(() => {
+        loadPromise = null; // a failed load retries on the next call
+      });
+  }
+  return loadPromise;
 }
