@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { get, post, patch, request, storeTokens, clearTokens } from '../services/api';
+import { get, post, patch, request, getTokens, storeTokens, clearTokens } from '../services/api';
 import {
   registerForPushNotificationsAsync,
   deviceTimezone,
@@ -101,8 +101,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     try {
-      const { refresh } = await AsyncStorage.multiGet(['@pawpawcare/refresh_token'])
-        .then((p) => ({ refresh: p[0][1] }));
+      const { refresh } = await getTokens();
       if (refresh) await post('/auth/logout', { refresh_token: refresh }).catch(() => {});
     } catch (_) {}
     await deregisterDevice();
