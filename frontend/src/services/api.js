@@ -1,29 +1,9 @@
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config';
+import { getTokens, storeTokens, clearTokens } from './tokenStorage';
 
-const KEYS = {
-  ACCESS: '@pawpawcare/access_token',
-  REFRESH: '@pawpawcare/refresh_token',
-};
-
-// ── Token storage ─────────────────────────────────────────────────────────────
-
-export async function storeTokens(accessToken, refreshToken) {
-  await AsyncStorage.multiSet([
-    [KEYS.ACCESS, accessToken],
-    [KEYS.REFRESH, refreshToken],
-  ]);
-}
-
-export async function clearTokens() {
-  await AsyncStorage.multiRemove([KEYS.ACCESS, KEYS.REFRESH]);
-}
-
-async function getTokens() {
-  const pairs = await AsyncStorage.multiGet([KEYS.ACCESS, KEYS.REFRESH]);
-  return { access: pairs[0][1], refresh: pairs[1][1] };
-}
+// Re-exported so callers keep one import surface for auth plumbing.
+export { getTokens, storeTokens, clearTokens };
 
 // ── Token refresh (deduplicated so parallel 401s only refresh once) ───────────
 
