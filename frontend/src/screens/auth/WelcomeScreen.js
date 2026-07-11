@@ -1,18 +1,17 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useObserve } from '../../services/observe';
-import { colors, typography, spacing, radii, shadows } from '../../theme';
+import { ui, PET_COLOR_PAIRS } from '../../theme';
 
-const { width } = Dimensions.get('window');
+// Logged-out landing screen: warm hero + one primary path (Signup) and a text
+// link for returning users. Redesign direction 1g — flat surfaces, one accent.
 
-const FEATURES = [
-  { icon: 'paw', label: 'Multiple Pets', bg: '#ffddb8', color: '#653e00' },
-  { icon: 'needle', label: 'Vaccinations', bg: '#c5e7ff', color: '#004c6a' },
-  { icon: 'food-drumstick-outline', label: 'Favorite Foods', bg: '#d8e2ff', color: '#085ac0' },
-  { icon: 'account-group-outline', label: 'Community', bg: '#b2f2d4', color: '#1a6b3a' },
+const PACK = [
+  { initial: 'B', ...PET_COLOR_PAIRS[0] },
+  { initial: 'M', ...PET_COLOR_PAIRS[1] },
+  { initial: 'K', ...PET_COLOR_PAIRS[2] },
 ];
 
 export default function WelcomeScreen({ navigation }) {
@@ -23,154 +22,110 @@ export default function WelcomeScreen({ navigation }) {
   }, [markInteractive]);
 
   return (
-    <View style={styles.root}>
-      <LinearGradient
-        colors={['#fff8f4', '#fef1e7', '#fce8d8']}
-        style={StyleSheet.absoluteFillObject}
-      />
-      {/* Decorative blobs */}
-      <View style={[styles.blob, styles.blob1]} />
-      <View style={[styles.blob, styles.blob2]} />
-      <View style={[styles.blob, styles.blob3]} />
-
-      <SafeAreaView style={styles.container}>
-        {/* Logo + Brand */}
-        <View style={styles.logoArea}>
-          <View style={styles.logoRing}>
-            <View style={styles.logoBox}>
-              <MaterialCommunityIcons name="paw" size={46} color={colors.primaryContainer} />
-            </View>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      <View style={styles.container}>
+        <View style={styles.hero}>
+          <View style={styles.logoBox}>
+            <MaterialCommunityIcons name="paw" size={36} color={ui.accentTint} />
           </View>
-          <Text style={styles.appName}>PawPawCare</Text>
-          <Text style={styles.tagline}>Health & happiness for your pets</Text>
+          <Text style={styles.headline}>Every tail,{'\n'}on track.</Text>
+          <Text style={styles.tagline}>
+            Vaccines, vet visits and daily care for all your pets — in one calm place.
+          </Text>
         </View>
 
-        {/* Feature cards grid */}
-        <View style={styles.grid}>
-          {FEATURES.map((f) => (
-            <View key={f.label} style={[styles.featureCard, { backgroundColor: f.bg }]}>
-              <View style={[styles.featureIconWrap, { backgroundColor: 'rgba(255,255,255,0.6)' }]}>
-                <MaterialCommunityIcons name={f.icon} size={24} color={f.color} />
+        <View style={styles.footer}>
+          <View style={styles.packRow}>
+            {PACK.map((p, i) => (
+              <View
+                key={p.initial}
+                style={[
+                  styles.packAvatar,
+                  { backgroundColor: p.bg },
+                  i > 0 && styles.packAvatarOverlap,
+                ]}
+              >
+                <Text style={[styles.packInitial, { color: p.fg }]}>{p.initial}</Text>
               </View>
-              <Text style={[styles.featureLabel, { color: f.color }]}>{f.label}</Text>
-            </View>
-          ))}
-        </View>
+            ))}
+            <Text style={styles.packCaption}>Built for multi-pet homes</Text>
+          </View>
 
-        {/* CTAs */}
-        <View style={styles.ctas}>
-          <TouchableOpacity
-            style={styles.primaryBtn}
+          <Pressable
+            style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
             onPress={() => navigation.navigate('Signup')}
-            activeOpacity={0.88}
           >
-            <MaterialCommunityIcons name="paw" size={18} color={colors.onPrimary} />
-            <Text style={styles.primaryBtnText}>Get Started</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.secondaryBtn}
+            <Text style={styles.primaryBtnText}>Get started</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.loginLink, pressed && { opacity: 0.7 }]}
             onPress={() => navigation.navigate('Login')}
-            activeOpacity={0.88}
+            hitSlop={{ top: 6, bottom: 6, left: 12, right: 12 }}
           >
-            <Text style={styles.secondaryBtnText}>Already have an account? Log In</Text>
-          </TouchableOpacity>
+            <Text style={styles.loginLinkText}>I already have an account</Text>
+          </Pressable>
         </View>
-      </SafeAreaView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
-const CARD_W = (width - spacing.margin * 2 - spacing.sm) / 2;
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  blob: { position: 'absolute', borderRadius: radii.full, opacity: 0.18 },
-  blob1: { width: 340, height: 340, backgroundColor: colors.primaryFixed, top: -120, right: -110 },
-  blob2: { width: 240, height: 240, backgroundColor: colors.tertiaryFixed, bottom: 100, left: -80 },
-  blob3: { width: 120, height: 120, backgroundColor: colors.secondaryFixed, top: '45%', right: -20 },
+  safe: { flex: 1, backgroundColor: ui.background },
   container: {
     flex: 1,
-    paddingHorizontal: spacing.margin,
-    justifyContent: 'space-evenly',
-    paddingBottom: spacing.md,
+    justifyContent: 'space-between',
+    paddingTop: 40,
+    paddingHorizontal: 32,
+    paddingBottom: 20,
   },
-  logoArea: { alignItems: 'center' },
-  logoRing: {
-    width: 116,
-    height: 116,
-    borderRadius: radii.full,
-    backgroundColor: 'rgba(253,185,101,0.18)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
+  hero: { gap: 22 },
   logoBox: {
-    width: 92,
-    height: 92,
-    borderRadius: radii.full,
-    backgroundColor: colors.primaryFixed,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.medium,
-  },
-  appName: {
-    ...typography.headlineLg,
-    color: colors.primaryContainer,
-    marginBottom: spacing.xs,
-    letterSpacing: -0.5,
-  },
-  tagline: { ...typography.bodyMd, color: colors.onSurfaceVariant },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    justifyContent: 'center',
-  },
-  featureCard: {
-    width: CARD_W,
-    height: 118,
-    borderRadius: radii.xl,
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    borderCurve: 'continuous',
+    backgroundColor: ui.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    ...shadows.card,
   },
-  featureIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
+  headline: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 42,
+    lineHeight: 45,
+    letterSpacing: -1.2,
+    color: ui.ink,
   },
-  featureLabel: {
-    ...typography.labelMd,
-    textAlign: 'center',
-    fontSize: 13,
-  },
-  ctas: { gap: spacing.sm },
-  primaryBtn: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    borderRadius: radii.xl,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: spacing.base,
-    ...shadows.button,
-  },
-  primaryBtnText: {
-    ...typography.labelMd,
-    color: colors.onPrimary,
+  tagline: {
+    fontFamily: 'PlusJakartaSans_400Regular',
     fontSize: 16,
+    lineHeight: 25,
+    color: ui.sub,
+    maxWidth: 280,
   },
-  secondaryBtn: {
-    paddingVertical: spacing.sm,
+  footer: { gap: 14 },
+  packRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  packAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: ui.background,
+  },
+  packAvatarOverlap: { marginLeft: -26 },
+  packInitial: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 18 },
+  packCaption: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: ui.subtle },
+  primaryBtn: {
+    paddingVertical: 17,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    backgroundColor: ui.accent,
     alignItems: 'center',
   },
-  secondaryBtnText: {
-    ...typography.labelMd,
-    color: colors.primaryContainer,
-    fontSize: 14,
-  },
+  primaryBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: '#ffffff' },
+  loginLink: { alignItems: 'center', paddingVertical: 6 },
+  loginLinkText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: ui.accent },
 });

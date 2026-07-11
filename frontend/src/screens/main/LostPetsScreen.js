@@ -1,12 +1,17 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Linking, Alert,
+  View, Text, ScrollView, StyleSheet, RefreshControl, Linking, Pressable, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { colors, typography, spacing, radii, shadows } from '../../theme';
+import { ui, type, PET_COLOR_PAIRS } from '../../theme';
+import { Card, Button, ConfirmDialog, showToast } from '../../components';
+
+// Redesign: this pushed screen is now the report/manage surface — the board
+// itself lives inline in Community's "Lost pets" section. Report form on top,
+// then your active reports (mark as found), then everyone else's.
 
 function timeAgo(iso) {
   if (!iso) return '';
@@ -16,10 +21,27 @@ function timeAgo(iso) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+function missingFor(iso) {
+  if (!iso) return 'Missing';
+  const days = Math.floor((Date.now() - new Date(iso)) / 86400000);
+  if (days < 1) return 'Missing today';
+  return `Missing ${days} day${days === 1 ? '' : 's'}`;
+}
+
+const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
+
 export default function LostPetsScreen({ navigation }) {
-  const { lostPets, refreshLostPets, resolveLostPet } = useData();
+  const {
+    pets, lostPets, myReports, refreshLostPets, reportPetLost, resolveLostPet,
+  } = useData();
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedPetId, setSelectedPetId] = useState(null);
+  const [lastSeen, setLastSeen] = useState('');
+  const [note, setNote] = useState('');
+  const [phone, setPhone] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, action }
 
   useEffect(() => { refreshLostPets(); }, []);
 
@@ -29,181 +51,314 @@ export default function LostPetsScreen({ navigation }) {
     setRefreshing(false);
   }, [refreshLostPets]);
 
-  const onMarkFound = (report) => {
-    Alert.alert('Mark as found', `Has ${report.petName} been found safe?`, [
-      { text: 'Not yet', style: 'cancel' },
-      { text: 'Found!', onPress: () => resolveLostPet(report.id) },
-    ]);
+  const activeReports = myReports.filter((r) => r.status !== 'resolved');
+  const reportedPetIds = new Set(activeReports.map((r) => r.petId));
+  const otherReports = lostPets.filter((r) => r.reportedBy !== user?.id);
+
+  const selectPet = (pet) => {
+    if (reportedPetIds.has(pet.id)) {
+      showToast(`${pet.name} is already on the board`);
+      return;
+    }
+    setSelectedPetId((prev) => (prev === pet.id ? null : pet.id));
   };
 
-  return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={colors.onBackground} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Lost Pets</Text>
-        <View style={{ width: 40 }} />
-      </View>
+  const handleSubmit = async () => {
+    if (!selectedPetId || submitting) return;
+    const pet = pets.find((p) => p.id === selectedPetId);
+    setSubmitting(true);
+    await reportPetLost(selectedPetId, {
+      lastSeenLocation: lastSeen.trim(),
+      description: note.trim(),
+      contactPhone: phone.trim(),
+    });
+    setSubmitting(false);
+    setSelectedPetId(null);
+    setLastSeen('');
+    setNote('');
+    setPhone('');
+    showToast(`${pet?.name || 'Your pet'} posted to the board`);
+  };
 
+  const handleMarkFound = (report) => setConfirm({
+    title: 'Mark as found?',
+    message: `Has ${report.petName} been found safe?`,
+    confirmLabel: 'Found!',
+    action: async () => { await resolveLostPet(report.id); showToast('Welcome home!'); },
+  });
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primaryContainer} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
-        {lostPets.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <MaterialCommunityIcons name="heart-outline" size={34} color={colors.primaryContainer} />
-            </View>
-            <Text style={styles.emptyTitle}>No pets reported lost</Text>
-            <Text style={styles.emptySub}>Good news — every pet in the community is home safe.</Text>
-          </View>
-        ) : (
-          lostPets.map((r) => {
-            const mine = r.reportedBy === user?.id;
-            return (
-              <View key={r.id} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View style={[styles.avatar, { backgroundColor: r.petColor || colors.primaryFixed }]}>
-                    <Text style={styles.avatarText}>{(r.petName || '?')[0]}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.petName}>{r.petName}</Text>
-                      <View style={styles.lostBadge}>
-                        <MaterialCommunityIcons name="alert" size={11} color={colors.onErrorContainer} />
-                        <Text style={styles.lostBadgeText}>LOST</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.meta}>
-                      {r.petType ? `${r.petType} · ` : ''}reported by {mine ? 'you' : r.reporterName || 'someone'} · {timeAgo(r.createdAt)}
-                    </Text>
-                  </View>
-                </View>
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable
+            style={({ pressed }) => [styles.backBtn, pressed && { borderColor: ui.faint }]}
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Report missing pet</Text>
+        </View>
+        <Text style={styles.intro}>
+          Your report is shared with owners nearby. Most pets are reunited within 48 hours.
+        </Text>
 
+        {/* Report form */}
+        <View style={styles.form}>
+          <View>
+            <Text style={styles.fieldLabel}>Which pet?</Text>
+            {pets.length === 0 ? (
+              <Text style={styles.noPets}>Add a pet to your profile first, then report it here.</Text>
+            ) : (
+              <View style={styles.petChips}>
+                {pets.map((pet) => {
+                  const selected = selectedPetId === pet.id;
+                  const reported = reportedPetIds.has(pet.id);
+                  return (
+                    <Pressable
+                      key={pet.id}
+                      onPress={() => selectPet(pet)}
+                      style={[
+                        styles.petChip,
+                        selected && styles.petChipSelected,
+                        reported && { opacity: 0.45 },
+                      ]}
+                    >
+                      <View style={[styles.petChipAvatar, { backgroundColor: pet.color || ui.accentTint }]}>
+                        <Text style={[styles.petChipInitial, { color: petFg(pet.color) }]}>
+                          {(pet.name || '?')[0]}
+                        </Text>
+                      </View>
+                      <Text style={styles.petChipLabel}>{pet.name}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          <View>
+            <Text style={styles.fieldLabel}>Last seen</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Marina Park, near the fountain"
+              placeholderTextColor={ui.subtle}
+              value={lastSeen}
+              onChangeText={setLastSeen}
+            />
+          </View>
+
+          <View>
+            <Text style={styles.fieldLabel}>Anything helpers should know</Text>
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              placeholder="Collar color, temperament, responds to…"
+              placeholderTextColor={ui.subtle}
+              value={note}
+              onChangeText={setNote}
+              multiline
+            />
+          </View>
+
+          <View>
+            <Text style={styles.fieldLabel}>Contact number</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="So helpers can reach you"
+              placeholderTextColor={ui.subtle}
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+            />
+          </View>
+
+          <Button
+            label={submitting ? 'Posting…' : 'Post to the board'}
+            onPress={handleSubmit}
+            disabled={!selectedPetId || submitting}
+          />
+        </View>
+
+        {/* Your active reports */}
+        {activeReports.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Your active reports</Text>
+            {activeReports.map((r) => (
+              <Card key={r.id} padded style={styles.reportCard}>
+                <View style={styles.reportTitleRow}>
+                  <Text style={styles.reportTitle} numberOfLines={1}>
+                    {r.petName}
+                    {r.petType ? ` — ${r.petType}` : ''}
+                  </Text>
+                  <Text style={styles.reportMissing}>{missingFor(r.createdAt)}</Text>
+                </View>
                 {r.lastSeenLocation ? (
-                  <View style={styles.infoRow}>
-                    <MaterialCommunityIcons name="map-marker-outline" size={16} color={colors.tertiary} />
-                    <Text style={styles.infoText}>Last seen near {r.lastSeenLocation}</Text>
+                  <View style={styles.metaRow}>
+                    <MaterialCommunityIcons name="map-marker-outline" size={15} color={ui.subtle} />
+                    <Text style={styles.metaText}>Last seen near {r.lastSeenLocation}</Text>
                   </View>
                 ) : null}
-                {r.description ? <Text style={styles.desc}>{r.description}</Text> : null}
-
-                <View style={styles.actions}>
-                  {r.contactPhone ? (
-                    <TouchableOpacity
-                      style={styles.contactBtn}
-                      onPress={() => Linking.openURL(`tel:${r.contactPhone}`).catch(() => {})}
-                      activeOpacity={0.88}
-                    >
-                      <MaterialCommunityIcons name="phone" size={15} color={colors.onPrimary} />
-                      <Text style={styles.contactBtnText}>Contact owner</Text>
-                    </TouchableOpacity>
-                  ) : <View style={{ flex: 1 }} />}
-                  {mine && (
-                    <TouchableOpacity style={styles.foundBtn} onPress={() => onMarkFound(r)} activeOpacity={0.88}>
-                      <MaterialCommunityIcons name="check-circle-outline" size={15} color={colors.successFg} />
-                      <Text style={styles.foundBtnText}>Mark found</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            );
-          })
+                {r.description ? <Text style={styles.reportDesc}>{r.description}</Text> : null}
+                <Pressable
+                  onPress={() => handleMarkFound(r)}
+                  style={({ pressed }) => [styles.foundBtn, pressed && { opacity: 0.85 }]}
+                >
+                  <Text style={styles.foundBtnText}>Mark as found</Text>
+                </Pressable>
+              </Card>
+            ))}
+          </View>
         )}
+
+        {/* Other reports */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Reported nearby</Text>
+          {otherReports.length === 0 ? (
+            <View style={styles.empty}>
+              <MaterialCommunityIcons name="heart-outline" size={30} color={ui.faint} />
+              <Text style={styles.emptyTitle}>No pets reported lost</Text>
+              <Text style={styles.emptyText}>Good news — every pet in the community is home safe.</Text>
+            </View>
+          ) : (
+            otherReports.map((r) => (
+              <Card key={r.id} padded style={styles.reportCard}>
+                <View style={styles.reportTitleRow}>
+                  <Text style={styles.reportTitle} numberOfLines={1}>
+                    {r.petName}
+                    {r.petType ? ` — ${r.petType}` : ''}
+                  </Text>
+                  <Text style={styles.reportMissing}>{missingFor(r.createdAt)}</Text>
+                </View>
+                <View style={styles.metaRow}>
+                  <MaterialCommunityIcons name="account-outline" size={15} color={ui.subtle} />
+                  <Text style={styles.metaText}>
+                    Reported by {r.reporterName || 'someone'} · {timeAgo(r.createdAt)}
+                  </Text>
+                </View>
+                {r.lastSeenLocation ? (
+                  <View style={styles.metaRow}>
+                    <MaterialCommunityIcons name="map-marker-outline" size={15} color={ui.subtle} />
+                    <Text style={styles.metaText}>Last seen near {r.lastSeenLocation}</Text>
+                  </View>
+                ) : null}
+                {r.description ? <Text style={styles.reportDesc}>{r.description}</Text> : null}
+                {r.contactPhone ? (
+                  <Button
+                    icon="phone"
+                    label="Contact owner"
+                    onPress={() => Linking.openURL(`tel:${r.contactPhone}`).catch(() => {})}
+                  />
+                ) : null}
+              </Card>
+            ))
+          )}
+        </View>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => { const a = confirm?.action; setConfirm(null); a?.(); }}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.margin,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    backgroundColor: colors.surfaceContainerLow,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: { ...typography.titleLg, color: colors.onBackground },
-  scroll: { paddingHorizontal: spacing.margin, paddingBottom: spacing.xl, gap: spacing.sm },
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii.xl,
-    padding: spacing.md,
-    ...shadows.card,
+  safe: { flex: 1, backgroundColor: ui.background },
+  scroll: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 32 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8 },
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: ui.surface,
     borderWidth: 1,
-    borderColor: colors.errorContainer,
-    gap: spacing.sm,
-  },
-  cardTop: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
-  avatar: { width: 46, height: 46, borderRadius: radii.full, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { ...typography.headlineMd, fontSize: 20, color: colors.primaryContainer },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  petName: { ...typography.titleLg, color: colors.onSurface, fontSize: 17 },
-  lostBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: colors.errorContainer,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: radii.full,
-  },
-  lostBadgeText: { ...typography.labelSm, color: colors.onErrorContainer, fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold' },
-  meta: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 2 },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  infoText: { ...typography.bodyMd, fontSize: 14, color: colors.onSurface },
-  desc: { ...typography.bodyMd, fontSize: 14, color: colors.onSurfaceVariant, lineHeight: 20 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
-  contactBtn: {
-    flexDirection: 'row',
+    borderColor: ui.border,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.primaryContainer,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.full,
-    flex: 1,
-    ...shadows.button,
   },
-  contactBtnText: { ...typography.labelMd, color: colors.onPrimary },
-  foundBtn: {
+  headerTitle: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 22,
+    letterSpacing: -0.3,
+    color: ui.ink,
+  },
+  intro: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
+    color: ui.sub,
+    marginBottom: 22,
+  },
+  form: { gap: 20 },
+  fieldLabel: { ...type.sectionLabel, color: ui.subtle, marginBottom: 8 },
+  noPets: { ...type.secondary, color: ui.sub },
+  petChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  petChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: radii.full,
+    gap: 7,
+    paddingVertical: 7,
+    paddingRight: 14,
+    paddingLeft: 7,
+    borderRadius: 999,
+    backgroundColor: ui.surface,
+    borderWidth: 1,
+    borderColor: ui.border,
+  },
+  petChipSelected: { backgroundColor: ui.accentTint, borderColor: ui.accent },
+  petChipAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  petChipInitial: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11 },
+  petChipLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.ink },
+  input: {
     borderWidth: 1.5,
-    borderColor: colors.successFg,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: 14,
+    padding: 14,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
+    color: ui.ink,
   },
-  foundBtnText: { ...typography.labelMd, color: colors.successFg, fontSize: 13 },
-  empty: { alignItems: 'center', paddingTop: spacing.xl, gap: spacing.sm },
-  emptyIcon: {
-    width: 76,
-    height: 76,
-    borderRadius: radii.full,
-    backgroundColor: colors.primaryFixed,
-    justifyContent: 'center',
+  inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
+  section: { marginTop: 28, gap: 12 },
+  sectionLabel: { ...type.sectionLabel, color: ui.subtle },
+  reportCard: { gap: 12 },
+  reportTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 10,
+  },
+  reportTitle: { flex: 1, fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, color: ui.ink },
+  reportMissing: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: ui.danger },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metaText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5, color: ui.subtle, flex: 1 },
+  reportDesc: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, lineHeight: 19, color: ui.sub },
+  foundBtn: {
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: ui.successTint,
   },
-  emptyTitle: { ...typography.titleLg, color: colors.onBackground },
-  emptySub: { ...typography.bodyMd, fontSize: 14, color: colors.onSurfaceVariant, textAlign: 'center', paddingHorizontal: spacing.md },
+  foundBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.success },
+  empty: { alignItems: 'center', gap: 6, paddingVertical: 28 },
+  emptyTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: ui.ink, marginTop: 6 },
+  emptyText: { ...type.secondary, color: ui.sub, textAlign: 'center' },
 });

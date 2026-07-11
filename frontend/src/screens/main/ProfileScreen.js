@@ -1,20 +1,57 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { getPref, setPref } from '../../services/prefs';
+import { scheduleLocalReminders, cancelAllLocalReminders } from '../../services/notifications';
 import { ui, type } from '../../theme';
 import { Card, ListRow, ConfirmDialog } from '../../components';
 
-// The Profile tab: account card + sharing entry points + a guarded log out.
-// Replaces the user card that used to live on the deleted Schedule screen.
-// Phase 5 adds notification toggles, units and export.
+// The Profile tab: account card (+ Edit → AccountDetails), notification
+// toggles, sharing entry points and a guarded log out.
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
-  const { invites } = useData();
+  const { invites, reminders } = useData();
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [careReminders, setCareReminders] = useState(true);
+  const [communityDigest, setCommunityDigest] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([getPref('careReminders', true), getPref('communityDigest', true)]).then(
+      ([care, digest]) => {
+        if (!alive) return;
+        setCareReminders(!!care);
+        setCommunityDigest(!!digest);
+      },
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Real behavior: OFF cancels every pending local notification; ON reschedules
+  // from the current reminder list (scheduleLocalReminders reads the pref, so
+  // persist first).
+  const toggleCareReminders = async (value) => {
+    setCareReminders(value);
+    await setPref('careReminders', value);
+    if (value) {
+      scheduleLocalReminders(reminders);
+    } else {
+      cancelAllLocalReminders();
+    }
+  };
+
+  // Device-local preference only — there is no digest backend yet, so nothing
+  // else to wire.
+  const toggleCommunityDigest = (value) => {
+    setCommunityDigest(value);
+    setPref('communityDigest', value);
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -29,6 +66,45 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.userName}>{user?.name}</Text>
             <Text style={styles.userEmail}>{user?.email}</Text>
           </View>
+          <Pressable
+            onPress={() => navigation.navigate('AccountDetails')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={styles.editLink}>Edit</Text>
+          </Pressable>
+        </Card>
+
+        <Text style={[type.sectionLabel, styles.sectionLabel]}>Notifications</Text>
+        <Card style={styles.sectionCard}>
+          <ListRow
+            icon="bell-outline"
+            title="Care reminders"
+            subtitle="Vaccines, meds, vet visits"
+            right={
+              <Switch
+                value={careReminders}
+                onValueChange={toggleCareReminders}
+                trackColor={{ false: ui.track, true: ui.accent }}
+                thumbColor="#ffffff"
+                ios_backgroundColor={ui.track}
+              />
+            }
+          />
+          <ListRow
+            icon="newspaper-variant-outline"
+            title="Community digest"
+            subtitle="Weekly highlights from your groups"
+            right={
+              <Switch
+                value={communityDigest}
+                onValueChange={toggleCommunityDigest}
+                trackColor={{ false: ui.track, true: ui.accent }}
+                thumbColor="#ffffff"
+                ios_backgroundColor={ui.track}
+              />
+            }
+            last
+          />
         </Card>
 
         <Text style={[type.sectionLabel, styles.sectionLabel]}>Sharing & data</Text>
@@ -102,6 +178,7 @@ const styles = StyleSheet.create({
     color: ui.sub,
     marginTop: 1,
   },
+  editLink: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.accent },
   sectionLabel: { color: ui.subtle, marginHorizontal: 24, marginBottom: 8 },
   sectionCard: { marginHorizontal: 24, marginBottom: 22 },
   badge: {
