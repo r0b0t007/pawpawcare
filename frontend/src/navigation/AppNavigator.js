@@ -14,6 +14,7 @@ import DashboardScreen from '../screens/main/DashboardScreen';
 import PetsListScreen from '../screens/main/PetsListScreen';
 import PetProfileScreen from '../screens/main/PetProfileScreen';
 import AddPetScreen from '../screens/main/AddPetScreen';
+import EditPetScreen from '../screens/main/EditPetScreen';
 import VaccinationTrackerScreen from '../screens/main/VaccinationTrackerScreen';
 import CommunityScreen from '../screens/main/CommunityScreen';
 import HealthHubScreen from '../screens/main/HealthHubScreen';
@@ -54,6 +55,7 @@ function PetsStack() {
       <Stack.Screen name="PetsList" component={PetsListScreen} />
       <Stack.Screen name="PetProfile" component={PetProfileScreen} />
       <Stack.Screen name="AddPet" component={AddPetScreen} />
+      <Stack.Screen name="EditPet" component={EditPetScreen} />
       <Stack.Screen name="VaccinationTracker" component={VaccinationTrackerScreen} />
       <Stack.Screen name="MedicalRecords" component={MedicalRecordsScreen} />
     </Stack.Navigator>
