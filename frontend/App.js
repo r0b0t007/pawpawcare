@@ -18,6 +18,7 @@ import { ObserveRoot, ObserveNavigationContainer, configureObserve } from './src
 
 import { AuthProvider } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
+import { ToastHost } from './src/components';
 import { trackScreen } from './src/services/analytics';
 import AppNavigator from './src/navigation/AppNavigator';
 
@@ -71,6 +72,7 @@ function App() {
             >
               <StatusBar style="dark" backgroundColor="#fff8f4" />
               <AppNavigator />
+              <ToastHost />
             </ObserveNavigationContainer>
           </DataProvider>
         </AuthProvider>
