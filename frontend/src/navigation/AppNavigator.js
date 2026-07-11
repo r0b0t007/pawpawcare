@@ -19,6 +19,7 @@ import VaccinationTrackerScreen from '../screens/main/VaccinationTrackerScreen';
 import CommunityScreen from '../screens/main/CommunityScreen';
 import HealthHubScreen from '../screens/main/HealthHubScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import AccountDetailsScreen from '../screens/main/AccountDetailsScreen';
 import NotificationsScreen from '../screens/main/NotificationsScreen';
 import RemindersScreen from '../screens/main/RemindersScreen';
 import LostPetsScreen from '../screens/main/LostPetsScreen';
@@ -30,7 +31,7 @@ const Tab = createBottomTabNavigator();
 
 function AuthStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
@@ -89,6 +90,7 @@ function ProfileStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
+      <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} />
       <Stack.Screen name="Invites" component={InvitesScreen} />
     </Stack.Navigator>
   );

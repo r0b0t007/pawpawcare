@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
+import { getPref } from './prefs';
 
 // expo-notifications wires its push-token machinery at import time, and since
 // remote push was removed from Expo Go (SDK 53) that import THROWS there on
@@ -84,6 +85,10 @@ export async function registerForPushNotificationsAsync() {
  */
 export async function scheduleLocalReminders(reminders = []) {
   if (!Notifications) return;
+
+  // Respect the Profile → Notifications → "Care reminders" toggle: when the
+  // user turned local reminders off, never (re)schedule behind their back.
+  if (!(await getPref('careReminders', true))) return;
 
   try {
     await ensureAndroidChannel();

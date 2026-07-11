@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, Image, ActivityIndicator,
+  View, Text, ScrollView, StyleSheet, TextInput, Alert, Image,
+  ActivityIndicator, Linking, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,38 +9,55 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { resolveAsset } from '../../config';
-import { colors, typography, spacing, radii, shadows } from '../../theme';
+import { ui, type, PET_COLOR_PAIRS } from '../../theme';
+import { Card, Chip, Button, ConfirmDialog, showToast } from '../../components';
+
+// Redesign: one screen, three chip-switched sections (Feed / Groups / Lost
+// pets). The composer starts collapsed; lost-pet reporting lives on the
+// pushed LostPets screen — the section here only shows the board.
 
 function timeAgo(iso) {
   const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-const AVATAR_COLORS = ['#ffddb8', '#c5e7ff', '#d8e2ff', '#b2f2d4', '#ffd6e7', '#fff3b0'];
-function avatarColor(name) {
-  const i = name ? name.charCodeAt(0) % AVATAR_COLORS.length : 0;
-  return AVATAR_COLORS[i];
+function missingFor(iso) {
+  if (!iso) return 'Missing';
+  const days = Math.floor((Date.now() - new Date(iso)) / 86400000);
+  if (days < 1) return 'Missing today';
+  return `Missing ${days} day${days === 1 ? '' : 's'}`;
 }
 
-const GROUP_COLORS = [
-  { bg: '#ffddb8', accent: '#855300', icon: 'dog' },
-  { bg: '#c5e7ff', accent: '#004c6a', icon: 'cat' },
-  { bg: '#d8e2ff', accent: '#085ac0', icon: 'bird' },
-  { bg: '#b2f2d4', accent: '#1a6b3a', icon: 'rabbit' },
-  { bg: '#ffd6e7', accent: '#8b1a4a', icon: 'paw' },
+// Identity colors only — never UI chrome.
+const pairFor = (name) => PET_COLOR_PAIRS[name ? name.charCodeAt(0) % PET_COLOR_PAIRS.length : 0];
+
+const GROUP_ICONS = ['dog', 'cat', 'bird', 'rabbit', 'paw'];
+
+const SECTIONS = [
+  { key: 'feed', label: 'Feed' },
+  { key: 'groups', label: 'Groups' },
+  { key: 'lost', label: 'Lost pets' },
 ];
 
 export default function CommunityScreen({ navigation }) {
   const { user } = useAuth();
   const {
     posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets,
-    getComments, addComment, deleteComment,
+    getComments, addComment, deleteComment, refreshLostPets, resolveLostPet,
   } = useData();
+
+  const [section, setSection] = useState('feed');
+  const [composerOpen, setComposerOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [draftImage, setDraftImage] = useState(null);
   const [attaching, setAttaching] = useState(false);
+  const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, destructive, action }
+
+  useEffect(() => {
+    if (section === 'lost') refreshLostPets();
+  }, [section]);
 
   const attachImage = async () => {
     setAttaching(true);
@@ -56,175 +73,244 @@ export default function CommunityScreen({ navigation }) {
     await addPost(draft.trim(), draftImage);
     setDraft('');
     setDraftImage(null);
+    setComposerOpen(false);
+    showToast('Shared with the pack');
   };
 
+  const closeComposer = () => {
+    setDraft('');
+    setDraftImage(null);
+    setComposerOpen(false);
+  };
+
+  const handleToggleGroup = (group) => {
+    toggleGroupMembership(group.id);
+    showToast(group.isJoined ? `Left ${group.name}` : `Joined ${group.name}`);
+  };
+
+  const handleMarkFound = (report) => setConfirm({
+    title: 'Mark as found?',
+    message: `Has ${report.petName} been found safe?`,
+    confirmLabel: 'Found!',
+    action: async () => { await resolveLostPet(report.id); showToast('Welcome home!'); },
+  });
+
+  const handleSeen = (report) => {
+    if (report.contactPhone) {
+      Linking.openURL(`tel:${report.contactPhone}`).catch(() => {});
+    } else {
+      showToast('No contact number was shared');
+    }
+  };
+
+  const userPair = pairFor(user?.name);
+
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>Community</Text>
-            <Text style={styles.subtitle}>Connect with fellow pet owners</Text>
-          </View>
-          <View style={[styles.headerIcon, { backgroundColor: colors.primaryFixed }]}>
-            <MaterialCommunityIcons name="account-group-outline" size={22} color={colors.primaryContainer} />
-          </View>
-        </View>
+        <Text style={styles.title}>Community</Text>
 
-        {/* Lost Pets board entry */}
-        <TouchableOpacity
-          style={styles.lostBanner}
-          activeOpacity={0.9}
-          onPress={() => navigation.navigate('LostPets')}
-        >
-          <View style={styles.lostBannerIcon}>
-            <MaterialCommunityIcons name="map-marker-alert-outline" size={22} color={colors.onErrorContainer} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.lostBannerTitle}>Lost Pets Board</Text>
-            <Text style={styles.lostBannerSub}>
-              {lostPets && lostPets.length > 0
-                ? `${lostPets.length} pet${lostPets.length > 1 ? 's' : ''} missing nearby — help reunite them`
-                : 'Report a missing pet or help reunite one'}
-            </Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-right" size={22} color={colors.onErrorContainer} />
-        </TouchableOpacity>
-
-        {/* Join the Pack */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Join the Pack</Text>
-          <Text style={styles.groupCount}>{groups.filter(g => g.isJoined).length}/{groups.length} joined</Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupsRow}>
-          {groups.map((group, idx) => (
-            <GroupCard key={group.id} group={group} palette={GROUP_COLORS[idx % GROUP_COLORS.length]} onToggle={() => toggleGroupMembership(group.id)} />
+        {/* Section chips */}
+        <View style={styles.chipRow}>
+          {SECTIONS.map((s) => (
+            <Chip key={s.key} label={s.label} active={section === s.key} onPress={() => setSection(s.key)} />
           ))}
-        </ScrollView>
-
-        {/* Create Post */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Share a Moment</Text>
-        </View>
-        <View style={styles.createPost}>
-          <View style={[styles.createAvatar, { backgroundColor: avatarColor(user?.name) }]}>
-            <Text style={styles.createAvatarText}>{(user?.name || 'U')[0]}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <TextInput
-              style={styles.createInput}
-              placeholder="What's your pet up to?"
-              placeholderTextColor={colors.outlineVariant}
-              value={draft}
-              onChangeText={setDraft}
-              multiline
-            />
-          </View>
-          <TouchableOpacity
-            style={styles.attachBtn}
-            onPress={attachImage}
-            disabled={attaching}
-            activeOpacity={0.85}
-          >
-            {attaching
-              ? <ActivityIndicator size="small" color={colors.primaryContainer} />
-              : <MaterialCommunityIcons name="image-plus" size={19} color={colors.primaryContainer} />}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sendBtn, !draft.trim() && styles.sendBtnDisabled]}
-            onPress={handlePost}
-            disabled={!draft.trim()}
-            activeOpacity={0.88}
-          >
-            <MaterialCommunityIcons name="send" size={17} color={colors.onPrimary} />
-          </TouchableOpacity>
         </View>
 
-        {draftImage && (
-          <View style={styles.draftPreview}>
-            <Image source={{ uri: resolveAsset(draftImage) }} style={styles.draftPreviewImg} />
-            <TouchableOpacity
-              style={styles.draftRemove}
-              onPress={() => setDraftImage(null)}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            >
-              <MaterialCommunityIcons name="close" size={16} color={colors.onError} />
-            </TouchableOpacity>
+        {/* ── Feed ── */}
+        {section === 'feed' && (
+          <View>
+            {!composerOpen ? (
+              <Pressable
+                style={({ pressed }) => [styles.composerCollapsed, pressed && { borderColor: ui.faint }]}
+                onPress={() => setComposerOpen(true)}
+              >
+                <View style={[styles.composerAvatar, { backgroundColor: userPair.bg }]}>
+                  <Text style={[styles.composerAvatarText, { color: userPair.fg }]}>{(user?.name || 'U')[0]}</Text>
+                </View>
+                <Text style={styles.composerPlaceholder}>Share a moment…</Text>
+                <MaterialCommunityIcons name="camera-outline" size={19} color={ui.accent} />
+              </Pressable>
+            ) : (
+              <Card style={styles.composerCard}>
+                <TextInput
+                  style={styles.composerInput}
+                  placeholder="What's your pack up to?"
+                  placeholderTextColor={ui.subtle}
+                  value={draft}
+                  onChangeText={setDraft}
+                  multiline
+                  autoFocus
+                />
+                {draftImage && (
+                  <View style={styles.draftPreview}>
+                    <Image source={{ uri: resolveAsset(draftImage) }} style={styles.draftPreviewImg} />
+                    <Pressable
+                      style={styles.draftRemove}
+                      onPress={() => setDraftImage(null)}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
+                      <MaterialCommunityIcons name="close" size={15} color="#ffffff" />
+                    </Pressable>
+                  </View>
+                )}
+                <View style={styles.composerActions}>
+                  <Pressable onPress={attachImage} disabled={attaching} hitSlop={8}>
+                    {attaching
+                      ? <ActivityIndicator size="small" color={ui.accent} />
+                      : <MaterialCommunityIcons name="image-plus" size={20} color={ui.accent} />}
+                  </Pressable>
+                  <View style={{ flex: 1 }} />
+                  <Pressable onPress={closeComposer} hitSlop={8} style={styles.cancelBtn}>
+                    <Text style={styles.cancelText}>Cancel</Text>
+                  </Pressable>
+                  <Button pill label="Post" onPress={handlePost} disabled={!draft.trim()} />
+                </View>
+              </Card>
+            )}
+
+            <View style={styles.feedList}>
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  userId={user?.id}
+                  onPaw={() => togglePaw(post.id)}
+                  getComments={getComments}
+                  addComment={addComment}
+                  deleteComment={deleteComment}
+                />
+              ))}
+              {posts.length === 0 && (
+                <View style={styles.empty}>
+                  <MaterialCommunityIcons name="forum-outline" size={32} color={ui.faint} />
+                  <Text style={styles.emptyTitle}>No posts yet</Text>
+                  <Text style={styles.emptyText}>Be the first to share a moment with your pet!</Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
 
-        {/* Feed */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Feed</Text>
-          {posts.length > 0 && (
-            <Text style={styles.feedCount}>{posts.length} post{posts.length !== 1 ? 's' : ''}</Text>
-          )}
-        </View>
-        {posts.map((post) => (
-          <PostCard
-            key={post.id}
-            post={post}
-            userId={user?.id}
-            onPaw={() => togglePaw(post.id)}
-            getComments={getComments}
-            addComment={addComment}
-            deleteComment={deleteComment}
-          />
-        ))}
-        {posts.length === 0 && (
-          <View style={styles.empty}>
-            <View style={styles.emptyIllustration}>
-              <MaterialCommunityIcons name="forum-outline" size={36} color={colors.primaryContainer} />
-            </View>
-            <Text style={styles.emptyTitle}>No posts yet</Text>
-            <Text style={styles.emptyText}>Be the first to share a moment with your pet!</Text>
+        {/* ── Groups ── */}
+        {section === 'groups' && (
+          <View style={styles.groupList}>
+            {groups.map((group, idx) => {
+              const pair = PET_COLOR_PAIRS[idx % PET_COLOR_PAIRS.length];
+              const joined = group.isJoined;
+              return (
+                <Card key={group.id} style={styles.groupRow}>
+                  <View style={[styles.groupIcon, { backgroundColor: pair.bg }]}>
+                    <MaterialCommunityIcons name={GROUP_ICONS[idx % GROUP_ICONS.length]} size={24} color={pair.fg} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.groupName} numberOfLines={1}>{group.name}</Text>
+                    <Text style={styles.groupMembers}>{group.members} members</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => handleToggleGroup(group)}
+                    style={({ pressed }) => [
+                      styles.joinBtn,
+                      joined && styles.joinBtnJoined,
+                      pressed && { opacity: 0.85 },
+                    ]}
+                  >
+                    <Text style={[styles.joinBtnText, joined && styles.joinBtnTextJoined]}>
+                      {joined ? 'Joined' : 'Join'}
+                    </Text>
+                  </Pressable>
+                </Card>
+              );
+            })}
+            {groups.length === 0 && (
+              <View style={styles.empty}>
+                <MaterialCommunityIcons name="account-group-outline" size={32} color={ui.faint} />
+                <Text style={styles.emptyTitle}>No groups yet</Text>
+                <Text style={styles.emptyText}>Groups will appear here as the community grows.</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Lost pets ── */}
+        {section === 'lost' && (
+          <View style={styles.lostList}>
+            {lostPets.map((report) => {
+              const mine = report.reportedBy === user?.id;
+              return (
+                <Card key={report.id}>
+                  {report.photoUrl ? (
+                    <Image source={{ uri: resolveAsset(report.photoUrl) }} style={styles.lostPhoto} resizeMode="cover" />
+                  ) : null}
+                  <View style={styles.lostBody}>
+                    <View style={styles.lostTitleRow}>
+                      <Text style={styles.lostTitle} numberOfLines={1}>
+                        {report.petName}
+                        {report.petType ? ` — ${report.petType}` : ''}
+                      </Text>
+                      <Text style={styles.lostMissing}>{missingFor(report.createdAt)}</Text>
+                    </View>
+                    {report.description ? <Text style={styles.lostDesc}>{report.description}</Text> : null}
+                    {report.lastSeenLocation ? (
+                      <View style={styles.lostLocation}>
+                        <MaterialCommunityIcons name="map-marker-outline" size={15} color={ui.subtle} />
+                        <Text style={styles.lostLocationText}>Last seen near {report.lastSeenLocation}</Text>
+                      </View>
+                    ) : null}
+                    {mine ? (
+                      <Pressable
+                        onPress={() => handleMarkFound(report)}
+                        style={({ pressed }) => [styles.foundBtn, pressed && { opacity: 0.85 }]}
+                      >
+                        <Text style={styles.foundBtnText}>Mark as found</Text>
+                      </Pressable>
+                    ) : (
+                      <Button label="I've seen them" onPress={() => handleSeen(report)} />
+                    )}
+                  </View>
+                </Card>
+              );
+            })}
+            {lostPets.length === 0 && (
+              <View style={styles.empty}>
+                <MaterialCommunityIcons name="heart-outline" size={32} color={ui.faint} />
+                <Text style={styles.emptyTitle}>No pets reported lost</Text>
+                <Text style={styles.emptyText}>Good news — every pet in the community is home safe.</Text>
+              </View>
+            )}
+            <Pressable
+              style={({ pressed }) => [styles.reportBtn, pressed && { backgroundColor: '#fffdf8' }]}
+              onPress={() => navigation.navigate('LostPets')}
+            >
+              <MaterialCommunityIcons name="bullhorn-outline" size={19} color={ui.accent} />
+              <Text style={styles.reportBtnText}>Report a missing pet</Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
-  );
-}
 
-function GroupCard({ group, palette, onToggle }) {
-  const joined = group.isJoined;
-  return (
-    <View style={styles.groupCard}>
-      <View style={[styles.groupBanner, { backgroundColor: palette.bg }]}>
-        <MaterialCommunityIcons name={palette.icon} size={30} color={palette.accent} />
-      </View>
-      <View style={styles.groupInfo}>
-        <Text style={styles.groupName} numberOfLines={2}>{group.name}</Text>
-        <View style={styles.groupMeta}>
-          <MaterialCommunityIcons name="account-multiple-outline" size={12} color={colors.onSurfaceVariant} />
-          <Text style={styles.groupMetaText}>{group.members} members</Text>
-        </View>
-      </View>
-      <TouchableOpacity
-        style={[styles.joinBtn, joined && styles.joinBtnActive]}
-        onPress={onToggle}
-        activeOpacity={0.88}
-      >
-        {joined
-          ? <MaterialCommunityIcons name="check" size={14} color={colors.primaryContainer} />
-          : null
-        }
-        <Text style={[styles.joinBtnText, joined && styles.joinBtnTextActive]}>
-          {joined ? 'Joined' : 'Join'}
-        </Text>
-      </TouchableOpacity>
-    </View>
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        destructive={confirm?.destructive}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => { const a = confirm?.action; setConfirm(null); a?.(); }}
+      />
+    </SafeAreaView>
   );
 }
 
 function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment }) {
   const hasPawed = !!post.pawedByMe;
-  const bg = avatarColor(post.authorName);
+  const pair = pairFor(post.authorName);
 
   const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState(null); // null = never loaded
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
+  const [confirm, setConfirm] = useState(null); // comment pending deletion
 
   const toggleComments = async () => {
     const next = !expanded;
@@ -249,61 +335,46 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment 
     }
   };
 
-  const removeComment = (id) => {
-    Alert.alert('Delete comment', 'Remove this comment?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteComment(post.id, id);
-          setComments((prev) => (prev || []).filter((c) => c.id !== id));
-        },
-      },
-    ]);
+  const removeComment = async (id) => {
+    await deleteComment(post.id, id);
+    setComments((prev) => (prev || []).filter((c) => c.id !== id));
+    showToast('Comment deleted');
   };
 
+  const commentCount = comments ? comments.length : post.comments;
+
   return (
-    <View style={styles.postCard}>
+    <Card style={styles.postCard}>
       <View style={styles.postHeader}>
-        <View style={[styles.postAvatar, { backgroundColor: bg }]}>
-          <Text style={styles.postAvatarText}>{(post.authorName || '?')[0]}</Text>
+        <View style={[styles.postAvatar, { backgroundColor: pair.bg }]}>
+          <Text style={[styles.postAvatarText, { color: pair.fg }]}>{(post.authorName || '?')[0]}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.postAuthor}>{post.authorName}</Text>
           <Text style={styles.postTime}>{timeAgo(post.createdAt)}</Text>
         </View>
-        <TouchableOpacity style={styles.moreBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <MaterialCommunityIcons name="dots-horizontal" size={20} color={colors.onSurfaceVariant} />
-        </TouchableOpacity>
       </View>
       <Text style={styles.postContent}>{post.content}</Text>
       {post.imageUrl ? (
         <Image source={{ uri: resolveAsset(post.imageUrl) }} style={styles.postImage} resizeMode="cover" />
       ) : null}
-      <View style={styles.postDivider} />
       <View style={styles.postActions}>
-        <TouchableOpacity style={styles.actionBtn} onPress={onPaw} activeOpacity={0.85}>
+        <Pressable style={styles.actionBtn} onPress={onPaw} hitSlop={6}>
           <MaterialCommunityIcons
             name={hasPawed ? 'paw' : 'paw-outline'}
-            size={18}
-            color={hasPawed ? colors.primaryContainer : colors.onSurfaceVariant}
+            size={19}
+            color={hasPawed ? ui.accent : ui.sub}
           />
-          <Text style={[styles.actionText, hasPawed && { color: colors.primaryContainer }]}>
-            {post.paws} {post.paws === 1 ? 'Paw' : 'Paws'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={toggleComments} activeOpacity={0.85}>
+          <Text style={[styles.actionText, hasPawed && { color: ui.accent }]}>{post.paws}</Text>
+        </Pressable>
+        <Pressable style={styles.actionBtn} onPress={toggleComments} hitSlop={6}>
           <MaterialCommunityIcons
-            name={expanded ? 'comment' : 'comment-outline'}
-            size={18}
-            color={expanded ? colors.secondary : colors.onSurfaceVariant}
+            name={expanded ? 'chat' : 'chat-outline'}
+            size={19}
+            color={expanded ? ui.accent : ui.sub}
           />
-          <Text style={[styles.actionText, expanded && { color: colors.secondary }]}>{post.comments}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { marginLeft: 'auto' }]} activeOpacity={0.85}>
-          <MaterialCommunityIcons name="share-outline" size={18} color={colors.onSurfaceVariant} />
-        </TouchableOpacity>
+          <Text style={[styles.actionText, expanded && { color: ui.accent }]}>{commentCount}</Text>
+        </Pressable>
       </View>
 
       {expanded && (
@@ -314,11 +385,12 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment 
             <Text style={styles.commentEmpty}>No comments yet — say something nice!</Text>
           ) : (
             (comments || []).map((c) => {
+              const cPair = pairFor(c.author_name);
               const canDelete = c.author_id === userId || post.authorId === userId;
               return (
                 <View key={c.id} style={styles.commentRow}>
-                  <View style={[styles.commentAvatar, { backgroundColor: avatarColor(c.author_name) }]}>
-                    <Text style={styles.commentAvatarText}>{(c.author_name || '?')[0]}</Text>
+                  <View style={[styles.commentAvatar, { backgroundColor: cPair.bg }]}>
+                    <Text style={[styles.commentAvatarText, { color: cPair.fg }]}>{(c.author_name || '?')[0]}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.commentAuthor}>
@@ -327,9 +399,9 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment 
                     <Text style={styles.commentText}>{c.content}</Text>
                   </View>
                   {canDelete && (
-                    <TouchableOpacity onPress={() => removeComment(c.id)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                      <MaterialCommunityIcons name="close" size={14} color={colors.outline} />
-                    </TouchableOpacity>
+                    <Pressable onPress={() => setConfirm(c)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                      <MaterialCommunityIcons name="close" size={14} color={ui.faint} />
+                    </Pressable>
                   )}
                 </View>
               );
@@ -339,264 +411,240 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment 
             <TextInput
               style={styles.commentInput}
               placeholder="Add a comment…"
-              placeholderTextColor={colors.outlineVariant}
+              placeholderTextColor={ui.subtle}
               value={draft}
               onChangeText={setDraft}
               multiline
             />
-            <TouchableOpacity
-              style={[styles.commentSend, !draft.trim() && styles.sendBtnDisabled]}
+            <Pressable
+              style={[styles.commentSend, !draft.trim() && { opacity: 0.4 }]}
               onPress={submit}
               disabled={!draft.trim()}
-              activeOpacity={0.88}
             >
-              <MaterialCommunityIcons name="send" size={15} color={colors.onPrimary} />
-            </TouchableOpacity>
+              <MaterialCommunityIcons name="send" size={15} color="#ffffff" />
+            </Pressable>
           </View>
         </View>
       )}
-    </View>
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title="Delete comment?"
+        message="This comment will be removed for everyone."
+        confirmLabel="Delete"
+        destructive
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => { const c = confirm; setConfirm(null); if (c) removeComment(c.id); }}
+      />
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  scroll: { paddingBottom: spacing.xl },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.margin,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+  safe: { flex: 1, backgroundColor: ui.background },
+  scroll: { paddingBottom: 28 },
+  title: {
+    ...type.screenTitle,
+    color: ui.ink,
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 16,
   },
-  title: { ...typography.headlineMd, color: colors.onBackground },
-  subtitle: { ...typography.bodyMd, color: colors.onSurfaceVariant },
-  headerIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: radii.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  lostBanner: {
+  chipRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 24, paddingBottom: 20 },
+
+  // Composer
+  composerCollapsed: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.margin,
-    marginBottom: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radii.xl,
-    backgroundColor: '#fff1f0',
+    gap: 12,
+    marginHorizontal: 24,
+    marginBottom: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 18,
+    backgroundColor: ui.surface,
     borderWidth: 1,
-    borderColor: colors.errorContainer,
+    borderColor: ui.border,
+    borderRadius: 999,
   },
-  lostBannerIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.full,
-    backgroundColor: colors.errorContainer,
+  composerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  lostBannerTitle: { ...typography.labelMd, color: colors.onSurface },
-  lostBannerSub: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 1 },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.margin,
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
-  },
-  sectionTitle: { ...typography.titleLg, color: colors.onBackground },
-  groupCount: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  feedCount: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  groupsRow: { paddingHorizontal: spacing.margin, gap: spacing.sm, paddingBottom: spacing.sm },
-  groupCard: {
-    width: 158,
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii.xl,
-    overflow: 'hidden',
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.surfaceContainerLow,
-  },
-  groupBanner: {
-    height: 76,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  groupInfo: { padding: spacing.sm, gap: spacing.xs },
-  groupName: { ...typography.labelMd, color: colors.onSurface, lineHeight: 18 },
-  groupMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  groupMetaText: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  joinBtn: {
-    marginHorizontal: spacing.sm,
-    marginBottom: spacing.sm,
-    paddingVertical: spacing.xs + 2,
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radii.lg,
-    alignItems: 'center',
+  composerAvatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13 },
+  composerPlaceholder: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13.5, color: ui.subtle },
+  composerCard: { marginHorizontal: 24, marginBottom: 18, padding: 16, gap: 12 },
+  composerInput: {
     borderWidth: 1.5,
-    borderColor: colors.outlineVariant,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13.5,
+    color: ui.ink,
+    minHeight: 64,
+    textAlignVertical: 'top',
   },
-  joinBtnActive: { backgroundColor: colors.primaryFixed, borderColor: colors.primaryFixedDim },
-  joinBtnText: { ...typography.labelMd, color: colors.primaryContainer, fontSize: 13 },
-  joinBtnTextActive: { color: colors.primaryContainer },
-  createPost: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceContainerLowest,
-    marginHorizontal: spacing.margin,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.surfaceContainerLow,
-  },
-  createAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    justifyContent: 'center',
+  composerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cancelBtn: { paddingVertical: 9, paddingHorizontal: 16 },
+  cancelText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.sub },
+  draftPreview: { borderRadius: 14, overflow: 'hidden' },
+  draftPreviewImg: { width: '100%', height: 160 },
+  draftRemove: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(36, 26, 14, 0.6)',
     alignItems: 'center',
-    flexShrink: 0,
-  },
-  createAvatarText: { ...typography.titleLg, color: colors.primaryContainer, fontSize: 16 },
-  createInput: {
-    ...typography.bodyMd,
-    color: colors.onSurface,
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    minHeight: 44,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    backgroundColor: colors.primary,
     justifyContent: 'center',
+  },
+
+  // Feed
+  feedList: { marginHorizontal: 24, gap: 14 },
+  postCard: { padding: 18 },
+  postHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 10 },
+  postAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  postAvatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16 },
+  postAuthor: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: ui.ink },
+  postTime: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11.5, color: ui.subtle },
+  postContent: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: ui.ink,
+    marginBottom: 14,
+  },
+  postImage: { width: '100%', height: 200, borderRadius: 14, marginBottom: 14, backgroundColor: ui.track },
+  postActions: {
+    flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 0,
-    ...shadows.button,
-  },
-  sendBtnDisabled: { backgroundColor: colors.surfaceContainerHigh, shadowOpacity: 0, elevation: 0 },
-  postCard: {
-    backgroundColor: colors.surfaceContainerLowest,
-    marginHorizontal: spacing.margin,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    marginBottom: spacing.sm,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.surfaceContainerLow,
-  },
-  postHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  postAvatar: { width: 44, height: 44, borderRadius: radii.full, justifyContent: 'center', alignItems: 'center' },
-  postAvatarText: { ...typography.titleLg, color: colors.primaryContainer, fontSize: 16 },
-  postAuthor: { ...typography.labelMd, color: colors.onSurface },
-  postTime: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  moreBtn: { padding: spacing.xs },
-  postContent: { ...typography.bodyMd, color: colors.onSurface, marginBottom: spacing.sm, lineHeight: 22 },
-  postDivider: { height: 1, backgroundColor: colors.surfaceContainerHighest, marginBottom: spacing.sm },
-  postActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  actionText: { ...typography.labelMd, color: colors.onSurfaceVariant, fontSize: 13 },
-  commentsWrap: {
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
+    gap: 22,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.surfaceContainerHighest,
-    gap: spacing.sm,
+    borderTopColor: ui.hairline,
   },
-  commentEmpty: { ...typography.labelSm, color: colors.onSurfaceVariant, paddingVertical: spacing.xs },
-  commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.sub },
+
+  // Comments
+  commentsWrap: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: ui.hairline,
+    gap: 12,
+  },
+  commentEmpty: { ...type.secondary, color: ui.subtle },
+  commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   commentAvatar: {
     width: 28,
     height: 28,
-    borderRadius: radii.full,
-    justifyContent: 'center',
+    borderRadius: 14,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 2,
   },
-  commentAvatarText: { ...typography.labelSm, color: colors.primaryContainer, fontSize: 12 },
-  commentAuthor: { ...typography.labelMd, color: colors.onSurface, fontSize: 13 },
-  commentTime: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  commentText: { ...typography.bodyMd, fontSize: 14, color: colors.onSurface, marginTop: 1 },
-  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, marginTop: spacing.xs },
+  commentAvatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11 },
+  commentAuthor: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12.5, color: ui.ink },
+  commentTime: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, color: ui.subtle },
+  commentText: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
+    color: ui.ink,
+    marginTop: 1,
+  },
+  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   commentInput: {
     flex: 1,
-    ...typography.bodyMd,
-    fontSize: 14,
-    color: colors.onSurface,
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radii.lg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs + 2,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12.5,
+    color: ui.ink,
     maxHeight: 90,
   },
   commentSend: {
-    width: 34,
-    height: 34,
-    borderRadius: radii.full,
-    backgroundColor: colors.secondary,
-    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: ui.accent,
     alignItems: 'center',
-  },
-  attachBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    backgroundColor: colors.primaryFixed,
     justifyContent: 'center',
+  },
+
+  // Groups
+  groupList: { marginHorizontal: 24, gap: 14 },
+  groupRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
   },
-  draftPreview: {
-    marginHorizontal: spacing.margin,
-    marginBottom: spacing.sm,
-    borderRadius: radii.lg,
-    overflow: 'hidden',
-    position: 'relative',
+  groupIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  groupName: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: ui.ink },
+  groupMembers: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, color: ui.sub, marginTop: 1 },
+  joinBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.surface,
   },
-  draftPreviewImg: { width: '100%', height: 160, borderRadius: radii.lg },
-  draftRemove: {
-    position: 'absolute',
-    top: spacing.xs,
-    right: spacing.xs,
-    width: 28,
-    height: 28,
-    borderRadius: radii.full,
-    backgroundColor: colors.error,
+  joinBtnJoined: { backgroundColor: ui.accentTint, borderColor: ui.accentTint },
+  joinBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12.5, color: ui.ink },
+  joinBtnTextJoined: { color: ui.accent },
+
+  // Lost pets
+  lostList: { marginHorizontal: 24, gap: 14 },
+  lostPhoto: { width: '100%', height: 130, backgroundColor: ui.track },
+  lostBody: { padding: 18, gap: 12 },
+  lostTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 10,
+  },
+  lostTitle: { flex: 1, fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, color: ui.ink },
+  lostMissing: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: ui.danger },
+  lostDesc: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, lineHeight: 19, color: ui.sub },
+  lostLocation: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  lostLocationText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5, color: ui.subtle },
+  foundBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: ui.successTint,
+  },
+  foundBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.success },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: ui.faint,
+    borderRadius: 20,
+    padding: 16,
   },
-  postImage: {
-    width: '100%',
-    height: 220,
-    borderRadius: radii.lg,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.surfaceContainerLow,
-  },
-  empty: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
-  emptyIllustration: {
-    width: 80,
-    height: 80,
-    borderRadius: radii.full,
-    backgroundColor: colors.primaryFixed,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  emptyTitle: { ...typography.titleLg, color: colors.onBackground },
-  emptyText: { ...typography.bodyMd, color: colors.onSurfaceVariant, textAlign: 'center', fontSize: 14 },
+  reportBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: ui.accent },
+
+  // Empty states
+  empty: { alignItems: 'center', gap: 6, paddingVertical: 36, paddingHorizontal: 24 },
+  emptyTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: ui.ink, marginTop: 6 },
+  emptyText: { ...type.secondary, color: ui.sub, textAlign: 'center' },
 });
