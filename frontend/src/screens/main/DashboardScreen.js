@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
+  View, Text, ScrollView, Pressable, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,7 +8,13 @@ import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { resolveAsset } from '../../config';
-import { colors, typography, spacing, radii, shadows } from '../../theme';
+import { ui, type } from '../../theme';
+import { Card, StatusRing, UpNextCard, showToast } from '../../components';
+
+// Home = one calm answer to "what needs my attention?": the UpNext hero,
+// the pets row (status lives on the avatar ring, nowhere else), this week's
+// schedule, and a community teaser. Stat cards, spend banner and the quick
+// actions grid are gone per the redesign's delete list.
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -17,16 +23,24 @@ function getGreeting() {
   return 'Good evening';
 }
 
-function timeAgo(iso) {
-  const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+const fmtShort = (date) =>
+  date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+const vaxDate = (v) => new Date(`${v.dueDate}T12:00:00`);
+
+// Worst vaccination status wins the avatar ring.
+function petStatusOf(pet) {
+  const statuses = (pet.vaccinations || []).map((v) => v.status);
+  if (statuses.includes('overdue')) return 'overdue';
+  if (statuses.includes('due_soon')) return 'due';
+  return 'ok';
 }
+
+const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
-  const { dataLoaded, pets, posts, unreadCount, invites } = useData();
+  const { dataLoaded, pets, posts, reminders, unreadCount, markVaccinationComplete } = useData();
 
   // TTI: the dashboard is the main entry screen — interactive once the initial
   // data fan-out has rendered. Safe to call repeatedly; first call wins.
@@ -35,503 +49,287 @@ export default function DashboardScreen({ navigation }) {
     if (dataLoaded) markInteractive();
   }, [dataLoaded, markInteractive]);
 
-  const upcomingVax = pets.flatMap((p) =>
-    (p.vaccinations || []).filter((v) => v.status === 'upcoming' || v.status === 'due_soon' || v.status === 'overdue')
-  );
-
-  // Badge reflects unread notifications specifically (not "things due").
-  const bellCount = unreadCount;
-
-  const monthPrefix = new Date().toISOString().slice(0, 7);
-  const monthSpend = pets
-    .flatMap((p) => p.expenses || [])
-    .filter((e) => (e.incurredOn || '').startsWith(monthPrefix))
-    .reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
   const firstName = user?.name?.split(' ')[0] || 'Friend';
+  const today = useMemo(() => new Date(), []);
+  const dateLabel = today
+    .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    .toUpperCase();
+
+  const { upNext, weekItems } = useMemo(() => {
+    const pending = pets.flatMap((pet) =>
+      (pet.vaccinations || [])
+        .filter((v) => v.status === 'overdue' || v.status === 'due_soon' || v.status === 'upcoming')
+        .map((v) => ({ ...v, pet }))
+    );
+
+    // Most urgent: any overdue (earliest first), else the nearest due date.
+    const next =
+      pending
+        .filter((v) => v.status === 'overdue')
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0] ||
+      pending.sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0] ||
+      null;
+
+    const weekEnd = new Date(today);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const inWeek = (d) => d >= new Date(today.toDateString()) && d <= weekEnd;
+
+    const week = [
+      ...pending
+        .filter((v) => v.status !== 'overdue' && inWeek(vaxDate(v)))
+        .map((v) => ({
+          key: `vax-${v.pet.id}-${v.id}`,
+          date: vaxDate(v),
+          title: v.name,
+          sub: v.pet.name,
+          dot: v.status === 'due_soon' ? ui.warn : ui.ringOk,
+        })),
+      ...reminders
+        .filter((r) => r.next_fire_at || r.fire_at)
+        .map((r) => ({ r, date: new Date(r.next_fire_at || r.fire_at) }))
+        .filter(({ date }) => !Number.isNaN(date.getTime()) && inWeek(date))
+        .map(({ r, date }) => ({
+          key: `rem-${r.id}`,
+          date,
+          title: r.title,
+          sub: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+          dot: ui.ringOk,
+        })),
+    ].sort((a, b) => a.date - b.date);
+
+    return { upNext: next, weekItems: week.slice(0, 5) };
+  }, [pets, reminders, today]);
+
+  const upNextItem = upNext
+    ? {
+        title: upNext.name,
+        subtitle: `${upNext.pet.name} · due ${fmtShort(vaxDate(upNext))}`,
+        status: upNext.status === 'overdue' ? 'overdue' : 'due',
+        statusLabel:
+          upNext.status === 'overdue'
+            ? `Overdue · ${Math.max(1, Math.floor((Date.now() - vaxDate(upNext)) / 86400000))} days`
+            : `Due ${fmtShort(vaxDate(upNext))}`,
+        avatarColor: upNext.pet.color || ui.accentTint,
+        avatarTextColor: ui.accent,
+        initial: upNext.pet.name[0],
+        photo: upNext.pet.avatarUrl ? resolveAsset(upNext.pet.avatarUrl) : undefined,
+      }
+    : null;
 
   return (
-    <SafeAreaView style={styles.safe}>
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <View>
-          <Text style={styles.greeting}>{getGreeting()},</Text>
-          <Text style={styles.name}>{firstName}</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.bell}
-          activeOpacity={0.88}
-          onPress={() => navigation.navigate('Notifications')}
-        >
-          <MaterialCommunityIcons name="bell-outline" size={22} color={colors.primaryContainer} />
-          {bellCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{Math.min(bellCount, 9)}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Pending co-owner invitations */}
-        {invites.length > 0 && (
-          <TouchableOpacity
-            style={styles.inviteBanner}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('Invites')}
-          >
-            <View style={styles.inviteIcon}>
-              <MaterialCommunityIcons name="email-heart-outline" size={20} color={colors.primaryContainer} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.inviteTitle}>
-                {invites.length === 1 ? 'Pet sharing invitation' : `${invites.length} pet invitations`}
-              </Text>
-              <Text style={styles.inviteSub} numberOfLines={1}>
-                {invites.length === 1
-                  ? `${invites[0].inviterName} wants to share ${invites[0].petName}`
-                  : 'Tap to review who wants to share with you'}
-              </Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
-          </TouchableOpacity>
-        )}
-
-        {/* Stats row */}
-        <View style={styles.statsRow}>
-          <StatCard
-            icon="paw"
-            value={pets.length}
-            label="My Pets"
-            bg={colors.primaryFixed}
-            fg={colors.primaryContainer}
-            iconBg="rgba(133,83,0,0.12)"
-          />
-          <StatCard
-            icon="needle"
-            value={upcomingVax.length}
-            label="Due Vaccines"
-            bg={colors.tertiaryFixed}
-            fg={colors.tertiary}
-            iconBg="rgba(0,76,106,0.12)"
-          />
-          <StatCard
-            icon="forum-outline"
-            value={posts.length}
-            label="Posts"
-            bg={colors.secondaryFixed}
-            fg={colors.secondary}
-            iconBg="rgba(8,90,192,0.12)"
-          />
+        <View style={styles.header}>
+          <View>
+            <Text style={[type.sectionLabel, { color: ui.subtle, marginBottom: 6 }]}>
+              {dateLabel}
+            </Text>
+            <Text style={[type.screenTitle, { color: ui.ink }]}>
+              {getGreeting()},{'\n'}{firstName}
+            </Text>
+          </View>
+          <Pressable style={styles.bell} onPress={() => navigation.navigate('Notifications')}>
+            <MaterialCommunityIcons name="bell-outline" size={24} color={ui.ink} />
+            {unreadCount > 0 && <View style={styles.bellDot} />}
+          </Pressable>
         </View>
 
-        {monthSpend > 0 && (
-          <TouchableOpacity
-            style={styles.spendBanner}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('Pets')}
-          >
-            <View style={styles.spendIcon}>
-              <MaterialCommunityIcons name="wallet-outline" size={20} color={colors.secondary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.spendLabel}>Spent on pets this month</Text>
-              <Text style={styles.spendValue}>{monthSpend.toFixed(2)}</Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
-          </TouchableOpacity>
-        )}
+        <UpNextCard
+          item={upNextItem}
+          style={styles.hero}
+          onDone={async () => {
+            await markVaccinationComplete(upNext.pet.id, upNext.id);
+            showToast(`${upNext.name} marked done`);
+          }}
+          onReschedule={() =>
+            navigation.navigate('Pets', {
+              screen: 'VaccinationTracker',
+              params: { petId: upNext.pet.id },
+            })
+          }
+        />
 
-        {/* My Pets */}
-        <SectionHeader title="My Pets" onPress={() => navigation.navigate('Pets')} />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.petsRow}>
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>Your pets</Text>
+          <Pressable onPress={() => navigation.navigate('Pets')}>
+            <Text style={styles.sectionLink}>All pets</Text>
+          </Pressable>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.petsRow}
+        >
           {pets.map((pet) => (
-            <TouchableOpacity
+            <Pressable
               key={pet.id}
-              style={styles.petCard}
-              onPress={() => navigation.navigate('Pets', { screen: 'PetProfile', params: { petId: pet.id } })}
-              activeOpacity={0.88}
+              style={styles.petItem}
+              onPress={() =>
+                navigation.navigate('Pets', { screen: 'PetProfile', params: { petId: pet.id } })
+              }
             >
-              <View style={[styles.petAvatar, { backgroundColor: pet.color || colors.primaryFixed }]}>
-                {pet.avatarUrl ? (
-                  <Image source={{ uri: resolveAsset(pet.avatarUrl) }} style={styles.petAvatarImg} />
-                ) : (
-                  <Text style={styles.petAvatarText}>{pet.name[0]}</Text>
-                )}
-              </View>
-              <Text style={styles.petName} numberOfLines={1}>{pet.name}</Text>
-              <Text style={styles.petBreed} numberOfLines={1}>{pet.type}</Text>
-            </TouchableOpacity>
+              <StatusRing
+                size={62}
+                color={pet.color || ui.accentTint}
+                textColor={ui.accent}
+                initial={pet.name[0]}
+                photo={pet.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined}
+                status={petStatusOf(pet)}
+              />
+              <Text style={styles.petName}>{pet.name}</Text>
+            </Pressable>
           ))}
-          <TouchableOpacity
-            style={[styles.petCard, styles.addCard]}
+          <Pressable
+            style={styles.petItem}
             onPress={() => navigation.navigate('Pets', { screen: 'AddPet' })}
-            activeOpacity={0.88}
           >
-            <View style={[styles.petAvatar, { backgroundColor: colors.surfaceContainerHigh }]}>
-              <MaterialCommunityIcons name="plus" size={26} color={colors.primary} />
+            <View style={styles.addCircle}>
+              <MaterialCommunityIcons name="plus" size={22} color={ui.accent} />
             </View>
-            <Text style={[styles.petName, { color: colors.primary }]}>Add Pet</Text>
-          </TouchableOpacity>
+            <Text style={[styles.petName, { color: ui.subtle }]}>Add</Text>
+          </Pressable>
         </ScrollView>
 
-        {/* Health Alerts */}
-        {upcomingVax.length > 0 && (
-          <>
-            <SectionHeader title="Health Alerts" />
-            <View style={styles.alertsWrap}>
-              {upcomingVax.slice(0, 3).map((v, i) => (
-                <VaxRow key={i} vax={v} />
-              ))}
-            </View>
-          </>
-        )}
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>This week</Text>
+          <Pressable onPress={() => navigation.navigate('Health')}>
+            <Text style={styles.sectionLink}>Health</Text>
+          </Pressable>
+        </View>
+        <Card style={styles.weekCard}>
+          {weekItems.length === 0 ? (
+            <Text style={styles.emptyText}>Nothing scheduled this week.</Text>
+          ) : (
+            weekItems.map((item, i) => (
+              <View
+                key={item.key}
+                style={[styles.weekRow, i < weekItems.length - 1 && styles.rowDivider]}
+              >
+                <View style={styles.dayCol}>
+                  <Text style={styles.dayLabel}>{DAYS[item.date.getDay()]}</Text>
+                  <Text style={styles.dayDate}>{item.date.getDate()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>{item.title}</Text>
+                  <Text style={styles.rowSub}>{item.sub}</Text>
+                </View>
+                <View style={[styles.weekDot, { backgroundColor: item.dot }]} />
+              </View>
+            ))
+          )}
+        </Card>
 
-        {/* Community preview */}
-        <SectionHeader title="Community" onPress={() => navigation.navigate('Community')} />
-        {posts.slice(0, 2).map((post) => (
-          <PostPreview key={post.id} post={post} />
-        ))}
-        {posts.length === 0 && (
-          <TouchableOpacity
-            style={styles.emptyPost}
-            onPress={() => navigation.navigate('Community')}
-            activeOpacity={0.88}
-          >
-            <View style={styles.emptyPostIcon}>
-              <MaterialCommunityIcons name="forum-outline" size={28} color={colors.secondary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.emptyPostTitle}>Join the conversation</Text>
-              <Text style={styles.emptyPostSub}>Be the first to share a moment!</Text>
-            </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color={colors.outlineVariant} />
-          </TouchableOpacity>
-        )}
+        <Pressable
+          onPress={() => navigation.navigate('Community')}
+          style={({ pressed }) => pressed && { opacity: 0.9 }}
+        >
+          <Card style={styles.teaser}>
+            <MaterialCommunityIcons name="forum-outline" size={20} color={ui.accent} />
+            <Text style={styles.teaserText}>
+              {posts.length > 0 ? (
+                <>
+                  <Text style={styles.teaserBold}>
+                    {posts.length} recent {posts.length === 1 ? 'post' : 'posts'}
+                  </Text>
+                  {' in the community'}
+                </>
+              ) : (
+                'Say hi to the community'
+              )}
+            </Text>
+            <MaterialCommunityIcons name="chevron-right" size={18} color={ui.faint} />
+          </Card>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function StatCard({ icon, value, label, bg, fg, iconBg }) {
-  return (
-    <View style={[styles.statCard, { backgroundColor: bg }]}>
-      <View style={[styles.statIconWrap, { backgroundColor: iconBg }]}>
-        <MaterialCommunityIcons name={icon} size={20} color={fg} />
-      </View>
-      <Text style={[styles.statVal, { color: fg }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function SectionHeader({ title, onPress }) {
-  return (
-    <View style={styles.sectionHeader}>
-      <View style={styles.sectionTitleRow}>
-        <View style={styles.sectionAccent} />
-        <Text style={styles.sectionTitle}>{title}</Text>
-      </View>
-      {onPress && (
-        <TouchableOpacity onPress={onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.sectionLink}>View all</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-}
-
-function VaxRow({ vax }) {
-  const isOverdue = vax.status === 'overdue';
-  const isDue = vax.status === 'due_soon';
-  const badgeBg = isOverdue ? colors.errorContainer : isDue ? colors.dueSoonBg : colors.tertiaryFixed;
-  const badgeFg = isOverdue ? colors.onErrorContainer : isDue ? colors.dueSoonFg : colors.onTertiaryFixed;
-  const accentColor = isOverdue ? colors.error : isDue ? '#d4a000' : colors.tertiary;
-  const label = isOverdue ? 'Overdue' : isDue ? 'Due Soon' : 'Upcoming';
-
-  return (
-    <View style={[styles.vaxRow, { borderLeftColor: accentColor }]}>
-      <View style={[styles.vaxIcon, { backgroundColor: isOverdue ? colors.errorContainer : colors.tertiaryFixed }]}>
-        <MaterialCommunityIcons name="needle" size={18} color={isOverdue ? colors.onErrorContainer : colors.tertiary} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.vaxName}>{vax.name}</Text>
-        <Text style={styles.vaxDate}>Due: {vax.dueDate}</Text>
-      </View>
-      <View style={[styles.vaxBadge, { backgroundColor: badgeBg }]}>
-        <Text style={[styles.vaxBadgeText, { color: badgeFg }]}>{label}</Text>
-      </View>
-    </View>
-  );
-}
-
-function PostPreview({ post }) {
-  return (
-    <View style={styles.postCard}>
-      <View style={styles.postHeader}>
-        <View style={[styles.postAvatar, { backgroundColor: colors.primaryFixed }]}>
-          <Text style={styles.postAvatarText}>{(post.authorName || '?')[0]}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.postAuthor}>{post.authorName}</Text>
-          <Text style={styles.postTime}>{timeAgo(post.createdAt)}</Text>
-        </View>
-      </View>
-      <Text style={styles.postContent} numberOfLines={2}>{post.content}</Text>
-      <View style={styles.postActions}>
-        <View style={styles.actionItem}>
-          <MaterialCommunityIcons name="paw-outline" size={15} color={colors.primaryContainer} />
-          <Text style={styles.actionText}>{post.paws} paws</Text>
-        </View>
-        <View style={styles.actionItem}>
-          <MaterialCommunityIcons name="comment-outline" size={15} color={colors.outline} />
-          <Text style={styles.actionText}>{post.comments} comments</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  topBar: {
+  safe: { flex: 1, backgroundColor: ui.background },
+  scroll: { paddingBottom: 28 },
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingHorizontal: spacing.margin,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    alignItems: 'flex-end',
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 22,
   },
-  greeting: { ...typography.bodyMd, color: colors.onSurfaceVariant },
-  name: { ...typography.headlineMd, color: colors.onBackground },
   bell: {
-    width: 46,
-    height: 46,
-    borderRadius: radii.full,
-    backgroundColor: colors.surfaceContainerLow,
-    justifyContent: 'center',
+    width: 44,
+    height: 44,
     alignItems: 'center',
-    ...shadows.card,
+    justifyContent: 'center',
   },
-  badge: {
+  bellDot: {
     position: 'absolute',
     top: 8,
-    right: 8,
-    minWidth: 16,
-    height: 16,
-    borderRadius: radii.full,
-    backgroundColor: colors.error,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: colors.background,
+    right: 9,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#b06e00',
+    borderWidth: 2,
+    borderColor: ui.background,
   },
-  badgeText: { ...typography.labelSm, color: colors.onError, fontSize: 9 },
-  scroll: { paddingBottom: spacing.xl },
-  inviteBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.margin,
-    marginBottom: spacing.md,
-    padding: spacing.sm,
-    borderRadius: radii.xl,
-    backgroundColor: colors.surfaceContainerLowest,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.primaryFixedDim,
-  },
-  inviteIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.full,
-    backgroundColor: colors.primaryFixed,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  inviteTitle: { ...typography.labelMd, color: colors.onSurface },
-  inviteSub: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 2 },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.margin,
-    marginBottom: spacing.md,
-  },
-  spendBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.margin,
-    marginBottom: spacing.md,
-    padding: spacing.sm,
-    borderRadius: radii.xl,
-    backgroundColor: colors.surfaceContainerLowest,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.secondaryFixed,
-  },
-  spendIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.full,
-    backgroundColor: colors.secondaryFixed,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  spendLabel: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  spendValue: { ...typography.headlineMd, color: colors.secondary, fontSize: 20 },
-  statCard: {
-    flex: 1,
-    padding: spacing.sm,
-    borderRadius: radii.xl,
-    alignItems: 'center',
-    gap: spacing.xs,
-    minHeight: 96,
-    justifyContent: 'center',
-    ...shadows.card,
-  },
-  statIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: radii.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  statVal: { ...typography.headlineMd, lineHeight: 28 },
-  statLabel: { ...typography.labelSm, color: colors.onSurfaceVariant, textAlign: 'center' },
-  sectionHeader: {
+  hero: { marginHorizontal: 24, marginBottom: 26 },
+  sectionHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.margin,
-    marginBottom: spacing.sm,
-    marginTop: spacing.md,
+    alignItems: 'baseline',
+    marginHorizontal: 24,
+    marginBottom: 14,
   },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  sectionAccent: {
-    width: 4,
-    height: 18,
-    borderRadius: radii.full,
-    backgroundColor: colors.primaryContainer,
-  },
-  sectionTitle: { ...typography.titleLg, color: colors.onBackground },
-  sectionLink: { ...typography.labelMd, color: colors.secondary, fontSize: 13 },
-  petsRow: { paddingHorizontal: spacing.margin, gap: spacing.sm, paddingBottom: spacing.xs },
-  petCard: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii.xl,
-    padding: spacing.sm,
-    alignItems: 'center',
-    width: 100,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.surfaceContainerLow,
-  },
-  addCard: {
-    borderWidth: 2,
-    borderColor: colors.outlineVariant,
+  sectionTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: ui.ink },
+  sectionLink: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.accent },
+  petsRow: { gap: 20, paddingHorizontal: 24, paddingTop: 6, paddingBottom: 20 },
+  petItem: { alignItems: 'center', gap: 8 },
+  petName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: ui.ink },
+  addCircle: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
-    shadowOpacity: 0,
-    elevation: 0,
-    backgroundColor: 'transparent',
-  },
-  petAvatar: {
-    width: 54,
-    height: 54,
-    borderRadius: radii.full,
-    justifyContent: 'center',
+    borderColor: ui.faint,
     alignItems: 'center',
-    marginBottom: spacing.xs,
-    overflow: 'hidden',
+    justifyContent: 'center',
   },
-  petAvatarImg: { width: '100%', height: '100%' },
-  petAvatarText: { ...typography.headlineMd, color: colors.primaryContainer, fontSize: 22 },
-  petName: { ...typography.labelMd, color: colors.onSurface, fontSize: 12 },
-  petBreed: { ...typography.labelSm, color: colors.onSurfaceVariant, textAlign: 'center', textTransform: 'capitalize' },
-  alertsWrap: { paddingHorizontal: spacing.margin, gap: spacing.sm, marginBottom: spacing.xs },
-  vaxRow: {
+  weekCard: { marginHorizontal: 24, marginBottom: 24 },
+  weekRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceContainerLowest,
-    padding: spacing.sm,
-    borderRadius: radii.xl,
-    borderLeftWidth: 4,
-    ...shadows.card,
+    gap: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
   },
-  vaxIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: radii.full,
-    justifyContent: 'center',
-    alignItems: 'center',
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: ui.hairline },
+  dayCol: { width: 40, alignItems: 'center' },
+  dayLabel: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, color: ui.subtle },
+  dayDate: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 17, color: ui.ink },
+  rowTitle: { ...type.rowTitle, color: ui.ink },
+  rowSub: { ...type.secondary, color: ui.sub },
+  weekDot: { width: 8, height: 8, borderRadius: 4 },
+  emptyText: {
+    padding: 18,
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 13,
+    color: ui.subtle,
   },
-  vaxName: { ...typography.labelMd, color: colors.onSurface },
-  vaxDate: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  vaxBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.full,
-  },
-  vaxBadgeText: { ...typography.labelSm, fontFamily: 'PlusJakartaSans_600SemiBold' },
-  postCard: {
-    backgroundColor: colors.surfaceContainerLowest,
-    marginHorizontal: spacing.margin,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    marginBottom: spacing.sm,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.surfaceContainerLow,
-  },
-  postHeader: {
+  teaser: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
+    gap: 12,
+    marginHorizontal: 24,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
   },
-  postAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: radii.full,
-    justifyContent: 'center',
-    alignItems: 'center',
+  teaserText: {
+    flex: 1,
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 13.5,
+    color: ui.ink,
   },
-  postAvatarText: { ...typography.titleLg, color: colors.primaryContainer, fontSize: 16 },
-  postAuthor: { ...typography.labelMd, color: colors.onSurface },
-  postTime: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  postContent: { ...typography.bodyMd, color: colors.onSurface, marginBottom: spacing.sm, lineHeight: 22 },
-  postActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.surfaceContainerHighest,
-  },
-  actionItem: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  actionText: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  emptyPost: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.margin,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    backgroundColor: colors.surfaceContainerLowest,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.surfaceContainerLow,
-  },
-  emptyPostIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: radii.lg,
-    backgroundColor: colors.secondaryFixed,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyPostTitle: { ...typography.labelMd, color: colors.onSurface },
-  emptyPostSub: { ...typography.labelSm, color: colors.onSurfaceVariant },
+  teaserBold: { fontFamily: 'PlusJakartaSans_700Bold' },
 });
