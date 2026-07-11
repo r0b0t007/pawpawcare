@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
-import { colors, typography, radii } from '../theme';
+import { colors, ui } from '../theme';
 
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -16,7 +16,8 @@ import PetProfileScreen from '../screens/main/PetProfileScreen';
 import AddPetScreen from '../screens/main/AddPetScreen';
 import VaccinationTrackerScreen from '../screens/main/VaccinationTrackerScreen';
 import CommunityScreen from '../screens/main/CommunityScreen';
-import ScheduleScreen from '../screens/main/ScheduleScreen';
+import HealthHubScreen from '../screens/main/HealthHubScreen';
+import ProfileScreen from '../screens/main/ProfileScreen';
 import NotificationsScreen from '../screens/main/NotificationsScreen';
 import RemindersScreen from '../screens/main/RemindersScreen';
 import LostPetsScreen from '../screens/main/LostPetsScreen';
@@ -47,15 +48,6 @@ function DashboardStack() {
   );
 }
 
-function CommunityStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.background } }}>
-      <Stack.Screen name="CommunityFeed" component={CommunityScreen} />
-      <Stack.Screen name="LostPets" component={LostPetsScreen} />
-    </Stack.Navigator>
-  );
-}
-
 function PetsStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.background } }}>
@@ -68,11 +60,44 @@ function PetsStack() {
   );
 }
 
+// The Health hub absorbs the old Schedule lists. The per-pet tracker, medical
+// records and reminders screens stay registered here so hub rows can push
+// them until phase 4 folds their content in.
+function HealthStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
+      <Stack.Screen name="HealthHub" component={HealthHubScreen} />
+      <Stack.Screen name="VaccinationTracker" component={VaccinationTrackerScreen} />
+      <Stack.Screen name="MedicalRecords" component={MedicalRecordsScreen} />
+      <Stack.Screen name="Reminders" component={RemindersScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function CommunityStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.background } }}>
+      <Stack.Screen name="CommunityFeed" component={CommunityScreen} />
+      <Stack.Screen name="LostPets" component={LostPetsScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function ProfileStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
+      <Stack.Screen name="ProfileHome" component={ProfileScreen} />
+      <Stack.Screen name="Invites" component={InvitesScreen} />
+    </Stack.Navigator>
+  );
+}
+
 const TAB_ICONS = {
-  Dashboard: { active: 'view-dashboard', inactive: 'view-dashboard-outline' },
+  Dashboard: { active: 'home', inactive: 'home-outline' },
   Pets: { active: 'paw', inactive: 'paw-outline' },
+  Health: { active: 'heart', inactive: 'heart-outline' },
   Community: { active: 'forum', inactive: 'forum-outline' },
-  Schedule: { active: 'account', inactive: 'account-outline' },
+  Profile: { active: 'account', inactive: 'account-outline' },
 };
 
 function MainTabs() {
@@ -84,51 +109,33 @@ function MainTabs() {
           height: Platform.OS === 'ios' ? 80 : 66,
           paddingBottom: Platform.OS === 'ios' ? 20 : 10,
           paddingTop: 10,
-          backgroundColor: '#fffaf7',
+          backgroundColor: '#fffdfa',
           borderTopWidth: 1,
-          borderTopColor: colors.surfaceContainerHighest,
-          shadowColor: '#5a3500',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.07,
-          shadowRadius: 16,
-          elevation: 12,
+          borderTopColor: '#f0e6d7',
+          elevation: 0,
+          shadowOpacity: 0,
         },
-        tabBarActiveTintColor: colors.primaryContainer,
-        tabBarInactiveTintColor: colors.outline,
+        tabBarActiveTintColor: ui.accent,
+        tabBarInactiveTintColor: '#a08d72',
         tabBarLabelStyle: {
-          ...typography.labelSm,
+          fontFamily: 'PlusJakartaSans_600SemiBold',
           fontSize: 10,
-          letterSpacing: 0.3,
           marginTop: 2,
         },
         tabBarIcon: ({ focused, color }) => {
           const { active, inactive } = TAB_ICONS[route.name] || { active: 'help', inactive: 'help-circle-outline' };
-          return (
-            <View style={focused ? styles.activeIconWrap : null}>
-              <MaterialCommunityIcons name={focused ? active : inactive} size={24} color={color} />
-            </View>
-          );
+          return <MaterialCommunityIcons name={focused ? active : inactive} size={24} color={color} />;
         },
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardStack} options={{ tabBarLabel: 'Home' }} />
       <Tab.Screen name="Pets" component={PetsStack} options={{ tabBarLabel: 'Pets' }} />
+      <Tab.Screen name="Health" component={HealthStack} options={{ tabBarLabel: 'Health' }} />
       <Tab.Screen name="Community" component={CommunityStack} options={{ tabBarLabel: 'Community' }} />
-      <Tab.Screen name="Schedule" component={ScheduleScreen} options={{ tabBarLabel: 'Profile' }} />
+      <Tab.Screen name="Profile" component={ProfileStack} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
   );
 }
-
-const styles = {
-  activeIconWrap: {
-    backgroundColor: colors.primaryFixed,
-    borderRadius: radii.lg,
-    width: 48,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-};
 
 export default function AppNavigator() {
   const { user, isLoading } = useAuth();
@@ -136,7 +143,7 @@ export default function AppNavigator() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primaryContainer} />
+        <ActivityIndicator size="large" color={ui.accent} />
       </View>
     );
   }
