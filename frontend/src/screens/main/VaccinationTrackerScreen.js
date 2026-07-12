@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Modal, TextInput, KeyboardAvoidingView, Platform, Alert,
+  View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { colors, typography, spacing, radii, shadows } from '../../theme';
+import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
+import { Card, Button, Sheet, ConfirmDialog, StatusPill, showToast } from '../../components';
 
-const STATUS_STYLES = {
-  overdue: { bg: colors.errorContainer, fg: colors.onErrorContainer, label: 'Overdue', dot: colors.error, icon: 'alert-circle-outline' },
-  due_soon: { bg: colors.dueSoonBg, fg: colors.dueSoonFg, label: 'Due Soon', dot: '#d4a000', icon: 'clock-alert-outline' },
-  upcoming: { bg: colors.tertiaryFixed, fg: colors.tertiary, label: 'Upcoming', dot: colors.tertiary, icon: 'calendar-clock' },
-  completed: { bg: colors.successBg, fg: colors.successFg, label: 'Administered', dot: colors.successFg, icon: 'check-circle-outline' },
-};
+const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
+
+// Health statuses render through StatusPill; 'upcoming' stays a neutral date row.
+const PILL_STATUS = { overdue: 'overdue', due_soon: 'due' };
+
+const hit = { top: 8, bottom: 8, left: 8, right: 8 };
 
 const formatDisplay = (iso) => {
   if (!iso) return null;
@@ -30,6 +30,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ name: '', dueDate: '' });
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [confirm, setConfirm] = useState(null);
 
   if (!pet) return null;
 
@@ -48,10 +49,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
   };
 
   const handleAdd = async () => {
-    if (!form.name.trim() || !form.dueDate) {
-      Alert.alert('Missing Fields', 'Please fill in the vaccine name and due date.');
-      return;
-    }
+    if (!form.name.trim() || !form.dueDate) return;
     await addVaccination(petId, {
       name: form.name.trim(),
       dueDate: form.dueDate,
@@ -60,157 +58,162 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
     });
     setForm({ name: '', dueDate: '' });
     setModal(false);
+    showToast('Vaccination scheduled');
   };
 
-  const confirmComplete = (vax) => {
-    Alert.alert(
-      'Mark as Administered',
-      `Mark "${vax.name}" as administered today?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Confirm', onPress: () => markVaccinationComplete(petId, vax.id) },
-      ]
-    );
-  };
+  const confirmComplete = (vax) =>
+    setConfirm({
+      title: 'Mark as administered',
+      message: `Mark "${vax.name}" as administered today?`,
+      confirmLabel: 'Mark done',
+      action: async () => {
+        await markVaccinationComplete(petId, vax.id);
+        showToast(`${vax.name} marked done`);
+      },
+    });
 
-  const confirmDelete = (vax) => {
-    Alert.alert(
-      'Delete Record',
-      `Delete "${vax.name}" record?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteVaccination(petId, vax.id) },
-      ]
-    );
-  };
+  const confirmDelete = (vax) =>
+    setConfirm({
+      title: 'Delete record',
+      message: `Delete "${vax.name}" record?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      action: async () => {
+        await deleteVaccination(petId, vax.id);
+        showToast('Record deleted');
+      },
+    });
 
-  const petColor = pet.color || colors.primaryFixed;
+  const petBg = pet.color || ui.accentTint;
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* Header */}
         <View style={styles.topRow}>
-          <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color={colors.onSurface} />
-          </TouchableOpacity>
+          <Pressable
+            style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: ui.background }]}
+            onPress={() => navigation.goBack()}
+            hitSlop={hit}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
+          </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={styles.pageTitle}>Vaccinations</Text>
             <Text style={styles.pageSubtitle}>{pet.name}'s health records</Text>
           </View>
-          <View style={[styles.petBadge, { backgroundColor: petColor }]}>
-            <Text style={styles.petBadgeText}>{pet.name[0]}</Text>
+          <View style={[styles.petBadge, { backgroundColor: petBg }]}>
+            <Text style={[styles.petBadgeText, { color: petFg(pet.color) }]}>{pet.name[0]}</Text>
           </View>
         </View>
 
         {/* Stats summary */}
-        <View style={styles.summaryRow}>
-          <SummaryChip
-            icon="calendar-clock"
-            label="Upcoming"
-            value={upcoming.length}
-            bg={colors.tertiaryFixed}
-            fg={colors.tertiary}
-          />
-          <SummaryChip
-            icon="check-circle-outline"
-            label="Completed"
-            value={completed.length}
-            bg={colors.successBg}
-            fg={colors.successFg}
-          />
-          <SummaryChip
-            icon="needle"
-            label="Total"
-            value={vaccinations.length}
-            bg={colors.primaryFixed}
-            fg={colors.primaryContainer}
-          />
+        <View style={styles.statsRow}>
+          <Stat value={upcoming.length} label="Upcoming" />
+          <Stat value={completed.length} label="Completed" />
+          <Stat value={vaccinations.length} label="Total" />
         </View>
 
         {/* Upcoming */}
-        <Section title="Upcoming" count={upcoming.length}>
+        <Text style={[type.sectionLabel, styles.sectionLabel]}>Upcoming</Text>
+        <Card style={styles.sectionCard}>
           {upcoming.length === 0 ? (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="check-circle-outline" size={22} color={colors.successFg} />
+            <View style={styles.emptyRow}>
+              <MaterialCommunityIcons name="check-circle" size={18} color={ui.ringOk} />
               <Text style={styles.emptyText}>All vaccinations up to date!</Text>
             </View>
           ) : (
-            upcoming.map((vax) => (
-              <VaxCard
+            upcoming.map((vax, i) => (
+              <View
                 key={vax.id}
-                vax={vax}
-                onComplete={() => confirmComplete(vax)}
-                onDelete={() => confirmDelete(vax)}
-              />
+                style={[styles.vaxRow, i < upcoming.length - 1 && styles.rowDivider]}
+              >
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.rowTitle}>{vax.name}</Text>
+                  <Text style={styles.rowSub}>Due {formatDisplay(vax.dueDate) || vax.dueDate}</Text>
+                  {PILL_STATUS[vax.status] ? (
+                    <StatusPill status={PILL_STATUS[vax.status]} style={{ marginTop: 4 }} />
+                  ) : null}
+                </View>
+                <Button small variant="soft" label="Mark done" onPress={() => confirmComplete(vax)} />
+                <Pressable onPress={() => confirmDelete(vax)} hitSlop={hit}>
+                  <MaterialCommunityIcons name="trash-can-outline" size={18} color={ui.faint} />
+                </Pressable>
+              </View>
             ))
           )}
-        </Section>
+        </Card>
 
-        {/* Completed */}
+        {/* History */}
         {completed.length > 0 && (
-          <Section title="Completed" count={completed.length}>
-            {completed.map((vax) => (
-              <VaxCard key={vax.id} vax={vax} onDelete={() => confirmDelete(vax)} />
-            ))}
-          </Section>
+          <>
+            <Text style={[type.sectionLabel, styles.sectionLabel]}>History</Text>
+            <Card style={styles.sectionCard}>
+              {completed.map((vax, i) => (
+                <View
+                  key={vax.id}
+                  style={[styles.historyRow, i < completed.length - 1 && styles.rowDivider]}
+                >
+                  <MaterialCommunityIcons name="check-circle" size={18} color={ui.ringOk} />
+                  <Text style={styles.historyTitle}>{vax.name}</Text>
+                  <Text style={styles.historyDate}>
+                    {formatDisplay(vax.administeredDate?.split('T')[0]) || 'Done'}
+                  </Text>
+                  <Pressable onPress={() => confirmDelete(vax)} hitSlop={hit}>
+                    <MaterialCommunityIcons name="trash-can-outline" size={16} color={ui.faint} />
+                  </Pressable>
+                </View>
+              ))}
+            </Card>
+          </>
         )}
 
-        <TouchableOpacity
-          style={styles.addBtn}
+        <Button
+          icon="plus"
+          label="Schedule vaccination"
           onPress={() => setModal(true)}
-          activeOpacity={0.88}
-        >
-          <MaterialCommunityIcons name="plus" size={20} color={colors.onPrimary} />
-          <Text style={styles.addBtnText}>Schedule New Vaccination</Text>
-        </TouchableOpacity>
+          style={styles.addBtn}
+        />
       </ScrollView>
 
-      {/* Add Vaccination Modal */}
-      <Modal visible={modal} transparent animationType="slide">
-        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>New Vaccination</Text>
-            <View style={{ gap: spacing.md }}>
-              <View style={{ gap: 8 }}>
-                <Text style={styles.inputLabel}>Vaccine Name</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. Rabies Booster"
-                  placeholderTextColor={colors.outlineVariant}
-                  value={form.name}
-                  onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
-                  autoFocus
-                />
-              </View>
+      {/* Add vaccination sheet */}
+      <Sheet
+        visible={modal}
+        onClose={() => { setModal(false); setForm({ name: '', dueDate: '' }); }}
+        title="New vaccination"
+      >
+        <View>
+          <Text style={[type.sectionLabel, styles.fieldLabel]}>Vaccine name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Rabies booster"
+            placeholderTextColor={ui.subtle}
+            value={form.name}
+            onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
+            autoFocus
+          />
+        </View>
 
-              <View style={{ gap: 8 }}>
-                <Text style={styles.inputLabel}>Due Date</Text>
-                <TouchableOpacity style={styles.dateBtn} onPress={() => setShowDatePicker(true)} activeOpacity={0.88}>
-                  <MaterialCommunityIcons name="calendar-month-outline" size={18} color={colors.primaryContainer} />
-                  <Text style={[styles.dateBtnText, !form.dueDate && styles.datePlaceholder]}>
-                    {form.dueDate ? formatDisplay(form.dueDate) : 'Select due date'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+        <View>
+          <Text style={[type.sectionLabel, styles.fieldLabel]}>Due date</Text>
+          <Pressable
+            style={({ pressed }) => [styles.dateBtn, pressed && { backgroundColor: '#fffdf8' }]}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={ui.accent} />
+            <Text style={[styles.dateText, !form.dueDate && { color: ui.subtle }]}>
+              {form.dueDate ? formatDisplay(form.dueDate) : 'Select due date'}
+            </Text>
+            <MaterialCommunityIcons name="pencil-outline" size={16} color={ui.faint} />
+          </Pressable>
+        </View>
 
-            <View style={styles.sheetActions}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => { setModal(false); setForm({ name: '', dueDate: '' }); }}
-                activeOpacity={0.88}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmBtn} onPress={handleAdd} activeOpacity={0.88}>
-                <Text style={styles.confirmText}>Schedule</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        <Button
+          label="Schedule"
+          onPress={handleAdd}
+          disabled={!form.name.trim() || !form.dueDate}
+        />
+      </Sheet>
 
       {showDatePicker && Platform.OS === 'android' && (
         <DateTimePicker
@@ -225,15 +228,15 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
         <Modal visible={showDatePicker} transparent animationType="slide">
           <View style={styles.iosOverlay}>
             <View style={styles.iosSheet}>
-              <View style={styles.sheetHandle} />
+              <View style={styles.iosHandle} />
               <View style={styles.iosHeader}>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={hit}>
                   <Text style={styles.iosCancel}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={styles.iosTitle}>Due Date</Text>
-                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                </Pressable>
+                <Text style={styles.iosTitle}>Due date</Text>
+                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={hit}>
                   <Text style={styles.iosDone}>Done</Text>
-                </TouchableOpacity>
+                </Pressable>
               </View>
               <DateTimePicker
                 value={dueDateObj}
@@ -246,307 +249,169 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
           </View>
         </Modal>
       )}
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        destructive={confirm?.destructive}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => { const a = confirm?.action; setConfirm(null); a?.(); }}
+      />
     </SafeAreaView>
   );
 }
 
-function SummaryChip({ icon, label, value, bg, fg }) {
+function Stat({ value, label }) {
   return (
-    <View style={[styles.summaryChip, { backgroundColor: bg }]}>
-      <MaterialCommunityIcons name={icon} size={18} color={fg} />
-      <Text style={[styles.summaryValue, { color: fg }]}>{value}</Text>
-      <Text style={[styles.summaryLabel, { color: fg }]}>{label}</Text>
-    </View>
-  );
-}
-
-function Section({ title, count, children }) {
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <View style={[styles.countBadge, { backgroundColor: colors.surfaceContainerHigh }]}>
-          <Text style={styles.countText}>{count}</Text>
-        </View>
-      </View>
-      <View style={styles.timeline}>{children}</View>
-    </View>
-  );
-}
-
-function VaxCard({ vax, onComplete, onDelete }) {
-  const s = STATUS_STYLES[vax.status] || STATUS_STYLES.upcoming;
-  const isComplete = vax.status === 'completed';
-
-  return (
-    <View style={[styles.vaxCard, isComplete && styles.vaxCardComplete]}>
-      {/* Timeline dot */}
-      <View style={styles.dotColumn}>
-        <View style={[styles.dot, { backgroundColor: s.bg, borderColor: s.dot }]}>
-          <MaterialCommunityIcons name={s.icon} size={14} color={s.fg} />
-        </View>
-        <View style={styles.dotLine} />
-      </View>
-
-      <View style={styles.vaxContent}>
-        <View style={styles.vaxHeader}>
-          <Text style={styles.vaxName}>{vax.name}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: s.bg }]}>
-            <Text style={[styles.statusText, { color: s.fg }]}>{s.label}</Text>
-          </View>
-        </View>
-        <View style={styles.vaxDateRow}>
-          <MaterialCommunityIcons name="calendar-outline" size={13} color={colors.outline} />
-          <Text style={styles.vaxDate}>
-            {isComplete
-              ? `Administered: ${formatDisplay(vax.administeredDate?.split('T')[0]) || 'Done'}`
-              : `Due: ${formatDisplay(vax.dueDate) || vax.dueDate}`
-            }
-          </Text>
-        </View>
-        <View style={styles.vaxActions}>
-          {!isComplete && onComplete && (
-            <TouchableOpacity style={styles.completeBtn} onPress={onComplete} activeOpacity={0.88}>
-              <MaterialCommunityIcons name="check" size={13} color={colors.successFg} />
-              <Text style={styles.completeBtnText}>Mark Done</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            onPress={onDelete}
-            style={styles.deleteBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <MaterialCommunityIcons name="delete-outline" size={16} color={colors.outline} />
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
+    <Card style={styles.statCard}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  scroll: { paddingBottom: spacing.xl },
+  safe: { flex: 1, backgroundColor: ui.background },
+  scroll: { paddingBottom: 32 },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.margin,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  back: {
-    width: 44,
-    height: 44,
-    borderRadius: radii.full,
-    backgroundColor: colors.surfaceContainerLow,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
+    gap: 14,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 18,
   },
-  pageTitle: { ...typography.headlineMd, color: colors.onSurface },
-  pageSubtitle: { ...typography.bodyMd, color: colors.onSurfaceVariant, fontSize: 14 },
-  petBadge: {
-    width: 46,
-    height: 46,
-    borderRadius: radii.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  petBadgeText: { ...typography.headlineMd, color: colors.primaryContainer, fontSize: 20 },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.margin,
-    marginBottom: spacing.md,
-  },
-  summaryChip: {
-    flex: 1,
-    padding: spacing.sm,
-    borderRadius: radii.xl,
-    alignItems: 'center',
-    gap: 2,
-    minHeight: 76,
-    justifyContent: 'center',
-  },
-  summaryValue: { ...typography.headlineMd, fontSize: 22, lineHeight: 28 },
-  summaryLabel: { ...typography.labelSm, fontSize: 11, fontFamily: 'PlusJakartaSans_600SemiBold' },
-  section: { paddingHorizontal: spacing.margin, marginBottom: spacing.md },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.md,
-  },
-  sectionTitle: { ...typography.titleLg, color: colors.onSurface },
-  countBadge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: radii.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xs,
-  },
-  countText: { ...typography.labelSm, color: colors.onSurfaceVariant, fontFamily: 'PlusJakartaSans_600SemiBold' },
-  timeline: { gap: spacing.sm },
-  vaxCard: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
-  },
-  vaxCardComplete: { opacity: 0.8 },
-  dotColumn: { alignItems: 'center', width: 32 },
-  dot: {
-    width: 32,
-    height: 32,
-    borderRadius: radii.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-  },
-  dotLine: { flex: 1, width: 2, backgroundColor: colors.surfaceContainerHigh, marginTop: 4, minHeight: 12 },
-  vaxContent: {
-    flex: 1,
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii.xl,
-    padding: spacing.md,
-    gap: spacing.xs,
-    ...shadows.card,
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: ui.surface,
     borderWidth: 1,
-    borderColor: colors.surfaceContainerLow,
-  },
-  vaxHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  vaxName: { ...typography.titleLg, color: colors.onSurface, flex: 1, marginRight: spacing.sm, fontSize: 16 },
-  statusBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radii.full,
-    flexShrink: 0,
-  },
-  statusText: { ...typography.labelSm, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11 },
-  vaxDateRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  vaxDate: { ...typography.bodyMd, color: colors.onSurfaceVariant, fontSize: 13 },
-  vaxActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
-  completeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1.5,
-    borderColor: colors.successBg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.full,
-    backgroundColor: 'rgba(26,107,58,0.05)',
-  },
-  completeBtnText: { ...typography.labelSm, color: colors.successFg, fontFamily: 'PlusJakartaSans_600SemiBold' },
-  deleteBtn: { marginLeft: 'auto', padding: 2 },
-  emptyState: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: radii.xl,
-    backgroundColor: colors.successBg,
-  },
-  emptyText: { ...typography.bodyMd, color: colors.successFg, fontSize: 14 },
-  addBtn: {
-    flexDirection: 'row',
+    borderColor: ui.border,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    marginHorizontal: spacing.margin,
-    borderRadius: radii.xl,
-    marginTop: spacing.sm,
-    minHeight: 56,
-    ...shadows.button,
   },
-  addBtnText: { ...typography.labelMd, color: colors.onPrimary, fontSize: 15 },
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderTopLeftRadius: radii.xxl,
-    borderTopRightRadius: radii.xxl,
-    padding: spacing.lg,
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
+  pageTitle: { ...type.screenTitle, color: ui.ink },
+  pageSubtitle: { ...type.secondary, color: ui.sub, marginTop: 2 },
+  petBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: radii.full,
-    backgroundColor: colors.outlineVariant,
-    alignSelf: 'center',
-    marginBottom: spacing.xs,
+  petBadgeText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 17 },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 24,
+    marginBottom: 20,
   },
-  sheetTitle: { ...typography.titleLg, color: colors.onSurface },
-  inputLabel: { ...typography.labelMd, color: colors.onSurface },
+  statCard: { flex: 1, alignItems: 'center', paddingVertical: 14, gap: 1 },
+  statValue: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 21,
+    letterSpacing: -0.3,
+    color: ui.ink,
+  },
+  statLabel: { ...type.secondary, fontSize: 11, color: ui.subtle },
+  sectionLabel: { marginHorizontal: 24, marginBottom: 10, marginTop: 6, color: ui.subtle },
+  sectionCard: { marginHorizontal: 24, marginBottom: 16 },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: ui.hairline },
+  vaxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+  },
+  rowTitle: { ...type.rowTitle, color: ui.ink },
+  rowSub: { ...type.secondary, color: ui.sub },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+  },
+  historyTitle: {
+    flex: 1,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13.5,
+    color: ui.ink,
+  },
+  historyDate: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, color: ui.subtle },
+  emptyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+  },
+  emptyText: { ...type.body, fontSize: 13, color: ui.sub },
+  addBtn: { marginHorizontal: 24, marginTop: 4 },
+  fieldLabel: { color: ui.subtle, marginBottom: 8 },
   input: {
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
     borderWidth: 1.5,
-    borderColor: colors.outlineVariant,
-    ...typography.bodyMd,
-    color: colors.onSurface,
-    minHeight: 52,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: radii.control,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
+    color: ui.ink,
   },
   dateBtn: {
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderWidth: 1.5,
-    borderColor: colors.outlineVariant,
-    minHeight: 52,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: radii.control,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    minHeight: 48,
   },
-  dateBtnText: { ...typography.bodyMd, color: colors.onSurface, flex: 1 },
-  datePlaceholder: { color: colors.outlineVariant },
-  sheetActions: { flexDirection: 'row', gap: spacing.sm },
-  cancelBtn: {
+  dateText: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.lg,
-    backgroundColor: colors.surfaceContainerHigh,
-    alignItems: 'center',
-    minHeight: 50,
-    justifyContent: 'center',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 14,
+    color: ui.ink,
   },
-  cancelText: { ...typography.labelMd, color: colors.onSurface },
-  confirmBtn: {
+  iosOverlay: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.lg,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    minHeight: 50,
-    justifyContent: 'center',
-    ...shadows.button,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(36, 26, 14, 0.35)',
   },
-  confirmText: { ...typography.labelMd, color: colors.onPrimary },
-  iosOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   iosSheet: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderTopLeftRadius: radii.xxl,
-    borderTopRightRadius: radii.xxl,
-    paddingBottom: spacing.xl,
+    backgroundColor: ui.surface,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
+    borderCurve: 'continuous',
+    paddingTop: 14,
+    paddingBottom: 30,
+  },
+  iosHandle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: ui.controlBorder,
   },
   iosHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: colors.surfaceContainerLow,
+    borderBottomColor: ui.hairline,
   },
-  iosTitle: { ...typography.titleLg, color: colors.onSurface },
-  iosCancel: { ...typography.labelMd, color: colors.onSurfaceVariant },
-  iosDone: { ...typography.labelMd, color: colors.primary },
+  iosTitle: { ...type.cardTitleSm, color: ui.ink },
+  iosCancel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13.5, color: ui.sub },
+  iosDone: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: ui.accent },
 });

@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
-import { colors, ui } from '../theme';
+import { ui } from '../theme';
 
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -41,7 +41,7 @@ function AuthStack() {
 
 function DashboardStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="Home" component={DashboardScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Reminders" component={RemindersScreen} />
@@ -52,7 +52,7 @@ function DashboardStack() {
 
 function PetsStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="PetsList" component={PetsListScreen} />
       <Stack.Screen name="PetProfile" component={PetProfileScreen} />
       <Stack.Screen name="AddPet" component={AddPetScreen} />
@@ -79,7 +79,7 @@ function HealthStack() {
 
 function CommunityStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: colors.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="CommunityFeed" component={CommunityScreen} />
       <Stack.Screen name="LostPets" component={LostPetsScreen} />
     </Stack.Navigator>
@@ -146,7 +146,7 @@ export default function AppNavigator() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: ui.background }}>
         <ActivityIndicator size="large" color={ui.accent} />
       </View>
     );

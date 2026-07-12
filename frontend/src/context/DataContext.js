@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
-import { PET_COLORS } from '../theme';
+import { PET_COLOR_PAIRS } from '../theme';
+
+const PET_BGS = PET_COLOR_PAIRS.map((p) => p.bg);
 import { get, post, patch, put, del, uploadDocument } from '../services/api';
 import { scheduleLocalReminders } from '../services/notifications';
 import { track } from '../services/analytics';
@@ -101,7 +103,7 @@ export const toPet = (apiPet, opts = {}) => {
   weightUnit: apiPet.weight_unit || 'kg',
   gender: apiPet.gender,
   microchipped: apiPet.microchipped,
-  color: apiPet.color || PET_COLORS[index % PET_COLORS.length],
+  color: apiPet.color || PET_BGS[index % PET_BGS.length],
   avatarUrl: apiPet.avatar_url || null,
   vaccinations: vaccinations.map(toVax),
   activities: activities.map(toAct),
@@ -394,7 +396,7 @@ export function DataProvider({ children }) {
         weight_unit: petData.weightUnit || 'kg',
         gender: petData.gender || null,
         microchipped: petData.microchipped || false,
-        color: PET_COLORS[state.pets.length % PET_COLORS.length],
+        color: petData.color || PET_BGS[state.pets.length % PET_BGS.length],
         avatar_url: petData.avatarUrl || null,
       });
       const newPet = toPet(apiPet, { index: state.pets.length });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Modal,
-  Alert, KeyboardAvoidingView, Platform, RefreshControl, ActivityIndicator, Linking,
+  View, Text, ScrollView, Pressable, StyleSheet, TextInput,
+  RefreshControl, ActivityIndicator, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,7 +9,8 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { pickRecordImage } from '../../services/imagePicker';
 import { buildExtractionPayload, extractionCount } from '../../utils/extraction';
-import { colors, typography, spacing, radii, shadows } from '../../theme';
+import { ui, type, radii } from '../../theme';
+import { Card, Chip, Button, Sheet, ConfirmDialog, showToast } from '../../components';
 
 const DOC_CATEGORIES = [
   { id: 'lab', label: 'Lab', icon: 'test-tube' },
@@ -23,8 +24,14 @@ const DOC_CATEGORIES = [
 const docMeta = (id) => DOC_CATEGORIES.find((c) => c.id === id) || DOC_CATEGORIES[DOC_CATEGORIES.length - 1];
 
 const APPT_STATUS = ['scheduled', 'completed', 'cancelled'];
-const statusColor = (s) =>
-  s === 'completed' ? colors.secondary : s === 'cancelled' ? colors.outline : colors.tertiary;
+const APPT_STATUS_STYLE = {
+  scheduled: { bg: ui.accentTint, fg: ui.accent },
+  completed: { bg: ui.successTint, fg: ui.success },
+  cancelled: { bg: ui.track, fg: ui.sub },
+};
+const apptStyle = (s) => APPT_STATUS_STYLE[s] || APPT_STATUS_STYLE.scheduled;
+
+const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 const fmtDateTime = (iso) =>
   iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
@@ -52,6 +59,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const [docModal, setDocModal] = useState(false);
   const [extractingId, setExtractingId] = useState(null);
   const [reviewDoc, setReviewDoc] = useState(null);
+  const [confirm, setConfirm] = useState(null);
 
   const load = useCallback(async () => {
     const data = await getPetRecords(petId);
@@ -73,15 +81,21 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const openDocument = async (doc) => {
     // Files live on a private disk — fetch a short-lived signed URL to view.
     const url = await getDocumentUrl(petId, doc.id);
-    if (!url) { Alert.alert('Could not open', 'This file could not be opened.'); return; }
-    Linking.openURL(url).catch(() => Alert.alert('Could not open', 'This file could not be opened.'));
+    if (!url) { showToast('Could not open this file'); return; }
+    Linking.openURL(url).catch(() => showToast('Could not open this file'));
   };
 
   const confirmDelete = (label, fn) =>
-    Alert.alert('Delete', `Remove this ${label}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: fn },
-    ]);
+    setConfirm({
+      title: `Delete ${label}`,
+      message: `Remove this ${label}?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+      action: async () => {
+        await fn();
+        showToast(`${cap(label)} removed`);
+      },
+    });
 
   // AI intake: extract once (the backend caches a completed extraction),
   // then open the review sheet. Re-opening a reviewed document is free.
@@ -93,7 +107,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
       setReviewDoc(updated);
       load();
     } catch (e) {
-      Alert.alert('Could not read document', e.message || 'Please try again.');
+      showToast(e.message || 'Could not read the document');
     } finally {
       setExtractingId(null);
     }
@@ -105,41 +119,46 @@ export default function MedicalRecordsScreen({ navigation, route }) {
       (result.vaccinations?.length || 0) + (result.medications?.length || 0) +
       (result.weight ? 1 : 0) + (result.expense ? 1 : 0) + (result.clinic ? 1 : 0);
     const skipped = result.skipped?.length || 0;
-    Alert.alert(
-      'Records added',
-      `${added} record${added === 1 ? '' : 's'} added to ${petName || 'your pet'}'s profile.` +
-        (skipped ? ` ${skipped} skipped (already existed).` : ''),
+    showToast(
+      `${added} record${added === 1 ? '' : 's'} added` +
+        (skipped ? ` · ${skipped} skipped` : ''),
     );
     load();
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={colors.onBackground} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Medical Records</Text>
-        <View style={{ width: 40 }} />
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.topRow}>
+        <Pressable
+          style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: ui.background }]}
+          onPress={() => navigation.goBack()}
+          hitSlop={hit}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
+        </Pressable>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.pageTitle}>Medical Records</Text>
+          {petName ? <Text style={styles.pageSubtitle}>{petName}</Text> : null}
+        </View>
       </View>
 
       {!records ? (
-        <View style={styles.loading}><ActivityIndicator color={colors.primaryContainer} /></View>
+        <View style={styles.loading}><ActivityIndicator color={ui.accent} /></View>
       ) : (
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primaryContainer} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
         >
           {/* Vet clinics */}
-          <Section title="Vet Clinics" onAdd={() => setClinicModal(true)}>
+          <Section title="Vet clinics" onAdd={() => setClinicModal(true)}>
             {clinics.length === 0 ? (
               <Empty icon="hospital-building" text={`Add ${petName || 'your pet'}'s vet clinic`} onPress={() => setClinicModal(true)} />
             ) : (
-              clinics.map((c) => (
-                <View key={c.id} style={styles.row}>
-                  <View style={[styles.rowIcon, { backgroundColor: colors.tertiaryFixed }]}>
-                    <MaterialCommunityIcons name="hospital-building" size={18} color={colors.tertiary} />
+              clinics.map((c, i) => (
+                <View key={c.id} style={[styles.row, i < clinics.length - 1 && styles.rowDivider]}>
+                  <View style={styles.rowIcon}>
+                    <MaterialCommunityIcons name="hospital-building" size={18} color={ui.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>{c.name}</Text>
@@ -148,13 +167,13 @@ export default function MedicalRecordsScreen({ navigation, route }) {
                     </Text>
                   </View>
                   {!!c.phone && (
-                    <TouchableOpacity onPress={() => Linking.openURL(`tel:${c.phone}`)} hitSlop={hit} style={styles.rowAction}>
-                      <MaterialCommunityIcons name="phone" size={18} color={colors.secondary} />
-                    </TouchableOpacity>
+                    <Pressable onPress={() => Linking.openURL(`tel:${c.phone}`)} hitSlop={hit} style={styles.rowAction}>
+                      <MaterialCommunityIcons name="phone" size={18} color={ui.accent} />
+                    </Pressable>
                   )}
-                  <TouchableOpacity onPress={() => confirmDelete('clinic', () => deleteClinic(petId, c.id).then(load))} hitSlop={hit} style={styles.rowAction}>
-                    <MaterialCommunityIcons name="close" size={16} color={colors.outline} />
-                  </TouchableOpacity>
+                  <Pressable onPress={() => confirmDelete('clinic', () => deleteClinic(petId, c.id).then(load))} hitSlop={hit} style={styles.rowAction}>
+                    <MaterialCommunityIcons name="close" size={16} color={ui.faint} />
+                  </Pressable>
                 </View>
               ))
             )}
@@ -165,10 +184,10 @@ export default function MedicalRecordsScreen({ navigation, route }) {
             {appointments.length === 0 ? (
               <Empty icon="calendar-clock" text="Log a vet appointment" onPress={() => setApptModal(true)} />
             ) : (
-              appointments.map((a) => (
-                <View key={a.id} style={styles.row}>
-                  <View style={[styles.rowIcon, { backgroundColor: colors.primaryFixed }]}>
-                    <MaterialCommunityIcons name="calendar-clock" size={18} color={colors.primaryContainer} />
+              appointments.map((a, i) => (
+                <View key={a.id} style={[styles.row, i < appointments.length - 1 && styles.rowDivider]}>
+                  <View style={styles.rowIcon}>
+                    <MaterialCommunityIcons name="calendar-clock" size={18} color={ui.accent} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>{a.title}</Text>
@@ -176,12 +195,12 @@ export default function MedicalRecordsScreen({ navigation, route }) {
                       {fmtDateTime(a.scheduledAt)}{a.clinicName ? ` · ${a.clinicName}` : ''}
                     </Text>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: `${statusColor(a.status)}1f` }]}>
-                    <Text style={[styles.statusText, { color: statusColor(a.status) }]}>{a.status}</Text>
+                  <View style={[styles.statusBadge, { backgroundColor: apptStyle(a.status).bg }]}>
+                    <Text style={[styles.statusText, { color: apptStyle(a.status).fg }]}>{a.status}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => confirmDelete('appointment', () => deleteAppointment(petId, a.id).then(load))} hitSlop={hit} style={styles.rowAction}>
-                    <MaterialCommunityIcons name="close" size={16} color={colors.outline} />
-                  </TouchableOpacity>
+                  <Pressable onPress={() => confirmDelete('appointment', () => deleteAppointment(petId, a.id).then(load))} hitSlop={hit} style={styles.rowAction}>
+                    <MaterialCommunityIcons name="close" size={16} color={ui.faint} />
+                  </Pressable>
                 </View>
               ))
             )}
@@ -192,12 +211,20 @@ export default function MedicalRecordsScreen({ navigation, route }) {
             {documents.length === 0 ? (
               <Empty icon="folder-multiple-outline" text="Upload a photo of a record" onPress={() => setDocModal(true)} />
             ) : (
-              documents.map((d) => {
+              documents.map((d, i) => {
                 const m = docMeta(d.category);
                 return (
-                  <TouchableOpacity key={d.id} style={styles.row} activeOpacity={0.85} onPress={() => openDocument(d)}>
-                    <View style={[styles.rowIcon, { backgroundColor: colors.secondaryFixed }]}>
-                      <MaterialCommunityIcons name={d.mime === 'application/pdf' ? 'file-pdf-box' : m.icon} size={18} color={colors.secondary} />
+                  <Pressable
+                    key={d.id}
+                    style={({ pressed }) => [
+                      styles.row,
+                      i < documents.length - 1 && styles.rowDivider,
+                      pressed && { backgroundColor: '#fffdf8' },
+                    ]}
+                    onPress={() => openDocument(d)}
+                  >
+                    <View style={styles.rowIcon}>
+                      <MaterialCommunityIcons name={d.mime === 'application/pdf' ? 'file-pdf-box' : m.icon} size={18} color={ui.accent} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.rowTitle} numberOfLines={1}>{d.title}</Text>
@@ -206,21 +233,21 @@ export default function MedicalRecordsScreen({ navigation, route }) {
                       </Text>
                     </View>
                     {extractingId === d.id ? (
-                      <ActivityIndicator size="small" color={colors.tertiary} style={styles.rowAction} />
+                      <ActivityIndicator size="small" color={ui.accent} style={styles.rowAction} />
                     ) : (
-                      <TouchableOpacity onPress={() => startExtraction(d)} hitSlop={hit} style={styles.rowAction}>
+                      <Pressable onPress={() => startExtraction(d)} hitSlop={hit} style={styles.rowAction}>
                         <MaterialCommunityIcons
                           name={d.extraction?._applied_at ? 'check-decagram' : 'creation'}
                           size={18}
-                          color={d.extraction?._applied_at ? colors.secondary : colors.tertiary}
+                          color={d.extraction?._applied_at ? ui.success : ui.accent}
                         />
-                      </TouchableOpacity>
+                      </Pressable>
                     )}
-                    <MaterialCommunityIcons name="open-in-new" size={16} color={colors.outlineVariant} />
-                    <TouchableOpacity onPress={() => confirmDelete('document', () => deleteDocument(petId, d.id).then(load))} hitSlop={hit} style={styles.rowAction}>
-                      <MaterialCommunityIcons name="close" size={16} color={colors.outline} />
-                    </TouchableOpacity>
-                  </TouchableOpacity>
+                    <MaterialCommunityIcons name="open-in-new" size={16} color={ui.faint} />
+                    <Pressable onPress={() => confirmDelete('document', () => deleteDocument(petId, d.id).then(load))} hitSlop={hit} style={styles.rowAction}>
+                      <MaterialCommunityIcons name="close" size={16} color={ui.faint} />
+                    </Pressable>
+                  </Pressable>
                 );
               })
             )}
@@ -255,6 +282,16 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         onApply={(payload) => applyExtraction(petId, reviewDoc.id, payload)}
         onDone={onApplied}
       />
+
+      <ConfirmDialog
+        visible={!!confirm}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        destructive={confirm?.destructive}
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => { const a = confirm?.action; setConfirm(null); a?.(); }}
+      />
     </SafeAreaView>
   );
 }
@@ -265,22 +302,48 @@ function Section({ title, onAdd, children }) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        <TouchableOpacity onPress={onAdd} style={styles.addIconBtn} hitSlop={hit}>
-          <MaterialCommunityIcons name="plus" size={18} color={colors.onPrimary} />
-        </TouchableOpacity>
+        <Text style={[type.sectionLabel, { color: ui.subtle }]}>{title}</Text>
+        <Pressable onPress={onAdd} hitSlop={hit} style={styles.addLink}>
+          <MaterialCommunityIcons name="plus" size={14} color={ui.accent} />
+          <Text style={styles.addLinkText}>Add</Text>
+        </Pressable>
       </View>
-      {children}
+      <Card>{children}</Card>
     </View>
   );
 }
 
 function Empty({ icon, text, onPress }) {
   return (
-    <TouchableOpacity style={styles.empty} onPress={onPress} activeOpacity={0.88}>
-      <MaterialCommunityIcons name={icon} size={24} color={colors.primaryContainer} />
+    <Pressable
+      style={({ pressed }) => [styles.empty, pressed && { backgroundColor: '#fffdf8' }]}
+      onPress={onPress}
+    >
+      <MaterialCommunityIcons name={icon} size={20} color={ui.faint} />
       <Text style={styles.emptyText}>{text}</Text>
-    </TouchableOpacity>
+    </Pressable>
+  );
+}
+
+// Shared form scaffold on top of the design-system Sheet: scrollable body,
+// inline error, Cancel/Save footer.
+function FormSheet({ visible, title, onClose, onSave, busy, saveLabel, error, saveDisabled, children }) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title={title} style={{ maxHeight: '88%' }}>
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        {children}
+        {!!error && <Text style={styles.error}>{error}</Text>}
+      </ScrollView>
+      <View style={styles.sheetActions}>
+        <Button variant="soft" label="Cancel" onPress={onClose} style={{ flex: 1 }} />
+        <Button
+          label={busy ? 'Saving…' : saveLabel}
+          onPress={onSave}
+          disabled={busy || saveDisabled}
+          style={{ flex: 1 }}
+        />
+      </View>
+    </Sheet>
   );
 }
 
@@ -305,14 +368,15 @@ function ClinicModal({ visible, onClose, onSave, onDone }) {
         notes: form.notes.trim() || null,
       });
       reset(); onClose(); await onDone();
+      showToast('Clinic added');
     } catch (e) { setError(e.message || 'Could not save the clinic.'); } finally { setBusy(false); }
   };
 
   const field = (key, placeholder, opts = {}) => (
     <TextInput
-      style={[styles.input, { marginTop: spacing.sm }]}
+      style={[styles.input, { marginTop: 12 }]}
       placeholder={placeholder}
-      placeholderTextColor={colors.outlineVariant}
+      placeholderTextColor={ui.subtle}
       value={form[key]}
       onChangeText={(v) => { setForm({ ...form, [key]: v }); setError(null); }}
       {...opts}
@@ -320,11 +384,11 @@ function ClinicModal({ visible, onClose, onSave, onDone }) {
   );
 
   return (
-    <Sheet visible={visible} title="Add vet clinic" onClose={close} onSave={save} busy={busy} saveLabel="Add Clinic" error={error}>
+    <FormSheet visible={visible} title="Add vet clinic" onClose={close} onSave={save} busy={busy} saveLabel="Add clinic" error={error}>
       <TextInput
         style={styles.input}
         placeholder="Clinic name"
-        placeholderTextColor={colors.outlineVariant}
+        placeholderTextColor={ui.subtle}
         value={form.name}
         onChangeText={(v) => { setForm({ ...form, name: v }); setError(null); }}
         autoFocus
@@ -333,7 +397,7 @@ function ClinicModal({ visible, onClose, onSave, onDone }) {
       {field('phone', 'Phone', { keyboardType: 'phone-pad' })}
       {field('email', 'Email', { keyboardType: 'email-address', autoCapitalize: 'none' })}
       {field('address', 'Address')}
-    </Sheet>
+    </FormSheet>
   );
 }
 
@@ -363,27 +427,32 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
         notes: notes.trim() || null,
       });
       reset(); onClose(); await onDone();
+      showToast('Appointment logged');
     } catch (e) { setError(e.message || 'Could not save the appointment.'); } finally { setBusy(false); }
   };
 
   return (
-    <Sheet visible={visible} title="Log appointment" onClose={close} onSave={save} busy={busy} saveLabel="Save" error={error}>
+    <FormSheet visible={visible} title="Log appointment" onClose={close} onSave={save} busy={busy} saveLabel="Save" error={error}>
       <TextInput
         style={styles.input}
         placeholder="Reason (e.g. Annual checkup)"
-        placeholderTextColor={colors.outlineVariant}
+        placeholderTextColor={ui.subtle}
         value={title}
         onChangeText={(v) => { setTitle(v); setError(null); }}
         autoFocus
       />
-      <TouchableOpacity style={[styles.input, styles.pickerBtn]} onPress={() => setShowDate(true)} activeOpacity={0.85}>
-        <MaterialCommunityIcons name="calendar" size={16} color={colors.primaryContainer} />
+      <Pressable
+        style={({ pressed }) => [styles.pickerBtn, pressed && { backgroundColor: '#fffdf8' }]}
+        onPress={() => setShowDate(true)}
+      >
+        <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={ui.accent} />
         <Text style={styles.pickerText}>{fmtDateTime(when.toISOString())}</Text>
-      </TouchableOpacity>
+        <MaterialCommunityIcons name="pencil-outline" size={14} color={ui.faint} />
+      </Pressable>
 
       {clinics.length > 0 && (
         <>
-          <Text style={styles.fieldLabel}>Clinic (optional)</Text>
+          <Text style={[type.sectionLabel, styles.fieldLabel]}>Clinic (optional)</Text>
           <View style={styles.chipWrap}>
             {clinics.map((c) => (
               <Chip key={c.id} label={c.name} active={clinicId === c.id} onPress={() => setClinicId(clinicId === c.id ? null : c.id)} />
@@ -392,10 +461,10 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
         </>
       )}
 
-      <Text style={styles.fieldLabel}>Status</Text>
+      <Text style={[type.sectionLabel, styles.fieldLabel]}>Status</Text>
       <View style={styles.chipWrap}>
         {APPT_STATUS.map((s) => (
-          <Chip key={s} label={s} active={status === s} onPress={() => setStatus(s)} capitalize />
+          <Chip key={s} label={cap(s)} active={status === s} onPress={() => setStatus(s)} />
         ))}
       </View>
 
@@ -428,7 +497,7 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
           }}
         />
       )}
-    </Sheet>
+    </FormSheet>
   );
 }
 
@@ -457,29 +526,33 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
     try {
       await onSave(file, { title: title.trim(), category });
       reset(); onClose(); await onDone();
+      showToast('Document uploaded');
     } catch (e) { setError(e.message || 'Could not upload the document.'); } finally { setBusy(false); }
   };
 
   return (
-    <Sheet visible={visible} title="Add document" onClose={close} onSave={save} busy={busy} saveLabel="Upload" error={error} saveDisabled={!file}>
-      <TouchableOpacity style={styles.fileBtn} onPress={pick} activeOpacity={0.85}>
-        <MaterialCommunityIcons name={file ? 'check-circle' : 'image-plus'} size={20} color={file ? colors.secondary : colors.primaryContainer} />
+    <FormSheet visible={visible} title="Add document" onClose={close} onSave={save} busy={busy} saveLabel="Upload" error={error} saveDisabled={!file}>
+      <Pressable
+        style={({ pressed }) => [styles.fileBtn, pressed && { backgroundColor: '#fffdf8' }]}
+        onPress={pick}
+      >
+        <MaterialCommunityIcons name={file ? 'check-circle' : 'image-plus'} size={20} color={file ? ui.success : ui.accent} />
         <Text style={styles.fileBtnText} numberOfLines={1}>{file ? file.name : 'Choose a photo of the record'}</Text>
-      </TouchableOpacity>
+      </Pressable>
       <TextInput
-        style={[styles.input, { marginTop: spacing.sm }]}
+        style={[styles.input, { marginTop: 12 }]}
         placeholder="Title (e.g. Rabies certificate)"
-        placeholderTextColor={colors.outlineVariant}
+        placeholderTextColor={ui.subtle}
         value={title}
         onChangeText={(v) => { setTitle(v); setError(null); }}
       />
-      <Text style={styles.fieldLabel}>Category</Text>
+      <Text style={[type.sectionLabel, styles.fieldLabel]}>Category</Text>
       <View style={styles.chipWrap}>
         {DOC_CATEGORIES.map((c) => (
-          <Chip key={c.id} label={c.label} icon={c.icon} active={category === c.id} onPress={() => setCategory(c.id)} />
+          <Chip key={c.id} label={c.label} active={category === c.id} onPress={() => setCategory(c.id)} />
         ))}
       </View>
-    </Sheet>
+    </FormSheet>
   );
 }
 
@@ -543,7 +616,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
   };
 
   return (
-    <Sheet
+    <FormSheet
       visible={visible}
       title="Review extracted info"
       onClose={onClose}
@@ -554,9 +627,9 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
       error={error}
     >
       {ex.matches_pet === false && (
-        <Banner icon="alert" color={colors.error} text={`This document may belong to a different pet than ${petName || 'this one'}. Double-check before applying.`} />
+        <Banner icon="alert" tone="danger" text={`This document may belong to a different pet than ${petName || 'this one'}. Double-check before applying.`} />
       )}
-      {!!ex.notes_for_owner && <Banner icon="information" color={colors.tertiary} text={ex.notes_for_owner} />}
+      {!!ex.notes_for_owner && <Banner icon="information" tone="info" text={ex.notes_for_owner} />}
 
       {nothingFound ? (
         <Text style={styles.exEmpty}>No medical data was found in this document.</Text>
@@ -565,7 +638,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
           {sel.vaccinations.length > 0 && <ExGroup icon="needle" label="Vaccinations" />}
           {sel.vaccinations.map((v, i) => (
             <PickRow key={`vax-${i}`} included={v.included} onToggle={() => setVax(i, { included: !v.included })}>
-              <TextInput style={styles.exInput} value={v.name} placeholder="Vaccine name" placeholderTextColor={colors.outlineVariant} onChangeText={(t) => setVax(i, { name: t })} />
+              <TextInput style={styles.exInput} value={v.name} placeholder="Vaccine name" placeholderTextColor={ui.subtle} onChangeText={(t) => setVax(i, { name: t })} />
               <View style={styles.exDates}>
                 <ExDate label="Given" value={v.administered} onChange={(t) => setVax(i, { administered: t })} />
                 <ExDate label="Next due" value={v.due} onChange={(t) => setVax(i, { due: t })} />
@@ -576,9 +649,9 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
           {sel.medications.length > 0 && <ExGroup icon="pill" label="Medications" />}
           {sel.medications.map((m, i) => (
             <PickRow key={`med-${i}`} included={m.included} onToggle={() => setMed(i, { included: !m.included })}>
-              <TextInput style={styles.exInput} value={m.name} placeholder="Medication name" placeholderTextColor={colors.outlineVariant} onChangeText={(t) => setMed(i, { name: t })} />
+              <TextInput style={styles.exInput} value={m.name} placeholder="Medication name" placeholderTextColor={ui.subtle} onChangeText={(t) => setMed(i, { name: t })} />
               <View style={styles.exDates}>
-                <TextInput style={[styles.exInput, { flex: 1 }]} value={m.dosage} placeholder="Dosage" placeholderTextColor={colors.outlineVariant} onChangeText={(t) => setMed(i, { dosage: t })} />
+                <TextInput style={[styles.exInput, { flex: 1 }]} value={m.dosage} placeholder="Dosage" placeholderTextColor={ui.subtle} onChangeText={(t) => setMed(i, { dosage: t })} />
                 {!!m.frequency && <Text style={styles.exHint}>{m.frequency.replace('_', ' ')}</Text>}
               </View>
             </PickRow>
@@ -613,7 +686,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
             <>
               <ExGroup icon="hospital-building" label="Clinic" />
               <PickRow included={sel.clinic.included} onToggle={() => setSel({ ...sel, clinic: { ...sel.clinic, included: !sel.clinic.included } })}>
-                <TextInput style={styles.exInput} value={sel.clinic.name} placeholder="Clinic name" placeholderTextColor={colors.outlineVariant} onChangeText={(t) => setSel({ ...sel, clinic: { ...sel.clinic, name: t } })} />
+                <TextInput style={styles.exInput} value={sel.clinic.name} placeholder="Clinic name" placeholderTextColor={ui.subtle} onChangeText={(t) => setSel({ ...sel, clinic: { ...sel.clinic, name: t } })} />
               </PickRow>
             </>
           )}
@@ -630,15 +703,21 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
           <Text style={styles.exToggleText}>Set category to {docMeta(ex.document_type).label}</Text>
         </PickRow>
       )}
-    </Sheet>
+    </FormSheet>
   );
 }
 
-function Banner({ icon, color, text }) {
+const BANNER_TONES = {
+  danger: { bg: ui.dangerTint, fg: ui.dangerText },
+  info: { bg: ui.accentTint, fg: ui.accent },
+};
+
+function Banner({ icon, tone = 'info', text }) {
+  const t = BANNER_TONES[tone] || BANNER_TONES.info;
   return (
-    <View style={[styles.exBanner, { borderColor: `${color}55`, backgroundColor: `${color}14` }]}>
-      <MaterialCommunityIcons name={icon} size={16} color={color} />
-      <Text style={[styles.exBannerText, { color }]}>{text}</Text>
+    <View style={[styles.exBanner, { backgroundColor: t.bg }]}>
+      <MaterialCommunityIcons name={icon} size={16} color={t.fg} />
+      <Text style={[styles.exBannerText, { color: t.fg }]}>{text}</Text>
     </View>
   );
 }
@@ -646,8 +725,8 @@ function Banner({ icon, color, text }) {
 function ExGroup({ icon, label }) {
   return (
     <View style={styles.exGroup}>
-      <MaterialCommunityIcons name={icon} size={15} color={colors.onSurfaceVariant} />
-      <Text style={styles.exGroupText}>{label}</Text>
+      <MaterialCommunityIcons name={icon} size={14} color={ui.subtle} />
+      <Text style={[type.sectionLabel, { color: ui.subtle }]}>{label}</Text>
     </View>
   );
 }
@@ -655,14 +734,14 @@ function ExGroup({ icon, label }) {
 function PickRow({ included, onToggle, children }) {
   return (
     <View style={[styles.exRow, !included && { opacity: 0.45 }]}>
-      <TouchableOpacity onPress={onToggle} hitSlop={hit} style={styles.exCheck}>
+      <Pressable onPress={onToggle} hitSlop={hit} style={styles.exCheck}>
         <MaterialCommunityIcons
           name={included ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
           size={22}
-          color={included ? colors.secondary : colors.outlineVariant}
+          color={included ? ui.accent : ui.faint}
         />
-      </TouchableOpacity>
-      <View style={{ flex: 1, gap: spacing.xs }}>{children}</View>
+      </Pressable>
+      <View style={{ flex: 1, gap: 6 }}>{children}</View>
     </View>
   );
 }
@@ -675,7 +754,7 @@ function ExDate({ label, value, onChange }) {
         style={[styles.exInput, styles.exDateInput]}
         value={value}
         placeholder="YYYY-MM-DD"
-        placeholderTextColor={colors.outlineVariant}
+        placeholderTextColor={ui.subtle}
         onChangeText={onChange}
         autoCapitalize="none"
       />
@@ -683,155 +762,156 @@ function ExDate({ label, value, onChange }) {
   );
 }
 
-function Chip({ label, icon, active, onPress, capitalize }) {
-  return (
-    <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress} activeOpacity={0.85}>
-      {icon && <MaterialCommunityIcons name={icon} size={13} color={active ? colors.onPrimary : colors.onSurfaceVariant} />}
-      <Text style={[styles.chipText, capitalize && { textTransform: 'capitalize' }, active && { color: colors.onPrimary }]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function Sheet({ visible, title, onClose, onSave, busy, saveLabel, error, saveDisabled, children }) {
-  return (
-    <Modal visible={visible} transparent animationType="slide">
-      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.modalSheet}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.modalTitle}>{title}</Text>
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {children}
-            {!!error && <Text style={styles.error}>{error}</Text>}
-          </ScrollView>
-          <View style={styles.modalActions}>
-            <TouchableOpacity style={styles.modalCancel} onPress={onClose} activeOpacity={0.88}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalAdd, (busy || saveDisabled) && { opacity: 0.5 }]}
-              onPress={onSave}
-              disabled={busy || saveDisabled}
-              activeOpacity={0.88}
-            >
-              <Text style={styles.modalAddText}>{busy ? 'Saving…' : saveLabel}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.margin, paddingTop: spacing.sm, paddingBottom: spacing.sm,
+  safe: { flex: 1, backgroundColor: ui.background },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 6,
   },
-  iconBtn: {
-    width: 40, height: 40, borderRadius: radii.full,
-    backgroundColor: colors.surfaceContainerLow, justifyContent: 'center', alignItems: 'center',
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: ui.surface,
+    borderWidth: 1,
+    borderColor: ui.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerTitle: { ...typography.titleLg, color: colors.onBackground },
+  pageTitle: { ...type.screenTitle, color: ui.ink },
+  pageSubtitle: { ...type.secondary, color: ui.sub, marginTop: 2 },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  scroll: { paddingBottom: spacing.xl },
-  section: {
-    backgroundColor: colors.surfaceContainerLowest,
-    marginHorizontal: spacing.margin, marginTop: spacing.md,
-    padding: spacing.md, borderRadius: radii.xl,
-    ...shadows.card, borderWidth: 1, borderColor: colors.surfaceContainerLow,
+  scroll: { paddingBottom: 32 },
+  section: { marginHorizontal: 24, marginTop: 18 },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  sectionTitle: { ...typography.titleLg, color: colors.onSurface },
-  addIconBtn: {
-    width: 30, height: 30, borderRadius: radii.full,
-    backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center',
-  },
+  addLink: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  addLinkText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.accent },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: ui.hairline },
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    paddingVertical: spacing.sm, borderTopWidth: 1, borderTopColor: colors.surfaceContainerLow,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  rowIcon: { width: 38, height: 38, borderRadius: radii.full, justifyContent: 'center', alignItems: 'center' },
-  rowTitle: { ...typography.labelMd, color: colors.onSurface },
-  rowSub: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 1 },
-  rowAction: { paddingLeft: spacing.xs },
-  statusBadge: { paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radii.full },
-  statusText: { ...typography.labelSm, textTransform: 'capitalize' },
+  rowIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: ui.track,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rowTitle: { ...type.rowTitle, color: ui.ink },
+  rowSub: { ...type.secondary, color: ui.sub, marginTop: 1 },
+  rowAction: { paddingLeft: 4 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
+  statusText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    textTransform: 'capitalize',
+  },
   empty: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    paddingVertical: spacing.sm, paddingHorizontal: spacing.sm,
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.lg,
-    borderWidth: 1.5, borderColor: colors.outlineVariant, borderStyle: 'dashed',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
   },
-  emptyText: { ...typography.labelMd, color: colors.onSurfaceVariant },
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  modalSheet: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderTopLeftRadius: radii.xxl, borderTopRightRadius: radii.xxl,
-    padding: spacing.lg, paddingBottom: spacing.xl, maxHeight: '88%',
-  },
-  sheetHandle: { width: 40, height: 4, borderRadius: radii.full, backgroundColor: colors.outlineVariant, alignSelf: 'center', marginBottom: spacing.md },
-  modalTitle: { ...typography.titleLg, color: colors.onSurface, marginBottom: spacing.md },
+  emptyText: { ...type.body, fontSize: 13, color: ui.subtle },
+  error: { ...type.secondary, color: ui.danger, marginTop: 12 },
+  sheetActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   input: {
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.md,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.sm,
-    borderWidth: 1.5, borderColor: colors.outlineVariant,
-    ...typography.bodyMd, color: colors.onSurface, minHeight: 50,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: radii.control,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
+    color: ui.ink,
+    minHeight: 48,
   },
-  pickerBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
-  pickerText: { ...typography.bodyMd, color: colors.onSurface },
+  pickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: radii.control,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    minHeight: 48,
+    marginTop: 12,
+  },
+  pickerText: {
+    flex: 1,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 14,
+    color: ui.ink,
+  },
   fileBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    paddingVertical: spacing.md, paddingHorizontal: spacing.sm,
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.lg,
-    borderWidth: 1.5, borderColor: colors.outlineVariant, borderStyle: 'dashed',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderRadius: radii.control,
+    borderWidth: 1.5,
+    borderColor: ui.faint,
+    borderStyle: 'dashed',
+    backgroundColor: ui.background,
   },
-  fileBtnText: { ...typography.labelMd, color: colors.onSurfaceVariant, flex: 1 },
-  fieldLabel: { ...typography.labelMd, color: colors.onSurfaceVariant, marginTop: spacing.md, marginBottom: spacing.xs },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs + 2, borderRadius: radii.full,
-    backgroundColor: colors.surfaceContainerLow, borderWidth: 1.5, borderColor: colors.outlineVariant,
-  },
-  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  error: { ...typography.labelSm, color: colors.error, marginTop: spacing.sm },
-  modalActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  modalCancel: {
-    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.lg,
-    backgroundColor: colors.surfaceContainerHigh, alignItems: 'center', minHeight: 48, justifyContent: 'center',
-  },
-  modalCancelText: { ...typography.labelMd, color: colors.onSurface },
-  modalAdd: {
-    flex: 1, paddingVertical: spacing.sm, borderRadius: radii.lg,
-    backgroundColor: colors.primary, alignItems: 'center', minHeight: 48, justifyContent: 'center', ...shadows.button,
-  },
-  modalAddText: { ...typography.labelMd, color: colors.onPrimary },
+  fileBtnText: { ...type.rowTitle, color: ui.sub, flex: 1 },
+  fieldLabel: { color: ui.subtle, marginTop: 18, marginBottom: 8 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 
   // AI extraction review sheet
   exBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.xs,
-    padding: spacing.sm, borderRadius: radii.md, borderWidth: 1, marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: radii.control,
+    marginBottom: 10,
   },
-  exBannerText: { ...typography.labelSm, flex: 1 },
-  exGroup: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.md, marginBottom: spacing.xs },
-  exGroupText: { ...typography.labelMd, color: colors.onSurfaceVariant },
+  exBannerText: { ...type.secondary, flex: 1 },
+  exGroup: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, marginBottom: 6 },
   exRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
-    paddingVertical: spacing.xs, marginTop: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 4,
+    marginTop: 4,
   },
   exCheck: { paddingTop: 6 },
   exInput: {
-    backgroundColor: colors.surfaceContainerLow, borderRadius: radii.md,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.xs,
-    borderWidth: 1, borderColor: colors.outlineVariant,
-    ...typography.bodyMd, color: colors.onSurface, minHeight: 40,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: radii.control,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13.5,
+    color: ui.ink,
+    minHeight: 40,
   },
-  exDates: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  exDateWrap: { flex: 1, gap: 2 },
+  exDates: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  exDateWrap: { flex: 1, gap: 3 },
   exDateInput: { minHeight: 36, paddingVertical: 4 },
-  exHint: { ...typography.labelSm, color: colors.onSurfaceVariant },
-  exToggleText: { ...typography.labelMd, color: colors.onSurface, paddingTop: 8 },
-  exEmpty: { ...typography.bodyMd, color: colors.onSurfaceVariant, paddingVertical: spacing.md, textAlign: 'center' },
+  exHint: { ...type.secondary, color: ui.subtle },
+  exToggleText: { ...type.rowTitle, color: ui.ink, paddingTop: 8 },
+  exEmpty: { ...type.body, color: ui.sub, paddingVertical: 20, textAlign: 'center' },
 });

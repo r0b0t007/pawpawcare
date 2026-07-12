@@ -45,8 +45,8 @@ function App() {
 
   if (!fontsLoaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff8f4' }}>
-        <ActivityIndicator size="large" color="#855300" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fffaf6' }}>
+        <ActivityIndicator size="large" color="#8a5300" />
       </View>
     );
   }
@@ -70,7 +70,7 @@ function App() {
                 routeNameRef.current = current;
               }}
             >
-              <StatusBar style="dark" backgroundColor="#fff8f4" />
+              <StatusBar style="dark" backgroundColor="#fffaf6" />
               <AppNavigator />
               <ToastHost />
             </ObserveNavigationContainer>
