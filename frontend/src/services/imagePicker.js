@@ -3,7 +3,9 @@ import { uploadImage } from './api';
 
 /**
  * Let the user pick a photo and upload it. Resolves to:
- *   { url } on success · { canceled: true } · { error } (permission/upload failure)
+ *   { url } on success · { canceled: true } · { error } (permission failure)
+ *   · { error, uri } (upload failure — the picked local uri is retained so
+ *     callers can show it and retry the upload without re-picking)
  */
 export async function pickAndUploadImage({ aspect = [1, 1] } = {}) {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -17,11 +19,12 @@ export async function pickAndUploadImage({ aspect = [1, 1] } = {}) {
   });
   if (result.canceled) return { canceled: true };
 
+  const uri = result.assets[0].uri;
   try {
-    const url = await uploadImage(result.assets[0].uri);
+    const url = await uploadImage(uri);
     return { url };
   } catch (e) {
-    return { error: e?.message || 'upload_failed' };
+    return { error: e?.message || 'upload_failed', uri };
   }
 }
 

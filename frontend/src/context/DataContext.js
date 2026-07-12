@@ -236,6 +236,9 @@ function dataReducer(state, action) {
     case 'SET_LOST_PETS':     return { ...state, lostPets: action.payload };
     case 'SET_MY_REPORTS':    return { ...state, myReports: action.payload };
     case 'SET_INVITES':       return { ...state, invites: action.payload };
+    // Trust: when the store last successfully synced with the server (ms
+    // epoch, or null before the first sync / after logout).
+    case 'SET_LAST_SYNCED':   return { ...state, lastSyncedAt: action.payload };
     default:           return state;
   }
 }
@@ -245,7 +248,7 @@ function dataReducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
-    lostPets: [], myReports: [], invites: [], dataLoaded: false,
+    lostPets: [], myReports: [], invites: [], dataLoaded: false, lastSyncedAt: null,
   });
   const { user, logout } = useAuth();
   // Bridge to React Query while domains migrate off this store: mutations here
@@ -265,6 +268,7 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_LOST_PETS', payload: [] });
       dispatch({ type: 'SET_MY_REPORTS', payload: [] });
       dispatch({ type: 'SET_INVITES', payload: [] });
+      dispatch({ type: 'SET_LAST_SYNCED', payload: null });
     }
   }, [user?.id]);
 
@@ -320,6 +324,10 @@ export function DataProvider({ children }) {
     }
     // Initial fan-out finished (even with failures) — screens can report TTI.
     dispatch({ type: 'SET_DATA_LOADED', payload: true });
+    // Only stamp the sync time when every domain landed — a partial load must
+    // not read as "synced" (honest state; refreshReminders stamps on its own
+    // success, so a reminders-only recovery still updates the line).
+    if (!failed.length) dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
   };
 
   // ── Reminders & notifications ──
@@ -331,6 +339,7 @@ export function DataProvider({ children }) {
     try {
       const reminders = await get('/reminders');
       dispatch({ type: 'SET_REMINDERS', payload: reminders });
+      dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
       scheduleLocalReminders(reminders);
     } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
@@ -991,6 +1000,7 @@ export function DataProvider({ children }) {
     <DataContext.Provider
       value={{
         dataLoaded: state.dataLoaded,
+        lastSyncedAt: state.lastSyncedAt,
         pets: state.pets,
         posts: state.posts,
         groups: state.groups,

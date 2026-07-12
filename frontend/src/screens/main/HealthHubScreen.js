@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TextInput, Pressable, Platform, StyleSheet,
 } from 'react-native';
@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
+import { getPref } from '../../services/prefs';
 import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
 import { Card, Chip, Button, Sheet, showToast } from '../../components';
 
@@ -23,6 +24,19 @@ const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
 const fmtShort = (date) =>
   date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+// "Synced just now" / "Synced 5m ago" / "Synced 2h ago" — quiet trust line.
+const syncedLabel = (ts) => {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return 'Synced just now';
+  if (diff < 3600000) return `Synced ${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `Synced ${Math.floor(diff / 3600000)}h ago`;
+  return `Synced ${Math.floor(diff / 86400000)}d ago`;
+};
+
+// "Tue 9:00 AM" — when the local notification for a reminder will fire.
+const fmtDelivery = (date) =>
+  `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+
 const RECORD_TYPES = ['Vaccine', 'Vet visit', 'Medication', 'Weight'];
 
 const defaultDueDate = () => {
@@ -32,9 +46,18 @@ const defaultDueDate = () => {
 };
 
 export default function HealthHubScreen({ navigation }) {
-  const { pets, reminders, addVaccination, markVaccinationComplete } = useData();
+  const { pets, reminders, lastSyncedAt, addVaccination, markVaccinationComplete } = useData();
 
   const [filter, setFilter] = useState('all');
+  // Whether local reminder notifications are on (Profile → "Care reminders").
+  // null while loading — no delivery pill is shown until we know the truth.
+  const [remindersPrefOn, setRemindersPrefOn] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    getPref('careReminders', true).then((v) => { if (alive) setRemindersPrefOn(!!v); });
+    return () => { alive = false; };
+  }, []);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [recType, setRecType] = useState('Vaccine');
   const [recPetId, setRecPetId] = useState(null);
@@ -78,6 +101,10 @@ export default function HealthHubScreen({ navigation }) {
                   ? `${(r.recurrence || 'daily').replace(/^\w/, (c) => c.toUpperCase())} reminder`
                   : 'Reminder',
               icon: 'bell-outline',
+              // Backend reminders are delivered as local notifications on this
+              // device — the row can honestly state when. Vaccination rows
+              // never get this flag (their reminders are backend-created).
+              isReminder: true,
               onPress: () => navigation.navigate('Reminders'),
             }))
         : []),
@@ -157,7 +184,15 @@ export default function HealthHubScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Text style={[type.screenTitle, { color: ui.ink }]}>Health</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[type.screenTitle, { color: ui.ink }]}>Health</Text>
+            {lastSyncedAt != null && (
+              <View style={styles.syncRow}>
+                <MaterialCommunityIcons name="cloud-check" size={13} color={ui.ringOk} />
+                <Text style={styles.syncText}>{syncedLabel(lastSyncedAt)}</Text>
+              </View>
+            )}
+          </View>
           <Button pill icon="plus" label="Add record" onPress={openSheet} />
         </View>
 
@@ -251,6 +286,25 @@ export default function HealthHubScreen({ navigation }) {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.rowTitle}>{item.title}</Text>
                       <Text style={styles.rowSub}>{item.sub}</Text>
+                      {item.isReminder && remindersPrefOn !== null && (
+                        remindersPrefOn ? (
+                          <View style={[styles.deliveryPill, { backgroundColor: ui.successTint }]}>
+                            <MaterialCommunityIcons name="bell-check-outline" size={11} color={ui.success} />
+                            <Text style={[styles.deliveryPillText, { color: ui.success }]}>
+                              Scheduled · {fmtDelivery(item.date)} · this device
+                            </Text>
+                          </View>
+                        ) : (
+                          // Honest state: local scheduling is off, so no
+                          // notification will fire — never fake reassurance.
+                          <View style={[styles.deliveryPill, { backgroundColor: ui.track }]}>
+                            <MaterialCommunityIcons name="bell-off-outline" size={11} color={ui.subtle} />
+                            <Text style={[styles.deliveryPillText, { color: ui.subtle }]}>
+                              Notifications off
+                            </Text>
+                          </View>
+                        )
+                      )}
                     </View>
                     <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} />
                   </Pressable>
@@ -377,6 +431,8 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 16,
   },
+  syncRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
+  syncText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: ui.subtle },
   filters: { gap: 8, paddingHorizontal: 24, paddingBottom: 20 },
   sectionLabel: { marginHorizontal: 24, marginBottom: 10, marginTop: 6 },
   sectionCard: { marginHorizontal: 24, marginBottom: 16 },
@@ -423,6 +479,17 @@ const styles = StyleSheet.create({
   typeChipText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13 },
   rowTitle: { ...type.rowTitle, color: ui.ink },
   rowSub: { ...type.secondary, color: ui.sub },
+  deliveryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingVertical: 2,
+    paddingHorizontal: 7,
+    borderRadius: 999,
+    marginTop: 4,
+  },
+  deliveryPillText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10.5 },
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',

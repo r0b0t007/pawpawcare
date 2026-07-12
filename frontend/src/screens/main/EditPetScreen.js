@@ -39,6 +39,9 @@ export default function EditPetScreen({ navigation, route }) {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // Local uri of a picked photo whose upload failed — keep showing the chosen
+  // image (never saved as avatarUrl) so the user can just tap again to retry.
+  const [localPreview, setLocalPreview] = useState(null);
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
@@ -56,9 +59,12 @@ export default function EditPetScreen({ navigation, route }) {
     setUploading(true);
     const res = await pickAndUploadImage({ aspect: [1, 1] });
     setUploading(false);
-    if (res.url) set('avatarUrl', res.url);
+    if (res.url) { set('avatarUrl', res.url); setLocalPreview(null); }
     else if (res.error === 'permission') showToast('Allow photo access to set a pet photo');
-    else if (res.error) showToast('Could not upload that image — try again');
+    else if (res.error) {
+      if (res.uri) setLocalPreview(res.uri);
+      showToast('Could not upload that image — try again');
+    }
   };
 
   const handleSave = async () => {
@@ -113,6 +119,8 @@ export default function EditPetScreen({ navigation, route }) {
               <View style={[styles.avatar, { backgroundColor: form.color }]}>
                 {uploading ? (
                   <ActivityIndicator color={petFg(form.color)} />
+                ) : localPreview ? (
+                  <Image source={{ uri: localPreview }} style={styles.avatarImg} />
                 ) : form.avatarUrl ? (
                   <Image source={{ uri: resolveAsset(form.avatarUrl) }} style={styles.avatarImg} />
                 ) : (
