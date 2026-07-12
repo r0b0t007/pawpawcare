@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput, Switch, Platform,
+  View, Text, ScrollView, Pressable, StyleSheet, TextInput, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { colors, typography, spacing, radii, shadows } from '../../theme';
+import { ui, radii, type } from '../../theme';
+import { Card, Button, ConfirmDialog, showToast } from '../../components';
 
 const TYPE_ICON = {
   vaccination: 'needle',
@@ -45,6 +46,7 @@ export default function RemindersScreen({ navigation }) {
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const canSave = title.trim().length > 0 && when.getTime() > Date.now();
 
@@ -60,48 +62,56 @@ export default function RemindersScreen({ navigation }) {
     setTitle('');
     setWhen(defaultWhen());
     setSaving(false);
+    showToast('Reminder added');
+  };
+
+  const confirmDelete = () => {
+    const r = pendingDelete;
+    setPendingDelete(null);
+    if (!r) return;
+    deleteReminder(r.id);
+    showToast('Reminder deleted');
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.iconBtn}
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.topRow}>
+        <Pressable
+          style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: ui.background }]}
           onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={colors.onBackground} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reminders</Text>
-        <View style={{ width: 40 }} />
+          <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
+        </Pressable>
+        <Text style={styles.title} numberOfLines={1}>Reminders</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Add custom reminder */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>New reminder</Text>
+        <Card padded style={styles.formCard}>
+          <Text style={styles.formLabel}>New reminder</Text>
           <TextInput
             style={styles.input}
             placeholder="e.g. Give Rex his heartworm pill"
-            placeholderTextColor={colors.outline}
+            placeholderTextColor={ui.subtle}
             value={title}
             onChangeText={setTitle}
           />
-          <TouchableOpacity style={styles.whenRow} onPress={() => setShowDate(true)} activeOpacity={0.85}>
-            <MaterialCommunityIcons name="calendar-clock" size={18} color={colors.primaryContainer} />
-            <Text style={styles.whenText}>{formatWhen(when.toISOString())}</Text>
-            <MaterialCommunityIcons name="pencil-outline" size={16} color={colors.outline} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.saveBtn, !canSave && styles.saveBtnDisabled]}
-            onPress={onSave}
-            activeOpacity={0.88}
-            disabled={!canSave}
+          <Pressable
+            style={({ pressed }) => [styles.whenRow, pressed && { backgroundColor: ui.surface }]}
+            onPress={() => setShowDate(true)}
           >
-            <MaterialCommunityIcons name="bell-plus-outline" size={18} color={colors.onPrimary} />
-            <Text style={styles.saveBtnText}>Add reminder</Text>
-          </TouchableOpacity>
-        </View>
+            <MaterialCommunityIcons name="calendar-clock" size={17} color={ui.accent} />
+            <Text style={styles.whenText}>{formatWhen(when.toISOString())}</Text>
+            <MaterialCommunityIcons name="pencil-outline" size={15} color={ui.faint} />
+          </Pressable>
+          <Button
+            label="Add reminder"
+            icon="bell-plus-outline"
+            onPress={onSave}
+            disabled={!canSave || saving}
+          />
+        </Card>
 
         {showDate && (
           <DateTimePicker
@@ -135,125 +145,117 @@ export default function RemindersScreen({ navigation }) {
         )}
 
         {/* Existing reminders */}
-        <Text style={styles.sectionTitle}>Your reminders</Text>
+        <Text style={styles.sectionLabel}>Your reminders</Text>
         {reminders.length === 0 ? (
           <Text style={styles.emptyText}>No reminders yet. Vaccination reminders are added automatically.</Text>
         ) : (
-          reminders.map((r) => (
-            <View key={r.id} style={styles.reminderRow}>
-              <View style={[styles.rIcon, { opacity: r.enabled ? 1 : 0.4 }]}>
-                <MaterialCommunityIcons name={TYPE_ICON[r.type] || 'bell-outline'} size={20} color={colors.primaryContainer} />
+          <Card>
+            {reminders.map((r, i) => (
+              <View key={r.id} style={[styles.reminderRow, i > 0 && styles.rowDivider]}>
+                <View style={[styles.rIcon, { opacity: r.enabled ? 1 : 0.4 }]}>
+                  <MaterialCommunityIcons name={TYPE_ICON[r.type] || 'bell-outline'} size={18} color={ui.accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rTitle, !r.enabled && styles.rTitleOff]} numberOfLines={1}>{r.title}</Text>
+                  <Text style={styles.rSummary}>{scheduleSummary(r)}</Text>
+                </View>
+                <Switch
+                  value={!!r.enabled}
+                  onValueChange={(v) => updateReminder(r.id, { enabled: v })}
+                  trackColor={{ true: ui.accentTint, false: ui.track }}
+                  thumbColor={r.enabled ? ui.accent : ui.faint}
+                />
+                <Pressable
+                  onPress={() => setPendingDelete(r)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={({ pressed }) => [styles.delBtn, pressed && { opacity: 0.6 }]}
+                >
+                  <MaterialCommunityIcons name="trash-can-outline" size={18} color={ui.danger} />
+                </Pressable>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.rTitle, !r.enabled && styles.rTitleOff]} numberOfLines={1}>{r.title}</Text>
-                <Text style={styles.rSummary}>{scheduleSummary(r)}</Text>
-              </View>
-              <Switch
-                value={!!r.enabled}
-                onValueChange={(v) => updateReminder(r.id, { enabled: v })}
-                trackColor={{ true: colors.primaryFixedDim, false: colors.surfaceContainerHighest }}
-                thumbColor={r.enabled ? colors.primaryContainer : colors.outline}
-              />
-              <TouchableOpacity
-                onPress={() => deleteReminder(r.id)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={styles.delBtn}
-              >
-                <MaterialCommunityIcons name="trash-can-outline" size={18} color={colors.error} />
-              </TouchableOpacity>
-            </View>
-          ))
+            ))}
+          </Card>
         )}
       </ScrollView>
+
+      <ConfirmDialog
+        visible={!!pendingDelete}
+        title="Delete reminder?"
+        message={pendingDelete ? `"${pendingDelete.title}" will no longer fire. This can't be undone.` : ''}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  header: {
+  safe: { flex: 1, backgroundColor: ui.background },
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.margin,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    gap: 14,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    backgroundColor: colors.surfaceContainerLow,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: { ...typography.titleLg, color: colors.onBackground },
-  scroll: { paddingHorizontal: spacing.margin, paddingBottom: spacing.xl },
-  card: {
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii.xl,
-    padding: spacing.md,
-    ...shadows.card,
+  backBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: ui.surface,
     borderWidth: 1,
-    borderColor: colors.surfaceContainerLow,
-    gap: spacing.sm,
+    borderColor: ui.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cardTitle: { ...typography.labelMd, color: colors.onSurfaceVariant },
+  title: { ...type.screenTitle, flex: 1, color: ui.ink },
+  scroll: { paddingHorizontal: 24, paddingBottom: 32 },
+  formCard: { gap: 12 },
+  formLabel: { ...type.sectionLabel, color: ui.subtle },
   input: {
-    ...typography.bodyMd,
-    fontSize: 15,
-    color: colors.onSurface,
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: Platform.OS === 'ios' ? spacing.sm : spacing.xs,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: radii.control,
+    padding: 14,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 14,
+    color: ui.ink,
   },
   whenRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+    gap: 10,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: radii.control,
+    padding: 14,
   },
-  whenText: { ...typography.labelMd, color: colors.onSurface, flex: 1 },
-  saveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.primaryContainer,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.full,
-    ...shadows.button,
-  },
-  saveBtnDisabled: { backgroundColor: colors.outlineVariant, shadowOpacity: 0, elevation: 0 },
-  saveBtnText: { ...typography.labelMd, color: colors.onPrimary },
-  sectionTitle: { ...typography.titleLg, color: colors.onBackground, marginTop: spacing.md, marginBottom: spacing.sm },
-  emptyText: { ...typography.bodyMd, fontSize: 14, color: colors.onSurfaceVariant },
+  whenText: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13.5, color: ui.ink },
+  sectionLabel: { ...type.sectionLabel, color: ui.subtle, marginTop: 24, marginBottom: 10 },
+  emptyText: { ...type.body, color: ui.sub },
   reminderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceContainerLowest,
-    borderRadius: radii.xl,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-    ...shadows.card,
-    borderWidth: 1,
-    borderColor: colors.surfaceContainerLow,
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
   },
+  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ui.hairline },
   rIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radii.full,
-    backgroundColor: colors.primaryFixed,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: ui.accentTint,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  rTitle: { ...typography.labelMd, color: colors.onSurface },
-  rTitleOff: { color: colors.onSurfaceVariant, textDecorationLine: 'line-through' },
-  rSummary: { ...typography.labelSm, color: colors.onSurfaceVariant, marginTop: 2 },
-  delBtn: { padding: spacing.xs },
+  rTitle: { ...type.rowTitle, color: ui.ink },
+  rTitleOff: { color: ui.sub, textDecorationLine: 'line-through' },
+  rSummary: { ...type.secondary, color: ui.sub, marginTop: 1 },
+  delBtn: { padding: 4 },
 });
