@@ -46,6 +46,11 @@ jobs:
         run: echo "EXPO_PUBLIC_API_URL=${{ secrets.BACKEND_URL }}" >> .env.local
 
       - name: Publish OTA update
+        # Pass the commit message via env (assigned literally by Actions), never
+        # via ${{ }} inlined into the script — otherwise backticks/$() in a commit
+        # message run as shell (breaks the step, and is a command-injection vector).
+        env:
+          COMMIT_MESSAGE: ${{ github.event.inputs.message || github.event.head_commit.message }}
         run: |
-          MESSAGE="${{ github.event.inputs.message || github.event.head_commit.message }}"
+          MESSAGE="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)"
           eas update --channel production --message "$MESSAGE" --non-interactive
