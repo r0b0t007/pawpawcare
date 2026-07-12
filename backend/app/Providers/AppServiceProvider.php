@@ -58,5 +58,17 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('support', function (Request $request) {
             return Limit::perHour(5)->by('support|'.($request->user()?->id ?? $request->ip()));
         });
+
+        // Records export: PDF rendering is the priciest request in the app,
+        // and no legitimate user re-exports their history 10+ times an hour.
+        RateLimiter::for('records-export', function (Request $request) {
+            return Limit::perHour(10)->by('export|'.($request->user()?->id ?? $request->ip()));
+        });
+
+        // Post reporting: capped per user so one account can't mass-flag the
+        // feed (three distinct reporters hide a post for everyone else).
+        RateLimiter::for('post-report', function (Request $request) {
+            return Limit::perHour(10)->by('post-report|'.($request->user()?->id ?? $request->ip()));
+        });
     }
 }

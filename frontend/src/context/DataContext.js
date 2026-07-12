@@ -132,6 +132,8 @@ const toPost = (p) => ({
   pawedByMe: p.pawed_by_me,
   comments: p.comment_count ?? 0,
   imageUrl: p.image_url || null,
+  // I reported this post → the feed renders it collapsed with an Undo.
+  reportedByMe: !!p.reported_by_me,
   createdAt: p.created_at,
 });
 
@@ -929,6 +931,32 @@ export function DataProvider({ children }) {
     }
   };
 
+  // Flag a post for moderation (idempotent server-side). The API returns the
+  // post with `reported_by_me` set, which keeps the store's collapsed state in
+  // sync; a feed refresh persists it via the same flag.
+  const reportPost = async (postId) => {
+    try {
+      const apiPost = await post(`/community/posts/${postId}/report`);
+      dispatch({ type: 'UPDATE_POST', payload: toPost(apiPost) });
+      return true;
+    } catch (err) {
+      handleApiError(err);
+      return false;
+    }
+  };
+
+  // Undo my report ("Undo" on the hidden card) and restore the post.
+  const unreportPost = async (postId) => {
+    try {
+      const apiPost = await del(`/community/posts/${postId}/report`);
+      dispatch({ type: 'UPDATE_POST', payload: toPost(apiPost) });
+      return true;
+    } catch (err) {
+      handleApiError(err);
+      return false;
+    }
+  };
+
   const getComments = async (postId) => {
     try {
       return await get(`/community/posts/${postId}/comments`);
@@ -1020,6 +1048,8 @@ export function DataProvider({ children }) {
         revokeCareLinks,
         addPost,
         togglePaw,
+        reportPost,
+        unreportPost,
         getComments,
         addComment,
         deleteComment,
