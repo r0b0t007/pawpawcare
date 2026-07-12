@@ -125,6 +125,18 @@ export default function ProfileScreen({ navigation }) {
           />
         </Card>
 
+        <Text style={[type.sectionLabel, styles.sectionLabel]}>Support</Text>
+        <Card style={styles.sectionCard}>
+          <ListRow
+            icon="face-agent"
+            title="Help & support"
+            subtitle="Real humans — replies within 2 business days"
+            chevron
+            onPress={() => navigation.navigate('Support')}
+            last
+          />
+        </Card>
+
         <Pressable
           style={({ pressed }) => [styles.logoutBtn, pressed && { backgroundColor: '#fff7f6' }]}
           onPress={() => setConfirmLogout(true)}

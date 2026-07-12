@@ -108,6 +108,20 @@ export default function LoginScreen({ navigation }) {
                   />
                 </Pressable>
               </View>
+              <View style={styles.forgotRow}>
+                <Text style={styles.pasteHint}>
+                  Paste from your password manager always works
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    if (error) clearError();
+                    navigation.navigate('ForgotPassword');
+                  }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.forgotLink}>Forgot password?</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
 
@@ -190,6 +204,25 @@ const styles = StyleSheet.create({
     color: ui.ink,
   },
   inputFocused: { borderColor: ui.accent },
+  forgotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 10,
+  },
+  pasteHint: {
+    flex: 1,
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 11.5,
+    lineHeight: 15,
+    color: ui.subtle,
+  },
+  forgotLink: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 12.5,
+    color: ui.accent,
+  },
   errorText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 13,
