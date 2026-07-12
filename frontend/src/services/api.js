@@ -9,7 +9,9 @@ export { getTokens, storeTokens, clearTokens };
 
 let _refreshPromise = null;
 
-async function refreshAccessToken() {
+// Exported for authed raw fetches outside request() (uploads, export download)
+// so every caller shares the same deduplicated refresh.
+export async function refreshAccessToken() {
   if (_refreshPromise) return _refreshPromise;
 
   _refreshPromise = (async () => {

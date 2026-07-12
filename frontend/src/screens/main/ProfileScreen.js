@@ -6,18 +6,26 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { getPref, setPref } from '../../services/prefs';
 import { scheduleLocalReminders, cancelAllLocalReminders } from '../../services/notifications';
+import { exportRecords } from '../../services/exportRecords';
 import { ui, type } from '../../theme';
-import { Card, ListRow, ConfirmDialog } from '../../components';
+import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '../../components';
 
 // The Profile tab: account card (+ Edit → AccountDetails), notification
 // toggles, sharing entry points and a guarded log out.
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
-  const { invites, reminders } = useData();
+  const { invites, reminders, pets } = useData();
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [careReminders, setCareReminders] = useState(true);
   const [communityDigest, setCommunityDigest] = useState(true);
+
+  // Export center — sheet state lives here; the download/share plumbing is in
+  // services/exportRecords.js.
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState('pdf');
+  const [exportPets, setExportPets] = useState([]);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -51,6 +59,29 @@ export default function ProfileScreen({ navigation }) {
   const toggleCommunityDigest = (value) => {
     setCommunityDigest(value);
     setPref('communityDigest', value);
+  };
+
+  const openExport = () => {
+    setExportPets(pets.map((p) => p.id)); // default: everyone
+    setExportFormat('pdf');
+    setExportOpen(true);
+  };
+
+  const toggleExportPet = (id) =>
+    setExportPets((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // All pets selected → omit the filter so new records never miss out.
+      const ids = exportPets.length === pets.length ? [] : exportPets;
+      await exportRecords(exportFormat, ids);
+      setExportOpen(false);
+    } catch {
+      showToast('Export failed — nothing was lost, try again');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -108,7 +139,7 @@ export default function ProfileScreen({ navigation }) {
         </Card>
 
         <Text style={[type.sectionLabel, styles.sectionLabel]}>Sharing & data</Text>
-        <Card style={styles.sectionCard}>
+        <Card style={[styles.sectionCard, styles.dataCard]}>
           <ListRow
             icon="account-group-outline"
             title="Pet sharing & invites"
@@ -121,9 +152,19 @@ export default function ProfileScreen({ navigation }) {
             }
             chevron
             onPress={() => navigation.navigate('Invites')}
+          />
+          <ListRow
+            icon="download-outline"
+            title="Export health records"
+            subtitle="PDF or CSV · free forever"
+            chevron
+            onPress={openExport}
             last
           />
         </Card>
+        <Text style={styles.dataCaption}>
+          Your records belong to you — export everything free, anytime.
+        </Text>
 
         <Text style={[type.sectionLabel, styles.sectionLabel]}>Support</Text>
         <Card style={styles.sectionCard}>
@@ -145,6 +186,39 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.logoutText}>Log out</Text>
         </Pressable>
       </ScrollView>
+
+      <Sheet visible={exportOpen} onClose={() => setExportOpen(false)} title="Export health records">
+        {pets.length > 1 && (
+          <View>
+            <Text style={[type.sectionLabel, styles.sheetLabel]}>Pets</Text>
+            <View style={styles.sheetChips}>
+              {pets.map((pet) => (
+                <Chip
+                  key={pet.id}
+                  label={pet.name}
+                  active={exportPets.includes(pet.id)}
+                  onPress={() => toggleExportPet(pet.id)}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+        <View>
+          <Text style={[type.sectionLabel, styles.sheetLabel]}>Format</Text>
+          <View style={styles.sheetChips}>
+            <Chip label="PDF" active={exportFormat === 'pdf'} onPress={() => setExportFormat('pdf')} />
+            <Chip label="CSV" active={exportFormat === 'csv'} onPress={() => setExportFormat('csv')} />
+          </View>
+        </View>
+        <Button
+          label={exporting ? 'Exporting…' : exportFormat === 'pdf' ? 'Export PDF' : 'Export CSV'}
+          onPress={handleExport}
+          disabled={exporting || exportPets.length === 0}
+        />
+        <Text style={styles.sheetCaption}>
+          Free forever — your records are never locked behind a plan.
+        </Text>
+      </Sheet>
 
       <ConfirmDialog
         visible={confirmLogout}
@@ -193,6 +267,22 @@ const styles = StyleSheet.create({
   editLink: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.accent },
   sectionLabel: { color: ui.subtle, marginHorizontal: 24, marginBottom: 8 },
   sectionCard: { marginHorizontal: 24, marginBottom: 22 },
+  dataCard: { marginBottom: 8 },
+  dataCaption: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11.5,
+    color: ui.subtle,
+    marginHorizontal: 24,
+    marginBottom: 22,
+  },
+  sheetLabel: { color: ui.subtle, marginBottom: 8 },
+  sheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sheetCaption: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11.5,
+    color: ui.subtle,
+    textAlign: 'center',
+  },
   badge: {
     minWidth: 20,
     height: 20,

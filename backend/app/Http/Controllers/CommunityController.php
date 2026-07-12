@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Comment;
 use App\Models\Group;
 use App\Models\Post;
+use App\Models\PostReport;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,6 +22,10 @@ class CommunityController extends Controller
 
         $posts = Post::with(['author', 'pawedBy'])
             ->withCount('comments')
+            // Heavily-reported posts vanish for everyone but their author;
+            // the client hides the requester's own reports via `reported_by_me`.
+            ->visibleTo($userId)
+            ->withExists(['reports as reported_by_me' => fn ($q) => $q->where('user_id', $userId)])
             ->orderByDesc('created_at')
             ->skip($skip)
             ->take($limit)
@@ -71,6 +77,34 @@ class CommunityController extends Controller
             $post->pawedBy()->attach($userId);
         }
         $post->load('pawedBy');
+
+        return response()->json($post->toApi($userId));
+    }
+
+    // ── Reports ────────────────────────────────────────────────────────────
+
+    /** Flag a post for moderation. Idempotent: reporting twice is a 200 no-op. */
+    public function reportPost(Request $request, string $postId): JsonResponse
+    {
+        $post = $this->postOr404($postId)->load(['author', 'pawedBy'])->loadCount('comments');
+        $userId = $request->user()->id;
+
+        try {
+            PostReport::firstOrCreate(['user_id' => $userId, 'post_id' => $postId]);
+        } catch (UniqueConstraintViolationException) {
+            // Raced with a concurrent identical report — same outcome, keep 200.
+        }
+
+        return response()->json($post->toApi($userId));
+    }
+
+    /** Undo the requesting user's own report ("Undo" on the hidden card). */
+    public function unreportPost(Request $request, string $postId): JsonResponse
+    {
+        $post = $this->postOr404($postId)->load(['author', 'pawedBy'])->loadCount('comments');
+        $userId = $request->user()->id;
+
+        PostReport::where('user_id', $userId)->where('post_id', $postId)->delete();
 
         return response()->json($post->toApi($userId));
     }

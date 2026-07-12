@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Uploads;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,6 +51,28 @@ class Post extends Model
         return $this->hasMany(Comment::class);
     }
 
+    public function reports(): HasMany
+    {
+        return $this->hasMany(PostReport::class);
+    }
+
+    /** How many distinct reports pull a post from everyone else's feed. */
+    public const REPORT_HIDE_THRESHOLD = 3;
+
+    /**
+     * Feed visibility: posts reported by 3+ distinct users disappear for
+     * everyone except their author (who keeps seeing their own post).
+     * Individual "hidden for me" filtering is a client concern driven by
+     * the `reported_by_me` flag — never a server-side exclusion.
+     */
+    public function scopeVisibleTo(Builder $query, string $userId): Builder
+    {
+        return $query->where(function (Builder $q) use ($userId) {
+            $q->where('author_id', $userId)
+                ->orHas('reports', '<', self::REPORT_HIDE_THRESHOLD);
+        });
+    }
+
     /** Serialize to the public `PostOut` shape, relative to the current user. */
     public function toApi(string $currentUserId): array
     {
@@ -64,6 +87,10 @@ class Post extends Model
             'paw_count' => $pawedIds->count(),
             'pawed_by_me' => $pawedIds->contains($currentUserId),
             'comment_count' => $this->comments_count ?? $this->comments()->count(),
+            // `reported_by_me` drives the client's collapsed "hidden" state.
+            // Report *counts* are intentionally never exposed.
+            'reported_by_me' => (bool) ($this->reported_by_me
+                ?? $this->reports()->where('user_id', $currentUserId)->exists()),
             'author_name' => $this->author?->name ?? '',
             'author_avatar' => $this->author?->avatar_url,
             'created_at' => $this->created_at?->toISOString(),

@@ -8,6 +8,7 @@ use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\ExportController;
 use App\Http\Controllers\LostPetController;
 use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\NotificationController;
@@ -68,6 +69,11 @@ Route::middleware('auth.jwt')->group(function () {
     // Users
     Route::get('/users/me', [UserController::class, 'me']);
     Route::patch('/users/me', [UserController::class, 'update']);
+
+    // Export center — full health-record history as CSV/PDF, free forever.
+    // Named limiter (see AppServiceProvider): 10/hour per user.
+    Route::get('/users/me/export', [ExportController::class, 'export'])
+        ->middleware('throttle:records-export');
 
     // Pets
     Route::get('/pets', [PetController::class, 'index']);
@@ -161,6 +167,11 @@ Route::middleware('auth.jwt')->group(function () {
     Route::post('/community/posts', [CommunityController::class, 'createPost']);
     Route::delete('/community/posts/{post}', [CommunityController::class, 'deletePost']);
     Route::post('/community/posts/{post}/paw', [CommunityController::class, 'togglePaw']);
+    // Reporting: POST is throttled (named limiter, 10/hour per user); the
+    // DELETE undo isn't, so undoing never burns the reporter's quota.
+    Route::post('/community/posts/{post}/report', [CommunityController::class, 'reportPost'])
+        ->middleware('throttle:post-report');
+    Route::delete('/community/posts/{post}/report', [CommunityController::class, 'unreportPost']);
     Route::get('/community/posts/{post}/comments', [CommunityController::class, 'listComments']);
     Route::post('/community/posts/{post}/comments', [CommunityController::class, 'addComment'])->middleware('throttle:30,1');
     Route::delete('/community/posts/{post}/comments/{comment}', [CommunityController::class, 'deleteComment']);

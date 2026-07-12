@@ -46,6 +46,7 @@ export default function CommunityScreen({ navigation }) {
   const {
     posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets,
     getComments, addComment, deleteComment, refreshLostPets, resolveLostPet,
+    reportPost, unreportPost,
   } = useData();
 
   const [section, setSection] = useState('feed');
@@ -179,6 +180,8 @@ export default function CommunityScreen({ navigation }) {
                   getComments={getComments}
                   addComment={addComment}
                   deleteComment={deleteComment}
+                  reportPost={reportPost}
+                  unreportPost={unreportPost}
                 />
               ))}
               {posts.length === 0 && (
@@ -302,15 +305,34 @@ export default function CommunityScreen({ navigation }) {
   );
 }
 
-function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment }) {
+function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment, reportPost, unreportPost }) {
   const hasPawed = !!post.pawedByMe;
   const pair = pairFor(post.authorName);
+  const isOwn = post.authorId === userId;
 
   const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState(null); // null = never loaded
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState(null); // comment pending deletion
+  const [confirmReport, setConfirmReport] = useState(false);
+
+  // Reported by me → the whole card collapses into a quiet hidden state with
+  // an Undo. `reportedByMe` comes from the feed payload, so it survives
+  // refreshes until the report is undone.
+  if (post.reportedByMe) {
+    return (
+      <Card style={styles.hiddenCard}>
+        <MaterialCommunityIcons name="flag-outline" size={18} color={ui.subtle} />
+        <Text style={styles.hiddenText}>
+          Post hidden — thanks for the report. Our team reviews within 24 hours.
+        </Text>
+        <Pressable onPress={() => unreportPost(post.id)} hitSlop={8}>
+          <Text style={styles.hiddenUndo}>Undo</Text>
+        </Pressable>
+      </Card>
+    );
+  }
 
   const toggleComments = async () => {
     const next = !expanded;
@@ -353,6 +375,11 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment 
           <Text style={styles.postAuthor}>{post.authorName}</Text>
           <Text style={styles.postTime}>{timeAgo(post.createdAt)}</Text>
         </View>
+        {!isOwn && (
+          <Pressable onPress={() => setConfirmReport(true)} hitSlop={8}>
+            <MaterialCommunityIcons name="dots-horizontal" size={20} color={ui.subtle} />
+          </Pressable>
+        )}
       </View>
       <Text style={styles.postContent}>{post.content}</Text>
       {post.imageUrl ? (
@@ -435,6 +462,16 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment 
         destructive
         onCancel={() => setConfirm(null)}
         onConfirm={() => { const c = confirm; setConfirm(null); if (c) removeComment(c.id); }}
+      />
+
+      <ConfirmDialog
+        visible={confirmReport}
+        title="Report this post?"
+        message="It's hidden for you right away, and our team reviews every report within 24 hours."
+        confirmLabel="Report"
+        destructive
+        onCancel={() => setConfirmReport(false)}
+        onConfirm={() => { setConfirmReport(false); reportPost(post.id); }}
       />
     </Card>
   );
@@ -532,6 +569,23 @@ const styles = StyleSheet.create({
   },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.sub },
+
+  // Reported → hidden collapsed state
+  hiddenCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  hiddenText: {
+    flex: 1,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: ui.sub,
+  },
+  hiddenUndo: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.accent },
 
   // Comments
   commentsWrap: {
