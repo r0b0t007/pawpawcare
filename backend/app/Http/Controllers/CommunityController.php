@@ -25,7 +25,7 @@ class CommunityController extends Controller
             // Heavily-reported posts vanish for everyone but their author;
             // the client hides the requester's own reports via `reported_by_me`.
             ->visibleTo($userId)
-            ->withExists(['reports as reported_by_me' => fn ($q) => $q->where('user_id', $userId)])
+            ->withExists(['reports as reported_by_me' => fn ($q) => $q->where('user_id', $userId)->whereNull('dismissed_at')])
             ->orderByDesc('created_at')
             ->skip($skip)
             ->take($limit)
@@ -90,7 +90,15 @@ class CommunityController extends Controller
         $userId = $request->user()->id;
 
         try {
-            PostReport::firstOrCreate(['user_id' => $userId, 'post_id' => $postId]);
+            $report = PostReport::firstOrCreate(['user_id' => $userId, 'post_id' => $postId]);
+
+            // If this reporter's earlier report was dismissed by an admin, it
+            // only re-opens (re-queues the post) once the cooldown has passed —
+            // so a dismissal can't be undone by immediately re-reporting.
+            if ($report->dismissed_at
+                && $report->dismissed_at->lte(now()->subDays(PostReport::DISMISS_COOLDOWN_DAYS))) {
+                $report->forceFill(['dismissed_at' => null, 'created_at' => now()])->save();
+            }
         } catch (UniqueConstraintViolationException) {
             // Raced with a concurrent identical report — same outcome, keep 200.
         }
@@ -104,7 +112,14 @@ class CommunityController extends Controller
         $post = $this->postOr404($postId)->load(['author', 'pawedBy'])->loadCount('comments');
         $userId = $request->user()->id;
 
-        PostReport::where('user_id', $userId)->where('post_id', $postId)->delete();
+        // Only an OPEN report can be undone. A report an admin already
+        // dismissed stays on record — deleting it would both erase the audit
+        // trail and let the reporter escape the re-report cooldown by
+        // undo-then-report to mint a fresh active row.
+        PostReport::where('user_id', $userId)
+            ->where('post_id', $postId)
+            ->whereNull('dismissed_at')
+            ->delete();
 
         return response()->json($post->toApi($userId));
     }
