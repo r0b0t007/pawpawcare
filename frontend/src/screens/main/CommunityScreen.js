@@ -8,6 +8,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
+import { uploadImage } from '../../services/api';
+import { track } from '../../services/analytics';
 import { resolveAsset } from '../../config';
 import { ui, type, PET_COLOR_PAIRS } from '../../theme';
 import { Card, Chip, Button, ConfirmDialog, showToast } from '../../components';
@@ -54,6 +56,9 @@ export default function CommunityScreen({ navigation }) {
   const [draft, setDraft] = useState('');
   const [draftImage, setDraftImage] = useState(null);
   const [attaching, setAttaching] = useState(false);
+  // Last failed image attach — { uri } keeps the picked file so "tap to retry"
+  // re-uploads it without re-picking (uri is null if the pick itself is gone).
+  const [attachFailed, setAttachFailed] = useState(null);
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, destructive, action }
 
   useEffect(() => {
@@ -64,9 +69,34 @@ export default function CommunityScreen({ navigation }) {
     setAttaching(true);
     const res = await pickAndUploadImage({ aspect: [4, 3] });
     setAttaching(false);
-    if (res.url) setDraftImage(res.url);
+    if (res.url) { setDraftImage(res.url); setAttachFailed(null); }
     else if (res.error === 'permission') Alert.alert('Permission needed', 'Allow photo access to attach a picture.');
-    else if (res.error) Alert.alert('Upload failed', 'Could not upload that image. Please try again.');
+    else if (res.error) {
+      // The draft is untouched; show the failure inline instead of an alert
+      // and keep the picked file for a one-tap retry.
+      setAttachFailed({ uri: res.uri || null });
+      track('post_image_upload_failed');
+    }
+  };
+
+  const retryAttach = async () => {
+    track('post_image_upload_retried');
+    if (!attachFailed?.uri) {
+      // The picked file wasn't retained — reopen the picker instead.
+      setAttachFailed(null);
+      attachImage();
+      return;
+    }
+    setAttaching(true);
+    try {
+      const url = await uploadImage(attachFailed.uri);
+      setDraftImage(url);
+      setAttachFailed(null);
+    } catch {
+      track('post_image_upload_failed'); // still failing — keep the retry row
+    } finally {
+      setAttaching(false);
+    }
   };
 
   const handlePost = async () => {
@@ -74,6 +104,7 @@ export default function CommunityScreen({ navigation }) {
     await addPost(draft.trim(), draftImage);
     setDraft('');
     setDraftImage(null);
+    setAttachFailed(null);
     setComposerOpen(false);
     showToast('Shared with the pack');
   };
@@ -81,6 +112,7 @@ export default function CommunityScreen({ navigation }) {
   const closeComposer = () => {
     setDraft('');
     setDraftImage(null);
+    setAttachFailed(null);
     setComposerOpen(false);
   };
 
@@ -154,6 +186,12 @@ export default function CommunityScreen({ navigation }) {
                       <MaterialCommunityIcons name="close" size={15} color="#ffffff" />
                     </Pressable>
                   </View>
+                )}
+                {attachFailed && !attaching && (
+                  <Pressable onPress={retryAttach} hitSlop={6} style={styles.attachFailedRow}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={15} color={ui.dangerText} />
+                    <Text style={styles.attachFailedText}>Image upload failed — tap to retry</Text>
+                  </Pressable>
                 )}
                 <View style={styles.composerActions}>
                   <Pressable onPress={attachImage} disabled={attaching} hitSlop={8}>
@@ -529,6 +567,8 @@ const styles = StyleSheet.create({
   composerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cancelBtn: { paddingVertical: 9, paddingHorizontal: 16 },
   cancelText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.sub },
+  attachFailedRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  attachFailedText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12.5, color: ui.dangerText },
   draftPreview: { borderRadius: 14, overflow: 'hidden' },
   draftPreviewImg: { width: '100%', height: 160 },
   draftRemove: {

@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { pickRecordImage } from '../../services/imagePicker';
+import { track } from '../../services/analytics';
 import { buildExtractionPayload, extractionCount } from '../../utils/extraction';
 import { ui, type, radii } from '../../theme';
 import { Card, Chip, Button, Sheet, ConfirmDialog, showToast } from '../../components';
@@ -327,7 +328,7 @@ function Empty({ icon, text, onPress }) {
 
 // Shared form scaffold on top of the design-system Sheet: scrollable body,
 // inline error, Cancel/Save footer.
-function FormSheet({ visible, title, onClose, onSave, busy, saveLabel, error, saveDisabled, children }) {
+function FormSheet({ visible, title, onClose, onSave, busy, saveLabel, busyLabel = 'Saving…', error, saveDisabled, children }) {
   return (
     <Sheet visible={visible} onClose={onClose} title={title} style={{ maxHeight: '88%' }}>
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -337,7 +338,7 @@ function FormSheet({ visible, title, onClose, onSave, busy, saveLabel, error, sa
       <View style={styles.sheetActions}>
         <Button variant="soft" label="Cancel" onPress={onClose} style={{ flex: 1 }} />
         <Button
-          label={busy ? 'Saving…' : saveLabel}
+          label={busy ? busyLabel : saveLabel}
           onPress={onSave}
           disabled={busy || saveDisabled}
           style={{ flex: 1 }}
@@ -507,8 +508,12 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
   const [category, setCategory] = useState('lab');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  // The previous upload attempt failed. The whole form state (title, category,
+  // picked file) is kept — the primary button becomes "Retry upload" and a
+  // banner says so explicitly. Nothing fails silently in the vault.
+  const [failed, setFailed] = useState(false);
 
-  const reset = () => { setFile(null); setTitle(''); setCategory('lab'); setError(null); };
+  const reset = () => { setFile(null); setTitle(''); setCategory('lab'); setError(null); setFailed(false); };
   const close = () => { reset(); onClose(); };
 
   const pick = async () => {
@@ -517,21 +522,41 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
     if (res.error) { setError(res.error === 'permission' ? 'Photo permission is required.' : 'Could not pick the file.'); return; }
     if (res.canceled) return;
     setFile(res);
+    setFailed(false); // a new file is a fresh attempt, not a retry
     if (!title) setTitle(docMeta(category).label + ' record');
   };
 
   const save = async () => {
     if (!file || !title.trim()) return;
+    if (failed) track('document_upload_retried');
     setBusy(true); setError(null);
     try {
       await onSave(file, { title: title.trim(), category });
       reset(); onClose(); await onDone();
       showToast('Document uploaded');
-    } catch (e) { setError(e.message || 'Could not upload the document.'); } finally { setBusy(false); }
+    } catch (e) {
+      // Keep the ENTIRE form + picked file; the banner + retry button take
+      // over from here.
+      setFailed(true);
+      track('document_upload_failed');
+    } finally { setBusy(false); }
   };
 
   return (
-    <FormSheet visible={visible} title="Add document" onClose={close} onSave={save} busy={busy} saveLabel="Upload" error={error} saveDisabled={!file}>
+    <FormSheet
+      visible={visible}
+      title="Add document"
+      onClose={close}
+      onSave={save}
+      busy={busy}
+      saveLabel={failed ? 'Retry upload' : 'Upload'}
+      busyLabel="Uploading…"
+      error={error}
+      saveDisabled={!file}
+    >
+      {failed && !busy && (
+        <Banner icon="alert-circle-outline" tone="danger" text="Upload failed — nothing was lost." />
+      )}
       <Pressable
         style={({ pressed }) => [styles.fileBtn, pressed && { backgroundColor: '#fffdf8' }]}
         onPress={pick}

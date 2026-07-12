@@ -50,14 +50,20 @@ export default function AddPetScreen({ navigation, route }) {
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Local uri of a picked photo whose upload failed — keep showing the chosen
+  // image (never saved as avatarUrl) so the user can just tap again to retry.
+  const [localPreview, setLocalPreview] = useState(null);
 
   const pickAvatar = async () => {
     setUploading(true);
     const res = await pickAndUploadImage({ aspect: [1, 1] });
     setUploading(false);
-    if (res.url) set('avatarUrl', res.url);
+    if (res.url) { set('avatarUrl', res.url); setLocalPreview(null); }
     else if (res.error === 'permission') showToast('Allow photo access to set a pet photo');
-    else if (res.error) showToast('Could not upload that image — try again');
+    else if (res.error) {
+      if (res.uri) setLocalPreview(res.uri);
+      showToast('Could not upload that image — try again');
+    }
   };
 
   const birthdayDate = form.birthday ? new Date(form.birthday + 'T12:00:00') : new Date();
@@ -128,6 +134,8 @@ export default function AddPetScreen({ navigation, route }) {
               <View style={[styles.avatar, { backgroundColor: form.color }]}>
                 {uploading ? (
                   <ActivityIndicator color={petFg(form.color)} />
+                ) : localPreview ? (
+                  <Image source={{ uri: localPreview }} style={styles.avatarImg} />
                 ) : form.avatarUrl ? (
                   <Image source={{ uri: resolveAsset(form.avatarUrl) }} style={styles.avatarImg} />
                 ) : (
