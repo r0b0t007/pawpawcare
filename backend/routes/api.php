@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CareController;
@@ -199,4 +200,13 @@ Route::middleware('auth.jwt')->group(function () {
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'read']);
     Route::post('/notifications/{notification}/snooze', [NotificationController::class, 'snooze']);
     Route::post('/notifications/{notification}/dismiss', [NotificationController::class, 'dismiss']);
+});
+
+// ── Admin moderation (auth.jwt first, then the is_admin gate) ────────────────
+// Admins are only mintable from the server shell (`php artisan user:make-admin`);
+// no HTTP request can set is_admin, so this group is unreachable by sign-up.
+Route::middleware(['auth.jwt', 'admin'])->prefix('admin')->group(function () {
+    Route::get('/reports', [AdminController::class, 'reports']);
+    Route::post('/posts/{post}/dismiss-reports', [AdminController::class, 'dismissReports']);
+    Route::delete('/posts/{post}', [AdminController::class, 'deletePost']);
 });

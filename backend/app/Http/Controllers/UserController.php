@@ -10,7 +10,7 @@ class UserController extends Controller
 {
     public function me(Request $request): JsonResponse
     {
-        return response()->json($request->user()->toApi());
+        return response()->json($request->user()->toSelfApi());
     }
 
     public function update(Request $request): JsonResponse
@@ -44,6 +44,8 @@ class UserController extends Controller
             ReminderScheduler::recomputeForUser($user);
         }
 
-        return response()->json($user->toApi());
+        // toSelfApi: PATCH responses replace the client's stored user object,
+        // so the is_admin flag must survive a profile edit.
+        return response()->json($user->toSelfApi());
     }
 }
