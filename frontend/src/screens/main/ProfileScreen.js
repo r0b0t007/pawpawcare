@@ -14,7 +14,7 @@ import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '..
 // toggles, sharing entry points and a guarded log out.
 
 export default function ProfileScreen({ navigation }) {
-  const { user, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const { invites, reminders, pets } = useData();
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [careReminders, setCareReminders] = useState(true);
@@ -165,6 +165,22 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.dataCaption}>
           Your records belong to you — export everything free, anytime.
         </Text>
+
+        {isAdmin && (
+          <>
+            <Text style={[type.sectionLabel, styles.sectionLabel]}>Moderation</Text>
+            <Card style={styles.sectionCard}>
+              <ListRow
+                icon="shield-check-outline"
+                title="Moderation"
+                subtitle="Review reported posts"
+                chevron
+                onPress={() => navigation.navigate('Moderation')}
+                last
+              />
+            </Card>
+          </>
+        )}
 
         <Text style={[type.sectionLabel, styles.sectionLabel]}>Support</Text>
         <Card style={styles.sectionCard}>

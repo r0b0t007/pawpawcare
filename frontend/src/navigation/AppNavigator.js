@@ -27,6 +27,7 @@ import LostPetsScreen from '../screens/main/LostPetsScreen';
 import InvitesScreen from '../screens/main/InvitesScreen';
 import MedicalRecordsScreen from '../screens/main/MedicalRecordsScreen';
 import SupportScreen from '../screens/main/SupportScreen';
+import ModerationScreen from '../screens/main/ModerationScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -95,6 +96,7 @@ function ProfileStack() {
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
       <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} />
       <Stack.Screen name="Support" component={SupportScreen} />
+      <Stack.Screen name="Moderation" component={ModerationScreen} />
       <Stack.Screen name="Invites" component={InvitesScreen} />
     </Stack.Navigator>
   );

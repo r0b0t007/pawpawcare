@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\JwtAuth;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,7 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'auth.jwt' => \App\Http\Middleware\JwtAuth::class,
+            'auth.jwt' => JwtAuth::class,
+            'admin' => EnsureAdmin::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -26,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (Throwable $e, $request) {
             if ($e instanceof ValidationException) {
                 $msg = collect($e->errors())->flatten()->first() ?? 'Validation error';
+
                 return response()->json(['detail' => $msg], 422);
             }
             if ($e instanceof HttpExceptionInterface) {
@@ -34,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
                     $e->getStatusCode(),
                 );
             }
+
             return null; // fall through to the default handler (still JSON)
         });
     })->create();

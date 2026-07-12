@@ -121,7 +121,19 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user: state.user, isLoading: state.isLoading, error: state.error, signup, login, logout, updateUser, clearError }}
+      value={{
+        user: state.user,
+        // The raw /users/me payload already carries is_admin; surface it as a
+        // stable boolean so screens can gate admin-only UI without null checks.
+        isAdmin: !!state.user?.is_admin,
+        isLoading: state.isLoading,
+        error: state.error,
+        signup,
+        login,
+        logout,
+        updateUser,
+        clearError,
+      }}
     >
       {children}
     </AuthContext.Provider>

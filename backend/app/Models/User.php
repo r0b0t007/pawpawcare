@@ -34,6 +34,9 @@ class User extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        // `is_admin` is intentionally NOT fillable: it can only be set via the
+        // `user:make-admin` artisan command (forceFill), never over HTTP.
+        'is_admin' => 'boolean',
     ];
 
     public function pets(): HasMany
@@ -84,5 +87,16 @@ class User extends Model
             'bio' => $this->bio,
             'created_at' => $this->created_at?->toISOString(),
         ];
+    }
+
+    /**
+     * The /users/me shape: toApi() plus owner-only fields. `is_admin` lives
+     * here — NOT in toApi() — so moderator status is disclosed only to the
+     * account owner, never through endpoints that serialize other users
+     * (e.g. the pet-sharing members list).
+     */
+    public function toSelfApi(): array
+    {
+        return array_merge($this->toApi(), ['is_admin' => (bool) $this->is_admin]);
     }
 }
