@@ -56,6 +56,15 @@ class Post extends Model
         return $this->hasMany(PostReport::class);
     }
 
+    /**
+     * Open reports only. Dismissed reports stay in `reports` as an audit
+     * trail but no longer count toward hiding or the moderation queue.
+     */
+    public function activeReports(): HasMany
+    {
+        return $this->hasMany(PostReport::class)->whereNull('dismissed_at');
+    }
+
     /** How many distinct reports pull a post from everyone else's feed. */
     public const REPORT_HIDE_THRESHOLD = 3;
 
@@ -69,7 +78,7 @@ class Post extends Model
     {
         return $query->where(function (Builder $q) use ($userId) {
             $q->where('author_id', $userId)
-                ->orHas('reports', '<', self::REPORT_HIDE_THRESHOLD);
+                ->orHas('activeReports', '<', self::REPORT_HIDE_THRESHOLD);
         });
     }
 
@@ -90,7 +99,7 @@ class Post extends Model
             // `reported_by_me` drives the client's collapsed "hidden" state.
             // Report *counts* are intentionally never exposed.
             'reported_by_me' => (bool) ($this->reported_by_me
-                ?? $this->reports()->where('user_id', $currentUserId)->exists()),
+                ?? $this->activeReports()->where('user_id', $currentUserId)->exists()),
             'author_name' => $this->author?->name ?? '',
             'author_avatar' => $this->author?->avatar_url,
             'created_at' => $this->created_at?->toISOString(),

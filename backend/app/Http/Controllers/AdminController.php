@@ -14,37 +14,58 @@ use Illuminate\Support\Carbon;
  */
 class AdminController extends Controller
 {
+    /** Queue page size, capped so a caller can't request the whole table. */
+    private const PER_PAGE = 20;
+
+    private const MAX_PER_PAGE = 50;
+
     /**
-     * The review queue: every post with at least one open report, newest
-     * report first. Deliberately NOT scoped by visibleTo — auto-hidden posts
-     * are exactly the ones an admin must be able to see. Reporter identities
-     * are never included (reporter privacy); only counts and timestamps.
+     * The review queue: every post with at least one open (non-dismissed)
+     * report, newest report first, paginated. Deliberately NOT scoped by
+     * visibleTo — auto-hidden posts are exactly the ones an admin must be
+     * able to see. Reporter identities are never included (reporter privacy);
+     * only counts and timestamps.
      */
     public function reports(Request $request): JsonResponse
     {
+        $perPage = min(self::MAX_PER_PAGE, max(1, (int) $request->query('per_page', self::PER_PAGE)));
+
         $posts = Post::with('author')
-            ->withCount('reports')
+            ->withCount('activeReports')
             ->addSelect(['latest_reported_at' => PostReport::select('created_at')
                 ->whereColumn('post_id', 'posts.id')
+                ->whereNull('dismissed_at')
                 ->latest('created_at')
                 ->limit(1),
             ])
-            ->has('reports')
+            ->has('activeReports')
             ->orderByDesc('latest_reported_at')
-            ->get();
+            ->orderByDesc('posts.id') // stable tiebreaker so pages don't overlap
+            ->paginate($perPage);
 
-        return response()->json($posts->map(fn (Post $p) => $this->queueEntry($p))->values());
+        return response()->json([
+            'items' => collect($posts->items())->map(fn (Post $p) => $this->queueEntry($p))->values(),
+            'page' => $posts->currentPage(),
+            'last_page' => $posts->lastPage(),
+            'per_page' => $posts->perPage(),
+            'total' => $posts->total(),
+            'has_more' => $posts->hasMorePages(),
+        ]);
     }
 
     /**
-     * Dismiss every report on a post ("the reports were wrong"). Dropping the
-     * rows below the hide threshold restores the post for everyone.
+     * Dismiss every open report on a post ("the reports were wrong"). Reports
+     * are soft-marked (dismissed_at) rather than deleted, so the moderation
+     * decision survives as an audit trail; dropping the active count below the
+     * hide threshold restores the post for everyone.
      */
     public function dismissReports(Request $request, string $postId): JsonResponse
     {
         $this->postOr404($postId);
 
-        PostReport::where('post_id', $postId)->delete();
+        PostReport::where('post_id', $postId)
+            ->whereNull('dismissed_at')
+            ->update(['dismissed_at' => now()]);
 
         return response()->json(['status' => 'ok']);
     }
@@ -67,7 +88,7 @@ class AdminController extends Controller
     /** One review-queue entry: the post payload + report metadata. */
     private function queueEntry(Post $post): array
     {
-        $count = (int) $post->reports_count;
+        $count = (int) $post->active_reports_count;
 
         return [
             'post' => [

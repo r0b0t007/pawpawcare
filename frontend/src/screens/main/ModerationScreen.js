@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -33,13 +33,19 @@ export default function ModerationScreen({ navigation }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [busyId, setBusyId] = useState(null); // post id with an in-flight action
   const [confirmRemove, setConfirmRemove] = useState(null); // post id pending confirm
+  const nextPageRef = useRef(2); // the next page loadMore should request
 
+  // Fetch page 1 and replace the list (initial load + pull-to-refresh).
   const load = useCallback(async () => {
     try {
       const data = await get('/admin/reports');
-      setItems(Array.isArray(data) ? data : []);
+      setItems(Array.isArray(data?.items) ? data.items : []);
+      setHasMore(!!data?.has_more);
+      nextPageRef.current = 2;
     } catch (e) {
       showToast(e?.message || 'Could not load reports — try again');
     }
@@ -53,6 +59,27 @@ export default function ModerationScreen({ navigation }) {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  };
+
+  // Append the next page. Dedupe by post id so overlaps from the list shifting
+  // under offset pagination (a dismiss/remove between pages) never show twice.
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await get(`/admin/reports?page=${nextPageRef.current}`);
+      const more = Array.isArray(data?.items) ? data.items : [];
+      setItems((prev) => {
+        const seen = new Set(prev.map((it) => it.post.id));
+        return [...prev, ...more.filter((it) => !seen.has(it.post.id))];
+      });
+      setHasMore(!!data?.has_more);
+      nextPageRef.current += 1;
+    } catch (e) {
+      showToast(e?.message || 'Could not load more — try again');
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const removeFromList = (postId) =>
@@ -115,7 +142,8 @@ export default function ModerationScreen({ navigation }) {
             <Text style={styles.emptySub}>No open reports right now.</Text>
           </View>
         ) : (
-          items.map(({ post: p, report_count: count, hidden }) => (
+          <>
+            {items.map(({ post: p, report_count: count, hidden }) => (
             <Card key={p.id} style={styles.itemCard}>
               <View style={styles.itemHeader}>
                 <Text style={styles.author} numberOfLines={1}>
@@ -161,7 +189,19 @@ export default function ModerationScreen({ navigation }) {
                 />
               </View>
             </Card>
-          ))
+            ))}
+            {hasMore ? (
+              <View style={styles.loadMore}>
+                <Button
+                  small
+                  variant="ghost"
+                  label={loadingMore ? 'Loading…' : 'Load more'}
+                  onPress={loadMore}
+                  disabled={loadingMore}
+                />
+              </View>
+            ) : null}
+          </>
         )}
       </ScrollView>
 
@@ -246,4 +286,5 @@ const styles = StyleSheet.create({
   pillDanger: { backgroundColor: ui.dangerTint },
   pillText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11.5 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 2 },
+  loadMore: { alignItems: 'center', marginTop: 4, marginBottom: 8 },
 });
