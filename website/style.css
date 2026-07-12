@@ -435,6 +435,12 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
   object-position: top;
 }
 
+/* The weight-trends screen keeps its chart below the pet header, so frame the
+   card lower to land on the graph instead of the avatar. */
+.feature-card .shot img[src*="health.webp"] {
+  object-position: center 72%;
+}
+
 .shot-family {
   display: flex;
   align-items: center;
