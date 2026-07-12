@@ -1,0 +1,30 @@
+# PawPawCare
+
+> PawPawCare is a free pet health app for iOS and Android that keeps every pet's vaccinations, medications, weight trends, and vet records in one place — with reminders, AI-powered vet-record scanning, shareable read-only links for vets and pet sitters, family sharing, and a community for pet owners. It is currently in early access: joining the waitlist at https://pawpawcare.app/ gets a free preview invite.
+
+## What PawPawCare does
+
+- Multi-pet profiles: track dogs, cats, and other pets in one household account
+- Vaccination tracker with due-soon reminders; mark boosters administered at the clinic
+- Medication schedules with dose logging
+- Weight history translated into plain-language trend insights (e.g. "Up 0.8 kg (20%) over the last 3 months") with a non-diagnostic nudge when a change is worth a vet visit
+- Medical records vault: clinics, appointments, and uploaded documents (photos and PDFs)
+- AI document intake: photograph a vaccination card, prescription, or invoice and the app extracts vaccines, medications, weights, and costs for review — nothing is saved without the owner's approval
+- Vet share links: expiring, revocable, read-only web links a veterinarian can open in any browser without an account
+- Caretaker mode: a time-limited handoff page for pet sitters with feeding notes, medication schedules, and an emergency contact
+- Family sharing: co-own pets with household members
+- Community feed and lost-pet alerts that notify nearby owners
+
+## Key facts
+
+- Platforms: iOS and Android (pre-launch; early-access preview via waitlist)
+- Price: the preview is free; core tracking stays free after launch, with some power features planned for a paid plan
+- Privacy: user data is never sold; share links are opt-in, time-limited, and revocable; scanned documents are processed for extraction only and not used to train AI models
+- Website: https://pawpawcare.app/
+- Privacy policy: https://pawpawcare.app/privacy/
+- Contact: privacy@pawpawcare.app
+
+## Pages
+
+- [Home](https://pawpawcare.app/): features, how it works, FAQ, and the waitlist form
+- [Privacy Policy](https://pawpawcare.app/privacy/): plain-language data practices

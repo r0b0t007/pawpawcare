@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>PawPawCare — Pet health tracking, vaccine reminders & vet records</title>
+  <meta name="description" content="Keep every pet's vaccines, meds, weight trends, and vet records in one calm place. Join the free waitlist and get early access to the PawPawCare preview.">
+
+  <!-- Absolute URLs — swap the domain here when a custom domain lands -->
+  <link rel="canonical" href="https://pawpawcare.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PawPawCare">
+  <meta property="og:title" content="PawPawCare — All your pet's health, in one calm place">
+  <meta property="og:description" content="Vaccines, meds, weight trends, and vet records for the whole furry family. Join the free preview waitlist.">
+  <meta property="og:url" content="https://pawpawcare.app/">
+  <meta property="og:image" content="https://pawpawcare.app/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PawPawCare — All your pet's health, in one calm place">
+  <meta name="twitter:description" content="Vaccines, meds, weight trends, and vet records for the whole furry family. Join the free preview waitlist.">
+  <meta name="twitter:image" content="https://pawpawcare.app/og-image.png">
+
+  <meta name="theme-color" content="#fff8f4">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <link rel="preload" href="/fonts/plus-jakarta-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/images/dashboard.webp" as="image" type="image/webp" fetchpriority="high">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/script.js" defer></script>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "MobileApplication",
+        "name": "PawPawCare",
+        "description": "Pet health management app: vaccination reminders, medication schedules, weight trend insights, a medical records vault with AI document scanning, vet share links, caretaker mode, and a pet-owner community.",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "iOS, Android",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "url": "https://pawpawcare.app/"
+      },
+      {
+        "@type": "Organization",
+        "name": "PawPawCare",
+        "url": "https://pawpawcare.app/",
+        "logo": "https://pawpawcare.app/apple-touch-icon.png",
+        "email": "privacy@pawpawcare.app"
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "What is PawPawCare?",
+            "acceptedAnswer": { "@type": "Answer", "text": "PawPawCare is a free pet health app for iOS and Android that keeps every pet's vaccinations, medications, weight trends, and vet records in one place — with reminders, AI vet-record scanning, shareable read-only links for vets and pet sitters, family sharing, and a community for pet owners." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is PawPawCare free?",
+            "acceptedAnswer": { "@type": "Answer", "text": "The preview is completely free. When we launch, core tracking stays free; some power features may become part of a paid plan." }
+          },
+          {
+            "@type": "Question",
+            "name": "When does it launch?",
+            "acceptedAnswer": { "@type": "Answer", "text": "We're onboarding waitlist members in small batches right now, ahead of the app-store launch. Join the waitlist and your invite comes with the next batch." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is it for iOS or Android?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Both. The preview runs on iOS and Android." }
+          },
+          {
+            "@type": "Question",
+            "name": "Is my pet's data private?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes. Your records are yours: share links are opt-in, time-limited, and revocable, and we never sell your data." }
+          },
+          {
+            "@type": "Question",
+            "name": "What's in the free preview?",
+            "acceptedAnswer": { "@type": "Answer", "text": "The full app: multi-pet profiles, vaccination and medication tracking, weight trends, the records vault with AI scanning, vet and sitter sharing, and the community feed." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <a class="wordmark" href="#top" aria-label="PawPawCare — back to top">
+        <svg class="paw" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <ellipse cx="12" cy="15.5" rx="5.2" ry="4.6"/>
+          <ellipse cx="5.4" cy="10.6" rx="2.1" ry="2.7" transform="rotate(-20 5.4 10.6)"/>
+          <ellipse cx="9.5" cy="6.9" rx="2.1" ry="2.8" transform="rotate(-8 9.5 6.9)"/>
+          <ellipse cx="14.5" cy="6.9" rx="2.1" ry="2.8" transform="rotate(8 14.5 6.9)"/>
+          <ellipse cx="18.6" cy="10.6" rx="2.1" ry="2.7" transform="rotate(20 18.6 10.6)"/>
+        </svg>
+        PawPawCare
+      </a>
+      <nav aria-label="Primary">
+        <ul class="nav-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#faq">FAQ</a></li>
+        </ul>
+      </nav>
+      <a class="btn btn-primary btn-sm" href="#waitlist">Get early access</a>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ============ Hero ============ -->
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="tag-chip">Early access · Free preview</p>
+          <h1 id="hero-title">All your pet's health, in one&nbsp;calm&nbsp;place.</h1>
+          <p class="lede">PawPawCare remembers every shot, dose, and gram — vaccines, meds, weight trends, and vet records for the whole furry family. You just get the reminder at the right moment.</p>
+
+          <form class="waitlist-form" name="waitlist" method="POST" action="/thanks.html" data-netlify="true" netlify-honeypot="bot-field">
+            <input type="hidden" name="form-name" value="waitlist">
+            <p class="hp-field" aria-hidden="true">
+              <label>Don't fill this out: <input name="bot-field" tabindex="-1" autocomplete="off"></label>
+            </p>
+            <div class="form-row">
+              <div class="field">
+                <label for="email">Email address</label>
+                <input id="email" type="email" name="email" required autocomplete="email" inputmode="email" placeholder="you@example.com">
+              </div>
+              <button class="btn btn-primary" type="submit">Get the free preview</button>
+            </div>
+            <p class="form-note">Free early access. No spam — one invite email, that's it.</p>
+          </form>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="blob blob-a"></div>
+          <div class="blob blob-b"></div>
+          <div class="phone phone-hero">
+            <img src="/images/dashboard.webp" alt="PawPawCare home screen with an ‘Up next’ vaccine reminder and a row of pet profiles" width="780" height="1688" fetchpriority="high" decoding="async">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Social strip ============ -->
+    <div class="container">
+      <div class="pack-strip reveal">
+        <ul class="pet-chips" role="list">
+          <li class="pet-chip" style="--chip:#ffddb8">Biscuit</li>
+          <li class="pet-chip" style="--chip:#c5e7ff">Luna</li>
+          <li class="pet-chip" style="--chip:#d8e2ff">Mochi</li>
+          <li class="pet-chip" style="--chip:#b2f2d4">Pepper</li>
+          <li class="pet-chip" style="--chip:#ffd6e7">Nala</li>
+        </ul>
+        <p>Built for households with more than one furry opinion.</p>
+      </div>
+    </div>
+
+    <div class="trail" aria-hidden="true">
+      <svg viewBox="0 0 200 90" focusable="false">
+        <path class="trail-path" d="M20 10 C 60 40, 140 20, 180 78"/>
+        <g class="trail-paw" transform="translate(58 30) rotate(35) scale(0.55)"><use href="#pawprint"/></g>
+        <g class="trail-paw" transform="translate(132 44) rotate(55) scale(0.55)"><use href="#pawprint"/></g>
+      </svg>
+    </div>
+
+    <!-- ============ Core features ============ -->
+    <section class="section" id="features" aria-labelledby="features-title">
+      <div class="container">
+        <p class="tag-chip">Features</p>
+        <h2 id="features-title">The boring parts of pet care, handled.</h2>
+        <div class="feature-grid">
+          <article class="feature-card reveal">
+            <div class="shot">
+              <img src="/images/vaccinations.webp" alt="PawPawCare health hub tracking an overdue vaccine booster, upcoming vet visits and past vaccination history" width="780" height="1688" loading="lazy" decoding="async">
+            </div>
+            <h3>Never miss a booster</h3>
+            <p>Every vaccine on a timeline with due-soon reminders. Mark it done at the clinic and forget about it — until we remind you next year.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="shot">
+              <img src="/images/health.webp" alt="PawPawCare pet profile with a monthly weight trend chart, microchip, allergies and shared care team" width="780" height="1688" loading="lazy" decoding="async">
+            </div>
+            <h3>Weight trends in plain language</h3>
+            <p>&ldquo;Up 0.8&nbsp;kg (20%) over the last 3 months.&rdquo; Not a chart to decode — a sentence you can act on, with a gentle nudge when a change is worth a vet chat.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="shot shot-family" aria-hidden="true">
+              <div class="family-cluster">
+                <span class="avatar" style="--chip:#ffddb8">B</span>
+                <span class="avatar" style="--chip:#c5e7ff">L</span>
+                <span class="avatar" style="--chip:#b2f2d4">P</span>
+                <span class="avatar avatar-add">+</span>
+              </div>
+            </div>
+            <h3>Every pet, one home</h3>
+            <p>Profiles for the whole crew — dogs, cats, and the parrot who thinks he's a dog. Switch between them in a tap.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <div class="trail trail-flip" aria-hidden="true">
+      <svg viewBox="0 0 200 90" focusable="false">
+        <path class="trail-path" d="M20 10 C 60 40, 140 20, 180 78"/>
+        <g class="trail-paw" transform="translate(58 30) rotate(35) scale(0.55)"><use href="#pawprint"/></g>
+        <g class="trail-paw" transform="translate(132 44) rotate(55) scale(0.55)"><use href="#pawprint"/></g>
+      </svg>
+    </div>
+
+    <!-- ============ Records / AI intake ============ -->
+    <section class="section" id="records" aria-labelledby="records-title">
+      <div class="container split">
+        <div class="split-copy">
+          <p class="tag-chip">Records</p>
+          <h2 id="records-title">Snap a vet record. We file the rest.</h2>
+          <p>Point your camera at a vaccination card, prescription, or invoice. PawPawCare reads it and extracts the vaccines, meds, weights, and costs — then shows you exactly what it found.</p>
+          <p><strong>Nothing is saved until you approve it.</strong> Every extracted item gets a checkbox; you stay the editor-in-chief of your pet's file.</p>
+        </div>
+        <div class="split-visual reveal" aria-hidden="true">
+          <div class="scan-card">
+            <p class="scan-title">Found in your scan</p>
+            <ul role="list">
+              <li><span class="check">✓</span> Rabies booster — due Mar 2027</li>
+              <li><span class="check">✓</span> Amoxicillin 50&nbsp;mg · 2× daily</li>
+              <li><span class="check">✓</span> Weight: 12.4&nbsp;kg</li>
+            </ul>
+            <span class="scan-apply">Apply 3 items</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Sharing ============ -->
+    <section class="section section-tinted" id="sharing" aria-labelledby="sharing-title">
+      <div class="container">
+        <p class="tag-chip">Sharing</p>
+        <h2 id="sharing-title">Hand off care without handing off your phone.</h2>
+        <div class="share-grid">
+          <article class="share-card reveal">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 14a5 5 0 0 0 7.07 0l3.18-3.18a5 5 0 1 0-7.07-7.07L11.5 5.4"/><path d="M14 10a5 5 0 0 0-7.07 0l-3.18 3.18a5 5 0 1 0 7.07 7.07l1.68-1.65"/></svg>
+            <h3>Vet share links</h3>
+            <p>A read-only link with vaccines, meds, and weight history. Your vet opens it in a browser — no app, no account. It expires when you say so.</p>
+          </article>
+          <article class="share-card reveal">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M12 17.8s-3.2-1.9-3.2-4a1.9 1.9 0 0 1 3.2-1.4 1.9 1.9 0 0 1 3.2 1.4c0 2.1-3.2 4-3.2 4Z"/></svg>
+            <h3>Caretaker mode</h3>
+            <p>Going away? Give your sitter one page with feeding notes, med schedules, and your emergency contact. It self-destructs after the trip.</p>
+          </article>
+          <article class="share-card reveal">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M15.5 15.2c2.4.2 4.3 1.8 4.9 4.8"/></svg>
+            <h3>Family sharing</h3>
+            <p>Co-own pets with your household. Everyone logs walks and meals; nobody double-doses the dog.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Community ============ -->
+    <section class="section" id="community" aria-labelledby="community-title">
+      <div class="container split split-reverse">
+        <div class="split-copy">
+          <p class="tag-chip">Community</p>
+          <h2 id="community-title">A neighborhood that has your pet's back.</h2>
+          <p>Share the wins, ask the awkward questions, and swap notes with owners who get it.</p>
+          <p>And if a pet ever goes missing, lost-pet alerts reach nearby owners in seconds — because the fastest search party is the one already outside walking.</p>
+        </div>
+        <div class="split-visual reveal">
+          <div class="phone phone-sm">
+            <img src="/images/community.webp" alt="PawPawCare community feed with posts from local pet owners" width="780" height="1688" loading="lazy" decoding="async">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="trail" aria-hidden="true">
+      <svg viewBox="0 0 200 90" focusable="false">
+        <path class="trail-path" d="M20 10 C 60 40, 140 20, 180 78"/>
+        <g class="trail-paw" transform="translate(58 30) rotate(35) scale(0.55)"><use href="#pawprint"/></g>
+        <g class="trail-paw" transform="translate(132 44) rotate(55) scale(0.55)"><use href="#pawprint"/></g>
+      </svg>
+    </div>
+
+    <!-- ============ How it works ============ -->
+    <section class="section" id="how" aria-labelledby="how-title">
+      <div class="container">
+        <p class="tag-chip">How it works</p>
+        <h2 id="how-title">Three steps to calmer pet care.</h2>
+        <ol class="steps">
+          <li class="step reveal">
+            <span class="step-mark" aria-hidden="true">1</span>
+            <h3>Join the waitlist</h3>
+            <p>Leave your email below. That's the whole form.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-mark" aria-hidden="true">2</span>
+            <h3>Get your invite</h3>
+            <p>We onboard in small batches, so early feedback actually shapes the app.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-mark" aria-hidden="true">3</span>
+            <h3>Add your pets</h3>
+            <p>Profiles take a minute. Scan your vet records and you're up to date.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============ FAQ ============ -->
+    <section class="section" id="faq" aria-labelledby="faq-title">
+      <div class="container container-narrow">
+        <p class="tag-chip">FAQ</p>
+        <h2 id="faq-title">Questions, answered.</h2>
+        <details>
+          <summary>What is PawPawCare?</summary>
+          <p>PawPawCare is a free pet health app for iOS and Android that keeps every pet's vaccinations, medications, weight trends, and vet records in one place — with reminders, AI vet-record scanning, shareable read-only links for vets and pet sitters, family sharing, and a community for pet owners.</p>
+        </details>
+        <details>
+          <summary>Is PawPawCare free?</summary>
+          <p>The preview is completely free. When we launch, core tracking stays free; some power features may become part of a paid plan.</p>
+        </details>
+        <details>
+          <summary>When does it launch?</summary>
+          <p>We're onboarding waitlist members in small batches right now, ahead of the app-store launch. Join the waitlist and your invite comes with the next batch.</p>
+        </details>
+        <details>
+          <summary>Is it for iOS or Android?</summary>
+          <p>Both. The preview runs on iOS and Android.</p>
+        </details>
+        <details>
+          <summary>Is my pet's data private?</summary>
+          <p>Yes. Your records are yours: share links are opt-in, time-limited, and revocable, and we never sell your data.</p>
+        </details>
+        <details>
+          <summary>What's in the free preview?</summary>
+          <p>The full app: multi-pet profiles, vaccination and medication tracking, weight trends, the records vault with AI scanning, vet and sitter sharing, and the community feed.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ============ Waitlist CTA ============ -->
+    <section class="section" id="waitlist" aria-labelledby="waitlist-title">
+      <div class="container">
+        <div class="cta-panel reveal">
+          <svg class="paw paw-cta" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pawprint"/></svg>
+          <h2 id="waitlist-title">Be first in line for the preview.</h2>
+          <p>Join the waitlist and your invite arrives with the next batch.</p>
+          <form class="waitlist-form waitlist-form-center" name="waitlist" method="POST" action="/thanks.html" data-netlify="true" netlify-honeypot="bot-field">
+            <input type="hidden" name="form-name" value="waitlist">
+            <p class="hp-field" aria-hidden="true">
+              <label>Don't fill this out: <input name="bot-field" tabindex="-1" autocomplete="off"></label>
+            </p>
+            <div class="form-row">
+              <div class="field">
+                <label for="email-cta">Email address</label>
+                <input id="email-cta" type="email" name="email" required autocomplete="email" inputmode="email" placeholder="you@example.com">
+              </div>
+              <button class="btn btn-primary" type="submit">Get the free preview</button>
+            </div>
+            <p class="form-note">Free early access. One invite email — nothing else.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p class="wordmark wordmark-footer">
+        <svg class="paw" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pawprint"/></svg>
+        PawPawCare
+      </p>
+      <p class="footer-tagline">Made for the people pets rely on.</p>
+      <nav aria-label="Footer">
+        <ul class="nav-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#how">How it works</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#waitlist">Waitlist</a></li>
+          <li><a href="/privacy/">Privacy</a></li>
+        </ul>
+      </nav>
+      <p class="footer-legal">© 2026 PawPawCare</p>
+    </div>
+  </footer>
+
+  <!-- Shared paw-print symbol -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <g id="pawprint">
+        <ellipse cx="12" cy="15.5" rx="5.2" ry="4.6"/>
+        <ellipse cx="5.4" cy="10.6" rx="2.1" ry="2.7" transform="rotate(-20 5.4 10.6)"/>
+        <ellipse cx="9.5" cy="6.9" rx="2.1" ry="2.8" transform="rotate(-8 9.5 6.9)"/>
+        <ellipse cx="14.5" cy="6.9" rx="2.1" ry="2.8" transform="rotate(8 14.5 6.9)"/>
+        <ellipse cx="18.6" cy="10.6" rx="2.1" ry="2.7" transform="rotate(20 18.6 10.6)"/>
+      </g>
+    </defs>
+  </svg>
+</body>
+</html>
