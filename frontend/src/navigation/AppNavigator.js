@@ -10,6 +10,7 @@ import { ui } from '../theme';
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import PetsListScreen from '../screens/main/PetsListScreen';
 import PetProfileScreen from '../screens/main/PetProfileScreen';
@@ -25,6 +26,7 @@ import RemindersScreen from '../screens/main/RemindersScreen';
 import LostPetsScreen from '../screens/main/LostPetsScreen';
 import InvitesScreen from '../screens/main/InvitesScreen';
 import MedicalRecordsScreen from '../screens/main/MedicalRecordsScreen';
+import SupportScreen from '../screens/main/SupportScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -35,6 +37,7 @@ function AuthStack() {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </Stack.Navigator>
   );
 }
@@ -91,6 +94,7 @@ function ProfileStack() {
     <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
       <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} />
+      <Stack.Screen name="Support" component={SupportScreen} />
       <Stack.Screen name="Invites" component={InvitesScreen} />
     </Stack.Navigator>
   );

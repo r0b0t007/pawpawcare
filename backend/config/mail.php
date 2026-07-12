@@ -115,4 +115,16 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Support Inbox
+    |--------------------------------------------------------------------------
+    |
+    | Where in-app "Contact us" messages are forwarded. When unset, messages
+    | are only stored in the support_messages table.
+    |
+    */
+
+    'support_inbox' => env('SUPPORT_INBOX'),
+
 ];

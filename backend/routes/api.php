@@ -15,6 +15,7 @@ use App\Http\Controllers\PetController;
 use App\Http\Controllers\PetShareController;
 use App\Http\Controllers\PetSharingController;
 use App\Http\Controllers\ReminderController;
+use App\Http\Controllers\SupportController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -50,6 +51,14 @@ Route::middleware('throttle:20,1')->group(function () {
     Route::post('/auth/refresh', [AuthController::class, 'refresh']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 });
+
+// ── Password reset (public; named limiters — see AppServiceProvider) ─────────
+// forgot-password always answers 200 so it can't enumerate accounts;
+// reset-password is capped per IP against 6-digit code brute-forcing.
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
+    ->middleware('throttle:forgot-password');
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
+    ->middleware('throttle:password-reset');
 
 // ── Authenticated ───────────────────────────────────────────────────────────
 Route::middleware('auth.jwt')->group(function () {
@@ -157,6 +166,9 @@ Route::middleware('auth.jwt')->group(function () {
     Route::delete('/community/posts/{post}/comments/{comment}', [CommunityController::class, 'deleteComment']);
     Route::get('/community/groups', [CommunityController::class, 'listGroups']);
     Route::post('/community/groups/{group}/join', [CommunityController::class, 'toggleGroup']);
+
+    // Support (help & contact) — stored, then forwarded to SUPPORT_INBOX
+    Route::post('/support/messages', [SupportController::class, 'store'])->middleware('throttle:support');
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
