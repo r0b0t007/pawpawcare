@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { File as FileSystemFile } from 'expo-file-system';
 import { API_URL } from '../config';
 import { getTokens, storeTokens, clearTokens } from './tokenStorage';
 
@@ -104,15 +105,19 @@ export const del  = (path, opts) => request('DELETE', path, undefined, opts);
 
 // ── Image upload (multipart) ──────────────────────────────────────────────────
 
-// React Native's FormData accepts a { uri, name, type } descriptor; the web
-// FormData stringifies it to "[object Object]" (the server 422s). On web the
-// picker returns a blob:/data: URI — fetch it and wrap the bytes in a File.
+// Expo SDK 57's global fetch is the WinterCG implementation, whose multipart
+// encoder only accepts web-standard Blob/File parts — it rejects React Native's
+// classic { uri, name, type } descriptor with "Unsupported FormDataPart
+// implementation", so every upload has to hand it a real Blob/File.
+//   • Web: the picker returns a blob:/data: URI — fetch it into a File.
+//   • Native: expo-file-system's File implements Blob (carrying bytes() + a
+//     filename), which the encoder serializes correctly.
 async function asFormFile(uri, name, type) {
   if (Platform.OS === 'web') {
     const blob = await (await fetch(uri)).blob();
     return new File([blob], name, { type: blob.type || type });
   }
-  return { uri, name, type };
+  return new FileSystemFile(uri);
 }
 
 export async function uploadImage(localUri) {
