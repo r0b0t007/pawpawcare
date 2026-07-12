@@ -22,7 +22,7 @@
 - Privacy: user data is never sold; share links are opt-in, time-limited, and revocable; scanned documents are processed for extraction only and not used to train AI models
 - Website: https://pawpawcare.app/
 - Privacy policy: https://pawpawcare.app/privacy/
-- Contact: ahmedchioua@gmail.com
+- Contact: privacy@pawpawcare.app
 
 ## Pages
 
