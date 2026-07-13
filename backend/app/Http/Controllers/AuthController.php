@@ -13,6 +13,8 @@ use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 use Firebase\JWT\SignatureInvalidException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -346,7 +348,14 @@ class AuthController extends Controller
     /** Fetch a provider JWKS document, aborting 503 if the provider is down. */
     private function fetchJwks(string $url): array
     {
-        $res = Http::timeout(5)->retry(2, 200)->get($url);
+        try {
+            // With retries configured, a persistently failing response is thrown
+            // as a RequestException (and a dead connection as ConnectionException)
+            // after the attempts are exhausted — translate both to a clean 503.
+            $res = Http::timeout(5)->retry(2, 200)->get($url);
+        } catch (RequestException|ConnectionException $e) {
+            abort(503, 'Identity provider unavailable');
+        }
         abort_unless($res->successful(), 503, 'Identity provider unavailable');
 
         return $res->json();
