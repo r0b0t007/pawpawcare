@@ -202,6 +202,59 @@ class SocialAuthTest extends TestCase
         $this->assertSame(2, User::count());
     }
 
+    public function test_google_disabled_account_is_rejected_without_mutation(): void
+    {
+        // A disabled account must not have its password nulled / sessions revoked
+        // as a side effect of a sign-in it isn't allowed to complete.
+        $disabled = User::create([
+            'name' => 'Disabled',
+            'email' => 'disabled@gmail.com',
+            'hashed_password' => Hash::make('secret123'),
+            'is_active' => false,
+        ]);
+        $this->fakeCerts(self::GOOGLE_CERTS);
+
+        $this->postJson('/auth/google', [
+            'id_token' => $this->sign($this->googleClaims(['email' => 'disabled@gmail.com', 'sub' => 'g-dis'])),
+        ])->assertStatus(403);
+
+        $disabled->refresh();
+        $this->assertNull($disabled->provider);
+        $this->assertNotNull($disabled->hashed_password); // password preserved
+    }
+
+    public function test_google_is_503_when_audience_not_configured(): void
+    {
+        config(['services.google.client_id' => null]);
+        $this->fakeCerts(self::GOOGLE_CERTS);
+
+        $this->postJson('/auth/google', ['id_token' => $this->sign($this->googleClaims())])
+            ->assertStatus(503);
+    }
+
+    public function test_google_rejects_an_expired_token_without_refetching_keys(): void
+    {
+        $this->fakeCerts(self::GOOGLE_CERTS);
+
+        $this->postJson('/auth/google', [
+            'id_token' => $this->sign($this->googleClaims(['exp' => time() - 3600])),
+        ])->assertStatus(401);
+
+        // An expired token must NOT trigger a JWKS refetch — the keys are fetched
+        // exactly once (the initial cache fill), never again on a bad token.
+        Http::assertSentCount(1);
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_google_is_503_when_provider_jwks_is_unavailable(): void
+    {
+        Http::fake([self::GOOGLE_CERTS => Http::response('', 500)]);
+
+        $this->postJson('/auth/google', ['id_token' => $this->sign($this->googleClaims())])
+            ->assertStatus(503);
+        $this->assertDatabaseCount('users', 0);
+    }
+
     // ── Apple ────────────────────────────────────────────────────────────────
 
     public function test_apple_sign_in_creates_user_and_verifies_nonce(): void

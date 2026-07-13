@@ -7,8 +7,12 @@ use App\Models\PasswordResetCode;
 use App\Models\RefreshToken;
 use App\Models\User;
 use App\Services\JwtService;
+use Firebase\JWT\BeforeValidException;
+use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
+use Firebase\JWT\SignatureInvalidException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -285,39 +289,58 @@ class AuthController extends Controller
             abort(503, 'Social login is not configured');
         }
 
+        // `JWT::$leeway` is a process-global static shared with the app's own
+        // token validation (JwtService::decode). Set it only for this decode and
+        // restore it afterwards so a social login can't loosen access-token
+        // expiry checks for the rest of the request (or forever under Octane).
+        $previousLeeway = JWT::$leeway;
         JWT::$leeway = 60; // tolerate small clock skew
 
-        $cacheKey = 'social:jwks:'.md5($jwksUrl);
-        $jwks = Cache::remember($cacheKey, now()->addHours(6), fn () => $this->fetchJwks($jwksUrl));
-
-        $decode = fn (array $set): array => (array) JWT::decode($jwt, JWK::parseKeySet($set));
-
         try {
-            $payload = $decode($jwks);
-        } catch (\Throwable $e) {
-            // The signing key may have rotated since we cached the set. Refetch
-            // once and retry before giving up.
+            $cacheKey = 'social:jwks:'.md5($jwksUrl);
+            $jwks = Cache::remember($cacheKey, now()->addHours(6), fn () => $this->fetchJwks($jwksUrl));
+
+            $decode = fn (array $set): array => (array) JWT::decode($jwt, JWK::parseKeySet($set));
+
             try {
-                $jwks = $this->fetchJwks($jwksUrl);
-                Cache::put($cacheKey, $jwks, now()->addHours(6));
                 $payload = $decode($jwks);
-            } catch (\Throwable $e2) {
+            } catch (ExpiredException|BeforeValidException|SignatureInvalidException $e) {
+                // The token itself is bad (expired, not-yet-valid, or a forged
+                // signature against a known key). Refetching won't help, so fail
+                // fast — this stops a flood of invalid tokens from hammering the
+                // provider's JWKS endpoint on every request.
+                abort(401, 'Invalid identity token');
+            } catch (\UnexpectedValueException $e) {
+                // A plain UnexpectedValueException here means the token's `kid`
+                // isn't in our cached key set — the signing key likely rotated.
+                // Refetch once and retry before giving up.
+                try {
+                    $jwks = $this->fetchJwks($jwksUrl);
+                    Cache::put($cacheKey, $jwks, now()->addHours(6));
+                    $payload = $decode($jwks);
+                } catch (\Throwable $e2) {
+                    abort(401, 'Invalid identity token');
+                }
+            } catch (\Throwable $e) {
+                // Malformed token / any other decode failure.
                 abort(401, 'Invalid identity token');
             }
-        }
 
-        if (! in_array($payload['iss'] ?? '', $issuers, true)) {
-            abort(401, 'Invalid identity token');
-        }
+            if (! in_array($payload['iss'] ?? '', $issuers, true)) {
+                abort(401, 'Invalid identity token');
+            }
 
-        // `aud` is a string, but the spec allows an array of audiences.
-        $aud = $payload['aud'] ?? null;
-        $audMatches = is_array($aud) ? in_array($audience, $aud, true) : $aud === $audience;
-        if (! $audMatches) {
-            abort(401, 'Invalid identity token');
-        }
+            // `aud` is a string, but the spec allows an array of audiences.
+            $aud = $payload['aud'] ?? null;
+            $audMatches = is_array($aud) ? in_array($audience, $aud, true) : $aud === $audience;
+            if (! $audMatches) {
+                abort(401, 'Invalid identity token');
+            }
 
-        return $payload;
+            return $payload;
+        } finally {
+            JWT::$leeway = $previousLeeway;
+        }
     }
 
     /** Fetch a provider JWKS document, aborting 503 if the provider is down. */
@@ -351,6 +374,12 @@ class AuthController extends Controller
                     // Already bound to a *different* identity from this provider.
                     abort(409, 'This email is linked to a different account');
                 }
+                // Authorize before mutating: a disabled account must not have its
+                // password nulled and sessions revoked as a side effect of a
+                // sign-in it isn't allowed to complete.
+                if (! $existing->is_active) {
+                    abort(403, 'Account is disabled');
+                }
                 // Linking kills any existing password on the account. Signup never
                 // verifies email ownership, so a matching password row may have
                 // been created by someone who does NOT control this inbox (account
@@ -374,19 +403,27 @@ class AuthController extends Controller
         //    sign-ins — but those hit branch 1, never here).
         if (! $user) {
             $useEmail = $email && $emailVerified && ! User::where('email', $email)->exists();
-            $user = User::create([
-                'name' => $name ?: 'PawPaw friend',
-                'email' => $useEmail ? $email : $provider.'_'.$providerId.'@users.noreply.pawpawcare.app',
-                'hashed_password' => null,
-                'provider' => $provider,
-                'provider_id' => $providerId,
-                // Explicit so the fresh model carries it in memory — the DB
-                // default only applies on reload, so the disabled-account check
-                // below would otherwise see null and 403 every new sign-in.
-                'is_active' => true,
-            ]);
-
-            return $user;
+            try {
+                return User::create([
+                    'name' => $name ?: 'PawPaw friend',
+                    'email' => $useEmail ? $email : $provider.'_'.$providerId.'@users.noreply.pawpawcare.app',
+                    'hashed_password' => null,
+                    'provider' => $provider,
+                    'provider_id' => $providerId,
+                    // Explicit so the fresh model carries it in memory — the DB
+                    // default only applies on reload, so the disabled-account check
+                    // below would otherwise see null and 403 every new sign-in.
+                    'is_active' => true,
+                ]);
+            } catch (UniqueConstraintViolationException $e) {
+                // A concurrent first sign-in for the same identity won the race
+                // and inserted the row between our lookup and insert. Resolve to
+                // that row instead of surfacing a 500.
+                $user = User::where('provider', $provider)->where('provider_id', $providerId)->first();
+                if (! $user) {
+                    throw $e; // collision was on something else (e.g. email) — genuine
+                }
+            }
         }
 
         // Existing account (linked or matched): honour the disabled flag.
