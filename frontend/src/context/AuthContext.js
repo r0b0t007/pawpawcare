@@ -125,13 +125,26 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    try {
-      const { refresh } = await getTokens();
-      if (refresh) await post('/auth/logout', { refresh_token: refresh }).catch(() => {});
-    } catch (_) {}
-    await deregisterDevice();
-    await clearTokens();
+    // Grab the refresh token before we wipe local state (needed to revoke it).
+    const { refresh } = await getTokens().catch(() => ({ refresh: null }));
+
+    // Best-effort server / device / provider cleanup — all fire-and-forget so a
+    // slow or failing network call can neither delay the redirect to the landing
+    // screen nor trap the user in a logged-in state if it throws.
+    if (refresh) post('/auth/logout', { refresh_token: refresh }).catch(() => {});
+    deregisterDevice().catch(() => {});
     resetAnalytics(); // clear identity so the next user starts fresh
+    try {
+      // Clear the native Google session too, so the next sign-in shows the
+      // account picker instead of silently reusing the last account. Guarded
+      // require mirrors the codebase's defensive native-module pattern.
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      GoogleSignin.signOut().catch(() => {});
+    } catch (_) {}
+
+    // Guaranteed: clear tokens and flip to the landing screen immediately,
+    // independent of everything above.
+    await clearTokens().catch(() => {});
     dispatch({ type: 'LOGOUT' });
   };
 
