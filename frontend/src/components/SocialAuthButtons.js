@@ -9,6 +9,7 @@ import {
 } from '@react-native-google-signin/google-signin';
 import { useAuth } from '../context/AuthContext';
 import { showToast } from './Toast';
+import { GOOGLE_WEB_CLIENT_ID } from '../config';
 import { ui, radii } from '../theme';
 
 // The official Google "G" mark (brand asset). Google's guidelines permit a
@@ -126,7 +127,14 @@ export default function SocialAuthButtons() {
     }
   };
 
+  // Google needs a configured Web client ID to work; without it the flow would
+  // just error, so hide the button entirely rather than ship a dead control
+  // (mirrors how Apple hides when unavailable, and the backend's 503).
+  const showGoogle = !!GOOGLE_WEB_CLIENT_ID;
   const showApple = Platform.OS === 'ios' && appleAvailable;
+
+  // Nothing to offer (e.g. Android with Google unconfigured) → no orphan divider.
+  if (!showGoogle && !showApple) return null;
 
   return (
     <View style={styles.wrap}>
@@ -136,33 +144,37 @@ export default function SocialAuthButtons() {
         <View style={styles.hairline} />
       </View>
 
-      <Pressable
-        onPress={handleGoogle}
-        disabled={!!busy}
-        accessibilityRole="button"
-        accessibilityLabel="Continue with Google"
-        style={({ pressed }) => [
-          styles.googleBtn,
-          busy && { opacity: 0.6 },
-          pressed && !busy && { opacity: 0.85 },
-        ]}
-      >
-        {busy === 'google' ? (
-          <ActivityIndicator size="small" color={ui.ink} />
-        ) : (
-          <>
-            <GoogleG size={18} />
-            <Text style={styles.googleText}>Continue with Google</Text>
-          </>
-        )}
-      </Pressable>
+      {showGoogle ? (
+        <Pressable
+          onPress={handleGoogle}
+          disabled={!!busy}
+          accessibilityRole="button"
+          accessibilityLabel="Continue with Google"
+          style={({ pressed }) => [
+            styles.googleBtn,
+            busy && { opacity: 0.6 },
+            pressed && !busy && { opacity: 0.85 },
+          ]}
+        >
+          {busy === 'google' ? (
+            <ActivityIndicator size="small" color={ui.ink} />
+          ) : (
+            <>
+              <GoogleG size={18} />
+              <Text style={styles.googleText}>Continue with Google</Text>
+            </>
+          )}
+        </Pressable>
+      ) : null}
 
       {showApple ? (
         <AppleAuthentication.AppleAuthenticationButton
           buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
           buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
           cornerRadius={radii.control}
-          style={styles.appleBtn}
+          // Dimmed while a sign-in is in flight; taps are already no-ops via the
+          // `busy` guard in handleApple.
+          style={[styles.appleBtn, busy && { opacity: 0.6 }]}
           onPress={handleApple}
         />
       ) : null}
