@@ -380,9 +380,16 @@ class AuthController extends Controller
                 'hashed_password' => null,
                 'provider' => $provider,
                 'provider_id' => $providerId,
+                // Explicit so the fresh model carries it in memory — the DB
+                // default only applies on reload, so the disabled-account check
+                // below would otherwise see null and 403 every new sign-in.
+                'is_active' => true,
             ]);
+
+            return $user;
         }
 
+        // Existing account (linked or matched): honour the disabled flag.
         if (! $user->is_active) {
             abort(403, 'Account is disabled');
         }
