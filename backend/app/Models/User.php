@@ -28,9 +28,10 @@ class User extends Model
 
     protected $fillable = [
         'name', 'email', 'hashed_password', 'avatar_url', 'bio', 'is_active', 'timezone',
+        'provider', 'provider_id',
     ];
 
-    protected $hidden = ['hashed_password'];
+    protected $hidden = ['hashed_password', 'provider', 'provider_id'];
 
     protected $casts = [
         'is_active' => 'boolean',
