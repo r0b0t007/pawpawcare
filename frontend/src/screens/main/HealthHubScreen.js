@@ -127,6 +127,13 @@ export default function HealthHubScreen({ navigation }) {
     return { overdue: overdueVax, months: byMonth, history: done };
   }, [shownPets, reminders, filter, navigation]);
 
+  // Which month bucket holds the earliest reminder — the "Scheduled on this
+  // device" caption sits on that month's header (not always the first month),
+  // and stays hidden entirely when there are no reminders (findIndex → -1).
+  const firstReminderMonthIdx = months.findIndex((m) =>
+    m.items.some((it) => it.isReminder)
+  );
+
   const openSheet = () => {
     if (!pets.length) {
       showToast('Add a pet first');
@@ -258,14 +265,13 @@ export default function HealthHubScreen({ navigation }) {
                 <Text style={[type.sectionLabel, { color: ui.subtle }]}>
                   {month.label}
                 </Text>
-                {mi === 0 &&
-                  remindersPrefOn === true &&
-                  months.some((m) => m.items.some((it) => it.isReminder)) && (
+                {mi === firstReminderMonthIdx &&
+                  remindersPrefOn === true && (
                     <View style={styles.deviceCaption}>
                       <MaterialCommunityIcons
                         name="cellphone-check"
                         size={12}
-                        color={ui.subtle}
+                        color={ui.sub}
                       />
                       <Text style={styles.deviceCaptionText}>Scheduled on this device</Text>
                     </View>
@@ -460,10 +466,12 @@ const styles = StyleSheet.create({
   // Shown once (beside the first month) so each reminder row doesn't have to
   // repeat "· this device" — the delivery pills just say "Scheduled · <when>".
   deviceCaption: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // ui.sub (body-secondary) rather than ui.subtle — the smaller caption needs
+  // the extra contrast to clear WCAG AA at this size.
   deviceCaptionText: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 10,
-    color: ui.subtle,
+    color: ui.sub,
   },
   sectionCard: { marginHorizontal: 24, marginBottom: 16 },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: ui.hairline },
