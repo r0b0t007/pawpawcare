@@ -252,11 +252,25 @@ export default function HealthHubScreen({ navigation }) {
             </Text>
           </Card>
         ) : (
-          months.map((month) => (
+          months.map((month, mi) => (
             <View key={month.label}>
-              <Text style={[type.sectionLabel, styles.sectionLabel, { color: ui.subtle }]}>
-                {month.label}
-              </Text>
+              <View style={styles.monthHeaderRow}>
+                <Text style={[type.sectionLabel, { color: ui.subtle }]}>
+                  {month.label}
+                </Text>
+                {mi === 0 &&
+                  remindersPrefOn === true &&
+                  months.some((m) => m.items.some((it) => it.isReminder)) && (
+                    <View style={styles.deviceCaption}>
+                      <MaterialCommunityIcons
+                        name="cellphone-check"
+                        size={12}
+                        color={ui.subtle}
+                      />
+                      <Text style={styles.deviceCaptionText}>Scheduled on this device</Text>
+                    </View>
+                  )}
+              </View>
               <Card style={styles.sectionCard}>
                 {month.items.map((item, i) => (
                   <Pressable
@@ -291,7 +305,7 @@ export default function HealthHubScreen({ navigation }) {
                           <View style={[styles.deliveryPill, { backgroundColor: ui.successTint }]}>
                             <MaterialCommunityIcons name="bell-check-outline" size={11} color={ui.success} />
                             <Text style={[styles.deliveryPillText, { color: ui.success }]}>
-                              Scheduled · {fmtDelivery(item.date)} · this device
+                              Scheduled · {fmtDelivery(item.date)}
                             </Text>
                           </View>
                         ) : (
@@ -435,6 +449,22 @@ const styles = StyleSheet.create({
   syncText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: ui.subtle },
   filters: { gap: 8, paddingHorizontal: 24, paddingBottom: 20 },
   sectionLabel: { marginHorizontal: 24, marginBottom: 10, marginTop: 6 },
+  monthHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 24,
+    marginTop: 6,
+    marginBottom: 10,
+  },
+  // Shown once (beside the first month) so each reminder row doesn't have to
+  // repeat "· this device" — the delivery pills just say "Scheduled · <when>".
+  deviceCaption: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  deviceCaptionText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    color: ui.subtle,
+  },
   sectionCard: { marginHorizontal: 24, marginBottom: 16 },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: ui.hairline },
   attentionRow: {
