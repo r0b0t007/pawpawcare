@@ -47,3 +47,11 @@ Thumbs.db
 
 # Netlify local state
 website/.netlify/
+
+# Signing credentials & secrets — NEVER commit
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+google-service-account.json

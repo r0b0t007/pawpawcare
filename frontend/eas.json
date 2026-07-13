@@ -16,7 +16,9 @@
         "simulator": true
       },
       "env": {
-        "ENVIRONMENT": "development"
+        "ENVIRONMENT": "development",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "493303263143-srop8lcrhgvavaulh9jlthjjokghl2qd.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "493303263143-81gcusogeirf5gmjj5spk4b17v7m5hv6.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -31,8 +33,8 @@
       "env": {
         "ENVIRONMENT": "staging",
         "EXPO_PUBLIC_API_URL": "https://api.pawpawcare.app",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "REPLACE_WITH_GOOGLE_IOS_CLIENT_ID"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "493303263143-srop8lcrhgvavaulh9jlthjjokghl2qd.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "493303263143-81gcusogeirf5gmjj5spk4b17v7m5hv6.apps.googleusercontent.com"
       }
     },
     "production": {
@@ -44,8 +46,8 @@
       "env": {
         "ENVIRONMENT": "production",
         "EXPO_PUBLIC_API_URL": "https://api.pawpawcare.app",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID",
-        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "REPLACE_WITH_GOOGLE_IOS_CLIENT_ID"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "493303263143-srop8lcrhgvavaulh9jlthjjokghl2qd.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "493303263143-81gcusogeirf5gmjj5spk4b17v7m5hv6.apps.googleusercontent.com"
       }
     }
   },
