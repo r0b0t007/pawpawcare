@@ -1,0 +1,10 @@
+# EAS Build archives the whole git repo (the app lives in frontend/). Exclude
+# everything the native build doesn't need — this also drops backend/'s Laravel
+# `public/storage` symlink, which can't be recreated during the shallow clone on
+# Windows (EPERM: symlink) and aborts the upload.
+backend/
+website/
+docs/
+.github/
+.claude/
+.netlify/
