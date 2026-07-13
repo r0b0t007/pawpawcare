@@ -114,12 +114,21 @@ client(s) **must exist** or Google sign-in fails on Android at runtime.
 
 ## Step 6 — Rebuild and test
 
-Native modules **cannot** ship over OTA, so you need fresh builds:
+Native modules **cannot** ship over OTA, so you need a fresh build. Test on a
+**`preview`** build:
 
 ```bash
 cd frontend
-npm run build:dev        # or build:preview
+npm run build:preview
 ```
+
+Why `preview` and not `build:dev`: the `preview` profile is **release-signed
+with the EAS keystore whose SHA-1 you registered** in Step 4, so Android Google
+sign-in works. A `development` build is **debug-signed** (different SHA-1), so
+Android Google sign-in would fail with `DEVELOPER_ERROR` unless you also register
+that debug SHA-1 as its own Android OAuth client. (iOS is bundle-ID-based, so
+Google works on either build there — Android is the constraint.) All three build
+profiles now carry the `EXPO_PUBLIC_GOOGLE_*` vars, so the button shows on each.
 
 Then on device:
 - **Google** on **iOS + Android** → completes and loads the app.
