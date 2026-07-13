@@ -99,6 +99,31 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // Google/Apple sign-in. The screen runs the native provider flow and hands us
+  // the resulting token payload; the backend verifies it and returns our own JWT
+  // pair, after which the flow is identical to email/password login.
+  const socialLogin = async (provider, payload) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    try {
+      const tokens = await post(`/auth/${provider}`, payload, { skipAuth: true });
+      await storeTokens(tokens.access_token, tokens.refresh_token);
+      const user = await get('/users/me');
+      dispatch({ type: 'SET_USER', payload: user });
+      identifyUser(user);
+      // Social auth is find-or-create and the backend doesn't flag which
+      // happened, so infer a brand-new account from a just-set created_at to
+      // keep the signup funnel accurate (best-effort — analytics only).
+      const isNew =
+        user?.created_at && Date.now() - new Date(user.created_at).getTime() < 15000;
+      track(isNew ? 'user_signed_up' : 'user_logged_in', { method: provider });
+      syncDevice();
+      return true;
+    } catch (err) {
+      dispatch({ type: 'SET_ERROR', payload: err.message || 'Could not sign in. Please try again.' });
+      return false;
+    }
+  };
+
   const logout = async () => {
     try {
       const { refresh } = await getTokens();
@@ -130,6 +155,7 @@ export function AuthProvider({ children }) {
         error: state.error,
         signup,
         login,
+        socialLogin,
         logout,
         updateUser,
         clearError,

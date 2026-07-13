@@ -52,3 +52,4 @@ After editing any backend controller, model, route, or migration, run the `secur
 ## TODO
 
 - `frontend/eas.json` iOS submit credentials (`appleId`, `ascAppId`, `appleTeamId`) are placeholders — owner must fill them before the first `eas submit` to TestFlight.
+- **Social sign-in** (Google/Apple, shipped in the `feat/social-auth-*` PRs) needs owner-supplied secrets before it works in a build: (1) Google Cloud OAuth client IDs — iOS, Android, **Web** — set as `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`/`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` in `eas.json` and the backend's `GOOGLE_WEB_CLIENT_ID` (Web ID = the ID-token audience, must match on both sides); (2) `frontend/app.json` `iosUrlScheme` = reversed iOS client ID (currently a `PLACEHOLDER`); (3) fresh EAS builds — the native modules can't ship via OTA.
