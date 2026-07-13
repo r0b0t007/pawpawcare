@@ -44,6 +44,10 @@ class JwtService
             'type' => 'refresh',
             'iat' => $now->timestamp,
             'exp' => $exp->timestamp,
+            // Unique token id: without it, two refresh tokens issued for the same
+            // user within the same second are byte-identical and collide on the
+            // refresh_tokens.token unique index (a 500 on same-second re-auth).
+            'jti' => bin2hex(random_bytes(16)),
         ], self::secret(), self::algo());
 
         return [$token, $exp];

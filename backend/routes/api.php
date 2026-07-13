@@ -50,6 +50,8 @@ Route::get('/care/{pet}', [CareController::class, 'page'])
 Route::middleware('throttle:20,1')->group(function () {
     Route::post('/auth/signup', [AuthController::class, 'signup']);
     Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/google', [AuthController::class, 'google']);
+    Route::post('/auth/apple', [AuthController::class, 'apple']);
     Route::post('/auth/refresh', [AuthController::class, 'refresh']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 });

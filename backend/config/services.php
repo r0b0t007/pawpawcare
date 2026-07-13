@@ -40,6 +40,19 @@ return [
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-8'),
     ],
 
+    // Social sign-in. `google.client_id` is the Google *Web* OAuth client ID —
+    // it's the audience of the ID token minted by @react-native-google-signin
+    // (which is configured with the same value as its webClientId). `apple.bundle_id`
+    // is the app's bundle identifier, which is the audience of the identity
+    // token from the native Sign in with Apple flow.
+    'google' => [
+        'client_id' => env('GOOGLE_WEB_CLIENT_ID'),
+    ],
+
+    'apple' => [
+        'bundle_id' => env('APPLE_BUNDLE_ID', 'com.pawpawcare.app'),
+    ],
+
     // AI document intake provider. `anthropic` (default) uses the block above;
     // `openai-compatible` points the three settings below at any Chat
     // Completions vision endpoint (Qwen/DashScope, Kimi/Moonshot, OpenRouter…).
