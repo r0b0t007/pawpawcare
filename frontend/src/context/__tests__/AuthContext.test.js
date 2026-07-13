@@ -27,9 +27,12 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn(() => Promise.resolve()),
   removeItem: jest.fn(() => Promise.resolve()),
 }));
+jest.mock('@react-native-google-signin/google-signin', () => ({
+  GoogleSignin: { signOut: jest.fn(() => Promise.resolve()) },
+}));
 
 import { AuthProvider, useAuth } from '../AuthContext';
-import { post, get, storeTokens } from '../../services/api';
+import { post, get, storeTokens, clearTokens } from '../../services/api';
 import { track } from '../../services/analytics';
 
 // A probe that surfaces the latest context value to the test.
@@ -101,5 +104,40 @@ describe('AuthContext.socialLogin', () => {
     expect(result).toBe(false);
     expect(storeTokens).not.toHaveBeenCalled();
     expect(auth.error).toBe('Invalid identity token');
+  });
+});
+
+describe('AuthContext.logout', () => {
+  async function signInThen() {
+    await mount();
+    post.mockResolvedValueOnce({ access_token: 'a', refresh_token: 'r', token_type: 'bearer' });
+    get.mockResolvedValueOnce({ id: 'u1', name: 'Test', created_at: '2000-01-01T00:00:00Z' });
+    await act(async () => {
+      await auth.socialLogin('google', { id_token: 'tok' });
+    });
+    expect(auth.user).toBeTruthy();
+  }
+
+  it('clears the user (returns to the landing screen)', async () => {
+    await signInThen();
+
+    await act(async () => {
+      await auth.logout();
+    });
+
+    expect(auth.user).toBeNull();
+  });
+
+  it('still clears the user when a cleanup step rejects', async () => {
+    await signInThen();
+
+    // Token wipe fails — the user must still be logged out, not trapped.
+    clearTokens.mockRejectedValueOnce(new Error('keychain error'));
+
+    await act(async () => {
+      await auth.logout();
+    });
+
+    expect(auth.user).toBeNull();
   });
 });
