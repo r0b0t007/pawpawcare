@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import React, { useRef } from 'react';
 import { View, ActivityIndicator } from 'react-native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useNavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -21,9 +22,20 @@ import { DataProvider } from './src/context/DataContext';
 import { ToastHost } from './src/components';
 import { trackScreen } from './src/services/analytics';
 import AppNavigator from './src/navigation/AppNavigator';
+import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from './src/config';
 
 // Must run at module scope, before any screen mounts.
 configureObserve({ integrations: { 'react-navigation': true } });
+
+// Configure Google Sign-In once. webClientId is the audience the backend
+// verifies the ID token against; iosClientId wires the native iOS flow. Skip
+// when unconfigured (dev/CI) so the SDK doesn't warn — the button then no-ops.
+if (GOOGLE_WEB_CLIENT_ID) {
+  GoogleSignin.configure({
+    webClientId: GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
+  });
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {

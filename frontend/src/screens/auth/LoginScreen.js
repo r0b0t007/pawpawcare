@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { ui, type, radii } from '../../theme';
 import { Button } from '../../components';
+import SocialAuthButtons from '../../components/SocialAuthButtons';
 
 export default function LoginScreen({ navigation }) {
   const { login, error, isLoading, clearError } = useAuth();
@@ -133,6 +134,8 @@ export default function LoginScreen({ navigation }) {
             disabled={isLoading}
             style={styles.submitBtn}
           />
+
+          <SocialAuthButtons />
 
           <Pressable
             style={({ pressed }) => [styles.switchLink, pressed && { opacity: 0.7 }]}

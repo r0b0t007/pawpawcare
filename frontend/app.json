@@ -19,6 +19,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.pawpawcare.app",
       "buildNumber": "1",
+      "usesAppleSignIn": true,
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -51,7 +52,14 @@
         }
       ],
       "expo-secure-store",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-apple-authentication",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.PLACEHOLDER-REPLACE-WITH-REVERSED-IOS-CLIENT-ID"
+        }
+      ]
     ],
     "extra": {
       "eas": {

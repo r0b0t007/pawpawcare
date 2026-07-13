@@ -30,7 +30,9 @@
       },
       "env": {
         "ENVIRONMENT": "staging",
-        "EXPO_PUBLIC_API_URL": "https://api.pawpawcare.app"
+        "EXPO_PUBLIC_API_URL": "https://api.pawpawcare.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "REPLACE_WITH_GOOGLE_IOS_CLIENT_ID"
       }
     },
     "production": {
@@ -41,7 +43,9 @@
       },
       "env": {
         "ENVIRONMENT": "production",
-        "EXPO_PUBLIC_API_URL": "https://api.pawpawcare.app"
+        "EXPO_PUBLIC_API_URL": "https://api.pawpawcare.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "REPLACE_WITH_GOOGLE_IOS_CLIENT_ID"
       }
     }
   },
