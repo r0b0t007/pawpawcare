@@ -28,15 +28,16 @@
   <script src="/script.js" defer></script>
   <script src="/analytics.js" defer></script>
 
-  <!-- TODO(owner) E-E-A-T: this page carries pet-health guidance. Before leaning on it
-       for rankings, have a veterinarian review the schedule and replace the reviewer
-       placeholder below + the "reviewedBy" field in the JSON-LD with a real DVM. -->
+  <!-- Note: general pet-health info written by the founder, not a veterinarian.
+       A DVM review would further strengthen E-E-A-T — if one happens, add a
+       "reviewedBy" Person to the Article JSON-LD below. -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "Article",
     "headline": "Puppy & Kitten Vaccine Schedule (2026)",
     "description": "Typical core-vaccine ages for puppies and kittens, with a calculator that turns a birth date into upcoming vaccine due dates.",
+    "author": { "@type": "Person", "name": "Ahmed Chioua", "url": "https://www.linkedin.com/in/ahmedchioua/" },
     "about": ["Puppy vaccine schedule", "Kitten vaccine schedule", "Pet vaccination"],
     "isPartOf": { "@id": "https://pawpawcare.app/#website" },
     "publisher": { "@id": "https://pawpawcare.app/#org" },
@@ -161,7 +162,7 @@
         </div>
         <p class="vx-age">Non-core vaccines (e.g. Bordetella, Lyme, leptospirosis, FeLV) depend on where you live and how your pet spends its days — ask your vet whether any apply.</p>
 
-        <p style="margin-top:22px;"><strong>Reviewed for general accuracy by [Dr. Name, DVM].</strong> <span class="vx-age">Replace with your reviewing veterinarian, or remove this line until a review has happened.</span></p>
+        <p style="margin-top:22px;" class="vx-age">Written by <a href="https://www.linkedin.com/in/ahmedchioua/">Ahmed Chioua</a>, founder of PawPawCare. This is general information, not individualized veterinary advice — your veterinarian sets the schedule that's right for your pet.</p>
 
         <!-- ===== CTA back to product ===== -->
         <div class="vx-cta">
