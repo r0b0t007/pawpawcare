@@ -12,6 +12,7 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="stylesheet" href="/style.css">
+  <script src="/analytics.js" defer></script>
   <style>
     .legal { max-width: 720px; }
     .legal h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); }
@@ -57,6 +58,7 @@
           <li><strong>Device information for reminders</strong> — a push-notification token, so reminders can reach your phone.</li>
           <li><strong>Usage analytics</strong> — which screens and features are used, collected through PostHog to help us improve the app. Analytics events carry feature names, not your pets' medical details.</li>
           <li><strong>Waitlist email</strong> — if you join the waitlist on this site, we store your email (via Netlify Forms) solely to send your invite.</li>
+          <li><strong>Website analytics (opt-in)</strong> — only if you accept the cookie banner on this site, Google Analytics sets a cookie to count visits and see which pages help. Decline it and nothing is loaded. It never receives your name, email, or pets' records.</li>
         </ul>
 
         <h2>How we use it</h2>
@@ -73,7 +75,7 @@
         </ul>
 
         <h2>Services we rely on</h2>
-        <p>A small set of processors help us run PawPawCare: Expo (app infrastructure and push-notification delivery), PostHog (usage analytics), Anthropic (AI document extraction, only when you scan), and Netlify (this website and its waitlist form). Each receives only what its job requires.</p>
+        <p>A small set of processors help us run PawPawCare: Expo (app infrastructure and push-notification delivery), PostHog (in-app usage analytics), Anthropic (AI document extraction, only when you scan), Netlify (this website and its waitlist form), and Google Analytics (website visits, only if you accept the cookie banner). Each receives only what its job requires.</p>
 
         <h2>Security</h2>
         <p>Data moves over encrypted connections (HTTPS). Passwords are hashed, sessions use short-lived tokens, and share links are signed and time-limited.</p>
