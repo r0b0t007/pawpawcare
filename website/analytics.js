@@ -12,7 +12,7 @@
 (function () {
   'use strict';
 
-  var GA_ID = 'G-XXXXXXXXXX'; // ← paste your GA4 Measurement ID here
+  var GA_ID = 'G-0WTMCMYQ38'; // GA4 Measurement ID (Analytics → Admin → Data streams)
   var STORAGE_KEY = 'ppc:analytics-consent';
 
   // Not configured yet → do nothing (no banner, no cookie, no Google contact).
