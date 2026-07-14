@@ -8,6 +8,29 @@ var onScroll = function () {
 onScroll();
 window.addEventListener('scroll', onScroll, { passive: true });
 
+// Mobile nav toggle
+var navToggle = document.querySelector('.nav-toggle');
+if (navToggle && header) {
+  var setNav = function (open) {
+    header.classList.toggle('nav-open', open);
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  };
+  navToggle.addEventListener('click', function () {
+    setNav(!header.classList.contains('nav-open'));
+  });
+  // Close when a link is tapped, on Escape, or when tapping outside the header
+  header.querySelectorAll('#primary-nav a').forEach(function (a) {
+    a.addEventListener('click', function () { setNav(false); });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') setNav(false);
+  });
+  document.addEventListener('click', function (e) {
+    if (header.classList.contains('nav-open') && !header.contains(e.target)) setNav(false);
+  });
+}
+
 // Reveal sections as they enter the viewport (CSS no-ops under reduced motion)
 if ('IntersectionObserver' in window) {
   var io = new IntersectionObserver(function (entries) {

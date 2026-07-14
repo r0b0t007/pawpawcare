@@ -14,14 +14,15 @@
   <meta property="og:title" content="PawPawCare — All your pet's health, in one calm place">
   <meta property="og:description" content="Vaccines, meds, weight trends, and vet records for the whole furry family. Join the free preview waitlist.">
   <meta property="og:url" content="https://pawpawcare.app/">
-  <meta property="og:image" content="https://pawpawcare.app/og-image.png">
+  <meta property="og:image" content="https://pawpawcare.app/og-image.webp">
+  <meta property="og:image:type" content="image/webp">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PawPawCare — pet health tracking with vaccine and medication reminders">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="PawPawCare — All your pet's health, in one calm place">
   <meta name="twitter:description" content="Vaccines, meds, weight trends, and vet records for the whole furry family. Join the free preview waitlist.">
-  <meta name="twitter:image" content="https://pawpawcare.app/og-image.png">
+  <meta name="twitter:image" content="https://pawpawcare.app/og-image.webp">
   <meta name="twitter:image:alt" content="PawPawCare — pet health tracking with vaccine and medication reminders">
 
   <meta name="theme-color" content="#fff8f4">
@@ -30,43 +31,71 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
   <link rel="preload" href="/fonts/plus-jakarta-sans-var.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/images/dashboard.ef1b5bd3.webp" as="image" type="image/webp" fetchpriority="high">
+  <link rel="preload" as="image" href="/images/dashboard.ef1b5bd3.webp" imagesrcset="/images/dashboard-480.webp 480w, /images/dashboard.ef1b5bd3.webp 780w" imagesizes="(max-width: 640px) 60vw, (max-width: 820px) 240px, 300px" fetchpriority="high">
   <link rel="stylesheet" href="/style.css">
   <script src="/script.js" defer></script>
   <script src="/analytics.js" defer></script>
 
+  <!-- Structured data. TODO(owner): once the brand's LinkedIn / Product Hunt / Crunchbase
+       pages exist (SEO task H3), add their URLs to Organization.sameAs below; and replace
+       the founder placeholder with the real founder (name + jobTitle + a sameAs profile)
+       to strengthen E-E-A-T for this health-adjacent product. -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "WebSite",
+        "@id": "https://pawpawcare.app/#website",
+        "url": "https://pawpawcare.app/",
+        "name": "PawPawCare",
+        "publisher": { "@id": "https://pawpawcare.app/#org" }
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://pawpawcare.app/#org",
+        "name": "PawPawCare",
+        "url": "https://pawpawcare.app/",
+        "logo": "https://pawpawcare.app/apple-touch-icon.png",
+        "email": "privacy@pawpawcare.app",
+        "founder": { "@type": "Person", "name": "PawPawCare Team" },
+        "sameAs": []
+      },
+      {
         "@type": "MobileApplication",
+        "@id": "https://pawpawcare.app/#app",
         "name": "PawPawCare",
         "description": "Pet health management app: vaccination reminders, medication schedules, weight trend insights, a medical records vault with AI document scanning, vet share links, caretaker mode, and a pet-owner community.",
         "applicationCategory": "HealthApplication",
         "operatingSystem": "iOS, Android",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-        "url": "https://pawpawcare.app/"
-      },
-      {
-        "@type": "Organization",
-        "name": "PawPawCare",
         "url": "https://pawpawcare.app/",
-        "logo": "https://pawpawcare.app/apple-touch-icon.png",
-        "email": "privacy@pawpawcare.app"
+        "publisher": { "@id": "https://pawpawcare.app/#org" },
+        "featureList": [
+          "Vaccination tracking with due-soon reminders",
+          "Medication schedules and dose logging",
+          "Plain-language weight trend insights",
+          "Medical records vault with AI document scanning",
+          "Read-only vet share links",
+          "Caretaker mode for pet sitters",
+          "Family sharing for multi-pet households",
+          "Community feed and lost-pet alerts"
+        ]
       },
       {
         "@type": "FAQPage",
+        "@id": "https://pawpawcare.app/#faq",
+        "isPartOf": { "@id": "https://pawpawcare.app/#website" },
         "mainEntity": [
           {
             "@type": "Question",
             "name": "What is PawPawCare?",
-            "acceptedAnswer": { "@type": "Answer", "text": "PawPawCare is a free pet health app for iOS and Android that keeps every pet's vaccinations, medications, weight trends, and vet records in one place — with reminders, AI vet-record scanning, shareable read-only links for vets and pet sitters, family sharing, and a community for pet owners." }
+            "acceptedAnswer": { "@type": "Answer", "text": "PawPawCare is a free pet health tracker app for iOS and Android that keeps every pet's vaccinations, medications, weight trends, and vet records in one calm place. Instead of scattered paper cards, photos, and calendar alerts, you get one profile per pet with due-soon vaccine reminders, medication schedules with dose logging, and plain-language weight insights. A records vault stores clinic visits and documents, and its AI intake reads a photographed vaccination card, prescription, or invoice and extracts the details for you to review before anything is saved. You can share a read-only link with your vet or pet sitter, co-own pets with family, and follow a community feed for pet owners. It's built for multi-pet households and is currently in a free early-access preview ahead of the app-store launch." }
           },
           {
             "@type": "Question",
             "name": "Is PawPawCare free?",
-            "acceptedAnswer": { "@type": "Answer", "text": "The preview is completely free. When we launch, core tracking stays free; some power features may become part of a paid plan." }
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes — the early-access preview is completely free, with no card required and no trial clock. Join the waitlist, get your invite, and you have the full app: multi-pet profiles, vaccine and medication tracking, weight trends, the records vault with AI scanning, vet and sitter sharing, and the community feed. When PawPawCare launches publicly, the core tracking you rely on — vaccines, medications, weights, and reminders — stays free. Some power-user features may later become part of an optional paid plan, but we'll always be clear about what's included before anything changes, and preview members will get plenty of notice." }
           },
           {
             "@type": "Question",
@@ -81,7 +110,7 @@
           {
             "@type": "Question",
             "name": "Is my pet's data private?",
-            "acceptedAnswer": { "@type": "Answer", "text": "Yes. Your records are yours: share links are opt-in, time-limited, and revocable, and we never sell your data." }
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes — your pet's records are yours, and we never sell your data. There are no data brokers and no advertising networks in PawPawCare. Sharing is always something you switch on: vet share links and caretaker pages are read-only, expire on a schedule you choose, and can be revoked at any moment. Documents you scan are processed only to extract the details you review, and are not used to train AI models. Data travels over encrypted HTTPS connections, passwords are stored only as secure hashes, and sessions use short-lived tokens." }
           },
           {
             "@type": "Question",
@@ -103,14 +132,20 @@
         <img class="paw" src="/logo-mark.png" width="26" height="26" alt="" aria-hidden="true">
         PawPawCare
       </a>
-      <nav aria-label="Primary">
+      <nav aria-label="Primary" id="primary-nav">
         <ul class="nav-links">
           <li><a href="#features">Features</a></li>
           <li><a href="#how">How it works</a></li>
           <li><a href="#faq">FAQ</a></li>
+          <li><a href="/vaccine-schedule/">Vaccine schedule</a></li>
         </ul>
       </nav>
-      <a class="btn btn-primary btn-sm" href="#waitlist">Get early access</a>
+      <div class="header-actions">
+        <a class="btn btn-primary btn-sm" href="#waitlist">Get early access</a>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -122,7 +157,7 @@
         <div class="hero-copy">
           <p class="tag-chip">Early access · Free preview</p>
           <h1 id="hero-title">All your pet's health, in one&nbsp;calm&nbsp;place.</h1>
-          <p class="lede">PawPawCare remembers every shot, dose, and gram — vaccines, meds, weight trends, and vet records for the whole furry family. You just get the reminder at the right moment.</p>
+          <p class="lede">PawPawCare is the pet health tracker that remembers every shot, dose, and gram — vaccine reminders, medication schedules, weight trends, and vet records for the whole furry family. You just get the reminder at the right moment.</p>
 
           <form class="waitlist-form" name="waitlist" method="POST" action="/thanks.html" data-netlify="true" netlify-honeypot="bot-field">
             <input type="hidden" name="form-name" value="waitlist">
@@ -144,7 +179,7 @@
           <div class="blob blob-a"></div>
           <div class="blob blob-b"></div>
           <div class="phone phone-hero">
-            <img src="/images/dashboard.ef1b5bd3.webp" alt="PawPawCare home screen with an ‘Up next’ vaccine reminder and a row of pet profiles" width="780" height="1688" fetchpriority="high" decoding="async">
+            <img src="/images/dashboard.ef1b5bd3.webp" srcset="/images/dashboard-480.webp 480w, /images/dashboard.ef1b5bd3.webp 780w" sizes="(max-width: 640px) 60vw, (max-width: 820px) 240px, 300px" alt="PawPawCare home screen with an ‘Up next’ vaccine reminder and a row of pet profiles" width="780" height="1688" fetchpriority="high" decoding="async">
           </div>
         </div>
       </div>
@@ -224,6 +259,7 @@
           <h2 id="records-title">Snap a vet record. We file the rest.</h2>
           <p>Point your camera at a vaccination card, prescription, or invoice. PawPawCare reads it and extracts the vaccines, meds, weights, and costs — then shows you exactly what it found.</p>
           <p><strong>Nothing is saved until you approve it.</strong> Every extracted item gets a checkbox; you stay the editor-in-chief of your pet's file.</p>
+          <p class="disclaimer">PawPawCare helps you organize your pet's health records — it doesn't diagnose, and it isn't a substitute for professional veterinary care. Always confirm AI-extracted details against the original document, and check with your veterinarian before acting on any reminder or trend.</p>
         </div>
         <div class="split-visual reveal" aria-hidden="true">
           <div class="scan-card">
@@ -314,6 +350,23 @@
       </div>
     </section>
 
+    <!-- ============ About / trust (E-E-A-T) ============ -->
+    <!-- TODO(owner) SEO task H2 — E-E-A-T: fill the two bracketed placeholders below
+         before merging. A named founder (with a LinkedIn/sameAs link) and a named
+         reviewing veterinarian are the single biggest trust signal for a health-
+         adjacent product. Only claim a veterinary review if one has actually happened;
+         otherwise delete that line rather than shipping an unfilled claim. -->
+    <section class="section section-tinted" id="about" aria-labelledby="about-title">
+      <div class="container container-narrow">
+        <p class="tag-chip">About</p>
+        <h2 id="about-title">Who's behind PawPawCare.</h2>
+        <p>PawPawCare is built by a small team of pet owners who got tired of losing vaccine cards and second-guessing dose dates. The goal is simple: make the easy-to-forget parts of pet health effortless — without turning your pet's data into someone else's business.</p>
+        <p><strong>Founder:</strong> [Your name] — [one honest line on why you built PawPawCare]. <a href="[LinkedIn or profile URL]">Connect on LinkedIn</a>.</p>
+        <p><strong>Veterinary review:</strong> [Dr. Name, DVM] reviews our default vaccination and reminder guidance to keep it sensible. PawPawCare organizes your records; your own veterinarian remains the source of medical advice.</p>
+        <p>Questions or feedback? Email <a href="mailto:privacy@pawpawcare.app">privacy@pawpawcare.app</a>.</p>
+      </div>
+    </section>
+
     <!-- ============ FAQ ============ -->
     <section class="section" id="faq" aria-labelledby="faq-title">
       <div class="container container-narrow">
@@ -321,11 +374,11 @@
         <h2 id="faq-title">Questions, answered.</h2>
         <details>
           <summary>What is PawPawCare?</summary>
-          <p>PawPawCare is a free pet health app for iOS and Android that keeps every pet's vaccinations, medications, weight trends, and vet records in one place — with reminders, AI vet-record scanning, shareable read-only links for vets and pet sitters, family sharing, and a community for pet owners.</p>
+          <p>PawPawCare is a free pet health tracker app for iOS and Android that keeps every pet's vaccinations, medications, weight trends, and vet records in one calm place. Instead of scattered paper cards, photos, and calendar alerts, you get one profile per pet with due-soon vaccine reminders, medication schedules with dose logging, and plain-language weight insights. A records vault stores clinic visits and documents, and its AI intake reads a photographed vaccination card, prescription, or invoice and extracts the details for you to review before anything is saved. You can share a read-only link with your vet or pet sitter, co-own pets with family, and follow a community feed for pet owners. It's built for multi-pet households — dogs, cats, and everyone in between — and is currently in a free early-access preview ahead of the app-store launch.</p>
         </details>
         <details>
           <summary>Is PawPawCare free?</summary>
-          <p>The preview is completely free. When we launch, core tracking stays free; some power features may become part of a paid plan.</p>
+          <p>Yes — the early-access preview is completely free, with no card required and no trial clock. Join the waitlist, get your invite, and you have the full app: multi-pet profiles, vaccine and medication tracking, weight trends, the records vault with AI scanning, vet and sitter sharing, and the community feed. When PawPawCare launches publicly, the core tracking you rely on — vaccines, medications, weights, and reminders — stays free. Some power-user features may later become part of an optional paid plan, but we'll always be clear about what's included before anything changes, and preview members will get plenty of notice. We'd rather earn a subscription with features worth paying for than lock away the basics of keeping your pet healthy.</p>
         </details>
         <details>
           <summary>When does it launch?</summary>
@@ -337,7 +390,7 @@
         </details>
         <details>
           <summary>Is my pet's data private?</summary>
-          <p>Yes. Your records are yours: share links are opt-in, time-limited, and revocable, and we never sell your data.</p>
+          <p>Yes — your pet's records are yours, and we never sell your data. There are no data brokers and no advertising networks in PawPawCare. Sharing is always something you switch on: vet share links and caretaker pages are read-only, expire on a schedule you choose, and can be revoked at any moment. Documents you scan are processed only to extract the details you review, and are not used to train AI models. Data travels over encrypted HTTPS connections, passwords are stored only as secure hashes, and sessions use short-lived tokens. On this website, analytics load only if you accept the cookie banner — decline and nothing is set. You can read the specifics, and how to delete your account and every record attached to it, in our <a href="/privacy/">Privacy Policy</a>.</p>
         </details>
         <details>
           <summary>What's in the free preview?</summary>
