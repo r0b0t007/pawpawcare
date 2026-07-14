@@ -96,7 +96,23 @@
     if (trigger) { e.preventDefault(); showBanner(); }
   });
 
+  // Defer the banner until the visitor scrolls or dwells a moment, so it never
+  // covers the hero headline at first paint on small screens (SEO audit C1).
+  function scheduleBanner() {
+    var shown = false, timer;
+    function reveal() {
+      if (shown) return;
+      shown = true;
+      window.removeEventListener('scroll', onScroll);
+      clearTimeout(timer);
+      showBanner();
+    }
+    function onScroll() { if (window.pageYOffset > 80) reveal(); }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    timer = setTimeout(reveal, 6000); // fallback for readers who don't scroll
+  }
+
   var choice = readChoice();
   if (choice === 'granted') enableAnalytics();
-  else if (choice !== 'denied') showBanner();
+  else if (choice !== 'denied') scheduleBanner();
 })();

@@ -2,12 +2,14 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://pawpawcare.app/</loc>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
+    <lastmod>2026-07-14</lastmod>
+  </url>
+  <url>
+    <loc>https://pawpawcare.app/vaccine-schedule/</loc>
+    <lastmod>2026-07-14</lastmod>
   </url>
   <url>
     <loc>https://pawpawcare.app/privacy/</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.3</priority>
+    <lastmod>2026-07-07</lastmod>
   </url>
 </urlset>

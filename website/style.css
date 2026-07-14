@@ -165,8 +165,47 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
 
 .nav-links a:hover { color: var(--bark); }
 
+.header-actions { display: flex; align-items: center; gap: 10px; }
+
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: var(--card);
+  border: 1.5px solid var(--outline);
+  border-radius: var(--r-md);
+  color: var(--bark);
+  cursor: pointer;
+}
+.nav-toggle svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+
 @media (max-width: 640px) {
   .site-header nav { display: none; }
+  .nav-toggle { display: inline-flex; }
+  .site-header.nav-open nav {
+    display: block;
+    position: absolute;
+    top: var(--header-h);
+    left: 0;
+    right: 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--surface-high);
+    box-shadow: var(--shadow-card);
+    padding: 6px 0 10px;
+  }
+  .site-header.nav-open .nav-links {
+    flex-direction: column;
+    gap: 0;
+    padding-inline: clamp(20px, 4vw, 40px);
+  }
+  .site-header.nav-open .nav-links a {
+    display: block;
+    padding: 12px 0;
+    font-size: 1.05rem;
+  }
 }
 
 /* ---------- Buttons ---------- */
@@ -196,7 +235,7 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
 .btn-primary:active { transform: translateY(0); }
 .btn-primary[disabled] { opacity: 0.6; cursor: default; transform: none; }
 
-.btn-sm { min-height: 42px; padding: 8px 20px; font-size: 0.95rem; }
+.btn-sm { min-height: 48px; padding: 10px 20px; font-size: 0.95rem; }
 
 /* ---------- Tag chips (pet-tag section labels) ---------- */
 
@@ -288,6 +327,12 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
   .hero-grid { grid-template-columns: 1fr; }
   .hero-visual { order: -1; }
   .phone-hero { width: min(240px, 64vw); }
+}
+
+/* On phones the hero image sits above the copy; cap its height so the H1 and
+   lede stay high on the fold and readable at first paint (SEO audit C1). */
+@media (max-width: 640px) {
+  .phone-hero { width: auto; height: min(340px, 40vh); }
 }
 
 /* ---------- Forms ---------- */
@@ -492,6 +537,15 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
 
 .split-copy p { color: var(--ink-soft); max-width: 34em; }
 .split-copy strong { color: var(--ink); }
+
+.disclaimer {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  border-left: 3px solid var(--peach);
+  padding-left: 14px;
+  max-width: 34em;
+}
+#about strong { color: var(--ink); }
 
 .split-visual { display: flex; justify-content: center; }
 

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Puppy &amp; Kitten Vaccine Schedule (2026) — with a due-date calculator</title>
+  <meta name="description" content="A plain-language puppy and kitten vaccine schedule with typical core-vaccine ages, plus a free calculator that turns your pet's birth date into upcoming vaccine due dates.">
+  <link rel="canonical" href="https://pawpawcare.app/vaccine-schedule/">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="PawPawCare">
+  <meta property="og:title" content="Puppy & Kitten Vaccine Schedule (2026) — with a due-date calculator">
+  <meta property="og:description" content="Typical core-vaccine ages for puppies and kittens, plus a free calculator that turns a birth date into upcoming due dates.">
+  <meta property="og:url" content="https://pawpawcare.app/vaccine-schedule/">
+  <meta property="og:image" content="https://pawpawcare.app/og-image.webp">
+  <meta property="og:image:type" content="image/webp">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://pawpawcare.app/og-image.webp">
+
+  <meta name="theme-color" content="#fff8f4">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/script.js" defer></script>
+  <script src="/analytics.js" defer></script>
+
+  <!-- Note: general pet-health info written by the founder, not a veterinarian.
+       A DVM review would further strengthen E-E-A-T — if one happens, add a
+       "reviewedBy" Person to the Article JSON-LD below. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Puppy & Kitten Vaccine Schedule (2026)",
+    "description": "Typical core-vaccine ages for puppies and kittens, with a calculator that turns a birth date into upcoming vaccine due dates.",
+    "author": { "@type": "Person", "name": "Ahmed Chioua", "url": "https://www.linkedin.com/in/ahmedchioua/" },
+    "about": ["Puppy vaccine schedule", "Kitten vaccine schedule", "Pet vaccination"],
+    "isPartOf": { "@id": "https://pawpawcare.app/#website" },
+    "publisher": { "@id": "https://pawpawcare.app/#org" },
+    "mainEntityOfPage": "https://pawpawcare.app/vaccine-schedule/"
+  }
+  </script>
+
+  <style>
+    .vx { max-width: 820px; }
+    .vx h1 { font-size: clamp(2rem, 4.5vw, 2.9rem); }
+    .vx .lede { font-size: 1.12rem; color: var(--ink-soft); max-width: 40em; }
+    .vx-tool {
+      background: var(--card);
+      border: 1.5px solid var(--outline);
+      border-radius: var(--r-xl);
+      padding: clamp(20px, 4vw, 30px);
+      box-shadow: var(--shadow-card);
+      margin: 8px 0 28px;
+    }
+    .vx-controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+    .vx-controls .field { flex: 1 1 180px; }
+    .vx-controls label { display: block; font-size: 0.85rem; font-weight: 700; color: var(--ink-soft); margin-bottom: 5px; }
+    .vx-controls select, .vx-controls input {
+      width: 100%; font: inherit; color: var(--ink); background: var(--card);
+      border: 1.5px solid var(--outline); border-radius: var(--r-lg); padding: 12px 14px; min-height: 48px;
+    }
+    .vx-results { margin-top: 22px; }
+    .vx-results:empty { display: none; }
+    .vx-row { display: flex; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--surface-high); }
+    .vx-row:first-child { border-top: 0; }
+    .vx-vac { font-weight: 700; color: var(--ink); }
+    .vx-age { font-size: 0.85rem; color: var(--ink-soft); }
+    .vx-date { font-weight: 700; color: var(--bark); white-space: nowrap; text-align: right; }
+    .vx-date.past { color: var(--ink-soft); font-weight: 600; }
+    table.vx-table { width: 100%; border-collapse: collapse; margin: 10px 0 8px; }
+    table.vx-table caption { text-align: left; font-weight: 800; color: var(--bark); padding: 8px 0; }
+    table.vx-table th, table.vx-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--surface-high); font-size: 0.96rem; }
+    table.vx-table th { color: var(--ink-soft); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .vx-tables-wrap { overflow-x: auto; }
+    .vx-cta { background: var(--surface-low); border: 1.5px solid var(--peach); border-radius: var(--r-2xl); padding: clamp(24px, 4vw, 40px); text-align: center; margin-top: 32px; }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <a class="wordmark" href="/" aria-label="PawPawCare — home">
+        <img class="paw" src="/logo-mark.png" width="26" height="26" alt="" aria-hidden="true">
+        PawPawCare
+      </a>
+      <nav aria-label="Primary" id="primary-nav">
+        <ul class="nav-links">
+          <li><a href="/#features">Features</a></li>
+          <li><a href="/#how">How it works</a></li>
+          <li><a href="/#faq">FAQ</a></li>
+          <li><a href="/vaccine-schedule/" aria-current="page">Vaccine schedule</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <a class="btn btn-primary btn-sm" href="/#waitlist">Get early access</a>
+        <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="section" aria-labelledby="vx-title">
+      <div class="container vx">
+        <p class="tag-chip">Guide</p>
+        <h1 id="vx-title">Puppy &amp; kitten vaccine schedule</h1>
+        <p class="lede">The core vaccines most puppies and kittens need, at the ages they usually get them — plus a calculator that turns your pet's birth date into rough due dates you can take to the vet.</p>
+
+        <p class="disclaimer">This is general information, not veterinary advice. Real schedules vary by region, breed, lifestyle, and local law, and your veterinarian sets the plan that's right for your pet. Use the dates below as a starting point for that conversation — not a replacement for it.</p>
+
+        <!-- ===== Calculator ===== -->
+        <h2>Due-date calculator</h2>
+        <div class="vx-tool">
+          <div class="vx-controls">
+            <div class="field">
+              <label for="vx-species">Pet</label>
+              <select id="vx-species">
+                <option value="dog">Puppy (dog)</option>
+                <option value="cat">Kitten (cat)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="vx-dob">Date of birth</label>
+              <input id="vx-dob" type="date">
+            </div>
+          </div>
+          <div class="vx-results" id="vx-results" aria-live="polite"></div>
+        </div>
+
+        <!-- ===== Reference tables ===== -->
+        <h2>Typical core-vaccine ages</h2>
+        <div class="vx-tables-wrap">
+          <table class="vx-table">
+            <caption>Puppies — core vaccines</caption>
+            <thead><tr><th scope="col">Vaccine</th><th scope="col">Protects against</th><th scope="col">Usual age</th></tr></thead>
+            <tbody>
+              <tr><td>DHPP #1</td><td>Distemper, hepatitis (adenovirus), parvovirus, parainfluenza</td><td>6–8 weeks</td></tr>
+              <tr><td>DHPP #2</td><td>Same combination, second dose</td><td>10–12 weeks</td></tr>
+              <tr><td>DHPP #3</td><td>Same combination, third dose</td><td>14–16 weeks</td></tr>
+              <tr><td>Rabies</td><td>Rabies (often required by law)</td><td>12–16 weeks</td></tr>
+              <tr><td>DHPP booster</td><td>First adult booster</td><td>~12 months</td></tr>
+            </tbody>
+          </table>
+          <table class="vx-table">
+            <caption>Kittens — core vaccines</caption>
+            <thead><tr><th scope="col">Vaccine</th><th scope="col">Protects against</th><th scope="col">Usual age</th></tr></thead>
+            <tbody>
+              <tr><td>FVRCP #1</td><td>Feline viral rhinotracheitis, calicivirus, panleukopenia</td><td>6–8 weeks</td></tr>
+              <tr><td>FVRCP #2</td><td>Same combination, second dose</td><td>10–12 weeks</td></tr>
+              <tr><td>FVRCP #3</td><td>Same combination, third dose</td><td>14–16 weeks</td></tr>
+              <tr><td>Rabies</td><td>Rabies (often required by law)</td><td>12–16 weeks</td></tr>
+              <tr><td>FVRCP booster</td><td>First adult booster</td><td>~12 months</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="vx-age">Non-core vaccines (e.g. Bordetella, Lyme, leptospirosis, FeLV) depend on where you live and how your pet spends its days — ask your vet whether any apply.</p>
+
+        <p style="margin-top:22px;" class="vx-age">Written by <a href="https://www.linkedin.com/in/ahmedchioua/">Ahmed Chioua</a>, founder of PawPawCare. This is general information, not individualized veterinary advice — your veterinarian sets the schedule that's right for your pet.</p>
+
+        <!-- ===== CTA back to product ===== -->
+        <div class="vx-cta">
+          <h2 style="margin-top:0;">Let PawPawCare remember the dates for you.</h2>
+          <p style="color:var(--ink-soft);">Add your pet once and PawPawCare tracks every dose, sends due-soon reminders, and files the vet records — so you never rebuild this schedule by hand again.</p>
+          <p style="margin-bottom:0;"><a class="btn btn-primary" href="/#waitlist">Join the free waitlist</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p class="wordmark wordmark-footer">
+        <img class="paw" src="/logo-mark.png" width="26" height="26" alt="" aria-hidden="true">
+        PawPawCare
+      </p>
+      <p class="footer-tagline">Made for the people pets rely on.</p>
+      <nav aria-label="Footer">
+        <ul class="nav-links">
+          <li><a href="/#features">Features</a></li>
+          <li><a href="/vaccine-schedule/">Vaccine schedule</a></li>
+          <li><a href="/#waitlist">Waitlist</a></li>
+          <li><a href="/privacy/">Privacy</a></li>
+          <li><a href="#" data-cookie-settings>Cookie settings</a></li>
+        </ul>
+      </nav>
+      <p class="footer-legal">© 2026 PawPawCare</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var SCHEDULES = {
+        dog: [
+          { v: 'DHPP #1', age: '6–8 weeks', lo: 6, hi: 8 },
+          { v: 'DHPP #2', age: '10–12 weeks', lo: 10, hi: 12 },
+          { v: 'DHPP #3', age: '14–16 weeks', lo: 14, hi: 16 },
+          { v: 'Rabies', age: '12–16 weeks', lo: 12, hi: 16 },
+          { v: 'DHPP booster', age: '~12 months', lo: 52, hi: 52 }
+        ],
+        cat: [
+          { v: 'FVRCP #1', age: '6–8 weeks', lo: 6, hi: 8 },
+          { v: 'FVRCP #2', age: '10–12 weeks', lo: 10, hi: 12 },
+          { v: 'FVRCP #3', age: '14–16 weeks', lo: 14, hi: 16 },
+          { v: 'Rabies', age: '12–16 weeks', lo: 12, hi: 16 },
+          { v: 'FVRCP booster', age: '~12 months', lo: 52, hi: 52 }
+        ]
+      };
+      var species = document.getElementById('vx-species');
+      var dob = document.getElementById('vx-dob');
+      var out = document.getElementById('vx-results');
+      if (!species || !dob || !out) return;
+
+      var fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      function addWeeks(date, w) { var d = new Date(date.getTime()); d.setDate(d.getDate() + w * 7); return d; }
+
+      function render() {
+        out.innerHTML = '';
+        var val = dob.value;
+        if (!val) return;
+        var birth = new Date(val + 'T00:00:00');
+        if (isNaN(birth.getTime())) return;
+        var today = new Date(); today.setHours(0, 0, 0, 0);
+        SCHEDULES[species.value].forEach(function (item) {
+          var start = addWeeks(birth, item.lo);
+          var end = addWeeks(birth, item.hi);
+          var when = item.lo === item.hi ? fmt.format(start) : fmt.format(start) + ' – ' + fmt.format(end);
+          var past = end < today;
+          var row = document.createElement('div');
+          row.className = 'vx-row';
+          row.innerHTML = '<span><span class="vx-vac">' + item.v + '</span><br><span class="vx-age">Usual age: ' + item.age + '</span></span>' +
+            '<span class="vx-date' + (past ? ' past' : '') + '">' + when + (past ? ' · likely done' : '') + '</span>';
+          out.appendChild(row);
+        });
+        var note = document.createElement('p');
+        note.className = 'vx-age';
+        note.style.marginTop = '14px';
+        note.textContent = 'Estimated from the usual age windows above — confirm exact dates with your veterinarian.';
+        out.appendChild(note);
+      }
+      species.addEventListener('change', render);
+      dob.addEventListener('change', render);
+      dob.addEventListener('input', render);
+    })();
+  </script>
+</body>
+</html>
