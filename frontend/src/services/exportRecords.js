@@ -13,51 +13,18 @@ const MIME = {
   pdf: 'application/pdf',
 };
 
-// The JSON api client can't carry binary bodies, so this mirrors uploadImage:
-// an authed raw fetch with a single 401-refresh retry.
-async function fetchExport(format, petIds) {
+function exportUrl(format, petIds) {
   const params = new URLSearchParams({ format });
   if (petIds && petIds.length) params.set('pets', petIds.join(','));
-  const url = `${API_URL}/users/me/export?${params}`;
-
-  const send = (token) =>
-    fetch(url, {
-      headers: {
-        Accept: MIME[format],
-        'bypass-tunnel-reminder': 'true',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    });
-
-  const { access } = await getTokens();
-  let res = await send(access);
-
-  if (res.status === 401) {
-    let newToken;
-    try {
-      newToken = await refreshAccessToken();
-    } catch {
-      throw new Error('SESSION_EXPIRED');
-    }
-    res = await send(newToken);
-  }
-
-  if (!res.ok) {
-    const data = await res.json().catch(() => null);
-    throw new Error(data?.detail || `Export failed (${res.status})`);
-  }
-  return res;
+  return `${API_URL}/users/me/export?${params}`;
 }
 
-// blob → base64 payload (strip the data: prefix). FileReader is available on
-// both React Native and web, unlike Buffer/btoa-over-bytes.
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error || new Error('Could not read export'));
-    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
-    reader.readAsDataURL(blob);
-  });
+function authHeaders(format, token) {
+  return {
+    Accept: MIME[format],
+    'bypass-tunnel-reminder': 'true',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 /**
@@ -66,12 +33,25 @@ function blobToBase64(blob) {
  * omitted/empty means every pet. Throws on failure so callers can toast.
  */
 export async function exportRecords(format, petIds = []) {
-  const res = await fetchExport(format, petIds);
+  const url = exportUrl(format, petIds);
   const filename = `pawpawcare-records-${new Date().toISOString().slice(0, 10)}.${format}`;
-  const blob = await res.blob();
 
   if (Platform.OS === 'web') {
-    // No file system / share sheet on web — a plain download link.
+    // No file system / share sheet on web — fetch as a blob and click a link.
+    const { access } = await getTokens();
+    let res = await fetch(url, { headers: authHeaders(format, access) });
+    if (res.status === 401) {
+      let newToken;
+      try {
+        newToken = await refreshAccessToken();
+      } catch {
+        throw new Error('SESSION_EXPIRED');
+      }
+      res = await fetch(url, { headers: authHeaders(format, newToken) });
+    }
+    if (!res.ok) throw new Error(`Export failed (${res.status})`);
+
+    const blob = await res.blob();
     const href = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = href;
@@ -83,10 +63,33 @@ export async function exportRecords(format, petIds = []) {
     return;
   }
 
-  const base64 = await blobToBase64(blob);
-  const uri = FileSystem.cacheDirectory + filename;
-  await FileSystem.writeAsStringAsync(uri, base64, { encoding: 'base64' });
-  await Sharing.shareAsync(uri, {
+  // Native: stream the authed response straight to a file, then share it. This
+  // replaces the old blob → FileReader → base64 → writeAsStringAsync chain,
+  // which is unreliable on Android RN and was throwing "Export failed" there.
+  const fileUri = FileSystem.cacheDirectory + filename;
+  const download = (token) =>
+    FileSystem.downloadAsync(url, fileUri, { headers: authHeaders(format, token) });
+
+  const { access } = await getTokens();
+  let result = await download(access);
+
+  if (result.status === 401) {
+    let newToken;
+    try {
+      newToken = await refreshAccessToken();
+    } catch {
+      throw new Error('SESSION_EXPIRED');
+    }
+    result = await download(newToken);
+  }
+
+  if (result.status < 200 || result.status >= 300) {
+    // A non-2xx response means downloadAsync wrote an error body to the file,
+    // not a valid document — surface it instead of sharing a broken file.
+    throw new Error(`Export failed (${result.status})`);
+  }
+
+  await Sharing.shareAsync(result.uri, {
     mimeType: MIME[format],
     dialogTitle: 'Export health records',
     UTI: format === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text',

@@ -77,7 +77,10 @@ export default function ProfileScreen({ navigation }) {
       const ids = exportPets.length === pets.length ? [] : exportPets;
       await exportRecords(exportFormat, ids);
       setExportOpen(false);
-    } catch {
+    } catch (err) {
+      // Don't swallow the cause — a silent catch here is what made an Android
+      // download failure hard to diagnose. Friendly toast, but log the real one.
+      console.warn('Export failed', err);
       showToast('Export failed — nothing was lost, try again');
     } finally {
       setExporting(false);
@@ -226,10 +229,12 @@ export default function ProfileScreen({ navigation }) {
             <Chip label="CSV" active={exportFormat === 'csv'} onPress={() => setExportFormat('csv')} />
           </View>
         </View>
+        {/* Pet chips only render with 2+ pets, so only require a selection
+            then; with 0–1 pets an empty selection already means "all pets". */}
         <Button
           label={exporting ? 'Exporting…' : exportFormat === 'pdf' ? 'Export PDF' : 'Export CSV'}
           onPress={handleExport}
-          disabled={exporting || exportPets.length === 0}
+          disabled={exporting || (pets.length > 1 && exportPets.length === 0)}
         />
         <Text style={styles.sheetCaption}>
           Free forever — your records are never locked behind a plan.
