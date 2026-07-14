@@ -25,7 +25,7 @@ export default function WelcomeScreen({ navigation }) {
       <View style={styles.container}>
         <View style={styles.hero}>
           <Image
-            source={require('../../assets/logo-mark.png')}
+            source={require('../../../assets/logo-mark.png')}
             style={styles.logo}
             resizeMode="contain"
           />
