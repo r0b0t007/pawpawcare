@@ -85,7 +85,10 @@ export async function exportRecords(format, petIds = []) {
 
   if (result.status < 200 || result.status >= 300) {
     // A non-2xx response means downloadAsync wrote an error body to the file,
-    // not a valid document — surface it instead of sharing a broken file.
+    // not a valid document — bin that file and surface the error instead of
+    // sharing (or leaving behind) a broken one. Cleanup is best-effort so it
+    // can't mask the real failure.
+    await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
     throw new Error(`Export failed (${result.status})`);
   }
 
