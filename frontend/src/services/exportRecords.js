@@ -84,12 +84,20 @@ export async function exportRecords(format, petIds = []) {
   }
 
   if (result.status < 200 || result.status >= 300) {
-    // A non-2xx response means downloadAsync wrote an error body to the file,
-    // not a valid document — bin that file and surface the error instead of
-    // sharing (or leaving behind) a broken one. Cleanup is best-effort so it
-    // can't mask the real failure.
+    // A non-2xx response means downloadAsync wrote an error body (usually the
+    // API's JSON) to the file, not a valid document. Surface the backend's
+    // `detail` if we can read it (e.g. a throttle or "Pet not found" message),
+    // then bin the file so no broken export lingers. Both steps are best-effort
+    // so they can't mask the real failure.
+    let message = `Export failed (${result.status})`;
+    try {
+      const detail = JSON.parse(await FileSystem.readAsStringAsync(fileUri))?.detail;
+      if (detail) message = detail;
+    } catch {
+      // non-JSON / unreadable body — keep the generic message
+    }
     await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
-    throw new Error(`Export failed (${result.status})`);
+    throw new Error(message);
   }
 
   await Sharing.shareAsync(result.uri, {

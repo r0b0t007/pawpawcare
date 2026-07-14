@@ -229,12 +229,13 @@ export default function ProfileScreen({ navigation }) {
             <Chip label="CSV" active={exportFormat === 'csv'} onPress={() => setExportFormat('csv')} />
           </View>
         </View>
-        {/* Pet chips only render with 2+ pets, so only require a selection
-            then; with 0–1 pets an empty selection already means "all pets". */}
+        {/* Nothing to export with no pets. Pet chips only render with 2+ pets,
+            so a selection is only required then; with one pet an empty
+            selection already means "all pets". */}
         <Button
           label={exporting ? 'Exporting…' : exportFormat === 'pdf' ? 'Export PDF' : 'Export CSV'}
           onPress={handleExport}
-          disabled={exporting || (pets.length > 1 && exportPets.length === 0)}
+          disabled={exporting || pets.length === 0 || (pets.length > 1 && exportPets.length === 0)}
         />
         <Text style={styles.sheetCaption}>
           Free forever — your records are never locked behind a plan.

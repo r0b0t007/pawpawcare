@@ -6,6 +6,7 @@ jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: 'file:///cache/',
   downloadAsync: jest.fn(),
   deleteAsync: jest.fn(() => Promise.resolve()),
+  readAsStringAsync: jest.fn(() => Promise.resolve('')),
 }));
 jest.mock('expo-sharing', () => ({
   shareAsync: jest.fn(() => Promise.resolve()),
@@ -71,15 +72,24 @@ describe('exportRecords (native)', () => {
     expect(Sharing.shareAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('throws, cleans up the file, and does not share on a non-2xx response', async () => {
-    FileSystem.downloadAsync.mockResolvedValue({ status: 500, uri: 'file:///cache/x.pdf' });
+  it("surfaces the backend's detail message, cleans up, and does not share on non-2xx", async () => {
+    FileSystem.downloadAsync.mockResolvedValue({ status: 429, uri: 'file:///cache/x.pdf' });
+    FileSystem.readAsStringAsync.mockResolvedValue('{"detail":"Too many exports — try again soon"}');
 
-    await expect(exportRecords('pdf', [])).rejects.toThrow('Export failed (500)');
+    await expect(exportRecords('pdf', [])).rejects.toThrow('Too many exports — try again soon');
     expect(FileSystem.deleteAsync).toHaveBeenCalledWith(
       expect.stringMatching(/^file:\/\/\/cache\/pawpawcare-records-.*\.pdf$/),
       { idempotent: true },
     );
     expect(Sharing.shareAsync).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a generic message when the error body is not JSON', async () => {
+    FileSystem.downloadAsync.mockResolvedValue({ status: 500, uri: 'file:///cache/x.pdf' });
+    FileSystem.readAsStringAsync.mockResolvedValue('<html>500</html>');
+
+    await expect(exportRecords('pdf', [])).rejects.toThrow('Export failed (500)');
+    expect(FileSystem.deleteAsync).toHaveBeenCalled();
   });
 
   it('throws SESSION_EXPIRED (no retry, no share) when the token refresh fails', async () => {
