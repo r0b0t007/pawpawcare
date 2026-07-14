@@ -29,7 +29,7 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffddb8"
+        "backgroundColor": "#fdf8f4"
       }
     },
     "plugins": [

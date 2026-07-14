@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
 import { ui, PET_COLOR_PAIRS } from '../../theme';
 
@@ -25,9 +24,11 @@ export default function WelcomeScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={styles.container}>
         <View style={styles.hero}>
-          <View style={styles.logoBox}>
-            <MaterialCommunityIcons name="paw" size={36} color={ui.accentTint} />
-          </View>
+          <Image
+            source={require('../../assets/logo-mark.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.headline}>Every tail,{'\n'}on track.</Text>
           <Text style={styles.tagline}>
             Vaccines, vet visits and daily care for all your pets — in one calm place.
@@ -81,15 +82,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   hero: { gap: 22 },
-  logoBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
-    borderCurve: 'continuous',
-    backgroundColor: ui.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  logo: { width: 88, height: 88 },
   headline: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     fontSize: 42,
