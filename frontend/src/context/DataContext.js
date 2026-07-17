@@ -13,12 +13,6 @@ const DataContext = createContext(null);
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
-const formatDisplayDate = (isoStr) => {
-  if (!isoStr) return '';
-  const d = new Date(isoStr + 'T12:00:00Z');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
-
 const parseToISO = (str) => {
   if (!str?.trim()) return null;
   const trimmed = str.trim();
@@ -34,14 +28,22 @@ const parseToISO = (str) => {
 
 const toVax = (v) => {
   let status = v.status;
-  if (status === 'upcoming') {
-    const daysUntil = (new Date(v.due_date) - new Date()) / 86400000;
-    if (daysUntil <= 30) status = 'due_soon';
+  if (status === 'upcoming' && v.due_date) {
+    const daysUntil = (new Date(`${v.due_date}T12:00:00`) - new Date()) / 86400000;
+    // Mirror the server's list-time flip so a freshly added past-dated record
+    // lands in "Needs attention" immediately, not only after the next reload.
+    if (daysUntil < 0) status = 'overdue';
+    else if (daysUntil <= 30) status = 'due_soon';
   }
   return {
     id: v.id,
     name: v.name,
-    dueDate: formatDisplayDate(v.due_date),
+    // Keep ISO (YYYY-MM-DD): every consumer parses (`${dueDate}T12:00:00`)
+    // or sorts (localeCompare) this field — a locale display string here broke
+    // both on Hermes, silently hiding fresh records from the Health hub and
+    // Dashboard until a full re-login reloaded them. Format only at display
+    // time (see formatDisplay/shortDate in the screens).
+    dueDate: v.due_date || null,
     status,
     administeredDate: v.administered_date || null,
     notes: v.notes || null,
@@ -443,7 +445,13 @@ export function DataProvider({ children }) {
         const merged = {
           ...existing,
           ...toPet(updated, {
-            vaccinations: existing.vaccinations.map((v) => ({ ...v, due_date: v.dueDate })),
+            // Map the frontend shape back to the API keys toVax reads — both
+            // dates, or the round-trip silently drops administered_date.
+            vaccinations: existing.vaccinations.map((v) => ({
+              ...v,
+              due_date: v.dueDate,
+              administered_date: v.administeredDate,
+            })),
             activities: existing.activities,
             foods: existing.favoriteFoods,
           }),
@@ -482,7 +490,13 @@ export function DataProvider({ children }) {
       });
       const newVax = toVax(apiVax);
       const pet = state.pets.find((p) => p.id === petId);
-      dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: [...pet.vaccinations, newVax] } });
+      // Guard: if the pet isn't in the store (mid-reload), skip the local
+      // append rather than throwing AFTER the server write — a swallowed
+      // TypeError here would hide the new record until the next full load.
+      if (pet) {
+        dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: [...(pet.vaccinations || []), newVax] } });
+      }
+      queryClient.invalidateQueries({ queryKey: petsKeys.all });
       return newVax;
     } catch (err) {
       handleApiError(err);
@@ -494,7 +508,10 @@ export function DataProvider({ children }) {
       const apiVax = await patch(`/pets/${petId}/vaccinations/${vaccinationId}/complete`, {});
       const updated = toVax(apiVax);
       const pet = state.pets.find((p) => p.id === petId);
-      dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: pet.vaccinations.map((v) => (v.id === vaccinationId ? updated : v)) } });
+      if (pet) {
+        dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: (pet.vaccinations || []).map((v) => (v.id === vaccinationId ? updated : v)) } });
+      }
+      queryClient.invalidateQueries({ queryKey: petsKeys.all });
     } catch (err) {
       handleApiError(err);
     }
@@ -504,7 +521,10 @@ export function DataProvider({ children }) {
     try {
       await del(`/pets/${petId}/vaccinations/${vaccinationId}`);
       const pet = state.pets.find((p) => p.id === petId);
-      dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: pet.vaccinations.filter((v) => v.id !== vaccinationId) } });
+      if (pet) {
+        dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: (pet.vaccinations || []).filter((v) => v.id !== vaccinationId) } });
+      }
+      queryClient.invalidateQueries({ queryKey: petsKeys.all });
     } catch (err) {
       handleApiError(err);
     }
