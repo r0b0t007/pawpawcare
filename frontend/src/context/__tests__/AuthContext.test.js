@@ -32,7 +32,7 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
 }));
 
 import { AuthProvider, useAuth } from '../AuthContext';
-import { post, get, storeTokens, clearTokens } from '../../services/api';
+import { post, get, request, storeTokens, clearTokens } from '../../services/api';
 import { track } from '../../services/analytics';
 
 // A probe that surfaces the latest context value to the test.
@@ -139,5 +139,51 @@ describe('AuthContext.logout', () => {
     });
 
     expect(auth.user).toBeNull();
+  });
+});
+
+describe('AuthContext.deleteAccount', () => {
+  async function signInThen() {
+    await mount();
+    post.mockResolvedValueOnce({ access_token: 'a', refresh_token: 'r', token_type: 'bearer' });
+    get.mockResolvedValueOnce({ id: 'u1', name: 'Test', created_at: '2000-01-01T00:00:00Z' });
+    await act(async () => {
+      await auth.socialLogin('google', { id_token: 'tok' });
+    });
+    expect(auth.user).toBeTruthy();
+  }
+
+  it('requests deletion, then clears local state and logs out', async () => {
+    await signInThen();
+
+    request.mockResolvedValueOnce({ status: 'deletion_scheduled', purge_after: '2026-08-16T00:00:00Z' });
+
+    let result;
+    await act(async () => {
+      result = await auth.deleteAccount();
+    });
+
+    expect(request).toHaveBeenCalledWith('DELETE', '/users/me');
+    expect(track).toHaveBeenCalledWith('account_deletion_requested');
+    expect(clearTokens).toHaveBeenCalled();
+    expect(auth.user).toBeNull();
+    expect(result).toEqual(expect.objectContaining({ status: 'deletion_scheduled' }));
+  });
+
+  it('keeps the session when the server call fails', async () => {
+    await signInThen();
+
+    request.mockRejectedValueOnce(new Error('Network request failed'));
+
+    // mount() already burned one clearTokens call (SESSION_EXPIRED on load).
+    const clearCallsBefore = clearTokens.mock.calls.length;
+
+    await act(async () => {
+      await expect(auth.deleteAccount()).rejects.toThrow('Network request failed');
+    });
+
+    // No local wipe on failure — the user stays signed in and can retry.
+    expect(clearTokens.mock.calls.length).toBe(clearCallsBefore);
+    expect(auth.user).toBeTruthy();
   });
 });

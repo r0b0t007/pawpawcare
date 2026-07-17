@@ -59,7 +59,7 @@ class ClinicController extends Controller
             'phone' => 'sometimes|nullable|string|max:40',
             'email' => 'sometimes|nullable|email|max:255',
             'address' => 'sometimes|nullable|string|max:255',
-            'notes' => 'sometimes|nullable|string',
+            'notes' => 'sometimes|nullable|string|max:2000',
         ]);
     }
 

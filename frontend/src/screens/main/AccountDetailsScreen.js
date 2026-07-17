@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { ui, type, radii } from '../../theme';
-import { Button, showToast } from '../../components';
+import { Button, ConfirmDialog, showToast } from '../../components';
 
 // Account details (Profile → Edit). PATCH /users/me only accepts name / bio /
 // avatar_url / timezone, so name is the one editable field here; email is
@@ -21,9 +21,11 @@ import { Button, showToast } from '../../components';
 // backend has no password-change endpoint yet.
 
 export default function AccountDetailsScreen({ navigation }) {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, deleteAccount } = useAuth();
   const [name, setName] = useState(user?.name || '');
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const trimmed = name.trim();
   const canSave = trimmed.length > 0 && !saving;
@@ -35,6 +37,19 @@ export default function AccountDetailsScreen({ navigation }) {
     setSaving(false);
     showToast('Saved');
     navigation.goBack();
+  };
+
+  const handleDelete = async () => {
+    setConfirmDelete(false);
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      // Success logs the user out — AppNavigator flips to the landing screen,
+      // so no toast would be visible here.
+    } catch (_) {
+      setDeleting(false);
+      showToast("Couldn't delete your account — try again");
+    }
   };
 
   return (
@@ -91,8 +106,38 @@ export default function AccountDetailsScreen({ navigation }) {
 
             <Button label="Save changes" onPress={handleSave} disabled={!canSave} />
           </View>
+
+          <View style={styles.dangerZone}>
+            <Text style={[type.sectionLabel, styles.dangerLabel]}>Danger zone</Text>
+            <Pressable
+              style={({ pressed }) => [styles.dangerRow, pressed && { opacity: 0.7 }]}
+              onPress={() => setConfirmDelete(true)}
+              disabled={deleting}
+              accessibilityRole="button"
+              accessibilityLabel="Delete account"
+            >
+              <MaterialCommunityIcons name="trash-can-outline" size={19} color={ui.danger} />
+              <Text style={styles.dangerRowText}>
+                {deleting ? 'Deleting account…' : 'Delete account'}
+              </Text>
+            </Pressable>
+            <Text style={styles.dangerHint}>
+              Your account is deactivated right away and permanently deleted after 30
+              days. Log back in before then to cancel.
+            </Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ConfirmDialog
+        visible={confirmDelete}
+        title="Delete your account?"
+        message="Your account will be deactivated now and permanently deleted in 30 days — pets, records, photos and posts included. Logging back in before then cancels the deletion."
+        confirmLabel="Delete account"
+        destructive
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -157,5 +202,31 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: ui.subtle,
     marginTop: 7,
+  },
+  dangerZone: { marginTop: 36 },
+  dangerLabel: { color: ui.subtle, marginBottom: 10 },
+  dangerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: ui.dangerTint,
+    backgroundColor: ui.surface,
+    borderRadius: radii.control,
+    borderCurve: 'continuous',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  dangerRowText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 14,
+    color: ui.danger,
+  },
+  dangerHint: {
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 12,
+    lineHeight: 17,
+    color: ui.subtle,
+    marginTop: 8,
   },
 });

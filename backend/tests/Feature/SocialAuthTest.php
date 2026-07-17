@@ -14,11 +14,15 @@ class SocialAuthTest extends TestCase
     use RefreshDatabase;
 
     private const GOOGLE_AUD = 'test-google-web-client.apps.googleusercontent.com';
+
     private const APPLE_AUD = 'com.pawpawcare.app';
+
     private const GOOGLE_CERTS = 'https://www.googleapis.com/oauth2/v3/certs';
+
     private const APPLE_CERTS = 'https://appleid.apple.com/auth/keys';
 
     private string $privatePem;
+
     private array $jwk; // public key as a JWK (kid = "test-kid")
 
     protected function setUp(): void
@@ -119,6 +123,32 @@ class SocialAuthTest extends TestCase
         $this->assertSame(1, User::where('email', 'existing@gmail.com')->count());
         // Linking invalidates the pre-existing password (pre-hijack guard).
         $this->assertNull($existing->hashed_password);
+    }
+
+    public function test_google_sign_in_reactivates_a_pending_deletion(): void
+    {
+        // A returning social user whose account is disabled only because they
+        // requested deletion: signing back in during the grace period cancels
+        // the deletion (mirrors the email-login path in AccountDeletionTest).
+        $user = User::create([
+            'name' => 'Coming Back',
+            'email' => 'comeback@gmail.com',
+            'hashed_password' => null,
+            'provider' => 'google',
+            'provider_id' => 'g-comeback',
+            'is_active' => false,
+        ]);
+        $user->forceFill(['deletion_requested_at' => now()->subDay()])->save();
+
+        $this->fakeCerts(self::GOOGLE_CERTS);
+
+        $this->postJson('/auth/google', [
+            'id_token' => $this->sign($this->googleClaims(['email' => 'comeback@gmail.com', 'sub' => 'g-comeback'])),
+        ])->assertOk()->assertJson(['reactivated' => true]);
+
+        $user->refresh();
+        $this->assertTrue($user->is_active);
+        $this->assertNull($user->deletion_requested_at);
     }
 
     public function test_google_link_evicts_a_preregistered_password_and_sessions(): void

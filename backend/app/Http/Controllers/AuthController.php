@@ -59,18 +59,19 @@ class AuthController extends Controller
             abort(401, 'Invalid email or password');
         }
 
-        if (! $user->is_active) {
-            abort(403, 'Account is disabled');
-        }
+        $reactivated = $this->reactivateOrRejectDisabled($user);
 
-        return response()->json($this->issueTokens($user));
+        return response()->json(
+            $this->issueTokens($user) + ($reactivated ? ['reactivated' => true] : [])
+        );
     }
 
     /**
      * Sign in with Google. The client sends the Google-issued ID token (from
-     * @react-native-google-signin, configured with our Web client ID). We verify
-     * it against Google's public keys — never trusting any claim until the
-     * signature, issuer and audience check out — then find/link/create the user.
+     * the react-native-google-signin module, configured with our Web client
+     * ID). We verify it against Google's public keys — never trusting any
+     * claim until the signature, issuer and audience check out — then
+     * find/link/create the user.
      */
     public function google(Request $request): JsonResponse
     {
@@ -85,7 +86,7 @@ class AuthController extends Controller
             config('services.google.client_id'),
         );
 
-        $user = $this->loginSocialUser(
+        [$user, $reactivated] = $this->loginSocialUser(
             'google',
             (string) $payload['sub'],
             $payload['email'] ?? null,
@@ -93,7 +94,9 @@ class AuthController extends Controller
             $payload['name'] ?? null,
         );
 
-        return response()->json($this->issueTokens($user));
+        return response()->json(
+            $this->issueTokens($user) + ($reactivated ? ['reactivated' => true] : [])
+        );
     }
 
     /**
@@ -127,7 +130,7 @@ class AuthController extends Controller
             abort(401, 'Invalid identity token');
         }
 
-        $user = $this->loginSocialUser(
+        [$user, $reactivated] = $this->loginSocialUser(
             'apple',
             (string) $payload['sub'],
             $payload['email'] ?? null,
@@ -136,7 +139,9 @@ class AuthController extends Controller
             $data['full_name'] ?? null,
         );
 
-        return response()->json($this->issueTokens($user));
+        return response()->json(
+            $this->issueTokens($user) + ($reactivated ? ['reactivated' => true] : [])
+        );
     }
 
     public function refresh(Request $request): JsonResponse
@@ -164,7 +169,9 @@ class AuthController extends Controller
         $userId = $payload['sub'];
         $user = User::find($userId);
 
-        if (! $user) {
+        // Disabled accounts (banned or pending deletion) can't mint new
+        // sessions by refreshing — reactivation only happens via login.
+        if (! $user || ! $user->is_active) {
             abort(401, 'Invalid refresh token');
         }
 
@@ -194,7 +201,11 @@ class AuthController extends Controller
             'email' => 'required|email|max:255',
         ]);
 
-        $user = User::where('email', $data['email'])->where('is_active', true)->first();
+        // Pending-deletion accounts may still reset: "log back in to cancel
+        // deletion" must work even for a user who forgot their password.
+        $user = User::where('email', $data['email'])
+            ->where(fn ($q) => $q->where('is_active', true)->orWhereNotNull('deletion_requested_at'))
+            ->first();
 
         if ($user) {
             // A new request invalidates every earlier code for this user.
@@ -241,7 +252,10 @@ class AuthController extends Controller
 
         // One generic message for every failure mode — wrong email, wrong
         // code, expired or already used — so responses reveal nothing.
-        $user = User::where('email', $data['email'])->where('is_active', true)->first();
+        // Pending-deletion accounts are included (mirrors forgotPassword).
+        $user = User::where('email', $data['email'])
+            ->where(fn ($q) => $q->where('is_active', true)->orWhereNotNull('deletion_requested_at'))
+            ->first();
 
         $record = $user
             ? PasswordResetCode::where('user_id', $user->id)
@@ -268,6 +282,12 @@ class AuthController extends Controller
 
         $record->update(['used_at' => now()]);
         $user->update(['hashed_password' => Hash::make($data['password'])]);
+
+        // Completing a reset proves inbox ownership — cancel a pending
+        // self-deletion so the user can simply log in with the new password.
+        if (! $user->is_active && $user->deletion_requested_at !== null) {
+            $user->forceFill(['is_active' => true, 'deletion_requested_at' => null])->save();
+        }
 
         // Kill every existing session: a stolen refresh token must die with
         // the old password.
@@ -362,12 +382,43 @@ class AuthController extends Controller
     }
 
     /**
+     * If the account is disabled because the owner requested deletion, signing
+     * back in during the grace period cancels the deletion and re-enables the
+     * account. Any other disabled account (e.g. an admin ban) stays 403.
+     * Returns true when a pending deletion was cancelled.
+     *
+     * NOTE for manual bans (there is no HTTP ban endpoint — bans are shell/DB
+     * ops): banning a user who has a deletion pending must also NULL
+     * `deletion_requested_at`, otherwise this reactivation path would undo
+     * the ban on their next login.
+     */
+    private function reactivateOrRejectDisabled(User $user): bool
+    {
+        if ($user->is_active) {
+            return false;
+        }
+
+        if ($user->deletion_requested_at === null) {
+            abort(403, 'Account is disabled');
+        }
+
+        $user->forceFill([
+            'is_active' => true,
+            'deletion_requested_at' => null,
+        ])->save();
+
+        return true;
+    }
+
+    /**
      * Resolve a verified social identity to a user: reuse the linked account,
      * link to an existing account when the provider vouches for a matching
      * (verified) email, or create a fresh one. Never links on an unverified
      * email — that is the account-takeover guard.
+     *
+     * @return array{0: User, 1: bool} the user and whether a pending deletion was cancelled
      */
-    private function loginSocialUser(string $provider, string $providerId, ?string $email, bool $emailVerified, ?string $name): User
+    private function loginSocialUser(string $provider, string $providerId, ?string $email, bool $emailVerified, ?string $name): array
     {
         // 1) Known provider identity → that user.
         $user = User::where('provider', $provider)->where('provider_id', $providerId)->first();
@@ -385,8 +436,9 @@ class AuthController extends Controller
                 }
                 // Authorize before mutating: a disabled account must not have its
                 // password nulled and sessions revoked as a side effect of a
-                // sign-in it isn't allowed to complete.
-                if (! $existing->is_active) {
+                // sign-in it isn't allowed to complete. (A pending self-deletion
+                // is reactivated further down, after the link succeeds.)
+                if (! $existing->is_active && $existing->deletion_requested_at === null) {
                     abort(403, 'Account is disabled');
                 }
                 // Linking kills any existing password on the account. Signup never
@@ -413,7 +465,7 @@ class AuthController extends Controller
         if (! $user) {
             $useEmail = $email && $emailVerified && ! User::where('email', $email)->exists();
             try {
-                return User::create([
+                return [User::create([
                     'name' => $name ?: 'PawPaw friend',
                     'email' => $useEmail ? $email : $provider.'_'.$providerId.'@users.noreply.pawpawcare.app',
                     'hashed_password' => null,
@@ -423,7 +475,7 @@ class AuthController extends Controller
                     // default only applies on reload, so the disabled-account check
                     // below would otherwise see null and 403 every new sign-in.
                     'is_active' => true,
-                ]);
+                ]), false];
             } catch (UniqueConstraintViolationException $e) {
                 // A concurrent first sign-in for the same identity won the race
                 // and inserted the row between our lookup and insert. Resolve to
@@ -435,12 +487,11 @@ class AuthController extends Controller
             }
         }
 
-        // Existing account (linked or matched): honour the disabled flag.
-        if (! $user->is_active) {
-            abort(403, 'Account is disabled');
-        }
+        // Existing account (linked or matched): honour the disabled flag,
+        // cancelling a pending self-deletion (grace-period reactivation).
+        $reactivated = $this->reactivateOrRejectDisabled($user);
 
-        return $user;
+        return [$user, $reactivated];
     }
 
     /** Mint an access + refresh token pair and persist the refresh token. */

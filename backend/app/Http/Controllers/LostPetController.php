@@ -48,9 +48,9 @@ class LostPetController extends Controller
             'last_seen_at' => 'sometimes|nullable|date',
             'latitude' => 'sometimes|nullable|numeric',
             'longitude' => 'sometimes|nullable|numeric',
-            'description' => 'sometimes|nullable|string',
+            'description' => 'sometimes|nullable|string|max:5000',
             'contact_phone' => 'sometimes|nullable|string|max:40',
-            'photo_url' => 'sometimes|nullable|string',
+            'photo_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
         ]);
 
         $report = LostPetReport::where('pet_id', $pet->id)->where('status', 'active')->first();

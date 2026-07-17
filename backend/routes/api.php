@@ -29,21 +29,21 @@ Route::get('/health', fn () => response()->json(['status' => 'ok', 'version' => 
 // The URL is minted only for users with pet access via /pets/{pet}/documents/{id}/url
 // and expires within minutes, so a leaked link can't grant lasting access.
 Route::get('/documents/{document}/raw', [DocumentController::class, 'raw'])
-    ->middleware('signed')
+    ->middleware(['signed', 'throttle:60,1'])
     ->name('documents.raw');
 
 // ── Vet share page (no JWT — same signed-URL trust model as documents.raw) ────
 // A read-only medical summary a vet opens in a browser. Minted only by users
 // with pet access via POST /pets/{pet}/share-link, expiring in hours/days.
 Route::get('/share/{pet}', [PetShareController::class, 'show'])
-    ->middleware('signed')
+    ->middleware(['signed', 'throttle:60,1'])
     ->name('pets.share');
 
 // ── Caretaker page (no JWT — signed-URL trust model, independent care_token) ──
 // A read-only sitter handoff: care notes, feeding, active meds, emergency
 // contact. Minted via POST /pets/{pet}/care-link, expiring in days.
 Route::get('/care/{pet}', [CareController::class, 'page'])
-    ->middleware('signed')
+    ->middleware(['signed', 'throttle:60,1'])
     ->name('pets.care');
 
 // ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
@@ -65,13 +65,17 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
     ->middleware('throttle:password-reset');
 
 // ── Authenticated ───────────────────────────────────────────────────────────
-Route::middleware('auth.jwt')->group(function () {
+// `throttle:api` (see AppServiceProvider) is a generous per-user ceiling that
+// backstops every route; the tighter per-route limiters below stack on top.
+Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
     // Uploads (images)
     Route::post('/uploads', [UploadController::class, 'store'])->middleware('throttle:30,1');
 
     // Users
     Route::get('/users/me', [UserController::class, 'me']);
     Route::patch('/users/me', [UserController::class, 'update']);
+    // GDPR deletion: disables now, purges after the 30-day grace period.
+    Route::delete('/users/me', [UserController::class, 'destroy'])->middleware('throttle:5,60');
 
     // Export center — full health-record history as CSV/PDF, free forever.
     // Named limiter (see AppServiceProvider): 10/hour per user.
@@ -167,7 +171,7 @@ Route::middleware('auth.jwt')->group(function () {
 
     // Community
     Route::get('/community/posts', [CommunityController::class, 'listPosts']);
-    Route::post('/community/posts', [CommunityController::class, 'createPost']);
+    Route::post('/community/posts', [CommunityController::class, 'createPost'])->middleware('throttle:30,1');
     Route::delete('/community/posts/{post}', [CommunityController::class, 'deletePost']);
     Route::post('/community/posts/{post}/paw', [CommunityController::class, 'togglePaw']);
     // Reporting: POST is throttled (named limiter, 10/hour per user); the
@@ -207,7 +211,7 @@ Route::middleware('auth.jwt')->group(function () {
 // ── Admin moderation (auth.jwt first, then the is_admin gate) ────────────────
 // Admins are only mintable from the server shell (`php artisan user:make-admin`);
 // no HTTP request can set is_admin, so this group is unreachable by sign-up.
-Route::middleware(['auth.jwt', 'admin'])->prefix('admin')->group(function () {
+Route::middleware(['auth.jwt', 'admin', 'throttle:api'])->prefix('admin')->group(function () {
     Route::get('/reports', [AdminController::class, 'reports']);
     Route::post('/posts/{post}/dismiss-reports', [AdminController::class, 'dismissReports']);
     Route::delete('/posts/{post}', [AdminController::class, 'deletePost']);

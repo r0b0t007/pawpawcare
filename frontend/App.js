@@ -1,7 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import React, { useRef } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useNavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -30,11 +29,20 @@ configureObserve({ integrations: { 'react-navigation': true } });
 // Configure Google Sign-In once. webClientId is the audience the backend
 // verifies the ID token against; iosClientId wires the native iOS flow. Skip
 // when unconfigured (dev/CI) so the SDK doesn't warn — the button then no-ops.
+// Guarded require (the codebase's defensive native-module pattern): a static
+// import throws at bundle-eval time on any binary without the native module
+// (Expo Go, dev clients built before the social-login release), which would
+// crash the whole app — email login included — before anything renders.
 if (GOOGLE_WEB_CLIENT_ID) {
-  GoogleSignin.configure({
-    webClientId: GOOGLE_WEB_CLIENT_ID,
-    iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
-  });
+  try {
+    const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      iosClientId: GOOGLE_IOS_CLIENT_ID || undefined,
+    });
+  } catch (_) {
+    // Native module absent — SocialAuthButtons hides the Google button.
+  }
 }
 
 const queryClient = new QueryClient({

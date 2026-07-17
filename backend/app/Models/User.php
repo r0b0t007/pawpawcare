@@ -12,6 +12,12 @@ class User extends Model
 {
     use HasUuids;
 
+    /**
+     * Days between a deletion request and the permanent purge. Within this
+     * window logging back in cancels the deletion (GDPR-style grace period).
+     */
+    public const DELETION_GRACE_DAYS = 30;
+
     protected $keyType = 'string';
 
     public $incrementing = false;
@@ -38,6 +44,8 @@ class User extends Model
         // `is_admin` is intentionally NOT fillable: it can only be set via the
         // `user:make-admin` artisan command (forceFill), never over HTTP.
         'is_admin' => 'boolean',
+        // Not fillable either — only DELETE /users/me (forceFill) sets it.
+        'deletion_requested_at' => 'datetime',
     ];
 
     public function pets(): HasMany
