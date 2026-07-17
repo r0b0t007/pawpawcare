@@ -21,8 +21,12 @@ const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
 
+// '—' rather than the string "Invalid Date" if a malformed date ever slips
+// through — the overdue/history rows render without a validity filter.
 const fmtShort = (date) =>
-  date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 // "Synced just now" / "Synced 5m ago" / "Synced 2h ago" — quiet trust line.
 const syncedLabel = (ts) => {
