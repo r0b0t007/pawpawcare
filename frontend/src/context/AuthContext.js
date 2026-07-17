@@ -173,9 +173,11 @@ export function AuthProvider({ children }) {
     track('account_deletion_requested');
 
     // Local cleanup mirrors logout(); no /auth/logout or /devices call is
-    // needed — the server already revoked everything.
+    // needed — the server already revoked everything. Every step is
+    // best-effort: the account is already deleted server-side, so nothing
+    // may prevent reaching the LOGOUT dispatch below.
     await AsyncStorage.removeItem(PUSH_TOKEN_KEY).catch(() => {});
-    await cancelAllLocalReminders();
+    await cancelAllLocalReminders().catch(() => {});
     resetAnalytics();
     try {
       const { GoogleSignin } = require('@react-native-google-signin/google-signin');

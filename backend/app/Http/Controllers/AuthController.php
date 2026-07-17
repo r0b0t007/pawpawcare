@@ -68,10 +68,10 @@ class AuthController extends Controller
 
     /**
      * Sign in with Google. The client sends the Google-issued ID token (from
-     *
-     * @react-native-google-signin, configured with our Web client ID). We verify
-     * it against Google's public keys — never trusting any claim until the
-     * signature, issuer and audience check out — then find/link/create the user.
+     * the react-native-google-signin module, configured with our Web client
+     * ID). We verify it against Google's public keys — never trusting any
+     * claim until the signature, issuer and audience check out — then
+     * find/link/create the user.
      */
     public function google(Request $request): JsonResponse
     {
