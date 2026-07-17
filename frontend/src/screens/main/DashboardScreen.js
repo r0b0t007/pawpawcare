@@ -23,8 +23,12 @@ function getGreeting() {
   return 'Good evening';
 }
 
+// '—' rather than the string "Invalid Date" if a malformed date ever slips
+// through (e.g. a stale bundle's locale-string dueDate) — never show garbage.
 const fmtShort = (date) =>
-  date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  Number.isNaN(date.getTime())
+    ? '—'
+    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 const vaxDate = (v) => new Date(`${v.dueDate}T12:00:00`);
 
@@ -59,6 +63,9 @@ export default function DashboardScreen({ navigation }) {
     const pending = pets.flatMap((pet) =>
       (pet.vaccinations || [])
         .filter((v) => v.status === 'overdue' || v.status === 'due_soon' || v.status === 'upcoming')
+        // A record whose date can't parse must not become the Up Next card
+        // (the week list below already filters the same way).
+        .filter((v) => !Number.isNaN(vaxDate(v).getTime()))
         .map((v) => ({ ...v, pet }))
     );
 
