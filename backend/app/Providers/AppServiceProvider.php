@@ -30,6 +30,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Blanket ceiling for every authenticated route (applied to the
+        // auth.jwt group in routes/api.php). Generous enough that no real
+        // client ever hits it — it exists so a leaked/abused token can't
+        // hammer unthrottled writes without limit. Tighter per-route
+        // limiters stack on top of this one.
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute(120)->by('api|'.($request->user()?->id ?? $request->ip()));
+        });
+
         // Forgot-password: capped per target email AND per source IP as two
         // independent limits — a rotating-IP attacker still can't mail-bomb
         // one address (or keep invalidating a victim's fresh codes), and one
@@ -62,7 +71,13 @@ class AppServiceProvider extends ServiceProvider
         // Records export: PDF rendering is the priciest request in the app,
         // and no legitimate user re-exports their history 10+ times an hour.
         RateLimiter::for('records-export', function (Request $request) {
-            return Limit::perHour(10)->by('export|'.($request->user()?->id ?? $request->ip()));
+            return Limit::perHour(10)
+                ->by('export|'.($request->user()?->id ?? $request->ip()))
+                // The app surfaces this `detail` verbatim in the export sheet,
+                // so say something friendlier than "Too Many Attempts."
+                ->response(fn () => response()->json(
+                    ['detail' => 'Too many exports — please try again in an hour.'], 429
+                ));
         });
 
         // Post reporting: capped per user so one account can't mass-flag the

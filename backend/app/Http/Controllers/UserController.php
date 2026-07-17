@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\RefreshToken;
+use App\Models\User;
 use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,8 +19,8 @@ class UserController extends Controller
     {
         $data = $request->validate([
             'name' => 'sometimes|string|min:1|max:100',
-            'bio' => 'sometimes|nullable|string',
-            'avatar_url' => 'sometimes|nullable|string',
+            'bio' => 'sometimes|nullable|string|max:1000',
+            'avatar_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
             'timezone' => 'sometimes|nullable|string|max:64',
         ]);
 
@@ -47,5 +49,31 @@ class UserController extends Controller
         // toSelfApi: PATCH responses replace the client's stored user object,
         // so the is_admin flag must survive a profile edit.
         return response()->json($user->toSelfApi());
+    }
+
+    /**
+     * Request account deletion (GDPR-style). The account is disabled
+     * immediately — JwtAuth rejects every request from a disabled user, and
+     * all sessions are revoked here — then permanently purged by the
+     * `accounts:purge-deleted` command after the grace period. Logging back
+     * in (or completing a password reset) during the grace period cancels it.
+     */
+    public function destroy(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $user->forceFill([
+            'is_active' => false,
+            'deletion_requested_at' => now(),
+        ])->save();
+
+        // Kill every session and stop push notifications right away.
+        RefreshToken::where('user_id', $user->id)->delete();
+        $user->deviceTokens()->delete();
+
+        return response()->json([
+            'status' => 'deletion_scheduled',
+            'purge_after' => now()->addDays(User::DELETION_GRACE_DAYS)->toISOString(),
+        ]);
     }
 }

@@ -37,7 +37,7 @@ class PetController extends Controller
             'gender' => 'sometimes|nullable|string|max:20',
             'microchipped' => 'sometimes|boolean',
             'color' => 'sometimes|nullable|string|max:30',
-            'avatar_url' => 'sometimes|nullable|string',
+            'avatar_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
             'heart_rate' => 'sometimes|nullable|integer',
             'activity_level' => 'sometimes|nullable|string|max:30',
         ]);
@@ -70,7 +70,7 @@ class PetController extends Controller
             'gender' => 'sometimes|nullable|string|max:20',
             'microchipped' => 'sometimes|nullable|boolean',
             'color' => 'sometimes|nullable|string|max:30',
-            'avatar_url' => 'sometimes|nullable|string',
+            'avatar_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
             'heart_rate' => 'sometimes|nullable|integer',
             'activity_level' => 'sometimes|nullable|string|max:30',
         ]);
@@ -134,7 +134,7 @@ class PetController extends Controller
         $data = $request->validate([
             'name' => 'required|string|min:1|max:150',
             'due_date' => 'required|date',
-            'notes' => 'sometimes|nullable|string',
+            'notes' => 'sometimes|nullable|string|max:2000',
         ]);
 
         $vax = Vaccination::create(array_merge($data, ['pet_id' => $petId]));
@@ -151,7 +151,7 @@ class PetController extends Controller
 
         $data = $request->validate([
             'administered_date' => 'sometimes|nullable|date',
-            'notes' => 'sometimes|nullable|string',
+            'notes' => 'sometimes|nullable|string|max:2000',
         ]);
 
         $vax = Vaccination::where('id', $vaxId)->where('pet_id', $petId)->first();

@@ -70,7 +70,7 @@ class AppointmentController extends Controller
             'scheduled_at' => "{$req}|date",
             'clinic_id' => 'sometimes|nullable|string',
             'status' => 'sometimes|in:scheduled,completed,cancelled',
-            'notes' => 'sometimes|nullable|string',
+            'notes' => 'sometimes|nullable|string|max:2000',
         ]);
     }
 

@@ -69,7 +69,7 @@ class MedicationController extends Controller
 
         $data = $request->validate([
             'administered_at' => 'sometimes|nullable|date',
-            'notes' => 'sometimes|nullable|string',
+            'notes' => 'sometimes|nullable|string|max:2000',
         ]);
 
         $log = MedicationLog::create([
@@ -95,7 +95,7 @@ class MedicationController extends Controller
             'times.*' => 'date_format:H:i',
             'start_date' => 'sometimes|nullable|date',
             'end_date' => 'sometimes|nullable|date',
-            'notes' => 'sometimes|nullable|string',
+            'notes' => 'sometimes|nullable|string|max:2000',
             'active' => 'sometimes|boolean',
         ]);
     }

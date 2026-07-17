@@ -3,14 +3,23 @@ import { View, Text, Pressable, StyleSheet, Platform, ActivityIndicator } from '
 import Svg, { Path } from 'react-native-svg';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Crypto from 'expo-crypto';
-import {
-  GoogleSignin,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
 import { useAuth } from '../context/AuthContext';
 import { showToast } from './Toast';
 import { GOOGLE_WEB_CLIENT_ID } from '../config';
 import { ui, radii } from '../theme';
+
+// Guarded require (the codebase's defensive native-module pattern): a static
+// import evaluates the native TurboModule at bundle load and throws on any
+// binary that doesn't include it (Expo Go, dev clients built before the
+// social-login release) — crashing every screen in the bundle, email login
+// included. Resolve it lazily instead and just hide the button when absent.
+let GoogleSignin = null;
+let statusCodes = {};
+try {
+  ({ GoogleSignin, statusCodes } = require('@react-native-google-signin/google-signin'));
+} catch (_) {
+  // Native module absent — Google sign-in is unavailable on this build.
+}
 
 // The official Google "G" mark (brand asset). Google's guidelines permit a
 // custom button as long as their logo and clear space are used unaltered.
@@ -127,10 +136,11 @@ export default function SocialAuthButtons() {
     }
   };
 
-  // Google needs a configured Web client ID to work; without it the flow would
-  // just error, so hide the button entirely rather than ship a dead control
-  // (mirrors how Apple hides when unavailable, and the backend's 503).
-  const showGoogle = !!GOOGLE_WEB_CLIENT_ID;
+  // Google needs the native module AND a configured Web client ID to work;
+  // without either the flow would just error, so hide the button entirely
+  // rather than ship a dead control (mirrors how Apple hides when
+  // unavailable, and the backend's 503).
+  const showGoogle = !!GoogleSignin && !!GOOGLE_WEB_CLIENT_ID;
   const showApple = Platform.OS === 'ios' && appleAvailable;
 
   // Nothing to offer (e.g. Android with Google unconfigured) → no orphan divider.

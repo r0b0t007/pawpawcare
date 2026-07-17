@@ -17,3 +17,6 @@ Schedule::command('auth:prune-tokens')->daily();
 
 // Sweep uploaded images that are no longer referenced (e.g. abandoned picks).
 Schedule::command('uploads:prune')->daily();
+
+// Permanently purge accounts whose 30-day deletion grace period has passed.
+Schedule::command('accounts:purge-deleted')->daily();

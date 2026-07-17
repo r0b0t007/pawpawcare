@@ -7,6 +7,7 @@ import {
   cancelAllLocalReminders,
 } from '../services/notifications';
 import { identifyUser, resetAnalytics, track } from '../services/analytics';
+import { showToast } from '../components/Toast';
 
 const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
 
@@ -87,6 +88,10 @@ export function AuthProvider({ children }) {
     try {
       const tokens = await post('/auth/login', { email, password }, { skipAuth: true });
       await storeTokens(tokens.access_token, tokens.refresh_token);
+      // Logging in during the deletion grace period cancels the deletion.
+      if (tokens.reactivated) {
+        showToast('Welcome back — your account deletion was cancelled.');
+      }
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
       identifyUser(user);
@@ -107,6 +112,10 @@ export function AuthProvider({ children }) {
     try {
       const tokens = await post(`/auth/${provider}`, payload, { skipAuth: true });
       await storeTokens(tokens.access_token, tokens.refresh_token);
+      // Signing back in during the deletion grace period cancels the deletion.
+      if (tokens.reactivated) {
+        showToast('Welcome back — your account deletion was cancelled.');
+      }
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
       identifyUser(user);
@@ -155,6 +164,29 @@ export function AuthProvider({ children }) {
     } catch (_) {}
   };
 
+  // GDPR account deletion: the server disables the account immediately,
+  // revokes every session and push token, and permanently purges the data
+  // after a 30-day grace period. Logging back in within that window cancels
+  // it. Throws on failure so the caller can surface the error.
+  const deleteAccount = async () => {
+    const res = await request('DELETE', '/users/me');
+    track('account_deletion_requested');
+
+    // Local cleanup mirrors logout(); no /auth/logout or /devices call is
+    // needed — the server already revoked everything.
+    await AsyncStorage.removeItem(PUSH_TOKEN_KEY).catch(() => {});
+    await cancelAllLocalReminders();
+    resetAnalytics();
+    try {
+      const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+      GoogleSignin.signOut().catch(() => {});
+    } catch (_) {}
+
+    await clearTokens().catch(() => {});
+    dispatch({ type: 'LOGOUT' });
+    return res; // { status, purge_after }
+  };
+
   const clearError = () => dispatch({ type: 'SET_ERROR', payload: null });
 
   return (
@@ -171,6 +203,7 @@ export function AuthProvider({ children }) {
         socialLogin,
         logout,
         updateUser,
+        deleteAccount,
         clearError,
       }}
     >

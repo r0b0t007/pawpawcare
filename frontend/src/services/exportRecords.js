@@ -100,9 +100,15 @@ export async function exportRecords(format, petIds = []) {
     throw new Error(message);
   }
 
-  await Sharing.shareAsync(result.uri, {
-    mimeType: MIME[format],
-    dialogTitle: 'Export health records',
-    UTI: format === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text',
-  });
+  try {
+    await Sharing.shareAsync(result.uri, {
+      mimeType: MIME[format],
+      dialogTitle: 'Export health records',
+      UTI: format === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text',
+    });
+  } finally {
+    // The share sheet has copied/handed off the file by the time shareAsync
+    // resolves — clean up so repeated exports don't pile up in the cache.
+    await FileSystem.deleteAsync(fileUri, { idempotent: true }).catch(() => {});
+  }
 }

@@ -43,7 +43,19 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Create env file
-        run: echo "EXPO_PUBLIC_API_URL=${{ secrets.BACKEND_URL }}" >> .env.local
+        # EXPO_PUBLIC_* vars are inlined into the JS bundle at publish time, so
+        # every var the eas.json build profiles set MUST also be set here —
+        # otherwise an OTA update silently strips them from installed apps
+        # (e.g. an empty GOOGLE_WEB_CLIENT_ID hides the Google sign-in button).
+        # The Google client IDs are public identifiers (already committed in
+        # eas.json); the PostHog key is a public write-only client key.
+        run: |
+          {
+            echo "EXPO_PUBLIC_API_URL=${{ secrets.BACKEND_URL }}"
+            echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=493303263143-srop8lcrhgvavaulh9jlthjjokghl2qd.apps.googleusercontent.com"
+            echo "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=493303263143-81gcusogeirf5gmjj5spk4b17v7m5hv6.apps.googleusercontent.com"
+            echo "EXPO_PUBLIC_POSTHOG_KEY=${{ secrets.POSTHOG_KEY }}"
+          } >> .env.local
 
       - name: Publish OTA update
         # Pass the commit message via env (assigned literally by Actions), never

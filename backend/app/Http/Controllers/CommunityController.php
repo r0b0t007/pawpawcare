@@ -37,9 +37,11 @@ class CommunityController extends Controller
     public function createPost(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'content' => 'required|string|min:1',
-            'image_url' => 'sometimes|nullable|string',
-            'group_id' => 'sometimes|nullable|string',
+            'content' => 'required|string|min:1|max:5000',
+            // App uploads are stored as `/storage/...` paths; also allow full
+            // http(s) URLs — but never `javascript:`/`data:` and the like.
+            'image_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
+            'group_id' => 'sometimes|nullable|string|exists:groups,id',
         ]);
 
         $post = Post::create(array_merge($data, ['author_id' => $request->user()->id]));
