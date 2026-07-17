@@ -474,7 +474,7 @@ export default function PetProfileScreen({ navigation, route }) {
             <ListRow
               key={v.id}
               title={v.name}
-              subtitle={`Due ${v.dueDate || '—'}`}
+              subtitle={`Due ${fullDate(v.dueDate) || '—'}`}
               right={<StatusPill status={p.status} label={p.label} />}
               onPress={() => navigation.navigate('VaccinationTracker', { petId })}
             />
@@ -515,7 +515,7 @@ export default function PetProfileScreen({ navigation, route }) {
                 <MaterialCommunityIcons name="check-circle" size={18} color={ui.ringOk} />
                 <Text style={styles.historyTitle}>{v.name}</Text>
                 <Text style={styles.historyDate}>
-                  {v.administeredDate ? shortDate(v.administeredDate) : v.dueDate}
+                  {v.administeredDate ? shortDate(v.administeredDate) : shortDate(v.dueDate)}
                 </Text>
               </View>
             ))}
