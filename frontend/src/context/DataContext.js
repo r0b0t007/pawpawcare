@@ -29,9 +29,15 @@ const parseToISO = (str) => {
 const toVax = (v) => {
   let status = v.status;
   if (status === 'upcoming' && v.due_date) {
-    const daysUntil = (new Date(`${v.due_date}T12:00:00`) - new Date()) / 86400000;
-    // Mirror the server's list-time flip so a freshly added past-dated record
-    // lands in "Needs attention" immediately, not only after the next reload.
+    // Integer day diff, noon-to-noon: due *today* is 0 (due_soon), and only
+    // dates strictly before today flip to overdue — mirroring the server's
+    // list-time flip (`due_date < today`) so a freshly added past-dated
+    // record lands in "Needs attention" immediately, without going
+    // "overdue" at 12:01 PM on the due day itself.
+    const due = new Date(`${v.due_date}T12:00:00`);
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const daysUntil = Math.round((due - today) / 86400000);
     if (daysUntil < 0) status = 'overdue';
     else if (daysUntil <= 30) status = 'due_soon';
   }
@@ -481,6 +487,20 @@ export function DataProvider({ children }) {
 
   // ── Vaccination ──
 
+  // Shared tail of every vaccination mutation: apply the change to the pet's
+  // local list, then mark the pets query stale so migrated screens refetch.
+  // Guard: if the pet isn't in the store (mid-reload), skip the local update
+  // rather than throwing AFTER the server write — a swallowed TypeError here
+  // would hide the change until the next full load; the invalidated query is
+  // the recovery path either way.
+  const applyVaxChange = (petId, mutate) => {
+    const pet = state.pets.find((p) => p.id === petId);
+    if (pet) {
+      dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: mutate(pet.vaccinations || []) } });
+    }
+    queryClient.invalidateQueries({ queryKey: petsKeys.all });
+  };
+
   const addVaccination = async (petId, vaccination) => {
     try {
       const apiVax = await post(`/pets/${petId}/vaccinations`, {
@@ -489,14 +509,7 @@ export function DataProvider({ children }) {
         notes: vaccination.notes || null,
       });
       const newVax = toVax(apiVax);
-      const pet = state.pets.find((p) => p.id === petId);
-      // Guard: if the pet isn't in the store (mid-reload), skip the local
-      // append rather than throwing AFTER the server write — a swallowed
-      // TypeError here would hide the new record until the next full load.
-      if (pet) {
-        dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: [...(pet.vaccinations || []), newVax] } });
-      }
-      queryClient.invalidateQueries({ queryKey: petsKeys.all });
+      applyVaxChange(petId, (vaxes) => [...vaxes, newVax]);
       return newVax;
     } catch (err) {
       handleApiError(err);
@@ -507,11 +520,7 @@ export function DataProvider({ children }) {
     try {
       const apiVax = await patch(`/pets/${petId}/vaccinations/${vaccinationId}/complete`, {});
       const updated = toVax(apiVax);
-      const pet = state.pets.find((p) => p.id === petId);
-      if (pet) {
-        dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: (pet.vaccinations || []).map((v) => (v.id === vaccinationId ? updated : v)) } });
-      }
-      queryClient.invalidateQueries({ queryKey: petsKeys.all });
+      applyVaxChange(petId, (vaxes) => vaxes.map((v) => (v.id === vaccinationId ? updated : v)));
     } catch (err) {
       handleApiError(err);
     }
@@ -520,11 +529,7 @@ export function DataProvider({ children }) {
   const deleteVaccination = async (petId, vaccinationId) => {
     try {
       await del(`/pets/${petId}/vaccinations/${vaccinationId}`);
-      const pet = state.pets.find((p) => p.id === petId);
-      if (pet) {
-        dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: (pet.vaccinations || []).filter((v) => v.id !== vaccinationId) } });
-      }
-      queryClient.invalidateQueries({ queryKey: petsKeys.all });
+      applyVaxChange(petId, (vaxes) => vaxes.filter((v) => v.id !== vaccinationId));
     } catch (err) {
       handleApiError(err);
     }

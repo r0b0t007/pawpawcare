@@ -39,10 +39,13 @@ import { toPet } from '../DataContext';
 // silently vanished from the Health hub until re-login) or sorts it with
 // localeCompare (wrong order for "Jul"/"Aug" display strings).
 
+// Local-date ISO (not toISOString, which is UTC and drifts a day off local
+// near midnight) — the mapper's day math is local, so the fixtures must be.
 const isoDaysFromNow = (days) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
 const petWithVax = (vax) =>
@@ -56,6 +59,23 @@ describe('toVax (via toPet)', () => {
     expect(v.dueDate).toBe(due);
     // The Health hub / Dashboard parse exactly this way — must be valid.
     expect(Number.isNaN(new Date(`${v.dueDate}T12:00:00`).getTime())).toBe(false);
+  });
+
+  it('keeps a record due TODAY as due_soon, not overdue', () => {
+    // The server only flips to overdue when due_date is strictly before
+    // today — a record due today must stay in the upcoming schedule all day,
+    // regardless of the time of day the mapper runs.
+    const [v] = petWithVax({
+      id: 'v1', name: 'Rabies', due_date: isoDaysFromNow(0), status: 'upcoming',
+    }).vaccinations;
+    expect(v.status).toBe('due_soon');
+  });
+
+  it('treats the 30-day boundary as due_soon regardless of time of day', () => {
+    const [v] = petWithVax({
+      id: 'v1', name: 'Rabies', due_date: isoDaysFromNow(30), status: 'upcoming',
+    }).vaccinations;
+    expect(v.status).toBe('due_soon');
   });
 
   it('flags upcoming records within 30 days as due_soon', () => {
