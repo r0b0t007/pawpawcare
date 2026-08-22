@@ -22,7 +22,9 @@ class Milestone extends Model
 
     // Command-only write target (ComputeGamificationNightly). Never expose a
     // controller write path that mass-assigns pet_id from request input.
-    protected $fillable = ['pet_id', 'key', 'earned_at'];
+    // created_at records when the row was minted; earned_at can be backdated
+    // (anniversaries are stamped on the anniversary itself, not run night).
+    protected $fillable = ['pet_id', 'key', 'earned_at', 'created_at'];
 
     protected $casts = [
         'earned_at' => 'datetime',

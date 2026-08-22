@@ -153,6 +153,9 @@ class GamificationTest extends TestCase
         $this->assertCount(1, $res['streaks']);
         $this->assertSame(1, $res['streaks'][0]['current_weeks']);
         $this->assertCount(1, array_filter($res['milestones'], fn ($m) => $m['key'] === 'first_record'));
+        // created_at is populated even though the model manages it manually
+        // ($timestamps = false; earned_at can be backdated, created_at can't).
+        $this->assertNotNull(Milestone::where('pet_id', $pet->id)->first()->created_at);
     }
 
     public function test_future_dated_care_cannot_forge_or_zero_a_streak(): void

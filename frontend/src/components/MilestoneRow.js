@@ -17,7 +17,9 @@ export default function MilestoneRow({ label, earnedAt, last }) {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        paddingVertical: 11,
+        // Sized for a non-padded Card, matching PetProfile's History rows.
+        paddingVertical: 13,
+        paddingHorizontal: 18,
         borderBottomWidth: last ? 0 : 1,
         borderBottomColor: ui.hairline,
       }}

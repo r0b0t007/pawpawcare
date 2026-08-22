@@ -34,6 +34,8 @@ class ComputeGamificationNightly extends Command
 
     private const MAX_ANNIVERSARY_YEARS = 25;
 
+    // Scale note: ~12 queries per pet per night. Fine at consumer scale;
+    // past ~10k pets, batch the six signals into grouped queries instead.
     public function handle(): int
     {
         $processed = 0;
@@ -146,20 +148,20 @@ class ComputeGamificationNightly extends Command
 
         foreach (self::RECORD_MILESTONES as $key => $threshold) {
             if ($total >= $threshold) {
-                Milestone::firstOrCreate(['pet_id' => $pet->id, 'key' => $key], ['earned_at' => $now]);
+                Milestone::firstOrCreate(['pet_id' => $pet->id, 'key' => $key], ['earned_at' => $now, 'created_at' => $now]);
             }
         }
 
         foreach (self::WEIGHT_MILESTONES as $key => $threshold) {
             if ($weights >= $threshold) {
-                Milestone::firstOrCreate(['pet_id' => $pet->id, 'key' => $key], ['earned_at' => $now]);
+                Milestone::firstOrCreate(['pet_id' => $pet->id, 'key' => $key], ['earned_at' => $now, 'created_at' => $now]);
             }
         }
 
         // Every recorded vaccination completed (and at least one exists).
         $vaxTotal = $pet->vaccinations()->count();
         if ($vaxTotal > 0 && $pet->vaccinations()->where('status', '!=', 'completed')->count() === 0) {
-            Milestone::firstOrCreate(['pet_id' => $pet->id, 'key' => 'vax_complete'], ['earned_at' => $now]);
+            Milestone::firstOrCreate(['pet_id' => $pet->id, 'key' => 'vax_complete'], ['earned_at' => $now, 'created_at' => $now]);
         }
 
         // Care anniversaries — only from the real gotcha day, never faked from
@@ -169,7 +171,7 @@ class ComputeGamificationNightly extends Command
             for ($n = 1; $n <= min($years, self::MAX_ANNIVERSARY_YEARS); $n++) {
                 Milestone::firstOrCreate(
                     ['pet_id' => $pet->id, 'key' => "anniversary_{$n}"],
-                    ['earned_at' => $pet->adopted_on->copy()->addYears($n)->startOfDay()],
+                    ['earned_at' => $pet->adopted_on->copy()->addYears($n)->startOfDay(), 'created_at' => $now],
                 );
             }
         }

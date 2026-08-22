@@ -79,7 +79,8 @@ export default function PetProfileScreen({ navigation, route }) {
   const [segment, setSegment] = useState('overview');
 
   // This pet's weekly care streak + earned milestones (nightly-computed).
-  const { data: gamification } = useGamificationSummary();
+  const { data: gamification, refetch: refetchGamification } = useGamificationSummary();
+  useRefetchOnFocus(refetchGamification);
   const careStreak = (gamification?.streaks || []).find((s) => s.pet_id === petId);
   const petMilestones = (gamification?.milestones || [])
     .filter((m) => m.pet_id === petId && milestoneLabel(m.key))
@@ -554,7 +555,7 @@ export default function PetProfileScreen({ navigation, route }) {
               {careStreak.current_weeks} week{careStreak.current_weeks === 1 ? '' : 's'} of consistent care
             </Text>
           )}
-          <Card padded style={styles.block}>
+          <Card style={styles.block}>
             {petMilestones.map((m, i, arr) => (
               <MilestoneRow
                 key={m.id}
