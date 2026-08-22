@@ -81,6 +81,24 @@ describe('medicationStreak', () => {
       coveredToday: true,
     });
   });
+
+  it('survives DST/clock changes: consecutive calendar days count even when 23h/25h apart', () => {
+    // Casablanca 2026: Feb 15→16 is a 25h day, Mar 22→23 is 23h (verified on
+    // the host TZ); US zones flip Mar 8 / Nov 1. Calendar-day arithmetic must
+    // treat all of these as consecutive.
+    const springForward = ['2026-03-07', '2026-03-08', '2026-03-09', '2026-03-10'];
+    const s1 = medicationStreak(springForward, DAILY, new Date('2026-03-10T10:00:00'));
+    expect(s1).toEqual({ current: 4, longest: 4, coveredToday: true });
+
+    const clockChange = ['2026-02-14', '2026-02-15', '2026-02-16', '2026-02-17'];
+    const s2 = medicationStreak(clockChange, DAILY, new Date('2026-02-17T09:00:00'));
+    expect(s2).toEqual({ current: 4, longest: 4, coveredToday: true });
+
+    // "Alive until midnight" across a transition: last dose was the calendar
+    // day before `today`, even though the epoch gap isn't exactly 24h.
+    const s3 = medicationStreak(['2026-02-14', '2026-02-15'], DAILY, new Date('2026-02-16T00:30:00'));
+    expect(s3).toEqual({ current: 2, longest: 2, coveredToday: false });
+  });
 });
 
 describe('medicationStreakLabel', () => {

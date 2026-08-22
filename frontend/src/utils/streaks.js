@@ -45,9 +45,15 @@ export const medicationStreak = (doseDays, medication, today = new Date()) => {
   const days = [...new Set(doseDays || [])].filter(Boolean).sort();
   if (!days.length) return null;
 
-  // Walk the unique days once, tracking run lengths.
+  // Walk the unique days once, tracking run lengths. Day arithmetic uses UTC
+  // from the calendar components — local-midnight epoch diffs are 23h/25h
+  // across DST/clock changes (e.g. Casablanca Feb 15→16 2026 is 25h), which
+  // would silently break a streak twice a year.
   const MS_DAY = 86400000;
-  const at = (k) => new Date(`${k}T00:00:00`).getTime(); // local midnight
+  const at = (k) => {
+    const [y, m, d] = k.split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
   let longest = 1;
   let run = 1;
   for (let i = 1; i < days.length; i++) {
@@ -56,7 +62,10 @@ export const medicationStreak = (doseDays, medication, today = new Date()) => {
   }
 
   const todayKey = dayKey(today);
-  const yesterdayKey = dayKey(new Date(today.getTime() - MS_DAY));
+  // Calendar decrement (setDate), not minus-24h — same DST hazard as above.
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayKey = dayKey(yesterday);
   const last = days[days.length - 1];
   const coveredToday = last === todayKey;
   // `run` currently holds the length of the trailing run.
