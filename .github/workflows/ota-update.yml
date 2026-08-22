@@ -1,4 +1,4 @@
-# Triggered on every push to main.
+# Triggered by pushes to main that touch frontend/ (or manually).
 # Publishes an OTA (over-the-air) JS bundle update via EAS Update.
 # Users receive it silently on their next app launch — no store review needed.
 
@@ -7,6 +7,11 @@ name: OTA Update
 on:
   push:
     branches: [main]
+    # Only frontend changes can affect the JS bundle. Without this filter every
+    # website-, backend-, or docs-only merge republished an identical update.
+    paths:
+      - "frontend/**"
+      - ".github/workflows/ota-update.yml"
   workflow_dispatch:
     inputs:
       message:
