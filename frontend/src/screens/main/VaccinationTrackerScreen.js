@@ -68,7 +68,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       confirmLabel: 'Mark done',
       action: async () => {
         await markVaccinationComplete(petId, vax.id);
-        showToast(`${vax.name} marked done`);
+        showToast(`${vax.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
       },
     });
 

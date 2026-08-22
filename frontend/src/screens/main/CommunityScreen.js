@@ -125,7 +125,7 @@ export default function CommunityScreen({ navigation }) {
     title: 'Mark as found?',
     message: `Has ${report.petName} been found safe?`,
     confirmLabel: 'Found!',
-    action: async () => { await resolveLostPet(report.id); showToast('Welcome home!'); },
+    action: async () => { await resolveLostPet(report.id); showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' }); },
   });
 
   const handleSeen = (report) => {

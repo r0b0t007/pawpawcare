@@ -428,7 +428,7 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
         notes: notes.trim() || null,
       });
       reset(); onClose(); await onDone();
-      showToast('Appointment logged');
+      showToast('Appointment logged', { celebrate: true, actionType: 'appointment_logged' });
     } catch (e) { setError(e.message || 'Could not save the appointment.'); } finally { setBusy(false); }
   };
 
