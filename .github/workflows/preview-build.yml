@@ -1,24 +1,108 @@
-# Triggered on pushes to the `preview` branch or manually.
-# Builds an internal APK (Android) + ad-hoc IPA (iOS) for QA testing.
-# EAS posts a QR code / install link to the build; share it with testers.
+# Triggered by pushes to the `preview` branch that touch frontend/ (or manually).
+#
+# Publishes a preview-channel EAS Update when the native runtime is unchanged,
+# and only falls back to a full EAS Build when the fingerprint actually moved.
+# app.json sets runtimeVersion.policy = "fingerprint", so a binary can only load
+# an update whose fingerprint matches it — comparing the current fingerprint to
+# the last finished preview build tells us whether a rebuild is really required.
+#
+# Why it matters: the Free plan allows 15 Android + 15 iOS builds per calendar
+# month and cannot incur overage (builds simply stop until the 1st). A JS-only
+# change shipped as an update costs zero builds; rebuilding for it wastes two.
+#
+# NOTE: the automatic push path builds Android only, because the project is not
+# yet enrolled in the Apple Developer Program — an iOS build would fail and burn
+# a run every time. Once enrolled, change PLATFORM below to 'all'. iOS remains
+# selectable via a manual workflow_dispatch.
 
 name: Preview Build
 
 on:
   push:
     branches: [preview]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/preview-build.yml"
   workflow_dispatch:
     inputs:
       platform:
         description: "Platform to build"
         required: true
-        default: "all"
+        default: "android"
         type: choice
-        options: [all, android, ios]
+        options: [android, ios, all]
+      force_build:
+        description: "Force a full build even if the native fingerprint is unchanged"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
+  # ── 1. Does the native runtime actually differ from the last preview build? ──
+  decide:
+    name: Native change check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    outputs:
+      native_changed: ${{ steps.fp.outputs.native_changed }}
+      fingerprint: ${{ steps.fp.outputs.fingerprint }}
+      last_runtime: ${{ steps.fp.outputs.last_runtime }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Compare fingerprint against last preview build
+        id: fp
+        env:
+          FORCE_BUILD: ${{ github.event.inputs.force_build }}
+        run: |
+          set -euo pipefail
+
+          npx expo-updates fingerprint:generate --platform android > fingerprint.json
+          FP="$(node -p "require('./fingerprint.json').hash")"
+
+          eas build:list --platform android --build-profile preview \
+            --status finished --limit 1 --json --non-interactive > last-build.json
+          LAST="$(node -p "(require('./last-build.json')[0] || {}).runtimeVersion || ''")"
+
+          echo "current fingerprint : $FP"
+          echo "last preview build  : ${LAST:-<none>}"
+
+          # No prior build, a moved fingerprint, or an explicit force -> build.
+          if [ "$FP" = "$LAST" ] && [ "$FORCE_BUILD" != "true" ]; then
+            echo "Native runtime unchanged — publishing an update instead of building."
+            echo "native_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Native runtime changed (or forced) — a full build is required."
+            echo "native_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "fingerprint=$FP"   >> "$GITHUB_OUTPUT"
+          echo "last_runtime=$LAST" >> "$GITHUB_OUTPUT"
+
+  # ── 2a. Native changed -> full EAS Build (costs Free-plan build quota) ───────
   build:
     name: EAS Preview Build
+    needs: decide
+    if: ${{ needs.decide.outputs.native_changed == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,12 +128,64 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build preview (Android + iOS)
+      - name: Build preview
         run: |
-          PLATFORM="${{ github.event.inputs.platform || 'all' }}"
+          PLATFORM="${{ github.event.inputs.platform || 'android' }}"
+          echo "Fingerprint moved: ${{ needs.decide.outputs.last_runtime }} -> ${{ needs.decide.outputs.fingerprint }}"
           eas build \
             --profile preview \
             --platform "$PLATFORM" \
             --non-interactive \
             --no-wait
         # --no-wait: returns immediately; monitor progress at expo.dev/builds
+
+  # ── 2b. Native unchanged -> free OTA update on the preview channel ───────────
+  update:
+    name: Publish preview update
+    needs: decide
+    if: ${{ needs.decide.outputs.native_changed == 'false' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Create env file
+        # EXPO_PUBLIC_* vars are inlined into the JS bundle at publish time, so
+        # every var the eas.json `preview` profile sets MUST also be set here —
+        # otherwise the update silently strips them from installed test builds.
+        # Mirrors the preview profile exactly (which sets no PostHog key).
+        run: |
+          {
+            echo "EXPO_PUBLIC_API_URL=${{ secrets.BACKEND_URL }}"
+            echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=493303263143-srop8lcrhgvavaulh9jlthjjokghl2qd.apps.googleusercontent.com"
+            echo "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=493303263143-81gcusogeirf5gmjj5spk4b17v7m5hv6.apps.googleusercontent.com"
+          } >> .env.local
+
+      - name: Publish preview update
+        # Commit message passed via env (assigned literally by Actions), never
+        # inlined into the script — backticks/$() in a message would run as shell.
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'Manual preview update' }}
+        run: |
+          MESSAGE="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)"
+          eas update --channel preview --message "$MESSAGE" --non-interactive
