@@ -68,7 +68,7 @@ class MedicationController extends Controller
         $med = $this->medicationOr404($medicationId, $petId);
 
         $data = $request->validate([
-            'administered_at' => 'sometimes|nullable|date',
+            'administered_at' => 'sometimes|nullable|date|before_or_equal:now',
             'notes' => 'sometimes|nullable|string|max:2000',
         ]);
 

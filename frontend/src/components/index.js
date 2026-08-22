@@ -8,5 +8,7 @@ export { default as Button } from './Button';
 export { default as Sheet } from './Sheet';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as UpNextCard } from './UpNextCard';
+export { default as CareStreakCard } from './CareStreakCard';
+export { default as MilestoneRow } from './MilestoneRow';
 export { ToastHost, showToast } from './Toast';
 export { PET_STATUS } from './petStatus';

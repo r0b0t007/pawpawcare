@@ -7,9 +7,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
+import { useRefetchOnFocus } from '../../hooks/usePets';
+import { getPref, setPref } from '../../services/prefs';
+import { track } from '../../services/analytics';
 import { resolveAsset } from '../../config';
 import { ui, type } from '../../theme';
-import { Card, StatusRing, UpNextCard, showToast } from '../../components';
+import { Card, CareStreakCard, StatusRing, UpNextCard, showToast } from '../../components';
 
 // Home = one calm answer to "what needs my attention?": the UpNext hero,
 // the pets row (status lives on the avatar ring, nowhere else), this week's
@@ -52,6 +56,60 @@ export default function DashboardScreen({ navigation }) {
   useEffect(() => {
     if (dataLoaded) markInteractive();
   }, [dataLoaded, markInteractive]);
+
+  // Weekly care streaks + milestones (nightly-computed server-side).
+  const { data: gamification, refetch: refetchGamification } = useGamificationSummary();
+  useRefetchOnFocus(refetchGamification);
+
+  // Join streaks with pet names; pets the store hasn't loaded yet drop out.
+  const careStreaks = useMemo(
+    () =>
+      (gamification?.streaks || [])
+        .map((s) => {
+          const pet = pets.find((p) => p.id === s.pet_id);
+          return pet && {
+            petId: s.pet_id,
+            petName: pet.name,
+            currentWeeks: s.current_weeks,
+            longestWeeks: s.longest_weeks,
+          };
+        })
+        .filter(Boolean),
+    [gamification, pets],
+  );
+
+  // Streak visibility, bucketed — no counts, no names (analytics contract).
+  useEffect(() => {
+    const best = Math.max(0, ...careStreaks.map((s) => s.currentWeeks));
+    if (best > 0) {
+      const bucket = best <= 3 ? '1-3' : best <= 7 ? '4-7' : best <= 30 ? '8-30' : '30+';
+      track('care_streak_viewed', { weeks_bucket: bucket });
+    }
+    // Once per streak-set change, not per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [careStreaks.length]);
+
+  // Celebrate milestones earned since this device last saw the summary. The
+  // very first sighting only records the baseline — never a wall of toasts
+  // for a pet's whole history.
+  useEffect(() => {
+    const milestones = gamification?.milestones;
+    if (!milestones?.length) return;
+    (async () => {
+      const seen = await getPref('seenMilestones', null);
+      const ids = milestones.map((m) => m.id);
+      if (seen !== null) {
+        const fresh = milestones.find((m) => !seen.includes(m.id) && milestoneLabel(m.key));
+        if (fresh) {
+          const pet = pets.find((p) => p.id === fresh.pet_id);
+          const label = milestoneLabel(fresh.key);
+          showToast(pet ? `${pet.name}: ${label}` : label, { celebrate: true, actionType: 'milestone_earned' });
+          track('milestone_earned', { key: fresh.key });
+        }
+      }
+      setPref('seenMilestones', ids);
+    })();
+  }, [gamification, pets]);
 
   const firstName = user?.name?.split(' ')[0] || 'Friend';
   const today = useMemo(() => new Date(), []);
@@ -196,6 +254,8 @@ export default function DashboardScreen({ navigation }) {
             <Text style={[styles.petName, { color: ui.subtle }]}>Add</Text>
           </Pressable>
         </ScrollView>
+
+        <CareStreakCard streaks={careStreaks} style={styles.hero} />
 
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>This week</Text>

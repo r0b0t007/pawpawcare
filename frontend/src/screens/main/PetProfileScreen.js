@@ -10,11 +10,12 @@ import { useAuth } from '../../context/AuthContext';
 import { resolveAsset } from '../../config';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel } from '../../utils/streaks';
+import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
 import { track } from '../../services/analytics';
 import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
 import {
   Card, ListRow, StatusRing, StatusPill, Chip, SegmentedControl,
-  Button, Sheet, ConfirmDialog, showToast,
+  Button, Sheet, ConfirmDialog, MilestoneRow, showToast,
 } from '../../components';
 
 // Redesign: segmented Overview / Health / Notes layout. Every data action from
@@ -76,6 +77,14 @@ export default function PetProfileScreen({ navigation, route }) {
   const isOwner = !!pet && pet.ownerId === user?.id;
 
   const [segment, setSegment] = useState('overview');
+
+  // This pet's weekly care streak + earned milestones (nightly-computed).
+  const { data: gamification, refetch: refetchGamification } = useGamificationSummary();
+  useRefetchOnFocus(refetchGamification);
+  const careStreak = (gamification?.streaks || []).find((s) => s.pet_id === petId);
+  const petMilestones = (gamification?.milestones || [])
+    .filter((m) => m.pet_id === petId && milestoneLabel(m.key))
+    .sort((a, b) => (b.earned_at || '').localeCompare(a.earned_at || ''));
 
   // Streak visibility, bucketed — never exact counts or med names (no PII).
   useEffect(() => {
@@ -533,6 +542,27 @@ export default function PetProfileScreen({ navigation, route }) {
                   {v.administeredDate ? shortDate(v.administeredDate) : shortDate(v.dueDate)}
                 </Text>
               </View>
+            ))}
+          </Card>
+        </>
+      )}
+
+      {petMilestones.length > 0 && (
+        <>
+          <Text style={styles.sectionLabel}>Milestones</Text>
+          {careStreak?.current_weeks > 0 && (
+            <Text style={[type.secondary, { color: ui.accent, marginBottom: 8, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+              {careStreak.current_weeks} week{careStreak.current_weeks === 1 ? '' : 's'} of consistent care
+            </Text>
+          )}
+          <Card style={styles.block}>
+            {petMilestones.map((m, i, arr) => (
+              <MilestoneRow
+                key={m.id}
+                label={milestoneLabel(m.key)}
+                earnedAt={m.earned_at}
+                last={i === arr.length - 1}
+              />
             ))}
           </Card>
         </>

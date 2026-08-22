@@ -10,6 +10,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\GamificationController;
 use App\Http\Controllers\LostPetController;
 use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\NotificationController;
@@ -190,6 +191,9 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
 
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // Gamification (weekly care streaks + milestone badges, nightly-computed)
+    Route::get('/gamification/summary', [GamificationController::class, 'summary']);
 
     // Devices (push token registration)
     Route::post('/devices', [DeviceController::class, 'store']);

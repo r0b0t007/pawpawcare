@@ -47,8 +47,8 @@ class Pet extends Model
     }
 
     protected $fillable = [
-        'owner_id', 'name', 'type', 'breed', 'age', 'birthday', 'weight',
-        'weight_unit', 'gender', 'microchipped', 'color', 'avatar_url',
+        'owner_id', 'name', 'type', 'breed', 'age', 'birthday', 'adopted_on',
+        'weight', 'weight_unit', 'gender', 'microchipped', 'color', 'avatar_url',
         'heart_rate', 'activity_level',
     ];
 
@@ -64,6 +64,7 @@ class Pet extends Model
         'heart_rate' => 'integer',
         'microchipped' => 'boolean',
         'birthday' => 'date:Y-m-d',
+        'adopted_on' => 'date:Y-m-d',
     ];
 
     public function owner(): BelongsTo
@@ -161,6 +162,7 @@ class Pet extends Model
             'breed' => $this->breed,
             'age' => $this->age,
             'birthday' => $this->birthday?->format('Y-m-d'),
+            'adopted_on' => $this->adopted_on?->format('Y-m-d'),
             'weight' => $this->weight,
             'weight_unit' => $this->weight_unit,
             'gender' => $this->gender,
