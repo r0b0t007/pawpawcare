@@ -7,6 +7,8 @@ const PET_BGS = PET_COLOR_PAIRS.map((p) => p.bg);
 import { get, post, patch, put, del, uploadDocument } from '../services/api';
 import { scheduleLocalReminders } from '../services/notifications';
 import { track } from '../services/analytics';
+import { getPref, setPref } from '../services/prefs';
+import { addDoseDay } from '../utils/streaks';
 import { petsKeys } from '../hooks/queryKeys';
 
 const DataContext = createContext(null);
@@ -247,6 +249,9 @@ function dataReducer(state, action) {
     // Trust: when the store last successfully synced with the server (ms
     // epoch, or null before the first sync / after logout).
     case 'SET_LAST_SYNCED':   return { ...state, lastSyncedAt: action.payload };
+    // Device-local dose-day history per medication id ({ [medId]: ['YYYY-MM-DD'] })
+    // — drives the daily-med streak until the Phase-2 server summary exists.
+    case 'SET_MED_DOSE_DAYS': return { ...state, medDoseDays: action.payload };
     default:           return state;
   }
 }
@@ -257,6 +262,7 @@ export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
     lostPets: [], myReports: [], invites: [], dataLoaded: false, lastSyncedAt: null,
+    medDoseDays: {},
   });
   const { user, logout } = useAuth();
   // Bridge to React Query while domains migrate off this store: mutations here
@@ -277,6 +283,9 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_MY_REPORTS', payload: [] });
       dispatch({ type: 'SET_INVITES', payload: [] });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
+      // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
+      // cleared from memory so a different account never renders it.
+      dispatch({ type: 'SET_MED_DOSE_DAYS', payload: {} });
     }
   }, [user?.id]);
 
@@ -310,6 +319,7 @@ export function DataProvider({ children }) {
         );
         dispatch({ type: 'SET_PETS', payload: petsWithData });
         dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
+        hydrateDoseDays(petsWithData);
       },
       () => refreshPosts({ rethrow: true }),
       async () => {
@@ -336,6 +346,28 @@ export function DataProvider({ children }) {
     // not read as "synced" (honest state; refreshReminders stamps on its own
     // success, so a reminders-only recovery still updates the line).
     if (!failed.length) dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
+  };
+
+  // Merge the persisted dose-day history with each med's server-side
+  // last_administered_at, so pre-feature doses and family members' doses at
+  // least register their day. Prunes meds that no longer exist. Best-effort:
+  // the streak chip is supplementary — it must never break data loading.
+  const hydrateDoseDays = async (pets) => {
+    try {
+      const stored = await getPref('medDoseDays', {});
+      const map = {};
+      for (const pet of pets) {
+        for (const med of pet.medications || []) {
+          let days = stored[med.id] || [];
+          if (med.lastAdministeredAt) days = addDoseDay(days, med.lastAdministeredAt);
+          if (days.length) map[med.id] = days;
+        }
+      }
+      dispatch({ type: 'SET_MED_DOSE_DAYS', payload: map });
+      setPref('medDoseDays', map);
+    } catch {
+      // keep whatever is in state
+    }
   };
 
   // ── Reminders & notifications ──
@@ -521,6 +553,7 @@ export function DataProvider({ children }) {
       const apiVax = await patch(`/pets/${petId}/vaccinations/${vaccinationId}/complete`, {});
       const updated = toVax(apiVax);
       applyVaxChange(petId, (vaxes) => vaxes.map((v) => (v.id === vaccinationId ? updated : v)));
+      track('care_action_completed', { action_type: 'vaccination_done' });
     } catch (err) {
       handleApiError(err);
     }
@@ -571,6 +604,7 @@ export function DataProvider({ children }) {
       const newAct = toAct(apiAct);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, activities: [...pet.activities, newAct] } });
+      track('care_action_completed', { action_type: 'activity_added' });
     } catch (err) {
       handleApiError(err);
     }
@@ -610,6 +644,7 @@ export function DataProvider({ children }) {
       const weights = [...(pet.weights || []), newW].sort((a, b) => (a.loggedAt || '').localeCompare(b.loggedAt || ''));
       const latest = weights[weights.length - 1];
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, weights, weight: String(latest.weight), weightUnit: latest.unit } });
+      track('care_action_completed', { action_type: 'weight_logged' });
       return newW;
     } catch (err) {
       handleApiError(err);
@@ -649,6 +684,7 @@ export function DataProvider({ children }) {
       const newE = toExpense(apiE);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, expenses: [newE, ...(pet.expenses || [])] } });
+      track('care_action_completed', { action_type: 'expense_added' });
       return newE;
     } catch (err) {
       handleApiError(err);
@@ -722,6 +758,15 @@ export function DataProvider({ children }) {
           ),
         },
       });
+      track('care_action_completed', { action_type: 'dose_logged' });
+      // Extend this med's device-local streak history with the server's
+      // timestamp for the dose (falling back to now).
+      const doseDays = {
+        ...state.medDoseDays,
+        [medId]: addDoseDay(state.medDoseDays[medId], log?.administered_at || new Date()),
+      };
+      dispatch({ type: 'SET_MED_DOSE_DAYS', payload: doseDays });
+      setPref('medDoseDays', doseDays);
     } catch (err) {
       handleApiError(err);
     }
@@ -873,6 +918,7 @@ export function DataProvider({ children }) {
   // file = { uri, name }; fields = { title, category, appointment_id?, clinic_id? }
   const addDocument = async (petId, file, fields) => {
     const d = await uploadDocument(petId, file, fields);
+    track('care_action_completed', { action_type: 'document_uploaded' });
     return toDocument(d);
   };
   const deleteDocument = async (petId, id) => {
@@ -1035,6 +1081,7 @@ export function DataProvider({ children }) {
         lostPets: state.lostPets,
         myReports: state.myReports,
         invites: state.invites,
+        medDoseDays: state.medDoseDays,
         addPet,
         updatePet,
         deletePet,

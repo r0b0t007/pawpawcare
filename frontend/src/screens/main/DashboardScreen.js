@@ -146,7 +146,7 @@ export default function DashboardScreen({ navigation }) {
           style={styles.hero}
           onDone={async () => {
             await markVaccinationComplete(upNext.pet.id, upNext.id);
-            showToast(`${upNext.name} marked done`);
+            showToast(`${upNext.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
           }}
           onReschedule={() =>
             navigation.navigate('Pets', {

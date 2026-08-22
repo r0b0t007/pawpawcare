@@ -185,7 +185,7 @@ export default function HealthHubScreen({ navigation }) {
 
   const markDone = async (v) => {
     await markVaccinationComplete(v.pet.id, v.id);
-    showToast(`${v.name} marked done`);
+    showToast(`${v.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
   };
 
   const daysOverdue = (v) =>

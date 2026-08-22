@@ -9,6 +9,8 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { resolveAsset } from '../../config';
 import { convertWeight, weightInsight } from '../../utils/weight';
+import { medicationStreak, medicationStreakLabel } from '../../utils/streaks';
+import { track } from '../../services/analytics';
 import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
 import {
   Card, ListRow, StatusRing, StatusPill, Chip, SegmentedControl,
@@ -61,7 +63,7 @@ const vaxPill = (v) => (v.status === 'overdue'
 export default function PetProfileScreen({ navigation, route }) {
   const { petId } = route.params;
   const {
-    pets, myReports, addFavoriteFood, removeFavoriteFood, addActivity,
+    pets, myReports, medDoseDays, addFavoriteFood, removeFavoriteFood, addActivity,
     addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
     addWeight, deleteWeight, addExpense, deleteExpense,
     getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
@@ -74,6 +76,18 @@ export default function PetProfileScreen({ navigation, route }) {
   const isOwner = !!pet && pet.ownerId === user?.id;
 
   const [segment, setSegment] = useState('overview');
+
+  // Streak visibility, bucketed — never exact counts or med names (no PII).
+  useEffect(() => {
+    if (segment !== 'health' || !pet) return;
+    const best = Math.max(0, ...(pet.medications || []).map(
+      (m) => medicationStreak(medDoseDays?.[m.id], m)?.current || 0,
+    ));
+    if (best > 0) {
+      const bucket = best <= 3 ? '1-3' : best <= 7 ? '4-7' : best <= 30 ? '8-30' : '30+';
+      track('med_streak_viewed', { streak_bucket: bucket });
+    }
+  }, [segment]);
 
   const [foodSheet, setFoodSheet] = useState(false);
   const [activitySheet, setActivitySheet] = useState(false);
@@ -169,7 +183,7 @@ export default function PetProfileScreen({ navigation, route }) {
 
   const handleLogDose = async (med) => {
     await logMedicationDose(petId, med.id);
-    showToast('Dose logged');
+    showToast('Dose logged', { celebrate: true, actionType: 'dose_logged' });
   };
 
   const handleDeleteMedication = (med) => askConfirm({
@@ -193,7 +207,7 @@ export default function PetProfileScreen({ navigation, route }) {
       title: 'Mark as found?',
       message: `Has ${pet.name} been found safe?`,
       confirmLabel: 'Found!',
-      action: async () => { await resolveLostPet(activeReport.id); showToast('Welcome home!'); },
+      action: async () => { await resolveLostPet(activeReport.id); showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' }); },
     });
   };
 
@@ -203,7 +217,7 @@ export default function PetProfileScreen({ navigation, route }) {
     await addWeight(petId, { weight: v }); // unit is locked to the pet's unit server-side
     setNewWeight({ value: '' });
     setWeightSheet(false);
-    showToast('Weight logged');
+    showToast('Weight logged', { celebrate: true, actionType: 'weight_logged' });
   };
 
   const handleDeleteWeight = (w) => askConfirm({
@@ -499,6 +513,7 @@ export default function PetProfileScreen({ navigation, route }) {
           <MedicationRow
             key={med.id}
             med={med}
+            streakLabel={medicationStreakLabel(medicationStreak(medDoseDays?.[med.id], med))}
             onLog={() => handleLogDose(med)}
             onDelete={() => handleDeleteMedication(med)}
           />
@@ -943,7 +958,7 @@ function WeightSparkline({ weights }) {
   );
 }
 
-function MedicationRow({ med, onLog, onDelete }) {
+function MedicationRow({ med, streakLabel, onLog, onDelete }) {
   const freqLabel = med.frequency === 'as_needed'
     ? 'As needed'
     : `${cap(med.frequency)}${med.times?.length ? ` · ${med.times.join(', ')}` : ''}`;
@@ -960,6 +975,13 @@ function MedicationRow({ med, onLog, onDelete }) {
         </Text>
         <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>{freqLabel}</Text>
         {lastGiven && <Text style={[type.secondary, { color: ui.subtle, marginTop: 1 }]}>Last given: {lastGiven}</Text>}
+        {/* Daily-med streak — supplementary care-consistency line, not a health
+            status (StatusRing/StatusPill stay the only status renderers). */}
+        {streakLabel && (
+          <Text style={[type.secondary, { color: ui.accent, marginTop: 1, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
+            {streakLabel}
+          </Text>
+        )}
       </View>
       <Button pill small label="Log" onPress={onLog} />
       <Pressable onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>

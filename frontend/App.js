@@ -1,5 +1,5 @@
 import 'react-native-url-polyfill/auto';
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { useNavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -19,7 +19,8 @@ import { ObserveRoot, ObserveNavigationContainer, configureObserve } from './src
 import { AuthProvider } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
 import { ToastHost } from './src/components';
-import { trackScreen } from './src/services/analytics';
+import { track, trackScreen } from './src/services/analytics';
+import { addNotificationResponseListener } from './src/services/notifications';
 import AppNavigator from './src/navigation/AppNavigator';
 import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from './src/config';
 
@@ -54,6 +55,23 @@ const queryClient = new QueryClient({
 function App() {
   const navRef = useNavigationContainerRef();
   const routeNameRef = useRef(null);
+
+  // Notification tap → open the Notifications inbox. The payload's `screen`
+  // (sent by both the server push and scheduleLocalReminders) names a screen
+  // in the Dashboard stack. Kind is an enum for analytics — never content.
+  useEffect(() => {
+    const sub = addNotificationResponseListener((response) => {
+      const data = response?.notification?.request?.content?.data ?? {};
+      track('notification_opened', { kind: data.kind || 'reminder' });
+      const screen = data.screen || 'Notifications';
+      if (navRef.isReady()) {
+        navRef.navigate('Main', { screen: 'Dashboard', params: { screen } });
+      }
+      // Cold-start taps land on Home before the container is ready — acceptable:
+      // the unread bell dot on the Dashboard already points at the inbox.
+    });
+    return () => sub.remove();
+  }, [navRef]);
 
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
