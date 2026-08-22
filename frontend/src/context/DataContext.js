@@ -9,7 +9,7 @@ import { scheduleLocalReminders } from '../services/notifications';
 import { track } from '../services/analytics';
 import { getPref, setPref } from '../services/prefs';
 import { addDoseDay } from '../utils/streaks';
-import { petsKeys } from '../hooks/queryKeys';
+import { petsKeys, gamificationKeys } from '../hooks/queryKeys';
 
 const DataContext = createContext(null);
 
@@ -109,6 +109,7 @@ export const toPet = (apiPet, opts = {}) => {
   breed: apiPet.breed,
   age: apiPet.age,
   birthday: apiPet.birthday,
+  adoptedOn: apiPet.adopted_on || null, // "gotcha day" — drives care anniversaries
   weight: apiPet.weight?.toString() ?? null,
   weightUnit: apiPet.weight_unit || 'kg',
   gender: apiPet.gender,
@@ -291,6 +292,13 @@ export function DataProvider({ children }) {
 
   const handleApiError = (err) => {
     if (err.message === 'SESSION_EXPIRED') logout();
+  };
+
+  // Every care completion: analytics + a gamification refetch, so streaks and
+  // milestones computed by the nightly job surface without a full reload.
+  const trackCareAction = (actionType) => {
+    track('care_action_completed', { action_type: actionType });
+    queryClient.invalidateQueries({ queryKey: gamificationKeys.summary });
   };
 
   // Each domain loads and dispatches independently, so one failed request
@@ -553,7 +561,7 @@ export function DataProvider({ children }) {
       const apiVax = await patch(`/pets/${petId}/vaccinations/${vaccinationId}/complete`, {});
       const updated = toVax(apiVax);
       applyVaxChange(petId, (vaxes) => vaxes.map((v) => (v.id === vaccinationId ? updated : v)));
-      track('care_action_completed', { action_type: 'vaccination_done' });
+      trackCareAction('vaccination_done');
     } catch (err) {
       handleApiError(err);
     }
@@ -604,7 +612,7 @@ export function DataProvider({ children }) {
       const newAct = toAct(apiAct);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, activities: [...pet.activities, newAct] } });
-      track('care_action_completed', { action_type: 'activity_added' });
+      trackCareAction('activity_added');
     } catch (err) {
       handleApiError(err);
     }
@@ -644,7 +652,7 @@ export function DataProvider({ children }) {
       const weights = [...(pet.weights || []), newW].sort((a, b) => (a.loggedAt || '').localeCompare(b.loggedAt || ''));
       const latest = weights[weights.length - 1];
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, weights, weight: String(latest.weight), weightUnit: latest.unit } });
-      track('care_action_completed', { action_type: 'weight_logged' });
+      trackCareAction('weight_logged');
       return newW;
     } catch (err) {
       handleApiError(err);
@@ -684,7 +692,7 @@ export function DataProvider({ children }) {
       const newE = toExpense(apiE);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, expenses: [newE, ...(pet.expenses || [])] } });
-      track('care_action_completed', { action_type: 'expense_added' });
+      trackCareAction('expense_added');
       return newE;
     } catch (err) {
       handleApiError(err);
@@ -758,7 +766,7 @@ export function DataProvider({ children }) {
           ),
         },
       });
-      track('care_action_completed', { action_type: 'dose_logged' });
+      trackCareAction('dose_logged');
       // Extend this med's device-local streak history with the server's
       // timestamp for the dose (falling back to now).
       const doseDays = {
@@ -918,7 +926,7 @@ export function DataProvider({ children }) {
   // file = { uri, name }; fields = { title, category, appointment_id?, clinic_id? }
   const addDocument = async (petId, file, fields) => {
     const d = await uploadDocument(petId, file, fields);
-    track('care_action_completed', { action_type: 'document_uploaded' });
+    trackCareAction('document_uploaded');
     return toDocument(d);
   };
   const deleteDocument = async (petId, id) => {

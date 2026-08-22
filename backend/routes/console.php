@@ -20,3 +20,6 @@ Schedule::command('uploads:prune')->daily();
 
 // Permanently purge accounts whose 30-day deletion grace period has passed.
 Schedule::command('accounts:purge-deleted')->daily();
+
+// Recompute per-pet weekly care streaks and award new milestones.
+Schedule::command('gamification:nightly')->daily()->withoutOverlapping();

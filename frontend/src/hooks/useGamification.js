@@ -1,0 +1,46 @@
+import { useQuery } from '@tanstack/react-query';
+import { get } from '../services/api';
+import { gamificationKeys } from './queryKeys';
+
+// Weekly care streaks + milestone badges, nightly-computed server-side.
+// Read-only domain: there are no client writes, so nothing lives in
+// DataContext — completion mutations there invalidate gamificationKeys so a
+// fresh summary lands after the next nightly rollup.
+//
+// Shapes (snake_case, from GET /gamification/summary):
+//   streaks:    [{ pet_id, current_weeks, longest_weeks, last_qualifying_week_start }]
+//   milestones: [{ id, pet_id, key, earned_at }]
+async function fetchSummary() {
+  const data = await get('/gamification/summary');
+  return {
+    streaks: data.streaks || [],
+    milestones: data.milestones || [],
+  };
+}
+
+export function useGamificationSummary() {
+  return useQuery({ queryKey: gamificationKeys.summary, queryFn: fetchSummary });
+}
+
+// Human copy for milestone keys. Falls back to null for unknown keys so a
+// newer server never renders raw identifiers in the UI.
+const MILESTONE_LABELS = {
+  first_record: 'First health record',
+  records_10: '10 health records',
+  records_25: '25 health records',
+  records_100: '100 health records',
+  weights_5: '5 weight entries',
+  weights_20: '20 weight entries',
+  weights_50: '50 weight entries',
+  vax_complete: 'Vaccinations all caught up',
+};
+
+export function milestoneLabel(key) {
+  if (MILESTONE_LABELS[key]) return MILESTONE_LABELS[key];
+  const anniversary = /^anniversary_(\d+)$/.exec(key || '');
+  if (anniversary) {
+    const n = Number(anniversary[1]);
+    return `${n} year${n === 1 ? '' : 's'} together`;
+  }
+  return null;
+}

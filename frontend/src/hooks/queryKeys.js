@@ -3,3 +3,7 @@
 export const petsKeys = {
   all: ['pets'],
 };
+
+export const gamificationKeys = {
+  summary: ['gamification', 'summary'],
+};

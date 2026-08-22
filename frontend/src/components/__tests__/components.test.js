@@ -19,6 +19,8 @@ describe('component kit', () => {
     'Sheet',
     'ConfirmDialog',
     'UpNextCard',
+    'CareStreakCard',
+    'MilestoneRow',
     'ToastHost',
   ])('exports %s as a component', (name) => {
     expect(typeof components[name]).toBe('function');
