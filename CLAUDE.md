@@ -22,19 +22,19 @@ Invoke the matching skill BEFORE doing the work:
 
 | When the task involves… | Use |
 |---|---|
-| Upgrading Expo SDK / dependency conflicts / expo-doctor failures | `expo:upgrading-expo` |
+| Upgrading Expo SDK / dependency conflicts / expo-doctor failures | `expo:expo-upgrade` |
 | Adding any third-party library or service integration | `expo:expo-examples` + the Expo MCP `add_library` tool |
-| Any network request, API call, caching, offline, React Query work | `expo:native-data-fetching` |
-| Building/refactoring screens, navigation, animations, styling | `expo:building-native-ui` (+ `impeccable` for polish) |
+| Any network request, API call, caching, offline, React Query work | `expo:expo-data-fetching` |
+| Building/refactoring screens, navigation, animations, styling | `expo:expo-native-ui` (+ `impeccable` for polish) |
 | Native-feeling controls (sheets, menus, pickers, settings forms) | `expo:expo-ui` (in use: `@expo/ui/community/datetime-picker` replaced `@react-native-community/datetimepicker` on all four picker screens) |
-| EAS builds, store submission, versioning, eas.json, TestFlight/Play | `expo:expo-deployment` + Expo MCP `build_*` tools |
+| EAS builds, store submission, versioning, eas.json, TestFlight/Play | `expo:eas-app-stores` + Expo MCP `build_*` tools |
 | Dev builds / Expo Go limitations | `expo:expo-dev-client` |
 | OTA update health, rollout monitoring, embedded-vs-OTA split | `expo:eas-update-insights` |
 | Running/testing on iOS (Windows dev machine — no local iOS simulator) | `expo:eas-simulator` |
-| App performance, launch time, TTI, per-route metrics | `expo:expo-observe` (wired: `ObserveRoot`/`ObserveNavigationContainer` in App.js, `markInteractive` on entry screens; query with `eas observe:*`) |
+| App performance, launch time, TTI, per-route metrics | `expo:eas-observe` (wired: `ObserveRoot`/`ObserveNavigationContainer` in App.js, `markInteractive` on entry screens; query with `eas observe:*`) |
 | Expo docs lookup (don't guess API details from memory) | Expo MCP `learn` / `read_documentation` tools |
 
-**Not applicable to this repo** (don't reach for them): `add-app-clip`, `expo-brownfield`, `use-dom`, `web-to-native`, `expo-api-routes` (no expo-router), `expo-module`, `expo-tailwind-setup` (StyleSheet + theme tokens is the chosen styling system).
+**Not applicable to this repo** (don't reach for them): `expo-app-clip`, `expo-brownfield`, `expo-dom`, `expo-web-to-native`, `expo-router` + `eas-hosting` (React Navigation, not expo-router), `expo-module`, `expo-tailwind-setup` (StyleSheet + theme tokens is the chosen styling system).
 
 ## React Query migration (in progress)
 
@@ -43,7 +43,7 @@ Data fetching is migrating from `DataContext` to `@tanstack/react-query`, one do
 1. Query keys live in `frontend/src/hooks/queryKeys.js`; domain hooks in `frontend/src/hooks/` (see `usePets.js`) reuse the `services/api.js` client and the mappers exported from `DataContext.js`.
 2. **Reads** migrate to `useQuery`; **writes stay in `DataContext`** until every reader of that domain has migrated — DataContext mutations invalidate the matching query key to keep both stores in sync.
 3. Screens refetch on focus via `useRefetchOnFocus` to pick up edits from unmigrated screens.
-4. Consult `expo:native-data-fetching` before extending. Remaining domains: dashboard, reminders, notifications, community, lost pets, invites, medical vault.
+4. Consult `expo:expo-data-fetching` before extending. Migrated so far: pets (pilot), gamification (`useGamification.js` — reads-only domain). Remaining: dashboard, reminders, notifications, community, lost pets, invites, medical vault.
 
 ## Backend changes
 
