@@ -13,7 +13,10 @@ import Card from './Card';
 export default function RecapCard({ rows, style }) {
   const withNames = (rows || []).filter((r) => r && r.petName);
   const total = withNames.reduce((n, r) => n + r.doses + r.weights + r.activities, 0);
-  if (!withNames.length || total === 0) return null;
+  // Render whenever the Sunday recap push would have fired: some care was
+  // logged OR something needs a look. A push must never deep-link to nothing.
+  const needsLook = withNames.some((r) => !r.vaxCurrent);
+  if (!withNames.length || (total === 0 && !needsLook)) return null;
 
   const parts = (r) => {
     const p = [];

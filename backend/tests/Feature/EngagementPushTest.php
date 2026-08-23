@@ -10,6 +10,7 @@ use App\Models\WeightLog;
 use App\Services\JwtService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -73,6 +74,27 @@ class EngagementPushTest extends TestCase
         $this->assertSame($pet->id, $rows[0]->pet_id);
         $this->assertNotNull($rows[0]->sent_at);
         Http::assertSentCount(1);
+    }
+
+    public function test_co_owner_also_gets_the_celebration_for_a_shared_pet(): void
+    {
+        // The fan-out is intentional: the streak/celebration is the PET's, and
+        // every caretaker shares it. Tokens must still resolve per-recipient.
+        [$owner] = $this->actingUser();
+        [$member] = $this->actingUser();
+        $this->withDevice($owner);
+        $this->withDevice($member);
+        $pet = Pet::create(['owner_id' => $owner->id, 'name' => 'Luna', 'birthday' => '2024-08-24']);
+        DB::table('pet_members')->insert([
+            'pet_id' => $pet->id, 'user_id' => $member->id, 'role' => 'member', 'created_at' => now(),
+        ]);
+
+        $this->travelTo($this->celebrationInstant('2026-08-24'));
+        $this->artisan('engagement:send')->assertSuccessful();
+
+        // One ledger row per recipient — both the owner and the co-owner.
+        $this->assertSame(2, EngagementPush::where('kind', 'birthday')->where('pet_id', $pet->id)->count());
+        $this->assertSame(1, EngagementPush::where('user_id', $member->id)->count());
     }
 
     public function test_gotcha_day_push_uses_adopted_on(): void
