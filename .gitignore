@@ -55,3 +55,6 @@ website/.netlify/
 *.p8
 *.mobileprovision
 google-service-account.json
+
+# Netlify CLI artifact at the repo root (can acquire auth state)
+/.netlify/

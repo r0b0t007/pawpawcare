@@ -46,6 +46,8 @@ class User extends Model
         'is_admin' => 'boolean',
         // Not fillable either — only DELETE /users/me (forceFill) sets it.
         'deletion_requested_at' => 'datetime',
+        // Assigned explicitly in UserController::update, not mass-assigned.
+        'engagement_pushes_enabled' => 'boolean',
     ];
 
     public function pets(): HasMany
@@ -106,6 +108,9 @@ class User extends Model
      */
     public function toSelfApi(): array
     {
-        return array_merge($this->toApi(), ['is_admin' => (bool) $this->is_admin]);
+        return array_merge($this->toApi(), [
+            'is_admin' => (bool) $this->is_admin,
+            'engagement_pushes_enabled' => (bool) $this->engagement_pushes_enabled,
+        ]);
     }
 }

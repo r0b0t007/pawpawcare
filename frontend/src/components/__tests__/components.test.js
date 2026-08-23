@@ -21,6 +21,7 @@ describe('component kit', () => {
     'UpNextCard',
     'CareStreakCard',
     'MilestoneRow',
+    'RecapCard',
     'ToastHost',
   ])('exports %s as a component', (name) => {
     expect(typeof components[name]).toBe('function');

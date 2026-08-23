@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CareStreak;
 use App\Models\Milestone;
 use App\Models\Pet;
+use App\Support\GamificationRecap;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,5 +26,17 @@ class GamificationController extends Controller
             'milestones' => Milestone::whereIn('pet_id', $petIds)
                 ->orderBy('earned_at')->get()->map->toApi()->values(),
         ]);
+    }
+
+    /**
+     * Trailing-7-day care recap for the user's accessible pets — the same
+     * computation the Sunday recap push summarizes (App\Support\GamificationRecap),
+     * so the in-app card and the notification always agree.
+     */
+    public function recap(Request $request): JsonResponse
+    {
+        $petIds = Pet::accessibleBy($request->user()->id)->pluck('id');
+
+        return response()->json(GamificationRecap::forPets($petIds));
     }
 }

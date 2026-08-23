@@ -194,6 +194,7 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
 
     // Gamification (weekly care streaks + milestone badges, nightly-computed)
     Route::get('/gamification/summary', [GamificationController::class, 'summary']);
+    Route::get('/gamification/recap', [GamificationController::class, 'recap']);
 
     // Devices (push token registration)
     Route::post('/devices', [DeviceController::class, 'store']);
