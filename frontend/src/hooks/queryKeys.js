@@ -6,4 +6,5 @@ export const petsKeys = {
 
 export const gamificationKeys = {
   summary: ['gamification', 'summary'],
+  recap: ['gamification', 'recap'],
 };

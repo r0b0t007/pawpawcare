@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
+import { track } from '../../services/analytics';
 import { resolveAsset } from '../../config';
 import { ui, radii, type, PET_COLOR_PAIRS } from '../../theme';
 import { Button, showToast } from '../../components';
@@ -38,6 +39,7 @@ export default function AddPetScreen({ navigation, route }) {
     type: existing?.type || 'dog',
     breed: existing?.breed || '',
     birthday: existing?.birthday || '',
+    adoptedOn: existing?.adoptedOn || '',
     age: existing?.age?.toString() || '',
     weight: existing?.weight?.toString() || '',
     weightUnit: existing?.weightUnit || 'kg',
@@ -48,7 +50,8 @@ export default function AddPetScreen({ navigation, route }) {
   });
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  // Which date field the picker edits: null | 'birthday' | 'adoptedOn'.
+  const [datePickerField, setDatePickerField] = useState(null);
   const [uploading, setUploading] = useState(false);
   // Local uri of a picked photo whose upload failed — keep showing the chosen
   // image (never saved as avatarUrl) so the user can just tap again to retry.
@@ -66,7 +69,9 @@ export default function AddPetScreen({ navigation, route }) {
     }
   };
 
-  const birthdayDate = form.birthday ? new Date(form.birthday + 'T12:00:00') : new Date();
+  const pickerValue = datePickerField && form[datePickerField]
+    ? new Date(form[datePickerField] + 'T12:00:00')
+    : new Date();
 
   const formatBirthday = (iso) => {
     if (!iso) return null;
@@ -75,11 +80,12 @@ export default function AddPetScreen({ navigation, route }) {
   };
 
   const onDateChange = (event, selectedDate) => {
-    if (Platform.OS === 'android') setShowDatePicker(false);
-    if (event.type === 'dismissed') return;
+    const field = datePickerField;
+    if (Platform.OS === 'android') setDatePickerField(null);
+    if (event.type === 'dismissed' || !field) return;
     if (selectedDate) {
       const iso = selectedDate.toISOString().split('T')[0];
-      set('birthday', iso);
+      set(field, iso);
     }
   };
 
@@ -93,6 +99,7 @@ export default function AddPetScreen({ navigation, route }) {
       type: form.type,
       breed: form.breed.trim(),
       birthday: form.birthday || null,
+      adoptedOn: form.adoptedOn || null,
       age: parseInt(form.age) || 0,
       weight: form.weight,
       weightUnit: form.weightUnit,
@@ -101,6 +108,9 @@ export default function AddPetScreen({ navigation, route }) {
       color: form.color,
       avatarUrl: form.avatarUrl,
     };
+    if (form.adoptedOn && form.adoptedOn !== (existing?.adoptedOn || '')) {
+      track('gotcha_day_set', {});
+    }
     if (isEdit) {
       await updatePet(petId, data);
       navigation.goBack();
@@ -210,7 +220,7 @@ export default function AddPetScreen({ navigation, route }) {
               <Text style={styles.fieldLabel}>Birthday</Text>
               <Pressable
                 style={({ pressed }) => [styles.dateBtn, pressed && { backgroundColor: ui.surface }]}
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => setDatePickerField('birthday')}
               >
                 <MaterialCommunityIcons name="calendar-month-outline" size={17} color={ui.accent} />
                 <Text style={[styles.dateBtnText, !form.birthday && { color: ui.subtle }]} numberOfLines={1}>
@@ -218,6 +228,20 @@ export default function AddPetScreen({ navigation, route }) {
                 </Text>
               </Pressable>
             </View>
+          </View>
+
+          {/* Gotcha day (adoption date) — optional; drives care anniversaries */}
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Gotcha day (optional)</Text>
+            <Pressable
+              style={({ pressed }) => [styles.dateBtn, pressed && { backgroundColor: ui.surface }]}
+              onPress={() => setDatePickerField('adoptedOn')}
+            >
+              <MaterialCommunityIcons name="heart-outline" size={17} color={ui.accent} />
+              <Text style={[styles.dateBtnText, !form.adoptedOn && { color: ui.subtle }]} numberOfLines={1}>
+                {form.adoptedOn ? formatBirthday(form.adoptedOn) : 'The day they came home'}
+              </Text>
+            </Pressable>
           </View>
 
           {/* Weight + unit */}
@@ -315,9 +339,9 @@ export default function AddPetScreen({ navigation, route }) {
       </KeyboardAvoidingView>
 
       {/* Android date picker */}
-      {showDatePicker && Platform.OS === 'android' && (
+      {!!datePickerField && Platform.OS === 'android' && (
         <DateTimePicker
-          value={birthdayDate}
+          value={pickerValue}
           mode="date"
           display="default"
           maximumDate={new Date()}
@@ -327,21 +351,21 @@ export default function AddPetScreen({ navigation, route }) {
 
       {/* iOS date picker modal */}
       {Platform.OS === 'ios' && (
-        <Modal visible={showDatePicker} transparent animationType="slide">
+        <Modal visible={!!datePickerField} transparent animationType="slide">
           <View style={styles.iosPickerOverlay}>
             <View style={styles.iosPickerSheet}>
               <View style={styles.sheetHandle} />
               <View style={styles.iosPickerHeader}>
-                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Pressable onPress={() => setDatePickerField(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Text style={styles.iosPickerCancel}>Cancel</Text>
                 </Pressable>
-                <Text style={styles.iosPickerTitle}>Birthday</Text>
-                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={styles.iosPickerTitle}>{datePickerField === 'adoptedOn' ? 'Gotcha day' : 'Birthday'}</Text>
+                <Pressable onPress={() => setDatePickerField(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Text style={styles.iosPickerDone}>Done</Text>
                 </Pressable>
               </View>
               <DateTimePicker
-                value={birthdayDate}
+                value={pickerValue}
                 mode="date"
                 display="spinner"
                 maximumDate={new Date()}

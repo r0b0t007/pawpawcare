@@ -22,6 +22,7 @@ class UserController extends Controller
             'bio' => 'sometimes|nullable|string|max:1000',
             'avatar_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
             'timezone' => 'sometimes|nullable|string|max:64',
+            'engagement_pushes_enabled' => 'sometimes|boolean',
         ]);
 
         $user = $request->user();
@@ -32,6 +33,11 @@ class UserController extends Controller
                 $user->{$field} = $data[$field];
             }
         }
+        // Explicit boolean assignment (null falls through to unchanged).
+        if (array_key_exists('engagement_pushes_enabled', $data) && $data['engagement_pushes_enabled'] !== null) {
+            $user->engagement_pushes_enabled = (bool) $data['engagement_pushes_enabled'];
+        }
+
         // Timezone is validated against the IANA list before applying.
         $tzChanged = false;
         if (! empty($data['timezone'])

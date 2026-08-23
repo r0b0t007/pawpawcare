@@ -451,6 +451,7 @@ export function DataProvider({ children }) {
         breed: petData.breed || null,
         age: petData.age ? parseFloat(petData.age) : null,
         birthday: petData.birthday || null,
+        adopted_on: petData.adoptedOn || null,
         weight: petData.weight ? parseFloat(petData.weight) : null,
         weight_unit: petData.weightUnit || 'kg',
         gender: petData.gender || null,
@@ -478,6 +479,7 @@ export function DataProvider({ children }) {
       if (updates.breed !== undefined)       apiUpdate.breed = updates.breed;
       if (updates.age !== undefined)         apiUpdate.age = updates.age ? parseFloat(updates.age) : null;
       if (updates.birthday !== undefined)    apiUpdate.birthday = updates.birthday || null;
+      if (updates.adoptedOn !== undefined)   apiUpdate.adopted_on = updates.adoptedOn || null;
       if (updates.weight !== undefined)      apiUpdate.weight = updates.weight ? parseFloat(updates.weight) : null;
       if (updates.weightUnit !== undefined)  apiUpdate.weight_unit = updates.weightUnit;
       if (updates.gender !== undefined)      apiUpdate.gender = updates.gender;

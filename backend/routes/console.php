@@ -23,3 +23,8 @@ Schedule::command('accounts:purge-deleted')->daily();
 
 // Recompute per-pet weekly care streaks and award new milestones.
 Schedule::command('gamification:nightly')->daily()->withoutOverlapping();
+
+// Birthday / gotcha-day / weekly-recap pushes at each user's LOCAL hour —
+// hourly so every timezone gets its morning; the engagement_pushes unique
+// ledger makes reruns no-ops.
+Schedule::command('engagement:send')->hourly()->withoutOverlapping(55);

@@ -22,6 +22,18 @@ export function useGamificationSummary() {
   return useQuery({ queryKey: gamificationKeys.summary, queryFn: fetchSummary });
 }
 
+// Trailing-7-day recap ({ since, per_pet: [{ pet_id, doses, weights,
+// activities, vax_current, current_weeks }] }). Fetched only when `enabled` —
+// the Dashboard shows it around the week boundary (Sun–Mon), so there is no
+// point requesting it midweek.
+export function useGamificationRecap(enabled = true) {
+  return useQuery({
+    queryKey: gamificationKeys.recap,
+    queryFn: () => get('/gamification/recap'),
+    enabled,
+  });
+}
+
 // Human copy for milestone keys. Falls back to null for unknown keys so a
 // newer server never renders raw identifiers in the UI.
 const MILESTONE_LABELS = {

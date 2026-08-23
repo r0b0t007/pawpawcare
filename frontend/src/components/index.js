@@ -10,5 +10,6 @@ export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as UpNextCard } from './UpNextCard';
 export { default as CareStreakCard } from './CareStreakCard';
 export { default as MilestoneRow } from './MilestoneRow';
+export { default as RecapCard } from './RecapCard';
 export { ToastHost, showToast } from './Toast';
 export { PET_STATUS } from './petStatus';

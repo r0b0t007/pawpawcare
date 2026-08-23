@@ -14,7 +14,7 @@ import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '..
 // toggles, sharing entry points and a guarded log out.
 
 export default function ProfileScreen({ navigation }) {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout, updateUser } = useAuth();
   const { invites, reminders, pets } = useData();
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [careReminders, setCareReminders] = useState(true);
@@ -59,6 +59,15 @@ export default function ProfileScreen({ navigation }) {
   const toggleCommunityDigest = (value) => {
     setCommunityDigest(value);
     setPref('communityDigest', value);
+  };
+
+  // SERVER-side switch (unlike the prefs above): birthday / gotcha-day /
+  // weekly-recap pushes originate on the server, so the opt-out must live
+  // there. Optimistic UI; updateUser refreshes the stored user on success.
+  const [engagementPushes, setEngagementPushes] = useState(user?.engagement_pushes_enabled !== false);
+  const toggleEngagementPushes = (value) => {
+    setEngagementPushes(value);
+    updateUser({ engagement_pushes_enabled: value });
   };
 
   const openExport = () => {
@@ -132,6 +141,20 @@ export default function ProfileScreen({ navigation }) {
               <Switch
                 value={communityDigest}
                 onValueChange={toggleCommunityDigest}
+                trackColor={{ false: ui.track, true: ui.accent }}
+                thumbColor="#ffffff"
+                ios_backgroundColor={ui.track}
+              />
+            }
+          />
+          <ListRow
+            icon="cake-variant-outline"
+            title="Celebrations & recaps"
+            subtitle="Birthdays, gotcha days, weekly care recap"
+            right={
+              <Switch
+                value={engagementPushes}
+                onValueChange={toggleEngagementPushes}
                 trackColor={{ false: ui.track, true: ui.accent }}
                 thumbColor="#ffffff"
                 ios_backgroundColor={ui.track}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, Pressable, StyleSheet,
 } from 'react-native';
@@ -7,13 +7,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
+import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/usePets';
 import { getPref, setPref } from '../../services/prefs';
 import { track } from '../../services/analytics';
 import { resolveAsset } from '../../config';
 import { ui, type } from '../../theme';
-import { Card, CareStreakCard, StatusRing, UpNextCard, showToast } from '../../components';
+import { Card, CareStreakCard, RecapCard, StatusRing, UpNextCard, showToast } from '../../components';
 
 // Home = one calm answer to "what needs my attention?": the UpNext hero,
 // the pets row (status lives on the avatar ring, nowhere else), this week's
@@ -113,6 +113,66 @@ export default function DashboardScreen({ navigation }) {
 
   const firstName = user?.name?.split(' ')[0] || 'Friend';
   const today = useMemo(() => new Date(), []);
+
+  // Weekly recap — fetched only around the week boundary (Sun–Mon), matching
+  // the Sunday-evening recap push so the card and notification agree.
+  const recapWindow = today.getDay() === 0 || today.getDay() === 1;
+  const { data: recap } = useGamificationRecap(recapWindow);
+  const recapRows = useMemo(
+    () =>
+      (recap?.per_pet || [])
+        .map((p) => {
+          const pet = pets.find((x) => x.id === p.pet_id);
+          return pet && {
+            petId: p.pet_id,
+            petName: pet.name,
+            doses: p.doses,
+            weights: p.weights,
+            activities: p.activities,
+            vaxCurrent: p.vax_current,
+          };
+        })
+        .filter(Boolean),
+    [recap, pets],
+  );
+
+  useEffect(() => {
+    const actions = recapRows.reduce((n, r) => n + r.doses + r.weights + r.activities, 0);
+    if (actions > 0) {
+      const bucket = actions <= 3 ? '1-3' : actions <= 10 ? '4-10' : '10+';
+      track('recap_viewed', { actions_bucket: bucket });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recapRows.length]);
+
+  // Birthday / gotcha-day banner — client-computed from pet dates, so it works
+  // even with engagement pushes off. Dismissable per pet+kind+year via prefs.
+  const [dismissedCelebrations, setDismissedCelebrations] = useState([]);
+  useEffect(() => {
+    getPref('celebrationsDismissed', []).then(setDismissedCelebrations);
+  }, []);
+
+  const celebration = useMemo(() => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const todayMd = `${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    for (const pet of pets) {
+      for (const [kind, iso] of [['birthday', pet.birthday], ['gotcha_day', pet.adoptedOn]]) {
+        if (!iso || iso.slice(5) !== todayMd) continue;
+        const years = today.getFullYear() - Number(iso.slice(0, 4));
+        if (years <= 0) continue; // no anniversary in the origin year
+        const dismissKey = `${pet.id}:${kind}:${today.getFullYear()}`;
+        if (dismissedCelebrations.includes(dismissKey)) continue;
+        return { pet, kind, years, dismissKey };
+      }
+    }
+    return null;
+  }, [pets, today, dismissedCelebrations]);
+
+  const dismissCelebration = () => {
+    const next = [...dismissedCelebrations, celebration.dismissKey].slice(-40);
+    setDismissedCelebrations(next);
+    setPref('celebrationsDismissed', next);
+  };
   const dateLabel = today
     .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
     .toUpperCase();
@@ -199,6 +259,31 @@ export default function DashboardScreen({ navigation }) {
           </Pressable>
         </View>
 
+        {celebration && (
+          <Card padded style={[styles.hero, { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ui.accentTint, borderColor: ui.accentTint }]}>
+            <MaterialCommunityIcons
+              name={celebration.kind === 'birthday' ? 'cake-variant-outline' : 'heart-outline'}
+              size={22}
+              color={ui.accent}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={[type.cardTitleSm, { color: ui.ink }]}>
+                {celebration.kind === 'birthday'
+                  ? `Happy birthday, ${celebration.pet.name}!`
+                  : `Gotcha day — ${celebration.years} year${celebration.years === 1 ? '' : 's'} with ${celebration.pet.name}`}
+              </Text>
+              {celebration.kind === 'birthday' && (
+                <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>
+                  {celebration.pet.name} turns {celebration.years} today
+                </Text>
+              )}
+            </View>
+            <Pressable onPress={dismissCelebration} hitSlop={10}>
+              <MaterialCommunityIcons name="close" size={16} color={ui.subtle} />
+            </Pressable>
+          </Card>
+        )}
+
         <UpNextCard
           item={upNextItem}
           style={styles.hero}
@@ -256,6 +341,8 @@ export default function DashboardScreen({ navigation }) {
         </ScrollView>
 
         <CareStreakCard streaks={careStreaks} style={styles.hero} />
+
+        {recapWindow && <RecapCard rows={recapRows} style={styles.hero} />}
 
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>This week</Text>
