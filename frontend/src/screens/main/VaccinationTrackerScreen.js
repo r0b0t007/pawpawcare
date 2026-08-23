@@ -197,7 +197,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
         <View>
           <Text style={[type.sectionLabel, styles.fieldLabel]}>Due date</Text>
           <Pressable
-            style={({ pressed }) => [styles.dateBtn, pressed && { backgroundColor: '#fffdf8' }]}
+            style={({ pressed }) => [styles.dateBtn, pressed && { backgroundColor: ui.pressTint }]}
             onPress={() => setShowDatePicker(true)}
           >
             <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={ui.accent} />

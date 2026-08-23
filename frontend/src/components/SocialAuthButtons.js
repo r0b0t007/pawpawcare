@@ -6,7 +6,7 @@ import * as Crypto from 'expo-crypto';
 import { useAuth } from '../context/AuthContext';
 import { showToast } from './Toast';
 import { GOOGLE_WEB_CLIENT_ID } from '../config';
-import { ui, radii } from '../theme';
+import { ui, radii, motion } from '../theme';
 
 // Guarded require (the codebase's defensive native-module pattern): a static
 // import evaluates the native TurboModule at bundle load and throws on any
@@ -163,7 +163,7 @@ export default function SocialAuthButtons() {
           style={({ pressed }) => [
             styles.googleBtn,
             busy && { opacity: 0.6 },
-            pressed && !busy && { opacity: 0.85 },
+            pressed && !busy && { opacity: motion.pressOpacitySoft },
           ]}
         >
           {busy === 'google' ? (

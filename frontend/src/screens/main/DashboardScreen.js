@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, Pressable, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeOut } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
@@ -10,9 +11,11 @@ import { useData } from '../../context/DataContext';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/usePets';
 import { getPref, setPref } from '../../services/prefs';
+
+const CARD_OUT = FadeOut.duration(150);
 import { track } from '../../services/analytics';
 import { resolveAsset } from '../../config';
-import { ui, type } from '../../theme';
+import { ui, type, motion } from '../../theme';
 import { Card, CareStreakCard, RecapCard, StatusRing, UpNextCard, showToast } from '../../components';
 
 // Home = one calm answer to "what needs my attention?": the UpNext hero,
@@ -260,6 +263,7 @@ export default function DashboardScreen({ navigation }) {
         </View>
 
         {celebration && (
+          <Animated.View exiting={CARD_OUT}>
           <Card padded style={[styles.hero, { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ui.accentTint, borderColor: ui.accentTint }]}>
             <MaterialCommunityIcons
               name={celebration.kind === 'birthday' ? 'cake-variant-outline' : 'heart-outline'}
@@ -282,6 +286,7 @@ export default function DashboardScreen({ navigation }) {
               <MaterialCommunityIcons name="close" size={16} color={ui.subtle} />
             </Pressable>
           </Card>
+          </Animated.View>
         )}
 
         <UpNextCard
@@ -375,7 +380,7 @@ export default function DashboardScreen({ navigation }) {
 
         <Pressable
           onPress={() => navigation.navigate('Community')}
-          style={({ pressed }) => pressed && { opacity: 0.9 }}
+          style={({ pressed }) => pressed && { opacity: motion.pressOpacitySoft }}
         >
           <Card style={styles.teaser}>
             <MaterialCommunityIcons name="forum-outline" size={20} color={ui.accent} />

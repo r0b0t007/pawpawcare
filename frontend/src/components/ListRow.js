@@ -32,7 +32,7 @@ export default function ListRow({
       onPress={onPress}
       style={
         onPress
-          ? ({ pressed }) => [baseStyle, pressed && { backgroundColor: '#fffdf8' }, style]
+          ? ({ pressed }) => [baseStyle, pressed && { backgroundColor: ui.pressTint }, style]
           : [baseStyle, style]
       }
     >

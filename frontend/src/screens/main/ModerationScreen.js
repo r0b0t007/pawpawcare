@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { get, post, del } from '../../services/api';
 import { resolveAsset } from '../../config';
-import { ui, type, radii } from '../../theme';
+import { ui, type, radii, motion } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast } from '../../components';
 
 // Admin-only review queue (Profile → Moderation). Lists every community post
@@ -123,7 +123,7 @@ export default function ModerationScreen({ navigation }) {
       >
         <View style={styles.header}>
           <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
             onPress={() => navigation.goBack()}
           >
             <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />

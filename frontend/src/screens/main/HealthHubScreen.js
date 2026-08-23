@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TextInput, Pressable, Platform, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
@@ -14,6 +15,9 @@ import { Card, Chip, Button, Sheet, showToast } from '../../components';
 // top ("needs attention"), the upcoming schedule grouped by month, and a done
 // history. Absorbs the old Schedule lists; the per-pet tracker and medical
 // records remain reachable from each row until phase 4 folds them in fully.
+
+const ROW_OUT = FadeOut.duration(150);
+const ROW_LAYOUT = LinearTransition.duration(200);
 
 const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY',
   'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
@@ -232,8 +236,10 @@ export default function HealthHubScreen({ navigation }) {
             </Text>
             <Card style={styles.sectionCard}>
               {overdue.map((v, i) => (
-                <View
+                <Animated.View
                   key={`${v.pet.id}-${v.id}`}
+                  exiting={ROW_OUT}
+                  layout={ROW_LAYOUT}
                   style={[styles.attentionRow, i < overdue.length - 1 && styles.rowDivider]}
                 >
                   <View style={[styles.petDot, { backgroundColor: v.pet.color || ui.accentTint }]}>
@@ -248,7 +254,7 @@ export default function HealthHubScreen({ navigation }) {
                     </Text>
                   </View>
                   <Button small label="Mark done" onPress={() => markDone(v)} />
-                </View>
+                </Animated.View>
               ))}
             </Card>
           </>
@@ -289,7 +295,7 @@ export default function HealthHubScreen({ navigation }) {
                     style={({ pressed }) => [
                       styles.scheduleRow,
                       i < month.items.length - 1 && styles.rowDivider,
-                      pressed && { backgroundColor: '#fffdf8' },
+                      pressed && { backgroundColor: ui.pressTint },
                     ]}
                   >
                     <View style={styles.dayCol}>

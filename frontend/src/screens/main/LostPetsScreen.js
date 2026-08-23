@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { ui, type, PET_COLOR_PAIRS } from '../../theme';
+import { ui, type, PET_COLOR_PAIRS, motion } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast } from '../../components';
 
 // Redesign: this pushed screen is now the report/manage surface — the board
@@ -207,7 +207,7 @@ export default function LostPetsScreen({ navigation }) {
                 {r.description ? <Text style={styles.reportDesc}>{r.description}</Text> : null}
                 <Pressable
                   onPress={() => handleMarkFound(r)}
-                  style={({ pressed }) => [styles.foundBtn, pressed && { opacity: 0.85 }]}
+                  style={({ pressed }) => [styles.foundBtn, pressed && { opacity: motion.pressOpacitySoft }]}
                 >
                   <Text style={styles.foundBtnText}>Mark as found</Text>
                 </Pressable>

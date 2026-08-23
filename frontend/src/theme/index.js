@@ -26,6 +26,8 @@ export const ui = {
   faint: '#cbb897', // chevrons, dashed add-outline
   dangerText: '#93000a', // text on dangerTint
   warnText: '#7a5c00', // text on warnTint
+  pressTint: '#fffdf8', // row pressed-state background
+  dangerPressTint: '#fff7f6', // danger row pressed-state background
 };
 
 // Type scale from the spec: screen title 26/800 · card title 17–19/700 ·
@@ -101,3 +103,15 @@ export const PET_COLOR_PAIRS = [
   { bg: '#ffd6e7', fg: '#96375c' },
   { bg: '#e9e2f4', fg: '#5c4a82' },
 ];
+
+// Motion scale — animate-expo pass. Durations in ms; css strings feed
+// Reanimated CSS transitions, the bezier pairs live in components/motion.js.
+export const motion = {
+  pressScale: 0.97,
+  pressOpacity: 0.7, // bare pressables: icons, text links, back buttons
+  pressOpacitySoft: 0.85, // filled buttons, cards
+
+  duration: { press: 120, control: 200, toast: 250, sheet: 300 },
+  easeOutCss: 'cubic-bezier(0.23, 1, 0.32, 1)',
+  easeInOutCss: 'cubic-bezier(0.77, 0, 0.175, 1)',
+};

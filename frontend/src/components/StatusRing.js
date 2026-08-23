@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text, Image } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { motion } from '../theme';
 import { PET_STATUS } from './petStatus';
 
 // Pet avatar (photo or initial on the pet's identity color) with a 3px status
@@ -46,19 +48,24 @@ export default function StatusRing({
 
   if (!ring) return <View style={style}>{avatar}</View>;
 
+  // The ring color easing over (overdue -> ok after "Mark done") is the app's
+  // most meaningful state change — never an instant swap.
   return (
-    <View
+    <Animated.View
       style={[
         {
           borderWidth: 3,
           borderColor: ring,
           borderRadius: 999,
           padding: 3,
+          transitionProperty: 'borderColor',
+          transitionDuration: motion.duration.control,
+          transitionTimingFunction: motion.easeOutCss,
         },
         style,
       ]}
     >
       {avatar}
-    </View>
+    </Animated.View>
   );
 }

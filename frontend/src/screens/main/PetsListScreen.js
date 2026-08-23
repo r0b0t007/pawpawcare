@@ -1,13 +1,17 @@
 import React from 'react';
 import {
-  View, Text, FlatList, Pressable, StyleSheet, ActivityIndicator,
+  View, Text, Pressable, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { usePetsQuery, useRefetchOnFocus } from '../../hooks/usePets';
 import { resolveAsset } from '../../config';
 import { ui, type, PET_COLOR_PAIRS } from '../../theme';
-import { StatusRing, StatusPill, Button } from '../../components';
+import { StatusRing, StatusPill, Button, Skeleton } from '../../components';
+
+// Reflow only — no entering on virtualized rows (recycling makes them flicker).
+const ROW_LAYOUT = LinearTransition.duration(200);
 
 // Redesign: the whole card navigates (no "View Profile" button), status lives
 // on the ring + one pill, and delete moved off the browse path into EditPet.
@@ -83,7 +87,7 @@ export default function PetsListScreen({ navigation }) {
 
   const ListFooter = () => (
     <Pressable
-      style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: '#fffdf8' }]}
+      style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
       onPress={() => navigation.navigate('AddPet')}
     >
       <MaterialCommunityIcons name="plus" size={20} color={ui.accent} />
@@ -92,10 +96,28 @@ export default function PetsListScreen({ navigation }) {
   );
 
   if (isLoading) {
+    // Real header, skeleton cards where the data goes — no layout jump when
+    // the list lands.
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={ui.accent} />
+        <View style={styles.list}>
+          <View style={styles.headerWrap}>
+            <View>
+              <Text style={[type.screenTitle, { color: ui.ink }]}>Your pets</Text>
+              <Skeleton width={110} height={12} style={{ marginTop: 8 }} />
+            </View>
+            <Button pill icon="plus" label="Add pet" onPress={() => navigation.navigate('AddPet')} />
+          </View>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={styles.card}>
+              <Skeleton width={56} height={56} radius={28} />
+              <View style={{ flex: 1, gap: 9 }}>
+                <Skeleton width="55%" height={16} />
+                <Skeleton width="40%" height={11} />
+                <Skeleton width={82} height={22} radius={11} style={{ marginTop: 2 }} />
+              </View>
+            </View>
+          ))}
         </View>
       </SafeAreaView>
     );
@@ -114,7 +136,7 @@ export default function PetsListScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <FlatList
+      <Animated.FlatList
         data={pets}
         keyExtractor={(p) => p.id}
         renderItem={renderPet}
@@ -122,6 +144,7 @@ export default function PetsListScreen({ navigation }) {
         ListFooterComponent={ListFooter}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        itemLayoutAnimation={ROW_LAYOUT}
       />
     </SafeAreaView>
   );

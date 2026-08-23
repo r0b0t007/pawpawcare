@@ -11,7 +11,7 @@ import { pickAndUploadImage } from '../../services/imagePicker';
 import { uploadImage } from '../../services/api';
 import { track } from '../../services/analytics';
 import { resolveAsset } from '../../config';
-import { ui, type, PET_COLOR_PAIRS } from '../../theme';
+import { ui, type, PET_COLOR_PAIRS, motion } from '../../theme';
 import { Card, Chip, Button, ConfirmDialog, showToast } from '../../components';
 
 // Redesign: one screen, three chip-switched sections (Feed / Groups / Lost
@@ -253,7 +253,7 @@ export default function CommunityScreen({ navigation }) {
                     style={({ pressed }) => [
                       styles.joinBtn,
                       joined && styles.joinBtnJoined,
-                      pressed && { opacity: 0.85 },
+                      pressed && { opacity: motion.pressOpacitySoft },
                     ]}
                   >
                     <Text style={[styles.joinBtnText, joined && styles.joinBtnTextJoined]}>
@@ -301,7 +301,7 @@ export default function CommunityScreen({ navigation }) {
                     {mine ? (
                       <Pressable
                         onPress={() => handleMarkFound(report)}
-                        style={({ pressed }) => [styles.foundBtn, pressed && { opacity: 0.85 }]}
+                        style={({ pressed }) => [styles.foundBtn, pressed && { opacity: motion.pressOpacitySoft }]}
                       >
                         <Text style={styles.foundBtnText}>Mark as found</Text>
                       </Pressable>
@@ -320,7 +320,7 @@ export default function CommunityScreen({ navigation }) {
               </View>
             )}
             <Pressable
-              style={({ pressed }) => [styles.reportBtn, pressed && { backgroundColor: '#fffdf8' }]}
+              style={({ pressed }) => [styles.reportBtn, pressed && { backgroundColor: ui.pressTint }]}
               onPress={() => navigation.navigate('LostPets')}
             >
               <MaterialCommunityIcons name="bullhorn-outline" size={19} color={ui.accent} />
