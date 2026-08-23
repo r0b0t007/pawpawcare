@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // RN Modal unmounts the instant `visible` flips false, which kills any exit
 // animation. This wrapper keeps the Modal mounted for `exitDuration` ms after
@@ -23,7 +24,11 @@ export default function AnimatedModal({ visible, onRequestClose, exitDuration = 
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={onRequestClose}>
-      {typeof children === 'function' ? children(visible) : children}
+      {/* A Modal is its own native root on Android — gestures inside need
+          their own GestureHandlerRootView (nested roots are safe). */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        {typeof children === 'function' ? children(visible) : children}
+      </GestureHandlerRootView>
     </Modal>
   );
 }

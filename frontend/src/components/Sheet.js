@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -32,6 +32,15 @@ export default function Sheet({ visible, onClose, title, children, style }) {
   const fade = useSharedValue(0); // reduced-motion show/hide
   const context = useSharedValue(0);
   const entered = useRef(false);
+
+  // Stable close callback so the pan gesture is created once — rebuilding a
+  // gesture on a parent re-render can drop a drag mid-flight. Worklets capture
+  // by value, so the ref is read on the RN side, never from the worklet.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+  const requestClose = useCallback(() => onCloseRef.current?.(), []);
 
   useEffect(() => {
     if (visible) {
@@ -101,7 +110,7 @@ export default function Sheet({ visible, onClose, title, children, style }) {
                   overshootClamping: true,
                 },
                 (finished) => {
-                  if (finished) scheduleOnRN(onClose);
+                  if (finished) scheduleOnRN(requestClose);
                 }
               )
             );
@@ -116,7 +125,7 @@ export default function Sheet({ visible, onClose, title, children, style }) {
             scheduleOnRN(Haptics.impactAsync, Haptics.ImpactFeedbackStyle.Light);
           }
         }),
-    [onClose, context, translateY, height]
+    [requestClose, context, translateY, height]
   );
 
   const sheetStyle = useAnimatedStyle(() => ({
@@ -133,9 +142,14 @@ export default function Sheet({ visible, onClose, title, children, style }) {
   });
 
   return (
-    <AnimatedModal visible={visible} onRequestClose={onClose} exitDuration={motion.duration.sheet}>
+    <AnimatedModal
+      visible={visible}
+      onRequestClose={onClose}
+      exitDuration={motion.duration.sheet + 50}
+    >
       <View style={{ flex: 1, justifyContent: 'flex-end' }}>
         <Animated.View
+          pointerEvents={visible ? 'auto' : 'none'}
           style={[
             StyleSheet.absoluteFill,
             { backgroundColor: 'rgba(36, 26, 14, 0.35)' },

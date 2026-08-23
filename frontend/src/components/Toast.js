@@ -42,7 +42,7 @@ export function ToastHost() {
       if (celebrate) {
         scale.set(0.6);
         scale.set(withSpring(1, { duration: 400, dampingRatio: 0.7 }));
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       } else {
         scale.set(1);
       }
