@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { ui, type, radii } from '../../theme';
+import { ui, type, radii, motion } from '../../theme';
 import { Button } from '../../components';
 import SocialAuthButtons from '../../components/SocialAuthButtons';
 
@@ -65,7 +65,7 @@ export default function SignupScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
         >
           <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
             onPress={() => navigation.goBack()}
           >
             <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
@@ -166,7 +166,7 @@ export default function SignupScreen({ navigation }) {
           <SocialAuthButtons />
 
           <Pressable
-            style={({ pressed }) => [styles.switchLink, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.switchLink, pressed && { opacity: motion.pressOpacity }]}
             onPress={() => {
               if (error) clearError();
               navigation.navigate('Login');

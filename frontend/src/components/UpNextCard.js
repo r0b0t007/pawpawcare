@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ui, type } from '../theme';
 import Card from './Card';
@@ -11,9 +12,13 @@ import StatusRing from './StatusRing';
 //
 // item: { title, subtitle, status: 'overdue'|'due', statusLabel,
 //         avatarColor, avatarTextColor, initial, photo }
+const SWAP_IN = FadeIn.duration(200);
+const SWAP_OUT = FadeOut.duration(150);
+
 export default function UpNextCard({ item, onDone, onReschedule, style }) {
   if (!item) {
     return (
+      <Animated.View key="caught-up" entering={SWAP_IN} exiting={SWAP_OUT}>
       <Card
         padded
         style={[
@@ -40,12 +45,14 @@ export default function UpNextCard({ item, onDone, onReschedule, style }) {
           </Text>
         </View>
       </Card>
+      </Animated.View>
     );
   }
 
   const statusColor = item.status === 'overdue' ? ui.danger : ui.warnText;
 
   return (
+    <Animated.View key="task" entering={SWAP_IN} exiting={SWAP_OUT}>
     <Card padded style={[{ gap: 16 }, style]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={[type.sectionLabel, { color: ui.subtle }]}>Up next</Text>
@@ -71,5 +78,6 @@ export default function UpNextCard({ item, onDone, onReschedule, style }) {
         <Button label="Reschedule" variant="ghost" onPress={onReschedule} style={{ flex: 1 }} />
       </View>
     </Card>
+    </Animated.View>
   );
 }

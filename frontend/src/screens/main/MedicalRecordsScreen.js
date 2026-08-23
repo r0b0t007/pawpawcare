@@ -220,7 +220,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
                     style={({ pressed }) => [
                       styles.row,
                       i < documents.length - 1 && styles.rowDivider,
-                      pressed && { backgroundColor: '#fffdf8' },
+                      pressed && { backgroundColor: ui.pressTint },
                     ]}
                     onPress={() => openDocument(d)}
                   >
@@ -317,7 +317,7 @@ function Section({ title, onAdd, children }) {
 function Empty({ icon, text, onPress }) {
   return (
     <Pressable
-      style={({ pressed }) => [styles.empty, pressed && { backgroundColor: '#fffdf8' }]}
+      style={({ pressed }) => [styles.empty, pressed && { backgroundColor: ui.pressTint }]}
       onPress={onPress}
     >
       <MaterialCommunityIcons name={icon} size={20} color={ui.faint} />
@@ -443,7 +443,7 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
         autoFocus
       />
       <Pressable
-        style={({ pressed }) => [styles.pickerBtn, pressed && { backgroundColor: '#fffdf8' }]}
+        style={({ pressed }) => [styles.pickerBtn, pressed && { backgroundColor: ui.pressTint }]}
         onPress={() => setShowDate(true)}
       >
         <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={ui.accent} />
@@ -558,7 +558,7 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
         <Banner icon="alert-circle-outline" tone="danger" text="Upload failed — nothing was lost." />
       )}
       <Pressable
-        style={({ pressed }) => [styles.fileBtn, pressed && { backgroundColor: '#fffdf8' }]}
+        style={({ pressed }) => [styles.fileBtn, pressed && { backgroundColor: ui.pressTint }]}
         onPress={pick}
       >
         <MaterialCommunityIcons name={file ? 'check-circle' : 'image-plus'} size={20} color={file ? ui.success : ui.accent} />

@@ -4,6 +4,7 @@ import {
   TextInput, Platform, Share, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -22,6 +23,12 @@ import {
 // the old screen is preserved — weight add/delete, medications, foods,
 // activities, expenses, sharing (co-owners, vet links, caretaker handoff),
 // lost-pet reporting — just reorganized into the three segments.
+
+// Motion builders live at module scope — rebuilt-in-render builders cost
+// every re-render.
+const SEGMENT_IN = FadeIn.duration(150);
+const ROW_OUT = FadeOut.duration(150);
+const ROW_LAYOUT = LinearTransition.duration(200);
 
 const EXPENSE_CATEGORIES = [
   { id: 'vet', label: 'Vet', icon: 'medical-bag' },
@@ -350,7 +357,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const renderOverview = () => (
     <View>
       {activeReport && (
-        <Pressable style={({ pressed }) => [styles.lostBanner, pressed && { backgroundColor: '#fff7f6' }]} onPress={handleMarkFound}>
+        <Pressable style={({ pressed }) => [styles.lostBanner, pressed && { backgroundColor: ui.dangerPressTint }]} onPress={handleMarkFound}>
           <MaterialCommunityIcons name="map-marker-alert" size={20} color={ui.danger} />
           <View style={{ flex: 1 }}>
             <Text style={styles.lostTitle}>{pet.name} is reported lost</Text>
@@ -474,7 +481,7 @@ export default function PetProfileScreen({ navigation, route }) {
 
       {!activeReport && (
         <Pressable
-          style={({ pressed }) => [styles.reportLostBtn, pressed && { backgroundColor: '#fff7f6' }]}
+          style={({ pressed }) => [styles.reportLostBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
           onPress={() => setLostSheet(true)}
         >
           <MaterialCommunityIcons name="map-marker-alert-outline" size={17} color={ui.danger} />
@@ -494,13 +501,14 @@ export default function PetProfileScreen({ navigation, route }) {
         {upcoming.map((v) => {
           const p = vaxPill(v);
           return (
-            <ListRow
-              key={v.id}
-              title={v.name}
-              subtitle={`Due ${fullDate(v.dueDate) || '—'}`}
-              right={<StatusPill status={p.status} label={p.label} />}
-              onPress={() => navigation.navigate('VaccinationTracker', { petId })}
-            />
+            <Animated.View key={v.id} exiting={ROW_OUT} layout={ROW_LAYOUT}>
+              <ListRow
+                title={v.name}
+                subtitle={`Due ${fullDate(v.dueDate) || '—'}`}
+                right={<StatusPill status={p.status} label={p.label} />}
+                onPress={() => navigation.navigate('VaccinationTracker', { petId })}
+              />
+            </Animated.View>
           );
         })}
         <ListRow
@@ -519,13 +527,14 @@ export default function PetProfileScreen({ navigation, route }) {
           <Text style={styles.emptyRowText}>No medications yet.</Text>
         )}
         {(pet.medications || []).map((med) => (
-          <MedicationRow
-            key={med.id}
-            med={med}
-            streakLabel={medicationStreakLabel(medicationStreak(medDoseDays?.[med.id], med))}
-            onLog={() => handleLogDose(med)}
-            onDelete={() => handleDeleteMedication(med)}
-          />
+          <Animated.View key={med.id} exiting={ROW_OUT} layout={ROW_LAYOUT}>
+            <MedicationRow
+              med={med}
+              streakLabel={medicationStreakLabel(medicationStreak(medDoseDays?.[med.id], med))}
+              onLog={() => handleLogDose(med)}
+              onDelete={() => handleDeleteMedication(med)}
+            />
+          </Animated.View>
         ))}
         <AddRow label="Add medication" onPress={() => setMedSheet(true)} />
       </Card>
@@ -644,9 +653,12 @@ export default function PetProfileScreen({ navigation, route }) {
           style={styles.segmented}
         />
 
-        {segment === 'overview' && renderOverview()}
-        {segment === 'health' && renderHealth()}
-        {segment === 'notes' && renderNotes()}
+        {/* Fade only on segment switch — tabs are peers, no slide. */}
+        <Animated.View key={segment} entering={SEGMENT_IN}>
+          {segment === 'overview' && renderOverview()}
+          {segment === 'health' && renderHealth()}
+          {segment === 'notes' && renderNotes()}
+        </Animated.View>
       </ScrollView>
 
       {/* ── Sheets ── */}
@@ -914,7 +926,7 @@ export default function PetProfileScreen({ navigation, route }) {
               Shared with you{share?.owner ? ` by ${share.owner.name}` : ''}. You can view and update {pet.name}'s records.
             </Text>
             <Pressable
-              style={({ pressed }) => [styles.dangerOutlineBtn, pressed && { backgroundColor: '#fff7f6' }]}
+              style={({ pressed }) => [styles.dangerOutlineBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
               onPress={handleLeave}
             >
               <MaterialCommunityIcons name="exit-to-app" size={16} color={ui.danger} />
@@ -1039,7 +1051,7 @@ function ActivityRow({ activity }) {
 // Dashed "add" row at the bottom of a card.
 function AddRow({ label, onPress }) {
   return (
-    <Pressable style={({ pressed }) => [styles.addRow, pressed && { backgroundColor: '#fffdf8' }]} onPress={onPress}>
+    <Pressable style={({ pressed }) => [styles.addRow, pressed && { backgroundColor: ui.pressTint }]} onPress={onPress}>
       <MaterialCommunityIcons name="plus" size={17} color={ui.accent} />
       <Text style={styles.addRowText}>{label}</Text>
     </Pressable>

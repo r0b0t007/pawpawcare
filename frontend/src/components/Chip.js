@@ -1,12 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Text, Pressable } from 'react-native';
-import { ui } from '../theme';
+import Animated from 'react-native-reanimated';
+import { ui, motion } from '../theme';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // Filter/select chip: active = ink background, inactive = white + border.
+// Active flips crossfade; press gives the standard kit scale.
 export default function Chip({ label, active, onPress, style }) {
+  const [pressed, setPressed] = useState(false);
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      hitSlop={6}
+      pressRetentionOffset={16}
       style={[
         {
           paddingVertical: 8,
@@ -15,6 +24,10 @@ export default function Chip({ label, active, onPress, style }) {
           borderWidth: 1.5,
           backgroundColor: active ? ui.ink : ui.surface,
           borderColor: active ? ui.ink : ui.controlBorder,
+          transform: [{ scale: pressed ? motion.pressScale : 1 }],
+          transitionProperty: ['transform', 'backgroundColor', 'borderColor'],
+          transitionDuration: 150,
+          transitionTimingFunction: motion.easeOutCss,
         },
         style,
       ]}
@@ -28,6 +41,6 @@ export default function Chip({ label, active, onPress, style }) {
       >
         {label}
       </Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }

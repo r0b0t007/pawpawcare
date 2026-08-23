@@ -1,7 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Text, Pressable } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ui, radii } from '../theme';
+import { ui, radii, motion } from '../theme';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const VARIANTS = {
   primary: {
@@ -42,28 +45,39 @@ export default function Button({
       ? { borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14 }
       : { borderRadius: radii.control, paddingVertical: 14, paddingHorizontal: 16 };
   const fontSize = pill ? 13 : small ? 13.5 : 14;
+  // Plain-array style (not a function) so the CSS transition manager on the
+  // animated component sees the pressed change and eases the scale.
+  const [pressed, setPressed] = useState(false);
 
   return (
-    <Pressable
+    <AnimatedPressable
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      hitSlop={pill ? 6 : undefined}
+      pressRetentionOffset={16}
+      style={[
         {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 5,
           borderCurve: 'continuous',
+          transform: [{ scale: pressed && !disabled ? motion.pressScale : 1 }],
+          transitionProperty: 'transform',
+          transitionDuration: motion.duration.press,
+          transitionTimingFunction: motion.easeOutCss,
         },
         shape,
         v.container,
         disabled && { opacity: 0.5 },
-        pressed && !disabled && { opacity: 0.85 },
+        pressed && !disabled && { opacity: motion.pressOpacitySoft },
         style,
       ]}
     >
       {icon ? <MaterialCommunityIcons name={icon} size={16} color={v.text.color} /> : null}
       <Text style={[{ fontSize, lineHeight: fontSize + 4 }, v.text]}>{label}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }

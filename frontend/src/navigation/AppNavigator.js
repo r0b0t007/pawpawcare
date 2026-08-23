@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, ActivityIndicator, Platform } from 'react-native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -29,12 +29,12 @@ import MedicalRecordsScreen from '../screens/main/MedicalRecordsScreen';
 import SupportScreen from '../screens/main/SupportScreen';
 import ModerationScreen from '../screens/main/ModerationScreen';
 
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function AuthStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
@@ -45,7 +45,7 @@ function AuthStack() {
 
 function DashboardStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="Home" component={DashboardScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Reminders" component={RemindersScreen} />
@@ -56,7 +56,7 @@ function DashboardStack() {
 
 function PetsStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="PetsList" component={PetsListScreen} />
       <Stack.Screen name="PetProfile" component={PetProfileScreen} />
       <Stack.Screen name="AddPet" component={AddPetScreen} />
@@ -72,7 +72,7 @@ function PetsStack() {
 // them until phase 4 folds their content in.
 function HealthStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="HealthHub" component={HealthHubScreen} />
       <Stack.Screen name="VaccinationTracker" component={VaccinationTrackerScreen} />
       <Stack.Screen name="MedicalRecords" component={MedicalRecordsScreen} />
@@ -83,7 +83,7 @@ function HealthStack() {
 
 function CommunityStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="CommunityFeed" component={CommunityScreen} />
       <Stack.Screen name="LostPets" component={LostPetsScreen} />
     </Stack.Navigator>
@@ -92,7 +92,7 @@ function CommunityStack() {
 
 function ProfileStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false, cardStyle: { backgroundColor: ui.background } }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: ui.background } }}>
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
       <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} />
       <Stack.Screen name="Support" component={SupportScreen} />
@@ -159,7 +159,8 @@ export default function AppNavigator() {
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    // Login/logout swaps the whole tree — crossfade instead of a hard cut.
+    <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
       {user ? (
         <Stack.Screen name="Main" component={MainTabs} />
       ) : (

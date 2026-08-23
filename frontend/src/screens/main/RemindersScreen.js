@@ -3,11 +3,15 @@ import {
   View, Text, ScrollView, Pressable, StyleSheet, TextInput, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { ui, radii, type } from '../../theme';
+import { ui, radii, type, motion } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast } from '../../components';
+
+const ROW_OUT = FadeOut.duration(150);
+const ROW_LAYOUT = LinearTransition.duration(200);
 
 const TYPE_ICON = {
   vaccination: 'needle',
@@ -151,12 +155,22 @@ export default function RemindersScreen({ navigation }) {
         ) : (
           <Card>
             {reminders.map((r, i) => (
-              <View key={r.id} style={[styles.reminderRow, i > 0 && styles.rowDivider]}>
-                <View style={[styles.rIcon, { opacity: r.enabled ? 1 : 0.4 }]}>
+              <Animated.View
+                key={r.id}
+                exiting={ROW_OUT}
+                layout={ROW_LAYOUT}
+                style={[styles.reminderRow, i > 0 && styles.rowDivider]}
+              >
+                <Animated.View style={[styles.rIcon, { opacity: r.enabled ? 1 : 0.4 }, styles.toggleFade]}>
                   <MaterialCommunityIcons name={TYPE_ICON[r.type] || 'bell-outline'} size={18} color={ui.accent} />
-                </View>
+                </Animated.View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.rTitle, !r.enabled && styles.rTitleOff]} numberOfLines={1}>{r.title}</Text>
+                  <Animated.Text
+                    style={[styles.rTitle, !r.enabled && styles.rTitleOff, styles.toggleFade]}
+                    numberOfLines={1}
+                  >
+                    {r.title}
+                  </Animated.Text>
                   <Text style={styles.rSummary}>{scheduleSummary(r)}</Text>
                 </View>
                 <Switch
@@ -168,11 +182,11 @@ export default function RemindersScreen({ navigation }) {
                 <Pressable
                   onPress={() => setPendingDelete(r)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={({ pressed }) => [styles.delBtn, pressed && { opacity: 0.6 }]}
+                  style={({ pressed }) => [styles.delBtn, pressed && { opacity: motion.pressOpacity }]}
                 >
                   <MaterialCommunityIcons name="trash-can-outline" size={18} color={ui.danger} />
                 </Pressable>
-              </View>
+              </Animated.View>
             ))}
           </Card>
         )}
@@ -256,6 +270,12 @@ const styles = StyleSheet.create({
   },
   rTitle: { ...type.rowTitle, color: ui.ink },
   rTitleOff: { color: ui.sub, textDecorationLine: 'line-through' },
+  // Toggling a reminder crossfades the puck + title instead of snapping.
+  toggleFade: {
+    transitionProperty: ['opacity', 'color'],
+    transitionDuration: motion.duration.control,
+    transitionTimingFunction: motion.easeOutCss,
+  },
   rSummary: { ...type.secondary, color: ui.sub, marginTop: 1 },
   delBtn: { padding: 4 },
 });

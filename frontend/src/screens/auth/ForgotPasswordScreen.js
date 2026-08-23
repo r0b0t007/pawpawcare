@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { post } from '../../services/api';
-import { ui, type, radii } from '../../theme';
+import { ui, type, radii, motion } from '../../theme';
 import { Button, showToast } from '../../components';
 
 // Code-based password reset. Step 1 asks for the email; step 2 confirms a
@@ -109,7 +109,7 @@ export default function ForgotPasswordScreen({ navigation }) {
           keyboardShouldPersistTaps="handled"
         >
           <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
             onPress={handleBack}
           >
             <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
@@ -240,7 +240,7 @@ export default function ForgotPasswordScreen({ navigation }) {
               />
 
               <Pressable
-                style={({ pressed }) => [styles.resendLink, pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [styles.resendLink, pressed && { opacity: motion.pressOpacity }]}
                 onPress={() => sendCode({ again: true })}
                 disabled={sending}
                 hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}

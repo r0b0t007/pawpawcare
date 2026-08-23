@@ -221,7 +221,7 @@ export default function ProfileScreen({ navigation }) {
         </Card>
 
         <Pressable
-          style={({ pressed }) => [styles.logoutBtn, pressed && { backgroundColor: '#fff7f6' }]}
+          style={({ pressed }) => [styles.logoutBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
           onPress={() => setConfirmLogout(true)}
         >
           <MaterialCommunityIcons name="logout" size={18} color={ui.danger} />

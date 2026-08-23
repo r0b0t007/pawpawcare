@@ -230,7 +230,7 @@ export default function EditPetScreen({ navigation, route }) {
               Removing {pet.name} deletes their records for everyone they're shared with.
             </Text>
             <Pressable
-              style={({ pressed }) => [styles.removeBtn, pressed && { backgroundColor: '#fff7f6' }]}
+              style={({ pressed }) => [styles.removeBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
               onPress={() => setConfirmRemove(true)}
             >
               <MaterialCommunityIcons name="delete-outline" size={17} color={ui.danger} />

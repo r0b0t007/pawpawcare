@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { ui, type, radii } from '../../theme';
+import { ui, type, radii, motion } from '../../theme';
 import { Button, ConfirmDialog, showToast } from '../../components';
 
 // Account details (Profile → Edit). PATCH /users/me only accepts name / bio /
@@ -65,7 +65,7 @@ export default function AccountDetailsScreen({ navigation }) {
         >
           <View style={styles.header}>
             <Pressable
-              style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
               onPress={() => navigation.goBack()}
             >
               <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
@@ -110,7 +110,7 @@ export default function AccountDetailsScreen({ navigation }) {
           <View style={styles.dangerZone}>
             <Text style={[type.sectionLabel, styles.dangerLabel]}>Danger zone</Text>
             <Pressable
-              style={({ pressed }) => [styles.dangerRow, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [styles.dangerRow, pressed && { opacity: motion.pressOpacity }]}
               onPress={() => setConfirmDelete(true)}
               disabled={deleting}
               accessibilityRole="button"

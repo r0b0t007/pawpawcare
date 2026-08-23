@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useObserve } from '../../services/observe';
-import { ui, PET_COLOR_PAIRS } from '../../theme';
+import { ui, PET_COLOR_PAIRS, motion } from '../../theme';
 
 // Logged-out landing screen: warm hero + one primary path (Signup) and a text
 // link for returning users. Redesign direction 1g — flat surfaces, one accent.
@@ -53,14 +53,14 @@ export default function WelcomeScreen({ navigation }) {
           </View>
 
           <Pressable
-            style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: motion.pressOpacitySoft }]}
             onPress={() => navigation.navigate('Signup')}
           >
             <Text style={styles.primaryBtnText}>Get started</Text>
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [styles.loginLink, pressed && { opacity: 0.7 }]}
+            style={({ pressed }) => [styles.loginLink, pressed && { opacity: motion.pressOpacity }]}
             onPress={() => navigation.navigate('Login')}
             hitSlop={{ top: 6, bottom: 6, left: 12, right: 12 }}
           >

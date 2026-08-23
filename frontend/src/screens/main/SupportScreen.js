@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { post } from '../../services/api';
-import { ui, type, radii } from '../../theme';
+import { ui, type, radii, motion } from '../../theme';
 import { Card, ListRow, Button, showToast } from '../../components';
 
 // Help & support (Profile → Help & support). Static guide rows for now plus a
@@ -60,7 +60,7 @@ export default function SupportScreen({ navigation }) {
         >
           <View style={styles.header}>
             <Pressable
-              style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
               onPress={() => navigation.goBack()}
             >
               <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
