@@ -82,7 +82,8 @@ jobs:
 
           eas build:list --platform android --build-profile preview \
             --status finished --limit 1 --json --non-interactive > last-build.json
-          LAST="$(node -p "(require('./last-build.json')[0] || {}).runtimeVersion || ''")"
+          # eas-cli 22 moved the hash from .runtimeVersion to .fingerprint.hash
+          LAST="$(node -p "const b=(require('./last-build.json')[0]||{}); b.runtimeVersion || b.fingerprint?.hash || ''")"
 
           echo "current fingerprint : $FP"
           echo "last preview build  : ${LAST:-<none>}"
