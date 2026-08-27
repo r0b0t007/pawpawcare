@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { motion } from '../theme';
+import { EASE_OUT_CSS } from './motion';
 import { PET_STATUS } from './petStatus';
 
 // Pet avatar (photo or initial on the pet's identity color) with a 3px status
@@ -60,7 +61,7 @@ export default function StatusRing({
           padding: 3,
           transitionProperty: 'borderColor',
           transitionDuration: motion.duration.control,
-          transitionTimingFunction: motion.easeOutCss,
+          transitionTimingFunction: EASE_OUT_CSS,
         },
         style,
       ]}

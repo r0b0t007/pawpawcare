@@ -3,6 +3,7 @@ import { Text, Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ui, radii, motion } from '../theme';
+import { EASE_OUT_CSS } from './motion';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -67,7 +68,7 @@ export default function Button({
           transform: [{ scale: pressed && !disabled ? motion.pressScale : 1 }],
           transitionProperty: 'transform',
           transitionDuration: motion.duration.press,
-          transitionTimingFunction: motion.easeOutCss,
+          transitionTimingFunction: EASE_OUT_CSS,
         },
         shape,
         v.container,

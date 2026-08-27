@@ -104,14 +104,13 @@ export const PET_COLOR_PAIRS = [
   { bg: '#e9e2f4', fg: '#5c4a82' },
 ];
 
-// Motion scale — animate-expo pass. Durations in ms; css strings feed
-// Reanimated CSS transitions, the bezier pairs live in components/motion.js.
+// Motion scale — animate-expo pass. Durations in ms.
 export const motion = {
   pressScale: 0.97,
   pressOpacity: 0.7, // bare pressables: icons, text links, back buttons
   pressOpacitySoft: 0.85, // filled buttons, cards
 
   duration: { press: 120, control: 200, toast: 250, sheet: 300 },
-  easeOutCss: 'cubic-bezier(0.23, 1, 0.32, 1)',
-  easeInOutCss: 'cubic-bezier(0.77, 0, 0.175, 1)',
+  // Easings live in components/motion.js — Reanimated CSS styles need its
+  // cubicBezier objects (EASE_OUT_CSS), never a 'cubic-bezier(...)' string.
 };

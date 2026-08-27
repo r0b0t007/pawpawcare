@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Text, Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { ui, motion } from '../theme';
+import { EASE_OUT_CSS } from './motion';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -27,7 +28,7 @@ export default function Chip({ label, active, onPress, style }) {
           transform: [{ scale: pressed ? motion.pressScale : 1 }],
           transitionProperty: ['transform', 'backgroundColor', 'borderColor'],
           transitionDuration: 150,
-          transitionTimingFunction: motion.easeOutCss,
+          transitionTimingFunction: EASE_OUT_CSS,
         },
         style,
       ]}

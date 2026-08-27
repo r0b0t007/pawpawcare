@@ -60,3 +60,34 @@ describe('redesign theme tokens', () => {
     expect(type.sectionLabel.letterSpacing).toBe(1.4);
   });
 });
+
+// Regression: Reanimated's CSS engine accepts keyword strings or cubicBezier()
+// objects — a 'cubic-bezier(...)' STRING passes every static check but throws
+// "Invalid predefined timing function" at mount on device (crashed build
+// b6c78ec0 on the login screen).
+describe('motion easings', () => {
+  it('CSS easings are parametrized objects the native validator accepts', () => {
+    const { EASE_OUT_CSS, EASE_IN_OUT_CSS } = require('../motion');
+    for (const easing of [EASE_OUT_CSS, EASE_IN_OUT_CSS]) {
+      expect(typeof easing.normalize).toBe('function');
+      expect(() => easing.normalize()).not.toThrow();
+    }
+  });
+
+  it('no source file uses a cubic-bezier string as a CSS timing function', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const offenders = [];
+    const walk = (dir) => {
+      for (const name of fs.readdirSync(dir)) {
+        const p = path.join(dir, name);
+        if (fs.statSync(p).isDirectory()) walk(p);
+        else if (name.endsWith('.js') && /TimingFunction:\s*['"`]cubic-bezier/.test(fs.readFileSync(p, 'utf8'))) {
+          offenders.push(p);
+        }
+      }
+    };
+    walk(path.join(__dirname, '..', '..'));
+    expect(offenders).toEqual([]);
+  });
+});
