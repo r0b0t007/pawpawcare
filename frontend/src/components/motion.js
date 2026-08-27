@@ -1,10 +1,17 @@
-import { Easing } from 'react-native-reanimated';
+import { Easing, cubicBezier } from 'react-native-reanimated';
 
 // Shared motion ingredients (animate-expo). Springs use Apple's two designer
 // parameters (duration + dampingRatio); beziers mirror motion.easeOutCss /
 // easeInOutCss in the theme.
 export const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 export const EASE_IN_OUT = Easing.bezier(0.77, 0, 0.175, 1);
+
+// For CSS transition/animation styles ONLY. Reanimated's CSS engine accepts
+// keyword strings ('ease-out') or these cubicBezier objects — a
+// 'cubic-bezier(...)' STRING throws "Invalid predefined timing function"
+// at mount on device.
+export const EASE_OUT_CSS = cubicBezier(0.23, 1, 0.32, 1);
+export const EASE_IN_OUT_CSS = cubicBezier(0.77, 0, 0.175, 1);
 
 // Where a flick would come to rest if it kept decelerating (Apple's
 // exponential-decay form). Lets velocity decide a dismissal, not distance.

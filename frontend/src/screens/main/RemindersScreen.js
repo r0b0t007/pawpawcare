@@ -9,6 +9,7 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { ui, radii, type, motion } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast } from '../../components';
+import { EASE_OUT_CSS } from '../../components/motion';
 
 const ROW_OUT = FadeOut.duration(150);
 const ROW_LAYOUT = LinearTransition.duration(200);
@@ -274,7 +275,7 @@ const styles = StyleSheet.create({
   toggleFade: {
     transitionProperty: ['opacity', 'color'],
     transitionDuration: motion.duration.control,
-    transitionTimingFunction: motion.easeOutCss,
+    transitionTimingFunction: EASE_OUT_CSS,
   },
   rSummary: { ...type.secondary, color: ui.sub, marginTop: 1 },
   delBtn: { padding: 4 },
