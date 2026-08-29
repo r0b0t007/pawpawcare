@@ -1,0 +1,98 @@
+# IndexNow — notify Bing / Yandex / Seznam / Naver (and therefore Microsoft
+# Copilot) whenever marketing-site pages change. Google does not consume
+# IndexNow; it relies on the sitemap submitted in Search Console instead.
+#
+# Triggers on pushes to main that touch website/ (Netlify auto-deploys the
+# same commit — see docs/deploy-marketing-website), and on manual dispatch.
+# The IndexNow key is intentionally public: it is served from the site root
+# as proof of host ownership (https://pawpawcare.app/<key>.txt).
+
+name: IndexNow
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "website/**"
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "Space-separated URLs to submit (empty = every URL in sitemap.xml)"
+        required: false
+        default: ""
+
+env:
+  HOST: pawpawcare.app
+  KEY: f8b7482642c74525b9431d5804b27521
+
+jobs:
+  submit:
+    name: Submit changed URLs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      - name: Work out which URLs changed
+        id: urls
+        shell: bash
+        run: |
+          set -euo pipefail
+          sitemap_urls() { grep -o '<loc>[^<]*</loc>' website/sitemap.xml | sed 's#</\?loc>##g'; }
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "${{ github.event.inputs.urls }}" ]; then
+              urls="${{ github.event.inputs.urls }}"
+            else
+              urls="$(sitemap_urls | tr '\n' ' ')"
+            fi
+          else
+            changed="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- website/ || true)"
+            echo "Changed files:"; echo "$changed"
+            urls=""
+            full=0
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              case "$f" in
+                website/index.html)         urls="$urls https://$HOST/" ;;
+                website/*/index.html)       dir="${f#website/}"; urls="$urls https://$HOST/${dir%index.html}" ;;
+                website/*.html)             rel="${f#website/}"; urls="$urls https://$HOST/$rel" ;;
+                website/sitemap.xml|website/robots.txt|website/_headers) ;;  # not pages
+                website/fonts/*|website/images/*|website/*.png|website/*.txt) ;;  # assets don't change indexed content
+                *)                          full=1 ;;  # shared CSS/JS etc. → resubmit everything
+              esac
+            done <<< "$changed"
+            if [ "$full" = "1" ]; then urls="$(sitemap_urls | tr '\n' ' ')"; fi
+          fi
+
+          urls="$(echo $urls | tr ' ' '\n' | sort -u | tr '\n' ' ')"
+          echo "urls=$urls" >> "$GITHUB_OUTPUT"
+          echo "Will submit: ${urls:-<nothing>}"
+
+      - name: Wait for Netlify to serve the new commit
+        if: steps.urls.outputs.urls != ''
+        shell: bash
+        run: |
+          # Netlify's git deploy usually lands in ~30s. Poll the key file (always
+          # present) as a liveness check, then give the CDN a moment to settle.
+          for i in $(seq 1 12); do
+            if curl -fsS "https://$HOST/$KEY.txt" | grep -q "$KEY"; then break; fi
+            sleep 10
+          done
+          sleep 45
+
+      - name: POST to api.indexnow.org
+        if: steps.urls.outputs.urls != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          list="$(for u in ${{ steps.urls.outputs.urls }}; do printf '"%s",' "$u"; done)"
+          body="{\"host\":\"$HOST\",\"key\":\"$KEY\",\"keyLocation\":\"https://$HOST/$KEY.txt\",\"urlList\":[${list%,}]}"
+          echo "$body"
+          code="$(curl -sS -o /tmp/resp.txt -w '%{http_code}' \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            -X POST https://api.indexnow.org/indexnow --data "$body")"
+          echo "HTTP $code"; cat /tmp/resp.txt || true
+          # 200 = OK, 202 = accepted (key validation pending). Anything else is a failure.
+          case "$code" in 200|202) exit 0 ;; *) exit 1 ;; esac

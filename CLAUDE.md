@@ -14,7 +14,7 @@ Pet health management app: **`frontend/`** is an Expo SDK 57 React Native app (R
 
 ## CI/CD
 
-**GitHub Actions in `.github/workflows/` is the canonical CI/CD — do not create `.eas/workflows/`.** `ci.yml` (tests), `ota-update.yml` (EAS Update on main), `preview-build.yml` (preview branch), `production-release.yml` (version tags), `deploy-backend.yml` (SSH deploy of `backend/` to the cPanel host on merge to main — see `docs/deploy-backend.md` §7). When editing the EAS steps in these workflows, consult the `expo:expo-cicd-workflows` skill for EAS CLI semantics only — output stays in GitHub Actions.
+**GitHub Actions in `.github/workflows/` is the canonical CI/CD — do not create `.eas/workflows/`.** `ci.yml` (tests), `ota-update.yml` (EAS Update on main), `preview-build.yml` (preview branch), `production-release.yml` (version tags), `deploy-backend.yml` (SSH deploy of `backend/` to the cPanel host on merge to main — see `docs/deploy-backend.md` §7), `indexnow.yml` (pings IndexNow/Bing with changed `website/` URLs on merge to main; manual dispatch accepts a URL list). When editing the EAS steps in these workflows, consult the `expo:expo-cicd-workflows` skill for EAS CLI semantics only — output stays in GitHub Actions.
 
 ## Expo skill routing
 
