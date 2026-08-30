@@ -42,6 +42,11 @@ if ('IntersectionObserver' in window) {
     });
   }, { rootMargin: '0px 0px -8% 0px' });
   document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+  // Safety net: if the observer never fires (bfcache restore, anchor jumps, odd
+  // viewports) nothing should stay invisible.
+  setTimeout(function () {
+    document.querySelectorAll('.reveal:not(.in)').forEach(function (el) { el.classList.add('in'); });
+  }, 1500);
 } else {
   document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
 }
