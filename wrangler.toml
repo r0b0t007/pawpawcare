@@ -1,0 +1,11 @@
+# Cloudflare Pages config for the marketing site (website/), migrating off
+# Netlify. Functions live in functions/ at the repo root (sibling of the
+# static output dir) per Cloudflare Pages convention.
+#
+# Local dev:   wrangler pages dev
+# Deploy:      wrangler pages deploy
+# See docs/deploy-website-cloudflare.md for full setup + secrets.
+
+name = "pawpawcare-website"
+pages_build_output_dir = "website"
+compatibility_date = "2026-08-30"

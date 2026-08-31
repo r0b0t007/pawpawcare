@@ -58,3 +58,6 @@ google-service-account.json
 
 # Netlify CLI artifact at the repo root (can acquire auth state)
 /.netlify/
+
+# Cloudflare Wrangler local dev state
+.wrangler/

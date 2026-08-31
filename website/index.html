@@ -167,8 +167,7 @@
           <h1 id="hero-title">All your pet's health, in one&nbsp;calm&nbsp;place.</h1>
           <p class="lede">PawPawCare is the pet health tracker that remembers every shot, dose, and gram — vaccine reminders, medication schedules, weight trends, and vet records for the whole furry family. You just get the reminder at the right moment.</p>
 
-          <form class="waitlist-form" name="waitlist" method="POST" action="/thanks.html" data-netlify="true" netlify-honeypot="bot-field">
-            <input type="hidden" name="form-name" value="waitlist">
+          <form class="waitlist-form" name="waitlist" method="POST" action="/api/waitlist">
             <p class="hp-field" aria-hidden="true">
               <label>Don't fill this out: <input name="bot-field" tabindex="-1" autocomplete="off"></label>
             </p>
@@ -413,8 +412,7 @@
           <svg class="paw paw-cta" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pawprint"/></svg>
           <h2 id="waitlist-title">Be first in line for the preview.</h2>
           <p>Join the waitlist and your invite arrives with the next batch.</p>
-          <form class="waitlist-form waitlist-form-center" name="waitlist" method="POST" action="/thanks.html" data-netlify="true" netlify-honeypot="bot-field">
-            <input type="hidden" name="form-name" value="waitlist">
+          <form class="waitlist-form waitlist-form-center" name="waitlist" method="POST" action="/api/waitlist">
             <p class="hp-field" aria-hidden="true">
               <label>Don't fill this out: <input name="bot-field" tabindex="-1" autocomplete="off"></label>
             </p>
