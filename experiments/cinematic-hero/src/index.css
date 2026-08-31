@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* shadcn-style semantic tokens, mapped to the PawPawCare brand (cream + bark).
+   Tailwind v4 generates bg-background / text-foreground / text-muted-foreground
+   utilities from these @theme variables. */
+@theme {
+  --color-background: #fff8f4;
+  --color-foreground: #653e00;
+  --color-muted-foreground: #6d5b4d;
+}
+
+html,
+body {
+  margin: 0;
+}
