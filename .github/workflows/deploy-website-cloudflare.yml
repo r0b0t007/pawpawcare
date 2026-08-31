@@ -1,4 +1,5 @@
-# Deploys the marketing site (website/ + functions/) to Cloudflare Pages.
+# Deploys the marketing site (website/, including website/functions/) to
+# Cloudflare Pages.
 #
 # NOT active until the repo secrets below exist and DNS points pawpawcare.app
 # at Cloudflare Pages — see docs/deploy-website-cloudflare.md. Netlify remains
@@ -11,7 +12,6 @@ on:
     branches: [main]
     paths:
       - "website/**"
-      - "functions/**"
       - "wrangler.toml"
   workflow_dispatch:
 
@@ -21,6 +21,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      # `wrangler pages deploy` only picks up a Functions route if it finds a
+      # pre-built _worker.js in the deploy directory — it does NOT bundle
+      # website/functions/ itself. Build it explicitly first (verified: a
+      # deploy without this step silently serves 200 instead of routing to
+      # the Function at all).
+      - name: Build Pages Functions
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages functions build website/functions
+            --outdir website/_worker.js
+            --output-routes-path website/_routes.json
+            --compatibility-date=2026-08-30
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

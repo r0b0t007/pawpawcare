@@ -16,7 +16,7 @@ you want a slower rollout.
 
 ## What's already built (this branch)
 
-- `functions/api/waitlist.js` — Pages Function that replaces Netlify Forms.
+- `website/functions/api/waitlist.js` — Pages Function that replaces Netlify Forms.
   Validates the honeypot + email server-side, then emails a notification via
   [Resend](https://resend.com) and redirects to `/thanks.html` (same UX as
   before, no JS required). Tested locally with `wrangler pages dev` against
@@ -32,9 +32,23 @@ you want a slower rollout.
   valid header rules").
 - `.github/workflows/deploy-website-cloudflare.yml` — mirrors the existing
   `deploy-backend.yml`/`indexnow.yml` pattern: deploys on push to `main`
-  touching `website/**` or `functions/**`. **Disabled until you add the two
-  repo secrets in step 5** (it will fail loudly otherwise, which is fine —
-  nothing merges to `main` until then anyway).
+  touching `website/**`. **Disabled until you add the two repo secrets in
+  step 5** (it will fail loudly otherwise, which is fine — nothing merges to
+  `main` until then anyway).
+
+**Gotcha found while testing against the real Cloudflare account (not just
+`wrangler pages dev`):** `wrangler pages deploy <dir>` does **not** bundle
+`<dir>/functions/` itself — it only routes to a Function if a pre-built
+`_worker.js` already sits in `<dir>`. Deploying without building first
+silently "succeeds" and serves the Function's own path as a plain 200
+static-asset response instead of running it (confirmed: `GET /api/waitlist`
+returned `200` instead of the Function's `302`). The fix is to always run
+`wrangler pages functions build` immediately before `wrangler pages deploy`
+— both the manual command below and the CI workflow do this. Also:
+`website/functions/` must live **inside** the deployed directory (not at the
+repo root) — the repo-root convention only applies to Cloudflare's own
+git-integrated dashboard builds and to `wrangler pages dev`'s
+`pages_build_output_dir` resolution, not to direct CLI deploys.
 
 ## Manual steps (in order)
 
@@ -79,7 +93,7 @@ Function) are separate — you need both:
 gh secret set CLOUDFLARE_API_TOKEN      # from dash.cloudflare.com/profile/api-tokens, "Edit Cloudflare Workers" template
 gh secret set CLOUDFLARE_ACCOUNT_ID     # from the Cloudflare dashboard sidebar
 
-# Cloudflare Pages Function secrets (used by functions/api/waitlist.js)
+# Cloudflare Pages Function secrets (used by website/functions/api/waitlist.js)
 wrangler pages secret put RESEND_API_KEY   --project-name=pawpawcare-website
 wrangler pages secret put WAITLIST_FROM    --project-name=pawpawcare-website   # e.g. "PawPawCare <waitlist@pawpawcare.app>"
 wrangler pages secret put WAITLIST_TO      --project-name=pawpawcare-website   # inbox that receives each signup
@@ -87,12 +101,18 @@ wrangler pages secret put WAITLIST_TO      --project-name=pawpawcare-website   #
 
 ### 6. First deploy (manual, to test before wiring CI)
 
+Build the Function bundle, then deploy — **both commands, every time** (see
+the gotcha above):
+
 ```
+wrangler pages functions build website/functions --outdir website/_worker.js --output-routes-path website/_routes.json --compatibility-date=2026-08-30
 wrangler pages deploy website --project-name=pawpawcare-website --branch=main
 ```
 
 This prints a `*.pages.dev` preview URL. Test the waitlist form there end to
-end before touching DNS.
+end before touching DNS — this repo's own test run confirmed all four paths
+(valid email, honeypot, invalid email, missing secrets) behave correctly
+against the live Cloudflare project, not just `wrangler pages dev`.
 
 ### 7. Add the custom domain
 

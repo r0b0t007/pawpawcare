@@ -1,9 +1,14 @@
-# Cloudflare Pages config for the marketing site (website/), migrating off
-# Netlify. Functions live in functions/ at the repo root (sibling of the
-# static output dir) per Cloudflare Pages convention.
+# Cloudflare Pages config for the marketing site. Functions live in
+# website/functions/ (INSIDE the deployed directory) because
+# `wrangler pages deploy <dir>` resolves Functions relative to <dir> itself,
+# not the repo root — that repo-root convention only applies to Cloudflare's
+# own git-integrated dashboard builds, and to `wrangler pages dev` when it
+# reads pages_build_output_dir from this file. `pages deploy` does NOT read
+# pages_build_output_dir in this Wrangler version (4.127.1) - always pass the
+# directory explicitly:
 #
-# Local dev:   wrangler pages dev
-# Deploy:      wrangler pages deploy
+# Local dev:   wrangler pages dev            (reads pages_build_output_dir below)
+# Deploy:      wrangler pages deploy website --project-name=pawpawcare-website --branch=main
 # See docs/deploy-website-cloudflare.md for full setup + secrets.
 
 name = "pawpawcare-website"
