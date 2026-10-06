@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\RefreshToken;
 use App\Models\User;
 use App\Services\ReminderScheduler;
+use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,6 +26,8 @@ class UserController extends Controller
         ]);
 
         $user = $request->user();
+
+        Uploads::assertUsableUrl($data['avatar_url'] ?? null, [$user->id], $user->avatar_url, 'avatar_url');
 
         // Mirror the previous backend: only apply provided, non-null fields.
         foreach (['name', 'bio', 'avatar_url'] as $field) {
@@ -73,9 +75,10 @@ class UserController extends Controller
             'deletion_requested_at' => now(),
         ])->save();
 
-        // Kill every session and stop push notifications right away.
-        RefreshToken::where('user_id', $user->id)->delete();
-        $user->deviceTokens()->delete();
+        // Kill every session — refresh tokens and live access tokens, which
+        // would otherwise revive if the user logs back in during the grace
+        // period — and stop push notifications right away.
+        $user->revokeAllSessions();
 
         return response()->json([
             'status' => 'deletion_scheduled',

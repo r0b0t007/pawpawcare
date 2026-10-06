@@ -63,6 +63,22 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // Login, per source network. One IPv6 subscriber holds a whole /64, so
+        // keying on the full address would hand them 2^64 separate budgets.
+        // (The per-account failure budget lives in AuthController::login.)
+        RateLimiter::for('login', function (Request $request) {
+            $ip = (string) $request->ip();
+            // IPv4-mapped (::ffff:a.b.c.d, from some dual-stack sockets) is
+            // plain IPv4 — its /64 would lump every IPv4 client together.
+            if (str_starts_with(strtolower($ip), '::ffff:') && filter_var(substr($ip, 7), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                $ip = substr($ip, 7);
+            } elseif (str_contains($ip, ':') && ($bin = @inet_pton($ip)) !== false) {
+                $ip = inet_ntop(substr($bin, 0, 8).str_repeat("\0", 8));
+            }
+
+            return Limit::perMinute(20)->by('login-ip|'.$ip);
+        });
+
         // Support inbox: 5/hour per authenticated user.
         RateLimiter::for('support', function (Request $request) {
             return Limit::perHour(5)->by('support|'.($request->user()?->id ?? $request->ip()));

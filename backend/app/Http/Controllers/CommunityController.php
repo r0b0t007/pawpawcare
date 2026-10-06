@@ -6,6 +6,7 @@ use App\Models\Comment;
 use App\Models\Group;
 use App\Models\Post;
 use App\Models\PostReport;
+use App\Support\Uploads;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,6 +44,8 @@ class CommunityController extends Controller
             'image_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
             'group_id' => 'sometimes|nullable|string|exists:groups,id',
         ]);
+
+        Uploads::assertUsableUrl($data['image_url'] ?? null, [$request->user()->id], null, 'image_url');
 
         $post = Post::create(array_merge($data, ['author_id' => $request->user()->id]));
         $post->load(['author', 'pawedBy']);

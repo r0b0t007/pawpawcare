@@ -2,9 +2,15 @@
 
 namespace App\Support;
 
+use App\Models\LostPetReport;
+use App\Models\Pet;
+use App\Models\Post;
+use App\Models\Upload;
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class Uploads
 {
@@ -18,13 +24,38 @@ class Uploads
      * bytes are a real image) and store it on the public disk. Returns the
      * relative /storage/... url. Aborts (422) if the file isn't a valid image.
      */
-    public static function storeImage(UploadedFile $file, string $dir = 'uploads'): string
+    public static function storeImage(UploadedFile $file, string $ownerId): string
     {
         [$binary, $ext] = self::encodeImage($file);
-        $path = self::randomPath($dir, $ext);
+        $path = self::randomPath('uploads', $ext);
         Storage::disk('public')->put($path, $binary);
+        Upload::create(['path' => $path, 'user_id' => $ownerId]);
 
         return '/storage/'.$path;
+    }
+
+    /**
+     * Guard for every client-supplied image URL field (avatars, post images,
+     * lost-pet photos). Accepts an external http(s) URL, the field's current
+     * value unchanged, or a `/storage/...` upload made by one of $uploaderIds.
+     * Anything else — another user's upload, a hand-written or traversal-shaped
+     * path — is a 422, so a record can never point at a file its owner may not
+     * delete.
+     *
+     * @param  list<string>  $uploaderIds
+     */
+    public static function assertUsableUrl(?string $url, array $uploaderIds, ?string $current, string $field): void
+    {
+        if ($url === null || $url === '' || $url === $current || preg_match('#^https?://#i', $url)) {
+            return;
+        }
+
+        $path = self::pathFromUrl($url);
+        $owned = $path && Upload::where('path', $path)->whereIn('user_id', $uploaderIds)->exists();
+
+        if (! $owned) {
+            throw ValidationException::withMessages([$field => 'That image is not one of your uploads.']);
+        }
     }
 
     // ── Private files (medical documents) ────────────────────────────────────
@@ -53,22 +84,53 @@ class Uploads
 
     // ── Public-disk path helpers (used by the prune command) ─────────────────
 
-    /** Extract the public-disk path from a managed /storage/... url (or null). */
+    /**
+     * Extract the public-disk path from a managed /storage/... url, or null.
+     * Only the shape the app generates is managed — a 40-char random name in
+     * uploads/ (storeImage() today; Laravel's hashName() for older uploads,
+     * whose extension could be e.g. .jpeg or .bmp). Anything else (external,
+     * hand-written, traversal-shaped) is left alone.
+     */
     public static function pathFromUrl(?string $url): ?string
     {
-        if (! $url || ! str_starts_with($url, '/storage/')) {
-            return null; // external or non-managed URL — leave it alone
+        if (! $url || ! preg_match('#^/storage/(uploads/[A-Za-z0-9]{40}\.[A-Za-z0-9]{2,5})$#', $url, $m)) {
+            return null;
         }
 
-        return substr($url, strlen('/storage/'));
+        return $m[1];
     }
 
-    /** Delete the file behind a managed /storage/... url, if any. */
-    public static function deleteByUrl(?string $url): void
+    /**
+     * Best-effort removal of a managed upload once nothing references it any
+     * more. Call only after the owning write (updated/deleted hooks), so the
+     * changed record no longer points at the file. Files with no ownership row
+     * (pre-dating the uploads table) are left to `uploads:prune`. Never throws:
+     * a cleanup failure must not block deleting or editing the record.
+     */
+    public static function deleteIfOrphaned(?string $url): void
     {
         $path = self::pathFromUrl($url);
-        if ($path) {
+        if (! $path) {
+            return;
+        }
+
+        try {
+            if (! Upload::where('path', $path)->exists()) {
+                return;
+            }
+
+            $stillReferenced = User::where('avatar_url', $url)->exists()
+                || Pet::where('avatar_url', $url)->exists()
+                || Post::where('image_url', $url)->exists()
+                || LostPetReport::where('photo_url', $url)->exists();
+            if ($stillReferenced) {
+                return;
+            }
+
             Storage::disk('public')->delete($path);
+            Upload::where('path', $path)->delete();
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

@@ -9,6 +9,7 @@ use App\Models\Pet;
 use App\Models\Vaccination;
 use App\Models\WeightLog;
 use App\Services\ReminderScheduler;
+use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -43,6 +44,8 @@ class PetController extends Controller
             'activity_level' => 'sometimes|nullable|string|max:30',
         ]);
 
+        Uploads::assertUsableUrl($data['avatar_url'] ?? null, [$request->user()->id], null, 'avatar_url');
+
         $pet = Pet::create(array_merge($data, ['owner_id' => $request->user()->id]));
 
         // Seed the weight history so the tracker and the profile agree from day one.
@@ -76,6 +79,9 @@ class PetController extends Controller
             'heart_rate' => 'sometimes|nullable|integer',
             'activity_level' => 'sometimes|nullable|string|max:30',
         ]);
+
+        // Any co-owner may set the shared pet's photo from their own uploads.
+        Uploads::assertUsableUrl($data['avatar_url'] ?? null, $pet->participantIds(), $pet->avatar_url, 'avatar_url');
 
         $oldWeight = $pet->weight;
 

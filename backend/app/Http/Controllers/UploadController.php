@@ -21,6 +21,7 @@ class UploadController extends Controller
             'file' => 'required|file|image|max:5120', // 5 MB; `image` excludes SVG by default
         ]);
 
-        return response()->json(['url' => Uploads::storeImage($request->file('file'), 'uploads')], 201);
+        // Recorded against the uploader: only they can attach it to a record.
+        return response()->json(['url' => Uploads::storeImage($request->file('file'), $request->user()->id)], 201);
     }
 }

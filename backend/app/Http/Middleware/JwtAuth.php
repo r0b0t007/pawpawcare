@@ -32,6 +32,12 @@ class JwtAuth
             return response()->json(['detail' => 'User not found'], 401);
         }
 
+        // Revoked by User::revokeAllSessions() (password reset, social-link
+        // takeover). Tokens minted before `ver` existed count as version 0.
+        if ((int) ($payload['ver'] ?? 0) !== (int) $user->token_version) {
+            return response()->json(['detail' => 'Invalid or expired access token'], 401);
+        }
+
         $request->setUserResolver(fn () => $user);
 
         return $next($request);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LostPetReport;
 use App\Models\Pet;
 use App\Models\Post;
+use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -55,6 +56,8 @@ class LostPetController extends Controller
 
         $report = LostPetReport::where('pet_id', $pet->id)->where('status', 'active')->first();
         $isNew = ! $report;
+
+        Uploads::assertUsableUrl($data['photo_url'] ?? null, $pet->participantIds(), $report?->photo_url, 'photo_url');
 
         $report ??= new LostPetReport(['pet_id' => $pet->id, 'reported_by' => $request->user()->id, 'status' => 'active']);
         $report->fill($data);

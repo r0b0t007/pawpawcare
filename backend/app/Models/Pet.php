@@ -21,16 +21,17 @@ class Pet extends Model
 
     protected static function booted(): void
     {
-        // Delete the old avatar file when it's replaced or cleared.
-        static::updating(function (Pet $pet) {
-            if ($pet->isDirty('avatar_url')) {
-                Uploads::deleteByUrl($pet->getOriginal('avatar_url'));
+        // Delete the old avatar file once it's been replaced or cleared. Runs
+        // after the write so this row no longer references the file.
+        static::updated(function (Pet $pet) {
+            if ($pet->wasChanged('avatar_url')) {
+                Uploads::deleteIfOrphaned($pet->getOriginal('avatar_url'));
             }
         });
 
-        static::deleting(function (Pet $pet) {
-            Uploads::deleteByUrl($pet->avatar_url);
+        static::deleted(fn (Pet $pet) => Uploads::deleteIfOrphaned($pet->avatar_url));
 
+        static::deleting(function (Pet $pet) {
             // DB-level FK cascades bypass Eloquent events, so clean up the lost-pet
             // broadcast posts here before the pet (and its reports) are removed.
             $postIds = $pet->lostPetReports()->whereNotNull('post_id')->pluck('post_id');
@@ -77,6 +78,15 @@ class Pet extends Model
     {
         return $this->belongsToMany(User::class, 'pet_members')
             ->withPivot('role', 'created_at');
+    }
+
+    /** @return list<string> the owner's and every co-owner's user id */
+    public function participantIds(): array
+    {
+        return array_values(array_unique([
+            $this->owner_id,
+            ...$this->members()->pluck('users.id')->all(),
+        ]));
     }
 
     public function invites(): HasMany

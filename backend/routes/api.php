@@ -9,6 +9,7 @@ use App\Http\Controllers\CommunityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\GamificationController;
 use App\Http\Controllers\LostPetController;
@@ -50,7 +51,7 @@ Route::get('/care/{pet}', [CareController::class, 'page'])
 // ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
 Route::middleware('throttle:20,1')->group(function () {
     Route::post('/auth/signup', [AuthController::class, 'signup']);
-    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('/auth/google', [AuthController::class, 'google']);
     Route::post('/auth/apple', [AuthController::class, 'apple']);
     Route::post('/auth/refresh', [AuthController::class, 'refresh']);
@@ -77,6 +78,13 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
     Route::patch('/users/me', [UserController::class, 'update']);
     // GDPR deletion: disables now, purges after the 30-day grace period.
     Route::delete('/users/me', [UserController::class, 'destroy'])->middleware('throttle:5,60');
+
+    // Email ownership (emailed 6-digit code). Required before pet invites —
+    // which are addressed by email alone — can be seen or accepted.
+    Route::post('/users/me/email-verification', [EmailVerificationController::class, 'send'])
+        ->middleware('throttle:5,60,email-verify-send:');
+    Route::post('/users/me/email-verification/confirm', [EmailVerificationController::class, 'confirm'])
+        ->middleware('throttle:10,60,email-verify-confirm:');
 
     // Export center — full health-record history as CSV/PDF, free forever.
     // Named limiter (see AppServiceProvider): 10/hour per user.

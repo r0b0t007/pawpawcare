@@ -22,14 +22,20 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 
 class AuthController extends Controller
 {
+    /** Failed password logins allowed per account per window, from any IPs. */
+    private const LOGIN_FAILURES_PER_WINDOW = 10;
+
+    private const LOGIN_FAILURE_WINDOW_SECONDS = 900;
+
     public function signup(Request $request): JsonResponse
     {
         $data = $request->validate([
             'name' => 'required|string|min:1|max:100',
-            'email' => 'required|email|max:255',
+            'email' => 'required|email|ascii|max:255',
             'password' => 'required|string|min:6',
         ]);
 
@@ -49,15 +55,32 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email' => 'required|email',
+            'email' => 'required|email|ascii|max:255',
             'password' => 'required|string',
         ]);
+
+        // Per-account failure budget, independent of source address: the
+        // route's per-IP throttle alone lets a caller with many addresses (an
+        // IPv6 /64, a proxy pool) guess one account's password without limit.
+        // Counted for unknown emails too, so a lockout reveals nothing.
+        // The attempt is counted BEFORE the (slow) bcrypt check, so a parallel
+        // burst can't all pass the check at once; a success clears it.
+        $failKey = self::loginFailKey($data['email']);
+        $locked = 'Too many failed sign-in attempts for this account. Try again in 15 minutes or reset your password.';
+        if (RateLimiter::tooManyAttempts($failKey, self::LOGIN_FAILURES_PER_WINDOW)) {
+            abort(429, $locked);
+        }
+        if (RateLimiter::hit($failKey, self::LOGIN_FAILURE_WINDOW_SECONDS) > self::LOGIN_FAILURES_PER_WINDOW) {
+            abort(429, $locked);
+        }
 
         $user = User::where('email', $data['email'])->first();
 
         if (! $user || ! Hash::check($data['password'], $user->hashed_password)) {
             abort(401, 'Invalid email or password');
         }
+
+        RateLimiter::clear($failKey);
 
         $reactivated = $this->reactivateOrRejectDisabled($user);
 
@@ -164,14 +187,21 @@ class AuthController extends Controller
             abort(401, 'Refresh token expired or revoked');
         }
 
-        $stored->update(['revoked' => true]);
+        // Consume atomically: of two parallel refreshes with one token, only
+        // the request that flips `revoked` gets a new pair.
+        $consumed = RefreshToken::where('id', $stored->id)->where('revoked', false)->update(['revoked' => true]);
+        if ($consumed !== 1) {
+            abort(401, 'Refresh token expired or revoked');
+        }
 
         $userId = $payload['sub'];
         $user = User::find($userId);
 
         // Disabled accounts (banned or pending deletion) can't mint new
-        // sessions by refreshing — reactivation only happens via login.
-        if (! $user || ! $user->is_active) {
+        // sessions by refreshing — reactivation only happens via login. A
+        // token minted before User::revokeAllSessions() is dead too, even if
+        // it slipped past the refresh-token delete.
+        if (! $user || ! $user->is_active || (int) ($payload['ver'] ?? 0) !== (int) $user->token_version) {
             abort(401, 'Invalid refresh token');
         }
 
@@ -198,7 +228,7 @@ class AuthController extends Controller
     public function forgotPassword(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email' => 'required|email|max:255',
+            'email' => 'required|email|ascii|max:255',
         ]);
 
         // Pending-deletion accounts may still reset: "log back in to cancel
@@ -245,7 +275,7 @@ class AuthController extends Controller
     public function resetPassword(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'email' => 'required|email|max:255',
+            'email' => 'required|email|ascii|max:255',
             'code' => 'required|string|max:10',
             'password' => 'required|string|min:8',
         ]);
@@ -265,33 +295,40 @@ class AuthController extends Controller
                 ->first()
             : null;
 
-        if (! $record || ! Hash::check($data['code'], $record->code_hash)) {
-            if ($record) {
-                // Per-code attempt cap: five wrong guesses burn the code, so
-                // brute-forcing the 6-digit space can't be done by IP rotation.
-                // Increment and burn are both DB-side conditionals so parallel
-                // guesses can't each read a stale count and slip past the cap.
-                $record->increment('attempts');
-                PasswordResetCode::where('id', $record->id)
-                    ->where('attempts', '>=', 5)
-                    ->whereNull('used_at')
-                    ->update(['used_at' => now()]);
-            }
+        // Per-code attempt cap: at most five comparisons ever run against one
+        // code. The attempt is reserved with one conditional UPDATE *before*
+        // the compare, so parallel guesses can't each read a stale count.
+        $reserved = $record
+            ? PasswordResetCode::where('id', $record->id)
+                ->whereNull('used_at')
+                ->where('attempts', '<', 5)
+                ->increment('attempts')
+            : 0;
+
+        if ($reserved !== 1 || ! Hash::check($data['code'], $record->code_hash)) {
             abort(400, 'Invalid or expired code');
         }
 
-        $record->update(['used_at' => now()]);
+        // Single-use: only the request that marks it used resets the password.
+        if (PasswordResetCode::where('id', $record->id)->whereNull('used_at')->update(['used_at' => now()]) !== 1) {
+            abort(400, 'Invalid or expired code');
+        }
         $user->update(['hashed_password' => Hash::make($data['password'])]);
 
-        // Completing a reset proves inbox ownership — cancel a pending
-        // self-deletion so the user can simply log in with the new password.
+        // Completing a reset proves inbox ownership.
+        $user->forceFill(['email_verified_at' => $user->email_verified_at ?? now()])->save();
+
+        // ...so also cancel a pending self-deletion: the user can simply log
+        // in with the new password.
         if (! $user->is_active && $user->deletion_requested_at !== null) {
             $user->forceFill(['is_active' => true, 'deletion_requested_at' => null])->save();
         }
 
-        // Kill every existing session: a stolen refresh token must die with
-        // the old password.
-        RefreshToken::where('user_id', $user->id)->delete();
+        // Kill every existing session: stolen refresh tokens, live access
+        // tokens and push bindings must all die with the old password.
+        $user->revokeAllSessions();
+        // The lockout message tells users to reset; a reset must lift it.
+        RateLimiter::clear(self::loginFailKey($user->email));
 
         return response()->json(['status' => 'ok']);
     }
@@ -420,8 +457,21 @@ class AuthController extends Controller
      */
     private function loginSocialUser(string $provider, string $providerId, ?string $email, bool $emailVerified, ?string $name): array
     {
-        // 1) Known provider identity → that user.
+        // Every other entry point is ASCII-only (the `ascii` rule): production
+        // MySQL compares emails accent-insensitively, so `bob@exämple.com`
+        // would match `bob@example.com`. Never link or claim with such an
+        // address — the account gets the no-reply placeholder instead.
+        if ($email !== null && preg_match('/[^\x21-\x7E]/', $email)) {
+            $email = null;
+        }
+
+        // 1) Known provider identity → that user. If the provider vouches for
+        //    the exact stored address, that proves inbox ownership too.
         $user = User::where('provider', $provider)->where('provider_id', $providerId)->first();
+        if ($user && ! $user->email_verified_at && $email && $emailVerified
+            && strtolower($user->email) === strtolower($email)) {
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
 
         // 2) A provider-verified email that matches an existing account links to
         //    it. Verified is essential — it proves the provider confirmed
@@ -429,6 +479,10 @@ class AuthController extends Controller
         //    asserting their address.
         if (! $user && $email && $emailVerified) {
             $existing = User::where('email', $email)->first();
+            // Byte-exact backstop on top of the collation-dependent lookup.
+            if ($existing && strtolower($existing->email) !== strtolower($email)) {
+                $existing = null;
+            }
             if ($existing) {
                 if ($existing->provider === $provider && $existing->provider_id !== $providerId) {
                     // Already bound to a *different* identity from this provider.
@@ -445,15 +499,17 @@ class AuthController extends Controller
                 // verifies email ownership, so a matching password row may have
                 // been created by someone who does NOT control this inbox (account
                 // pre-hijack). The provider has now proven ownership, so it wins
-                // the account: we null the password and revoke every existing
-                // refresh token, evicting a pre-registrant who still holds a
-                // password or session. A legitimate password owner simply resets.
+                // the account: we null the password and revoke every credential
+                // issued so far — refresh tokens, live access tokens and push
+                // devices — evicting a pre-registrant who still holds a password
+                // or session. A legitimate password owner simply resets.
                 $existing->forceFill([
                     'provider' => $provider,
                     'provider_id' => $providerId,
                     'hashed_password' => null,
+                    'email_verified_at' => $existing->email_verified_at ?? now(),
                 ])->save();
-                RefreshToken::where('user_id', $existing->id)->delete();
+                $existing->revokeAllSessions();
                 $user = $existing;
             }
         }
@@ -465,7 +521,7 @@ class AuthController extends Controller
         if (! $user) {
             $useEmail = $email && $emailVerified && ! User::where('email', $email)->exists();
             try {
-                return [User::create([
+                $created = User::create([
                     'name' => $name ?: 'PawPaw friend',
                     'email' => $useEmail ? $email : $provider.'_'.$providerId.'@users.noreply.pawpawcare.app',
                     'hashed_password' => null,
@@ -475,7 +531,13 @@ class AuthController extends Controller
                     // default only applies on reload, so the disabled-account check
                     // below would otherwise see null and 403 every new sign-in.
                     'is_active' => true,
-                ]), false];
+                ]);
+                if ($useEmail) {
+                    // The provider vouched for this address.
+                    $created->forceFill(['email_verified_at' => now()])->save();
+                }
+
+                return [$created, false];
             } catch (UniqueConstraintViolationException $e) {
                 // A concurrent first sign-in for the same identity won the race
                 // and inserted the row between our lookup and insert. Resolve to
@@ -494,11 +556,16 @@ class AuthController extends Controller
         return [$user, $reactivated];
     }
 
+    private static function loginFailKey(string $email): string
+    {
+        return 'login-fail|'.sha1(strtolower(trim($email)));
+    }
+
     /** Mint an access + refresh token pair and persist the refresh token. */
     private function issueTokens(User $user): array
     {
-        $access = JwtService::createAccessToken($user->id);
-        [$refresh, $expiresAt] = JwtService::createRefreshToken($user->id);
+        $access = JwtService::createAccessToken($user->id, (int) $user->token_version);
+        [$refresh, $expiresAt] = JwtService::createRefreshToken($user->id, (int) $user->token_version);
 
         RefreshToken::create([
             'user_id' => $user->id,
