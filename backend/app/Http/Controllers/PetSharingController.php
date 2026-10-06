@@ -28,7 +28,7 @@ class PetSharingController extends Controller
         $pet = $this->ownedPetOr404($request, $petId);
 
         $data = $request->validate([
-            'email' => 'required|email|max:255',
+            'email' => 'required|email|ascii|max:255',
         ]);
         $email = strtolower(trim($data['email']));
 
@@ -103,14 +103,26 @@ class PetSharingController extends Controller
 
     // ── Invitee-side: respond to invitations addressed to me ────────────────
 
-    /** Pending invitations addressed to the current user's email. */
+    /**
+     * Pending invitations addressed to the current user's email — only once
+     * they've proven they own it. Signup doesn't verify the address, so
+     * without this anyone could register an invitee's email first and claim
+     * their invite (and with it co-owner access to the pet's records).
+     */
     public function listInvites(Request $request): JsonResponse
     {
+        if (! $request->user()->hasVerifiedEmail()) {
+            return response()->json([]);
+        }
+
+        $email = $request->user()->email;
         $invites = PetInvite::with(['pet', 'inviter'])
-            ->whereRaw('LOWER(email) = ?', [strtolower($request->user()->email)])
+            ->whereRaw('LOWER(email) = ?', [strtolower($email)])
             ->where('status', 'pending')
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->filter(fn (PetInvite $i) => self::sameEmail($i->email, $email))
+            ->values();
 
         return response()->json($invites->map->toApi());
     }
@@ -121,8 +133,12 @@ class PetSharingController extends Controller
         $user = $request->user();
         $invite = $this->myPendingInviteOr404($inviteId, $user);
 
-        $invite->status = 'accepted';
-        $invite->save();
+        // Atomic: if the owner cancelled (deleted) the invite meanwhile, this
+        // flips no row and no membership is granted.
+        $accepted = PetInvite::where('id', $invite->id)->where('status', 'pending')->update(['status' => 'accepted']);
+        if ($accepted !== 1) {
+            abort(404, 'Invite not found');
+        }
 
         // Idempotent: re-accepting (or owning) won't create a duplicate row.
         $pet = Pet::find($invite->pet_id);
@@ -185,14 +201,28 @@ class PetSharingController extends Controller
 
     private function myPendingInviteOr404(string $inviteId, User $user): PetInvite
     {
+        if (! $user->hasVerifiedEmail()) {
+            abort(403, 'Confirm your email address to respond to invitations');
+        }
+
         $invite = PetInvite::where('id', $inviteId)
             ->whereRaw('LOWER(email) = ?', [strtolower($user->email)])
             ->where('status', 'pending')
             ->first();
-        if (! $invite) {
+        if (! $invite || ! self::sameEmail($invite->email, $user->email)) {
             abort(404, 'Invite not found');
         }
 
         return $invite;
+    }
+
+    /**
+     * Byte-exact (case-insensitive) email match. The SQL `LOWER(email) = ?`
+     * runs under the production collation, which also folds accents — so a
+     * verified `bob@exämple.com` would match an invite for `bob@example.com`.
+     */
+    private static function sameEmail(string $a, string $b): bool
+    {
+        return hash_equals(strtolower($a), strtolower($b));
     }
 }

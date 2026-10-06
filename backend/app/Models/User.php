@@ -24,10 +24,11 @@ class User extends Model
 
     protected static function booted(): void
     {
-        // Delete the old avatar file when it's replaced or cleared.
-        static::updating(function (User $user) {
-            if ($user->isDirty('avatar_url')) {
-                Uploads::deleteByUrl($user->getOriginal('avatar_url'));
+        // Delete the old avatar file once it's been replaced or cleared. Runs
+        // after the write so this row no longer references the file.
+        static::updated(function (User $user) {
+            if ($user->wasChanged('avatar_url')) {
+                Uploads::deleteIfOrphaned($user->getOriginal('avatar_url'));
             }
         });
     }
@@ -48,7 +49,29 @@ class User extends Model
         'deletion_requested_at' => 'datetime',
         // Assigned explicitly in UserController::update, not mass-assigned.
         'engagement_pushes_enabled' => 'boolean',
+        // Neither is fillable: bumped by revokeAllSessions() / set by the
+        // email-verification, password-reset and social-link flows (forceFill).
+        'token_version' => 'integer',
+        'email_verified_at' => 'datetime',
     ];
+
+    /**
+     * Kill every credential issued so far: refresh tokens, all outstanding
+     * access tokens (via the `ver` claim JwtAuth checks), and push-device
+     * bindings. Used whenever control of the account changes hands.
+     */
+    public function revokeAllSessions(): void
+    {
+        // DB-side increment: concurrent revocations can't collapse into one.
+        $this->increment('token_version');
+        RefreshToken::where('user_id', $this->id)->delete();
+        $this->deviceTokens()->delete();
+    }
+
+    public function hasVerifiedEmail(): bool
+    {
+        return $this->email_verified_at !== null;
+    }
 
     public function pets(): HasMany
     {
@@ -111,6 +134,7 @@ class User extends Model
         return array_merge($this->toApi(), [
             'is_admin' => (bool) $this->is_admin,
             'engagement_pushes_enabled' => (bool) $this->engagement_pushes_enabled,
+            'email_verified' => $this->hasVerifiedEmail(),
         ]);
     }
 }

@@ -189,6 +189,17 @@ export function AuthProvider({ children }) {
     return res; // { status, purge_after }
   };
 
+  // Email ownership: pet invites are addressed by email, so the server only
+  // shows/accepts them once the account has confirmed its address with an
+  // emailed 6-digit code. Both throw so the caller can surface the error.
+  const sendEmailVerification = () => post('/users/me/email-verification');
+
+  const confirmEmailVerification = async (code) => {
+    const updated = await post('/users/me/email-verification/confirm', { code });
+    dispatch({ type: 'SET_USER', payload: updated });
+    return updated;
+  };
+
   const clearError = () => dispatch({ type: 'SET_ERROR', payload: null });
 
   return (
@@ -206,6 +217,8 @@ export function AuthProvider({ children }) {
         logout,
         updateUser,
         deleteAccount,
+        sendEmailVerification,
+        confirmEmailVerification,
         clearError,
       }}
     >

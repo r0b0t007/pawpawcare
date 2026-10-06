@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\Document;
+use App\Models\LostPetReport;
 use App\Models\Pet;
 use App\Models\Post;
+use App\Models\Upload;
 use App\Models\User;
 use App\Support\Uploads;
 use Illuminate\Console\Command;
@@ -27,10 +29,11 @@ class PruneOrphanUploads extends Command
             ->merge(Pet::whereNotNull('avatar_url')->pluck('avatar_url'))
             ->merge(User::whereNotNull('avatar_url')->pluck('avatar_url'))
             ->merge(Post::whereNotNull('image_url')->pluck('image_url'))
+            ->merge(LostPetReport::whereNotNull('photo_url')->pluck('photo_url'))
             ->map(fn ($url) => Uploads::pathFromUrl($url))
             ->filter()
             ->flip();
-        $deleted += $this->prune(Storage::disk('public'), 'uploads', $publicRefs, $cutoff);
+        $deleted += $this->prune(Storage::disk('public'), 'uploads', $publicRefs, $cutoff, fn ($path) => Upload::where('path', $path)->delete());
 
         // Private disk: medical documents under documents/ (paths stored verbatim).
         $docRefs = Document::whereNotNull('file_path')->pluck('file_path')->flip();
@@ -42,7 +45,7 @@ class PruneOrphanUploads extends Command
     }
 
     /** Delete files in $dir on $disk that aren't referenced and are older than $cutoff. */
-    private function prune($disk, string $dir, $referenced, int $cutoff): int
+    private function prune($disk, string $dir, $referenced, int $cutoff, ?callable $afterDelete = null): int
     {
         $deleted = 0;
         foreach ($disk->files($dir) as $path) {
@@ -50,6 +53,9 @@ class PruneOrphanUploads extends Command
                 continue;
             }
             $disk->delete($path);
+            if ($afterDelete) {
+                $afterDelete($path); // drop the ownership row with the file
+            }
             $deleted++;
         }
 

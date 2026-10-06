@@ -20,13 +20,14 @@ class Post extends Model
 
     protected static function booted(): void
     {
-        static::updating(function (Post $post) {
-            if ($post->isDirty('image_url')) {
-                Uploads::deleteByUrl($post->getOriginal('image_url'));
+        // Cleanup runs after the write so this row no longer references the file.
+        static::updated(function (Post $post) {
+            if ($post->wasChanged('image_url')) {
+                Uploads::deleteIfOrphaned($post->getOriginal('image_url'));
             }
         });
 
-        static::deleting(fn (Post $post) => Uploads::deleteByUrl($post->image_url));
+        static::deleted(fn (Post $post) => Uploads::deleteIfOrphaned($post->image_url));
     }
 
     protected $fillable = ['author_id', 'content', 'image_url', 'group_id'];

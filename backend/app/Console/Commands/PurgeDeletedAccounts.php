@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
-use App\Support\Uploads;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -38,8 +37,8 @@ class PurgeDeletedAccounts extends Command
     /**
      * DB foreign keys cascade the rows, but cascades bypass Eloquent events —
      * so anything owning a file on disk is deleted through its model first
-     * (Pet::deleting removes the avatar + document files + lost-pet posts;
-     * Post::deleting removes the image), then the user row cascades the rest
+     * (Pet's delete hooks remove the avatar + document files + lost-pet posts;
+     * Post's remove the image), then the user row cascades the rest
      * (memberships, invites, comments, paws, reminders, device/refresh
      * tokens, reset codes, support messages, post reports).
      */
@@ -53,7 +52,12 @@ class PurgeDeletedAccounts extends Command
             $post->delete();
         }
 
-        Uploads::deleteByUrl($user->avatar_url);
+        // Clear the avatar while the user (and so its upload ownership row,
+        // which cascades with the user) still exists: the User `updated` hook
+        // then removes the file if nothing else references it.
+        if ($user->avatar_url !== null) {
+            $user->forceFill(['avatar_url' => null])->save();
+        }
 
         $user->delete();
     }

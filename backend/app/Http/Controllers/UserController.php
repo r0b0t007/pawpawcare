@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\RefreshToken;
 use App\Models\User;
 use App\Services\ReminderScheduler;
+use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -26,6 +27,8 @@ class UserController extends Controller
         ]);
 
         $user = $request->user();
+
+        Uploads::assertUsableUrl($data['avatar_url'] ?? null, [$user->id], $user->avatar_url, 'avatar_url');
 
         // Mirror the previous backend: only apply provided, non-null fields.
         foreach (['name', 'bio', 'avatar_url'] as $field) {

@@ -1,12 +1,99 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, Pressable, StyleSheet, RefreshControl,
+  View, Text, TextInput, ScrollView, Pressable, StyleSheet, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { ui, type } from '../../theme';
+import { ui, type, radii } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast } from '../../components';
+
+// Invites are addressed by email, and signup never proves the address — so
+// the server hides them until the account confirms it with an emailed code.
+function VerifyEmailCard({ email, onVerified }) {
+  const { sendEmailVerification, confirmEmailVerification } = useAuth();
+  const [step, setStep] = useState('intro'); // 'intro' | 'code'
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [error, setError] = useState(null);
+
+  const send = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await sendEmailVerification();
+      setStep('code');
+      showToast('Code sent — check your email');
+    } catch (e) {
+      setError(e?.message || 'Could not send the code — try again.');
+    }
+    setBusy(false);
+  };
+
+  const confirm = async () => {
+    if (code.trim().length !== 6) {
+      setError('Enter the 6-digit code from your email.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await confirmEmailVerification(code.trim());
+      showToast('Email confirmed');
+      await onVerified();
+    } catch (e) {
+      setError(e?.message || 'That code didn’t work — try again.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card style={styles.verifyCard}>
+      <View style={styles.emptyIcon}>
+        <MaterialCommunityIcons name="email-check-outline" size={34} color={ui.accent} />
+      </View>
+      <Text style={styles.emptyTitle}>Confirm your email</Text>
+      <Text style={styles.emptySub}>
+        {step === 'intro'
+          ? `Pets are shared by email. Confirm ${email} is yours and invitations sent to it will appear here.`
+          : `We sent a 6-digit code to ${email}. It's valid for 30 minutes.`}
+      </Text>
+
+      {step === 'code' && (
+        <TextInput
+          style={[styles.codeInput, focused && styles.codeInputFocused]}
+          placeholder="000000"
+          placeholderTextColor={ui.faint}
+          value={code}
+          onChangeText={(v) => { setCode(v.replace(/\D/g, '')); if (error) setError(null); }}
+          keyboardType="number-pad"
+          maxLength={6}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          textContentType="oneTimeCode"
+          autoComplete="one-time-code"
+        />
+      )}
+
+      {error ? <Text style={styles.errorText} selectable>{error}</Text> : null}
+
+      <Button
+        pill
+        label={step === 'intro' ? (busy ? 'Sending…' : 'Send code') : (busy ? 'Confirming…' : 'Confirm')}
+        disabled={busy}
+        onPress={step === 'intro' ? send : confirm}
+        style={styles.verifyBtn}
+      />
+      {step === 'code' && (
+        <Pressable onPress={send} disabled={busy} style={styles.resendLink}>
+          <Text style={styles.resendLinkText}>Send a new code</Text>
+        </Pressable>
+      )}
+    </Card>
+  );
+}
 
 const TYPE_ICON = {
   dog: 'dog',
@@ -15,7 +102,13 @@ const TYPE_ICON = {
 };
 
 export default function InvitesScreen({ navigation }) {
+  const { user } = useAuth();
   const { invites, refreshInvites, acceptInvite, declineInvite } = useData();
+  // Explicit false only: an older API without the flag never hides the list.
+  // Social accounts without a provider email (no-reply placeholder) have no
+  // inbox to confirm — and no invite can be addressed to them anyway.
+  const needsVerification = user?.email_verified === false
+    && !String(user?.email || '').toLowerCase().endsWith('@users.noreply.pawpawcare.app');
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState(null);
   const [pendingDecline, setPendingDecline] = useState(null);
@@ -64,7 +157,9 @@ export default function InvitesScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
-        {invites.length === 0 ? (
+        {needsVerification ? (
+          <VerifyEmailCard email={user.email} onVerified={() => refreshInvites()} />
+        ) : invites.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
               <MaterialCommunityIcons name="email-heart-outline" size={34} color={ui.accent} />
@@ -175,4 +270,35 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { ...type.cardTitle, color: ui.ink },
   emptySub: { ...type.body, color: ui.sub, textAlign: 'center', paddingHorizontal: 24 },
+  verifyCard: { padding: 20, gap: 12, alignItems: 'center', marginTop: 24 },
+  codeInput: {
+    alignSelf: 'stretch',
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.background,
+    borderRadius: radii.control,
+    borderCurve: 'continuous',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 18,
+    letterSpacing: 6,
+    textAlign: 'center',
+    color: ui.ink,
+  },
+  codeInputFocused: { borderColor: ui.accent },
+  errorText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    lineHeight: 18,
+    color: ui.danger,
+    textAlign: 'center',
+  },
+  verifyBtn: { alignSelf: 'stretch' },
+  resendLink: { alignItems: 'center', paddingVertical: 6 },
+  resendLinkText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13.5,
+    color: ui.accent,
+  },
 });

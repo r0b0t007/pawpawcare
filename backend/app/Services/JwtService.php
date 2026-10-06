@@ -18,7 +18,11 @@ class JwtService
         return (string) config('jwt.algo');
     }
 
-    public static function createAccessToken(string $userId): string
+    /**
+     * @param  int  $version  the user's current token_version; JwtAuth rejects
+     *                        the token once the account's version moves past it
+     */
+    public static function createAccessToken(string $userId, int $version = 0): string
     {
         $now = now();
         $exp = $now->clone()->addMinutes((int) config('jwt.access_ttl'));
@@ -26,6 +30,7 @@ class JwtService
         return JWT::encode([
             'sub' => $userId,
             'type' => 'access',
+            'ver' => $version,
             'iat' => $now->timestamp,
             'exp' => $exp->timestamp,
         ], self::secret(), self::algo());
@@ -34,7 +39,7 @@ class JwtService
     /**
      * @return array{0: string, 1: Carbon} the token and its absolute expiry
      */
-    public static function createRefreshToken(string $userId): array
+    public static function createRefreshToken(string $userId, int $version = 0): array
     {
         $now = now();
         $exp = $now->clone()->addDays((int) config('jwt.refresh_ttl'));
@@ -42,6 +47,9 @@ class JwtService
         $token = JWT::encode([
             'sub' => $userId,
             'type' => 'refresh',
+            // Checked on refresh too, so a refresh racing a revocation can't
+            // mint a fresh pair on the new version.
+            'ver' => $version,
             'iat' => $now->timestamp,
             'exp' => $exp->timestamp,
             // Unique token id: without it, two refresh tokens issued for the same

@@ -30,6 +30,9 @@ class ExtractionTest extends TestCase
             'timezone' => 'UTC',
         ]);
 
+        // Verified email: these users accept co-owner invites, which require it.
+        $u->forceFill(['email_verified_at' => now()])->save();
+
         return [$u, JwtService::createAccessToken($u->id)];
     }
 

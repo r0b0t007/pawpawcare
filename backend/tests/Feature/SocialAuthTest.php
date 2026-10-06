@@ -178,6 +178,35 @@ class SocialAuthTest extends TestCase
         $this->assertSame('victim-sub', $preRegistered->provider_id);
     }
 
+    public function test_google_link_also_revokes_the_preregistrants_live_access_token_and_devices(): void
+    {
+        // The pre-registrant signs up through the API, so they hold a live
+        // access token, and binds their own push device to the account.
+        $attackerAccess = $this->postJson('/auth/signup', [
+            'name' => 'Attacker',
+            'email' => 'victim@gmail.com',
+            'password' => 'attacker-password',
+        ])->assertCreated()->json('access_token');
+        $this->withToken($attackerAccess)
+            ->postJson('/devices', ['token' => 'ExponentPushToken[attacker-device]'])
+            ->assertOk();
+        $this->fakeCerts(self::GOOGLE_CERTS);
+
+        $victimAccess = $this->postJson('/auth/google', [
+            'id_token' => $this->sign($this->googleClaims(['email' => 'victim@gmail.com', 'sub' => 'victim-sub'])),
+        ])->assertOk()->json('access_token');
+
+        // Every pre-link credential is dead, not just the password + refresh.
+        $this->withToken($attackerAccess)->getJson('/users/me')->assertStatus(401);
+        $user = User::where('email', 'victim@gmail.com')->first();
+        $this->assertSame(0, $user->deviceTokens()->count());
+
+        // The victim's fresh session works, and the provider vouched for the email.
+        $this->withToken($victimAccess)->getJson('/users/me')
+            ->assertOk()
+            ->assertJsonPath('email_verified', true);
+    }
+
     public function test_returning_google_user_reuses_the_same_account(): void
     {
         $this->fakeCerts(self::GOOGLE_CERTS);

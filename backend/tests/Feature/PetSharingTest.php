@@ -25,6 +25,9 @@ class PetSharingTest extends TestCase
             'timezone' => 'UTC',
         ]);
 
+        // Verified email: these users accept co-owner invites, which require it.
+        $user->forceFill(['email_verified_at' => now()])->save();
+
         return [$user, JwtService::createAccessToken($user->id)];
     }
 
