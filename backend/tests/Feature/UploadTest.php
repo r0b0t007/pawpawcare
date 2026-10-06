@@ -132,4 +132,25 @@ class UploadTest extends TestCase
         $disk->assertExists($keep);
         $disk->assertMissing($orphan);
     }
+
+    public function test_prune_keeps_referenced_legacy_hashname_uploads(): void
+    {
+        // Pre-GD uploads were named by Laravel's hashName(): 40 random chars
+        // plus the guessed extension, which wasn't always jpg/png/webp/gif.
+        Storage::fake('public');
+        [$user] = $this->user();
+        $disk = Storage::disk('public');
+
+        $jpeg = 'uploads/'.str_repeat('J', 40).'.jpeg';
+        $bmp = 'uploads/'.str_repeat('B', 40).'.bmp';
+        $disk->put($jpeg, 'x');
+        $disk->put($bmp, 'y');
+        Pet::create(['owner_id' => $user->id, 'name' => 'P', 'avatar_url' => '/storage/'.$jpeg]);
+        $user->forceFill(['avatar_url' => '/storage/'.$bmp])->save();
+
+        $this->artisan('uploads:prune', ['--hours' => 0])->assertExitCode(0);
+
+        $disk->assertExists($jpeg);
+        $disk->assertExists($bmp);
+    }
 }

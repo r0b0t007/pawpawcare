@@ -132,6 +132,28 @@ class UploadOwnershipTest extends TestCase
         Storage::disk('public')->assertMissing(substr($avatar, strlen('/storage/')));
     }
 
+    public function test_a_departed_co_owners_upload_stays_tracked_for_cleanup(): void
+    {
+        [$owner, $ownerToken] = $this->user();
+        [$member, $memberToken] = $this->user();
+        $pet = Pet::create(['owner_id' => $owner->id, 'name' => 'Luna']);
+        $pet->members()->attach($member->id, ['role' => 'member', 'created_at' => now()]);
+        $photo = $this->upload($memberToken);
+        $this->withToken($memberToken)->patchJson("/pets/{$pet->id}", ['avatar_url' => $photo])->assertOk();
+
+        // The co-owner's account is purged; the shared pet keeps their photo.
+        $member->forceFill(['is_active' => false, 'deletion_requested_at' => now()->subDays(31)])->save();
+        $this->artisan('accounts:purge-deleted')->assertExitCode(0);
+        $this->assertFileKept($photo);
+
+        // Nobody can newly attach the orphaned-owner upload...
+        $this->withToken($ownerToken)->patchJson('/users/me', ['avatar_url' => $photo])->assertStatus(422);
+
+        // ...and replacing the pet photo still cleans the old file up.
+        $this->withToken($ownerToken)->patchJson("/pets/{$pet->id}", ['avatar_url' => $this->upload($ownerToken)])->assertOk();
+        Storage::disk('public')->assertMissing(substr($photo, strlen('/storage/')));
+    }
+
     public function test_a_malformed_stored_url_never_blocks_deletes(): void
     {
         // Rows written before validation tightened may hold any string.

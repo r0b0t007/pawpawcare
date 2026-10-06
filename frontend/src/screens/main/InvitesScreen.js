@@ -23,7 +23,13 @@ function VerifyEmailCard({ email, onVerified }) {
     setBusy(true);
     setError(null);
     try {
-      await sendEmailVerification();
+      if (await sendEmailVerification() === 'already_verified') {
+        // Confirmed elsewhere; the refreshed user hides this card.
+        showToast('Your email is already confirmed');
+        setBusy(false);
+        await onVerified();
+        return;
+      }
       setStep('code');
       showToast('Code sent — check your email');
     } catch (e) {

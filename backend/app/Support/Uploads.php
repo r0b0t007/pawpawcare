@@ -86,12 +86,14 @@ class Uploads
 
     /**
      * Extract the public-disk path from a managed /storage/... url, or null.
-     * Only the exact shape storeImage() generates is managed; anything else
-     * (external, hand-written, traversal-shaped) is left alone.
+     * Only the shape the app generates is managed — a 40-char random name in
+     * uploads/ (storeImage() today; Laravel's hashName() for older uploads,
+     * whose extension could be e.g. .jpeg or .bmp). Anything else (external,
+     * hand-written, traversal-shaped) is left alone.
      */
     public static function pathFromUrl(?string $url): ?string
     {
-        if (! $url || ! preg_match('#^/storage/(uploads/[A-Za-z0-9]{40}\.(?:jpg|png|webp|gif))$#', $url, $m)) {
+        if (! $url || ! preg_match('#^/storage/(uploads/[A-Za-z0-9]{40}\.[A-Za-z0-9]{2,5})$#', $url, $m)) {
             return null;
         }
 

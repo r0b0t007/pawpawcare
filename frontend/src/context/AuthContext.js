@@ -192,7 +192,17 @@ export function AuthProvider({ children }) {
   // Email ownership: pet invites are addressed by email, so the server only
   // shows/accepts them once the account has confirmed its address with an
   // emailed 6-digit code. Both throw so the caller can surface the error.
-  const sendEmailVerification = () => post('/users/me/email-verification');
+  // Resolves to the server status: 'sent', or 'already_verified' when the
+  // address was confirmed elsewhere (password reset, social sign-in) — in
+  // which case the stored user is refreshed so screens drop the prompt.
+  const sendEmailVerification = async () => {
+    const res = await post('/users/me/email-verification');
+    if (res?.status === 'already_verified') {
+      const user = await get('/users/me');
+      dispatch({ type: 'SET_USER', payload: user });
+    }
+    return res?.status;
+  };
 
   const confirmEmailVerification = async (code) => {
     const updated = await post('/users/me/email-verification/confirm', { code });

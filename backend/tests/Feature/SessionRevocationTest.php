@@ -104,6 +104,25 @@ class SessionRevocationTest extends TestCase
         $this->withToken($legacy)->getJson('/users/me')->assertStatus(401);
     }
 
+    public function test_account_deletion_kills_access_tokens_even_after_reactivation(): void
+    {
+        $old = $this->postJson('/auth/signup', [
+            'name' => 'U',
+            'email' => 'me@example.com',
+            'password' => 'old-password',
+        ])->assertCreated()->json('access_token');
+
+        $this->withToken($old)->deleteJson('/users/me')->assertOk();
+
+        // Logging back in during the grace period reactivates the account...
+        $fresh = $this->postJson('/auth/login', ['email' => 'me@example.com', 'password' => 'old-password'])
+            ->assertOk()->json('access_token');
+
+        // ...but the pre-deletion token stays dead.
+        $this->withToken($old)->getJson('/users/me')->assertStatus(401);
+        $this->withToken($fresh)->getJson('/users/me')->assertOk();
+    }
+
     public function test_tokens_survive_when_nothing_was_revoked(): void
     {
         $access = $this->postJson('/auth/signup', [

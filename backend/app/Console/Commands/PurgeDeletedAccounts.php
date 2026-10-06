@@ -52,9 +52,10 @@ class PurgeDeletedAccounts extends Command
             $post->delete();
         }
 
-        // Clear the avatar while the user (and so its upload ownership row,
-        // which cascades with the user) still exists: the User `updated` hook
-        // then removes the file if nothing else references it.
+        // Clear the avatar while the user row still exists: the User `updated`
+        // hook then removes the file if nothing else references it. (Deleting
+        // the row first would leave the purged user's own row as the last
+        // reference until it's gone.)
         if ($user->avatar_url !== null) {
             $user->forceFill(['avatar_url' => null])->save();
         }

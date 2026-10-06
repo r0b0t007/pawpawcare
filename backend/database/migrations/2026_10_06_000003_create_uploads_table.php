@@ -14,10 +14,15 @@ return new class extends Migration
         // listed here — so nobody can reference, and thereby delete, someone
         // else's file. Files uploaded before this table existed have no row and
         // are left to `uploads:prune`.
+        //
+        // user_id is nulled (not cascaded) when the uploader's account is
+        // purged: the file may still be a shared pet's photo, and keeping the
+        // row keeps it tracked for cleanup — while a null owner means nobody
+        // can newly attach it.
         Schema::create('uploads', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('path')->unique();
-            $table->foreignUuid('user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUuid('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
     }
