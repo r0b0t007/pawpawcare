@@ -89,9 +89,11 @@ DB_PASSWORD=<strong password>
 
 # JWT signing key — the variable is SECRET_KEY (config/jwt.php). It MUST
 # replace the .env.example placeholder: anyone with the key can mint a login
-# token for any user. In production the API refuses to issue or accept any
-# token if it's the placeholder or under 32 chars (logins fail; the error is
-# in storage/logs/laravel.log). Generate one with: openssl rand -base64 48
+# token for any user. Outside local/testing the API refuses to issue or accept
+# any token if it's the placeholder or under 32 chars: sign-in returns 503,
+# /health returns 503 (so the deploy check fails) and the reason is in
+# storage/logs/laravel.log. Set it explicitly — if SECRET_KEY is missing the key
+# silently falls back to APP_KEY. Generate one with: openssl rand -base64 48
 SECRET_KEY=<fresh random string, ≥ 32 chars — do NOT reuse the dev value>
 ANTHROPIC_API_KEY=<key>    # AI document intake
 

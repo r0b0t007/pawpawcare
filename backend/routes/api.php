@@ -22,10 +22,16 @@ use App\Http\Controllers\ReminderController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
+use App\Support\JwtSecretGuard;
 use Illuminate\Support\Facades\Route;
 
 // ── Health ──────────────────────────────────────────────────────────────────
-Route::get('/health', fn () => response()->json(['status' => 'ok', 'version' => '1.0.0']));
+// 503 when the JWT signing key is unsafe, so the post-deploy health check in
+// deploy-backend.yml fails loudly instead of going green with broken logins.
+// (The reason is logged, never returned.)
+Route::get('/health', fn () => JwtSecretGuard::isConfigured()
+    ? response()->json(['status' => 'ok', 'version' => '1.0.0'])
+    : response()->json(['status' => 'degraded', 'version' => '1.0.0'], 503));
 
 // ── Signed document delivery (no JWT — the signature is the authorization) ────
 // The URL is minted only for users with pet access via /pets/{pet}/documents/{id}/url

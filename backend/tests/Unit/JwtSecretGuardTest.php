@@ -4,47 +4,41 @@ namespace Tests\Unit;
 
 use App\Support\JwtSecretGuard;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 class JwtSecretGuardTest extends TestCase
 {
-    public function test_production_refuses_the_env_example_placeholder(): void
+    public function test_the_placeholder_is_refused_outside_local_and_testing(): void
     {
-        $this->expectException(RuntimeException::class);
-        JwtSecretGuard::assertSafe(true, JwtSecretGuard::EXAMPLE_PLACEHOLDER);
-    }
-
-    public function test_production_refuses_a_short_or_missing_key(): void
-    {
-        foreach ([null, '', str_repeat('k', 31)] as $weak) {
-            try {
-                JwtSecretGuard::assertSafe(true, $weak);
-                $this->fail('Expected a weak key to be refused: '.var_export($weak, true));
-            } catch (RuntimeException) {
-                $this->addToAssertionCount(1);
-            }
+        foreach (['production', 'staging', 'preview', 'prod'] as $env) {
+            $this->assertNotNull(JwtSecretGuard::problem($env, JwtSecretGuard::EXAMPLE_PLACEHOLDER), $env);
         }
     }
 
-    public function test_production_accepts_a_long_random_key(): void
+    public function test_a_short_or_missing_key_is_refused(): void
     {
-        JwtSecretGuard::assertSafe(true, base64_encode(random_bytes(36)));
-        $this->addToAssertionCount(1);
+        foreach ([null, '', str_repeat('k', 31)] as $weak) {
+            $this->assertNotNull(JwtSecretGuard::problem('production', $weak), var_export($weak, true));
+        }
     }
 
-    public function test_non_production_is_never_blocked(): void
+    public function test_a_long_random_key_is_accepted(): void
     {
-        JwtSecretGuard::assertSafe(false, JwtSecretGuard::EXAMPLE_PLACEHOLDER);
-        JwtSecretGuard::assertSafe(false, 'short');
-        $this->addToAssertionCount(1);
+        $this->assertNull(JwtSecretGuard::problem('production', base64_encode(random_bytes(36))));
+    }
+
+    public function test_local_and_testing_are_never_blocked(): void
+    {
+        foreach (['local', 'testing'] as $env) {
+            $this->assertNull(JwtSecretGuard::problem($env, JwtSecretGuard::EXAMPLE_PLACEHOLDER));
+            $this->assertNull(JwtSecretGuard::problem($env, 'short'));
+        }
     }
 
     public function test_the_guard_knows_the_placeholder_actually_shipped_in_env_example(): void
     {
         // Keeps the constant in sync if someone edits .env.example.
         $env = (string) file_get_contents(__DIR__.'/../../.env.example');
-        $this->assertMatchesRegularExpression('/^SECRET_KEY=(.*)$/m', $env);
-        preg_match('/^SECRET_KEY=(.*)$/m', $env, $m);
+        $this->assertSame(1, preg_match('/^SECRET_KEY=(.*)$/m', $env, $m));
         $this->assertSame(JwtSecretGuard::EXAMPLE_PLACEHOLDER, trim($m[1]));
     }
 }

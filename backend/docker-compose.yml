@@ -25,7 +25,9 @@ services:
       APP_DEBUG: "false"
       APP_KEY: ${APP_KEY}
       # No default: a public fallback key would let anyone forge tokens (and
-      # php-jwt rejects keys under 32 bytes anyway). e.g. `openssl rand -base64 48`
+      # php-jwt rejects keys under 32 bytes anyway). Compose reads it from the
+      # shell or backend/.env — replace the copied .env.example placeholder
+      # once with e.g. `openssl rand -base64 48`, or sign-in returns 503.
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY to a random string of at least 32 characters}
       JWT_ALGO: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 60

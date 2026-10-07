@@ -11,19 +11,13 @@ class JwtService
 {
     private static function secret(): string
     {
-        $secret = (string) config('jwt.secret');
-
         // Fail closed at the point of use (not at boot, which would also break
-        // composer/artisan before .env exists): in production a placeholder or
-        // weak key can neither sign nor verify, so no token can be forged.
-        try {
-            JwtSecretGuard::assertSafe(app()->isProduction(), $secret);
-        } catch (\RuntimeException $e) {
-            report($e); // decode() swallows errors — make the cause visible in the log
-            throw $e;
-        }
+        // composer/artisan before .env exists): a placeholder or weak key can
+        // neither sign nor verify, so no token can be forged. The guard logs
+        // the cause (rate-limited — decode() runs on every request).
+        JwtSecretGuard::enforce();
 
-        return $secret;
+        return (string) config('jwt.secret');
     }
 
     private static function algo(): string
