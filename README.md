@@ -170,7 +170,7 @@ export const API_URL = 'https://some-name.loca.lt';
 | `DB_HOST` / `DB_PORT` | `127.0.0.1` / `3306` | Database host & port |
 | `DB_DATABASE` | `pawpawcare` | Database name |
 | `DB_USERNAME` / `DB_PASSWORD` | `root` / *(empty)* | Database credentials |
-| `SECRET_KEY` | `change-me-...` | JWT signing key — **change in production** |
+| `SECRET_KEY` | `change-me-...` | JWT signing key — **must be changed in production** (≥ 32 chars, e.g. `openssl rand -base64 48`); outside `local`/`testing` the API refuses to issue or accept tokens with the placeholder |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | Access token lifetime |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | `30` | Refresh token lifetime |
 | `ALLOWED_ORIGINS` | *(wildcard)* | Comma-separated CORS origins (lock down in prod) |
@@ -190,7 +190,9 @@ and run `touch database/database.sqlite` before migrating.
 
 ```bash
 cd backend
-cp .env.example .env        # set a strong SECRET_KEY
+cp .env.example .env        # then replace SECRET_KEY with your own value, once:
+                            #   openssl rand -base64 48   (compose reads it from .env;
+                            #   the API refuses to sign tokens with the placeholder)
 php artisan key:generate    # or set APP_KEY in .env
 docker compose up --build   # starts MySQL + API (auto-migrates + seeds)
 # → API at http://localhost:8000

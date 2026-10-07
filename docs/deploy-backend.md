@@ -87,7 +87,14 @@ DB_DATABASE=<cpaneluser>_pawpawcare
 DB_USERNAME=<cpaneluser>_paw
 DB_PASSWORD=<strong password>
 
-JWT_SECRET=<fresh long random string — do NOT reuse the dev value>
+# JWT signing key — the variable is SECRET_KEY (config/jwt.php). It MUST
+# replace the .env.example placeholder: anyone with the key can mint a login
+# token for any user. Outside local/testing the API refuses to issue or accept
+# any token if it's the placeholder, under 32 chars, or missing (falling back
+# to APP_KEY): sign-in returns 503, /health returns 503 and the reason is in
+# storage/logs/laravel.log. deploy-backend.yml also checks this before changing
+# anything and aborts the deploy. Generate one with: openssl rand -base64 48
+SECRET_KEY=<fresh random string, ≥ 32 chars — do NOT reuse the dev value>
 ANTHROPIC_API_KEY=<key>    # AI document intake
 
 QUEUE_CONNECTION=sync      # start simple; see cron section to move to database

@@ -7,6 +7,7 @@ use App\Models\PasswordResetCode;
 use App\Models\RefreshToken;
 use App\Models\User;
 use App\Services\JwtService;
+use App\Support\JwtSecretGuard;
 use Firebase\JWT\BeforeValidException;
 use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWK;
@@ -33,6 +34,8 @@ class AuthController extends Controller
 
     public function signup(Request $request): JsonResponse
     {
+        JwtSecretGuard::enforce(); // before any side effect: no half-made accounts on a bad key
+
         $data = $request->validate([
             'name' => 'required|string|min:1|max:100',
             'email' => 'required|email|ascii|max:255',
@@ -54,6 +57,8 @@ class AuthController extends Controller
 
     public function login(Request $request): JsonResponse
     {
+        JwtSecretGuard::enforce(); // before any side effect: no half-made accounts on a bad key
+
         $data = $request->validate([
             'email' => 'required|email|ascii|max:255',
             'password' => 'required|string',
@@ -98,6 +103,8 @@ class AuthController extends Controller
      */
     public function google(Request $request): JsonResponse
     {
+        JwtSecretGuard::enforce(); // before any side effect: no half-made accounts on a bad key
+
         $data = $request->validate([
             'id_token' => 'required|string',
         ]);
@@ -129,6 +136,8 @@ class AuthController extends Controller
      */
     public function apple(Request $request): JsonResponse
     {
+        JwtSecretGuard::enforce(); // before any side effect: no half-made accounts on a bad key
+
         $data = $request->validate([
             'identity_token' => 'required|string',
             // Required, never optional: the native Sign in with Apple flow always
@@ -169,6 +178,8 @@ class AuthController extends Controller
 
     public function refresh(Request $request): JsonResponse
     {
+        JwtSecretGuard::enforce(); // before any side effect: no half-made accounts on a bad key
+
         $data = $request->validate([
             'refresh_token' => 'required|string',
         ]);
