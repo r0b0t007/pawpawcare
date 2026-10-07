@@ -57,7 +57,7 @@ class JwtSecretGuardTest extends TestCase
     }
 
     /** Boot a fresh app as $environment with the given keys, plus a migrated DB. */
-    private function bootAs(string $environment, ?string $secretKey, ?string $appKey = null): void
+    private function bootAs(string $environment, string $secretKey, ?string $appKey = null): void
     {
         $this->setVar('APP_ENV', $environment);
         $this->setVar('SECRET_KEY', $secretKey);
@@ -115,8 +115,13 @@ class JwtSecretGuardTest extends TestCase
 
     public function test_a_key_that_falls_back_to_app_key_is_refused(): void
     {
-        // SECRET_KEY unset → config/jwt.php uses APP_KEY.
-        $this->bootAs('production', null, 'base64:'.base64_encode(random_bytes(32)));
+        // With SECRET_KEY unset, config/jwt.php resolves to APP_KEY — so the
+        // signing key equals the app key actually in effect, set up here.
+        // (Unsetting SECRET_KEY / overriding APP_KEY via env isn't reliable in
+        // tests: Dotenv's process-wide repository re-applies values it loaded
+        // from a .env, as CI has, on every later boot.)
+        $this->bootAs('production', $this->strongKey());
+        config(['jwt.secret' => config('app.key')]);
         $this->makeUser();
 
         $this->postJson('/auth/login', ['email' => 'u@example.com', 'password' => 'secret123'])->assertStatus(503);
