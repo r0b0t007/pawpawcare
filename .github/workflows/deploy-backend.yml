@@ -90,6 +90,15 @@ jobs:
           script: |
             export PHP_BIN="${{ vars.PHP_BIN || 'php' }}"
             cd ${{ vars.DEPLOY_PATH || '~/pawpawcare' }}
+            # Refuse to deploy without a real JWT signing key (JwtSecretGuard
+            # would otherwise disable sign-in). Runs before any change, so the
+            # live app stays untouched. The value is never printed.
+            SK=$(sed -n 's/^SECRET_KEY=//p' backend/.env | tail -n 1 | tr -d '"\r')
+            if [ "${#SK}" -lt 32 ] || [ "$SK" = "change-me-to-a-long-random-secret-in-production" ]; then
+              echo "::error::backend/.env SECRET_KEY is missing, shorter than 32 chars, or the .env.example placeholder. Set it (openssl rand -base64 48) and re-run. Nothing was deployed."
+              exit 1
+            fi
+            unset SK
             git fetch origin main
             git reset --hard origin/main
             cd backend

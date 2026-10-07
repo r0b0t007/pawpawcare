@@ -26,6 +26,14 @@ class JwtSecretGuardTest extends TestCase
         $this->assertNull(JwtSecretGuard::problem('production', base64_encode(random_bytes(36))));
     }
 
+    public function test_falling_back_to_app_key_is_refused(): void
+    {
+        $appKey = 'base64:'.base64_encode(random_bytes(32));
+
+        $this->assertNotNull(JwtSecretGuard::problem('production', $appKey, $appKey));
+        $this->assertNull(JwtSecretGuard::problem('production', base64_encode(random_bytes(36)), $appKey));
+    }
+
     public function test_local_and_testing_are_never_blocked(): void
     {
         foreach (['local', 'testing'] as $env) {

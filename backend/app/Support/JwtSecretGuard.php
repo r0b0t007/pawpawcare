@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Log;
  * Refuses to sign or accept tokens with a guessable JWT signing key. Anyone
  * who knows the key can mint an access token for any user id, and the shipped
  * .env.example placeholder is public — so a deploy that copied .env.example
- * and forgot (or misnamed) SECRET_KEY must fail closed, not mint tokens.
+ * and forgot (or misnamed) SECRET_KEY must fail closed, not mint tokens —
+ * including when SECRET_KEY is unset and config/jwt.php falls back to APP_KEY.
  *
  * Enforced everywhere except local dev and the test suite (so staging,
  * preview, or a typo'd APP_ENV are covered too), at the point of use rather
@@ -29,7 +30,7 @@ class JwtSecretGuard
     private const REPORT_EVERY_SECONDS = 600;
 
     /** Why the key is unsafe for $environment, or null when it's fine. */
-    public static function problem(string $environment, ?string $secret): ?string
+    public static function problem(string $environment, ?string $secret, ?string $appKey = null): ?string
     {
         if (in_array($environment, self::RELAXED_ENVIRONMENTS, true)) {
             return null;
@@ -42,14 +43,25 @@ class JwtSecretGuard
         if (strlen($secret) < self::MIN_LENGTH) {
             return 'SECRET_KEY is shorter than '.self::MIN_LENGTH.' characters';
         }
+        // config/jwt.php falls back to APP_KEY when SECRET_KEY is unset — the
+        // key that also encrypts app data. Require a dedicated one.
+        if ($appKey !== null && $appKey !== '' && hash_equals($appKey, $secret)) {
+            return 'SECRET_KEY is not set, so the signing key falls back to APP_KEY';
+        }
 
         return null;
+    }
+
+    /** Why the configured key is unsafe for the running environment, or null. */
+    private static function currentProblem(): ?string
+    {
+        return self::problem(app()->environment(), config('jwt.secret'), config('app.key'));
     }
 
     /** Whether the configured key is safe for the running environment. */
     public static function isConfigured(): bool
     {
-        return self::problem(app()->environment(), config('jwt.secret')) === null;
+        return self::currentProblem() === null;
     }
 
     /**
@@ -59,17 +71,8 @@ class JwtSecretGuard
      */
     public static function enforce(): void
     {
-        $secret = config('jwt.secret');
-        $problem = self::problem(app()->environment(), $secret);
-
+        $problem = self::currentProblem();
         if ($problem === null) {
-            // Not blocking: SECRET_KEY unset makes config/jwt.php fall back
-            // to APP_KEY, which works but reuses the app's encryption key.
-            if ($secret !== null && $secret === config('app.key') && ! app()->environment(self::RELAXED_ENVIRONMENTS)) {
-                self::reportOnce('jwt-secret-guard:shares-app-key', 'warning',
-                    'JWT signing key falls back to APP_KEY: set a separate random SECRET_KEY in .env.');
-            }
-
             return;
         }
 
