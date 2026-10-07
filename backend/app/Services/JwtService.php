@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\JwtSecretGuard;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Illuminate\Support\Carbon;
@@ -10,7 +11,19 @@ class JwtService
 {
     private static function secret(): string
     {
-        return (string) config('jwt.secret');
+        $secret = (string) config('jwt.secret');
+
+        // Fail closed at the point of use (not at boot, which would also break
+        // composer/artisan before .env exists): in production a placeholder or
+        // weak key can neither sign nor verify, so no token can be forged.
+        try {
+            JwtSecretGuard::assertSafe(app()->isProduction(), $secret);
+        } catch (\RuntimeException $e) {
+            report($e); // decode() swallows errors — make the cause visible in the log
+            throw $e;
+        }
+
+        return $secret;
     }
 
     private static function algo(): string
