@@ -21,11 +21,14 @@
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Pages reference these as /<file>?v=<content hash> (enforced by
+# tests/website/assets.test.mjs; update with tools/bump-asset-versions.mjs
+# --fix), so every change gets a new URL and each URL can be cached forever.
 /style.css
-  Cache-Control: public, max-age=3600, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable
 
 /script.js
-  Cache-Control: public, max-age=3600, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable
 
 /analytics.js
-  Cache-Control: public, max-age=3600, must-revalidate
+  Cache-Control: public, max-age=31536000, immutable

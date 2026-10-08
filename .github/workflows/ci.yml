@@ -1,7 +1,8 @@
 # Continuous integration — runs on every PR and on pushes to main.
 # Backend: PHPUnit suite (SQLite in-memory). Frontend: Metro bundle (catches
 # import/syntax errors). Website: node:test suite for the waitlist Pages
-# Function and welcome email (fetch is mocked). None needs external services.
+# Function, welcome email and asset cache-busting versions (fetch is mocked).
+# None needs external services.
 
 name: CI
 
@@ -70,7 +71,7 @@ jobs:
         run: npx expo export --platform android --output-dir ./dist-ci
 
   website:
-    name: Website (waitlist function)
+    name: Website tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

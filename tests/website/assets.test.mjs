@@ -1,48 +1,53 @@
-// Guards the stylesheet cache-busting version on every page.
-// Run: node --test "tests/website/*.test.mjs"  (CI: "Website (waitlist function)").
+// Guards the cache-busting versions on /style.css, /script.js and
+// /analytics.js across every page. Run: node --test "tests/website/*.test.mjs"
+// (CI: "Website tests"). To fix a failure: node tools/bump-asset-versions.mjs --fix
 //
-// Cloudflare serves /style.css with a multi-hour browser cache while pages
-// themselves are revalidated on every load, so a CSS change shipped without a
-// new URL pairs new HTML with old CSS for returning visitors (the hero
-// redesign in #80 shipped with that exposure). Each page links /style.css?v=<first 10 hex chars of
-// the file's SHA-256>; this test fails if any page's version doesn't match.
+// Pages are revalidated on every load while these assets keep the same URL, so
+// a change shipped without a new URL pairs new HTML with an old cached asset
+// for returning visitors. See tools/bump-asset-versions.mjs.
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
 
-const SITE = fileURLToPath(new URL("../../website/", import.meta.url));
-const SKIP_DIRS = new Set(["functions", "_worker.js", "images", "fonts", "email"]);
+import { ASSETS, assetRefs, check, expectedRef, htmlFiles, rewrite, versionOf } from "../../tools/bump-asset-versions.mjs";
 
-function htmlFiles(dir) {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return SKIP_DIRS.has(name) ? [] : htmlFiles(path);
-    return name.endsWith(".html") ? [path] : [];
-  });
-}
+test("every page references the assets at their current content-hash version", () => {
+  assert.ok(htmlFiles().length >= 5, "expected the site's pages");
+  const problems = check();
+  assert.deepEqual(problems, [], `Run: node tools/bump-asset-versions.mjs --fix\n  ${problems.join("\n  ")}`);
+});
 
-const expected = createHash("sha256").update(readFileSync(join(SITE, "style.css"))).digest("hex").slice(0, 10);
-
-test("every page links /style.css with the current content-hash version", () => {
-  const pages = htmlFiles(SITE);
-  assert.ok(pages.length >= 5, `expected the site's pages, found ${pages.length}`);
-
-  const problems = [];
-  for (const page of pages) {
-    const html = readFileSync(page, "utf8");
-    const refs = [...html.matchAll(/href="\/style\.css(\?v=([0-9a-f]+))?"/g)];
-    for (const [, , version] of refs) {
-      if (version !== expected) problems.push(`${relative(SITE, page)}: v=${version ?? "(none)"}`);
-    }
+test("malformed or stale references are detected, not skipped", () => {
+  const v = expectedRef("style.css");
+  const bad = [
+    '<link rel="stylesheet" href="style.css">',
+    "<link rel='stylesheet' href='/style.css'>",
+    '<link rel="stylesheet" href="https://pawpawcare.app/style.css">',
+    `<link rel="stylesheet" href="${v.replace(/v=([0-9a-f]+)/, (_, h) => "v=" + h.toUpperCase())}">`,
+    `<link rel="stylesheet" href="${v}&x=1">`,
+    '<link rel="stylesheet" href="/style.css?v=0000000000">',
+    "<script src=/script.js defer></script>",
+    '<script src="/analytics.js" defer></script>',
+  ];
+  for (const html of bad) {
+    const refs = assetRefs(html);
+    assert.equal(refs.length, 1, `not detected: ${html}`);
+    assert.equal(refs[0].ok, false, `wrongly accepted: ${html}`);
   }
+  // Lookalike names are not assets.
+  assert.equal(assetRefs('<script src="/transcript.js"></script>').length, 0);
+});
 
-  assert.deepEqual(
-    problems,
-    [],
-    `style.css changed: set href="/style.css?v=${expected}" in:\n  ${problems.join("\n  ")}`,
-  );
+test("--fix rewrites every form to the canonical versioned URL", () => {
+  const html =
+    "<link href='style.css?v=1'><script src=/script.js defer></script>" +
+    '<script src="https://pawpawcare.app/analytics.js"></script>';
+  const fixed = rewrite(html);
+  for (const asset of ASSETS) assert.ok(fixed.includes(`"${expectedRef(asset)}"`), `${asset} not rewritten: ${fixed}`);
+  assert.ok(assetRefs(fixed).every((r) => r.ok));
+});
+
+test("version ignores CRLF vs LF (Git stores LF; editors on Windows may not)", () => {
+  assert.equal(versionOf("a {\r\n  color: red;\r\n}\r\n"), versionOf("a {\n  color: red;\n}\n"));
+  assert.notEqual(versionOf("a{color:red}"), versionOf("a{color:blue}"));
 });
