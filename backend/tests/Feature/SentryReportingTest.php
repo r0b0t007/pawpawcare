@@ -34,35 +34,63 @@ class SentryReportingTest extends TestCase
         parent::tearDown();
     }
 
-    private function expectCaptures(int $times): void
+    /** A mock hub used both by Integration::handles() and the `sentry` log channel. */
+    private function mockHub(): Mockery\MockInterface
     {
         $hub = Mockery::mock(HubInterface::class)->shouldIgnoreMissing();
-        $hub->shouldReceive('captureException')->times($times);
+        // The log handler captures inside withScope(); run the callback so a
+        // capture made there is actually seen by the expectations.
+        $hub->shouldReceive('withScope')->andReturnUsing(fn (callable $callback) => $callback(new Scope));
         SentrySdk::setCurrentHub($hub);
+        $this->app->instance('sentry', $hub);
+        $this->app->instance(HubInterface::class, $hub);
+
+        return $hub;
     }
 
     public function test_unexpected_exceptions_are_reported(): void
     {
-        $this->expectCaptures(1);
+        $this->mockHub()->shouldReceive('captureException')->once();
 
         $this->getJson('/__test/boom')->assertStatus(500);
     }
 
-    public function test_aborts_and_validation_errors_are_not_reported(): void
+    public function test_4xx_aborts_and_validation_errors_are_not_reported(): void
     {
-        $this->expectCaptures(0);
+        $this->mockHub()->shouldReceive('captureException')->never();
 
         $this->getJson('/__test/not-found')->assertStatus(404)->assertJson(['detail' => 'No such pet']);
-        $this->getJson('/__test/server-abort')->assertStatus(503);
         $this->postJson('/__test/invalid', [])->assertStatus(422);
     }
 
-    public function test_sentry_log_channel_does_not_recapture_exceptions(): void
+    public function test_5xx_aborts_are_reported_but_throttled_per_message(): void
     {
-        // Integration::handles() already reports unhandled exceptions; the
-        // `sentry` log channel (LOG_STACK=single,sentry) must not send them again.
-        $this->assertSame('sentry', config('logging.channels.sentry.driver'));
-        $this->assertFalse(config('logging.channels.sentry.report_exceptions'));
+        // A misconfiguration (e.g. social login, extraction provider) aborts
+        // every request: report it, but once per 10 minutes, not per request.
+        Route::get('/__test/other-abort', fn () => abort(502, 'Extraction provider failed'));
+        $this->mockHub()->shouldReceive('captureException')->twice();
+
+        $this->getJson('/__test/server-abort')->assertStatus(503);
+        $this->getJson('/__test/server-abort')->assertStatus(503);
+        $this->getJson('/__test/server-abort')->assertStatus(503);
+        $this->getJson('/__test/other-abort')->assertStatus(502);
+    }
+
+    public function test_exceptions_are_not_captured_twice_through_the_sentry_log_stack(): void
+    {
+        // Production runs LOG_STACK=single,sentry: Laravel logs every reported
+        // exception through the stack, and the `sentry` channel must not
+        // capture it a second time (report_exceptions=false).
+        config([
+            'logging.default' => 'stack',
+            'logging.channels.stack.channels' => ['single', 'sentry'],
+        ]);
+        $hub = $this->mockHub();
+        $hub->shouldReceive('captureException')->once();
+        $hub->shouldReceive('captureMessage')->never();
+        $hub->shouldReceive('captureEvent')->never();
+
+        $this->getJson('/__test/boom')->assertStatus(500);
     }
 
     public function test_authenticated_requests_tag_only_the_user_id(): void

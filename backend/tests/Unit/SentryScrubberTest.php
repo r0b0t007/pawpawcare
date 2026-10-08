@@ -67,6 +67,12 @@ class SentryScrubberTest extends TestCase
         $this->assertStringNotContainsString('abc123', $out);
         $this->assertStringContainsString('[jwt]', $out);
         $this->assertStringContainsString('/documents/9/raw?expires=[redacted]&signature=[redacted]', $out);
+
+        // Any credential-looking param name, not just a fixed list; others survive.
+        $this->assertSame(
+            '/auth/x?access_token=[redacted]&api_key=[redacted]&id_token=[redacted]&password=[redacted]&t=[redacted]&page=2',
+            SentryScrubber::scrubText('/auth/x?access_token=opaque123&api_key=sk-live-9&id_token=abc&password=hunter2&t=xyz&page=2'),
+        );
     }
 
     public function test_extra_contexts_tags_breadcrumb_data_frames_and_spans_are_scrubbed(): void
@@ -91,6 +97,7 @@ class SentryScrubberTest extends TestCase
 
         $span = new Span;
         $span->setData(['url' => 'https://api.test/x', 'http.query' => 'token=secret', 'error' => 'for owner@example.com']);
+        $span->setDescription("UPDATE pets SET share_token = 'x' WHERE id = 1 -- GET https://api.test/raw?signature=abc for owner@example.com");
         $event->setSpans([$span]);
 
         $out = SentryScrubber::beforeSend($event);
@@ -109,6 +116,9 @@ class SentryScrubberTest extends TestCase
         $spanData = $out->getSpans()[0]->getData();
         $this->assertSame('', $spanData['http.query']);
         $this->assertSame('for [email]', $spanData['error']);
+        $description = $out->getSpans()[0]->getDescription();
+        $this->assertStringNotContainsString('signature=abc', $description);
+        $this->assertStringNotContainsString('owner@example.com', $description);
     }
 
     public function test_event_user_is_reduced_to_id_and_everything_is_scrubbed(): void

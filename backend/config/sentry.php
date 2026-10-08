@@ -24,8 +24,11 @@ return [
     // 'logger' => Sentry\Logger\DebugFileLogger::class, // By default this will log to `storage_path('logs/sentry.log')`
 
     // The release version of your application
-    // Set by deploy-backend.yml (short git SHA) at config:cache time.
-    'release' => env('SENTRY_RELEASE'),
+    // deploy-backend.yml writes the short git SHA to backend/.release, so the
+    // release survives a later config:clear/optimize:clear on the server.
+    'release' => env('SENTRY_RELEASE') ?: (is_readable(base_path('.release'))
+        ? (trim((string) file_get_contents(base_path('.release'))) ?: null)
+        : null),
 
     // When left empty or `null` the Laravel environment will be used (usually discovered from `APP_ENV` in your `.env`)
     'environment' => env('SENTRY_ENVIRONMENT'),
@@ -149,8 +152,8 @@ return [
         // Define a threshold in milliseconds for HTTP client requests to resolve their origin
         'http_client_requests_origin_threshold_ms' => env('SENTRY_TRACE_HTTP_CLIENT_REQUESTS_ORIGIN_THRESHOLD_MS', 250),
 
-        // Capture Laravel cache events (hits, writes etc.) as spans
-        'cache' => env('SENTRY_TRACE_CACHE_ENABLED', true),
+        // Off, like the cache breadcrumbs: rate-limiter keys hash emails.
+        'cache' => env('SENTRY_TRACE_CACHE_ENABLED', false),
 
         // Capture Redis operations as spans (this enables Redis events in Laravel)
         'redis_commands' => env('SENTRY_TRACE_REDIS_COMMANDS', false),

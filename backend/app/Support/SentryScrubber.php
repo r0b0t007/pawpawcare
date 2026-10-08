@@ -79,6 +79,13 @@ class SentryScrubber
                 }
             }
             $span->setData($data);
+
+            // Descriptions hold cache keys, SQL (raw statements can inline
+            // values) and outgoing URLs.
+            $description = $span->getDescription();
+            if ($description !== null) {
+                $span->setDescription(self::scrubText($description));
+            }
         }
 
         $transaction = $event->getTransaction();
@@ -160,8 +167,13 @@ class SentryScrubber
             fn (array $m) => self::stripQuery($m[0]),
             $text,
         );
-        // Relative signed URLs: /documents/x/raw?expires=…&signature=…
-        $text = (string) preg_replace('/([?&](?:signature|expires|token|t|code)=)[^&\s"\'<>)]+/i', '$1[redacted]', $text);
+        // Credential-like query params in relative URLs or log text, e.g.
+        // /documents/x/raw?expires=…&signature=…, ?access_token=…, ?key=…
+        $text = (string) preg_replace(
+            '/([?&](?:t|[A-Za-z0-9_.-]*(?:token|key|secret|signature|sig|password|passwd|pwd|code|expires|auth|session)[A-Za-z0-9_.-]*)=)[^&\s"\'<>)]+/i',
+            '$1[redacted]',
+            $text,
+        );
         $text = (string) preg_replace('/\bBearer\s+[A-Za-z0-9._~+\/=-]+/i', 'Bearer [redacted]', $text);
         // Raw JWTs (access/refresh tokens are not always prefixed by Bearer).
         $text = (string) preg_replace('/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/', '[jwt]', $text);
