@@ -35,6 +35,9 @@ const SHARE_MAILTO =
   );
 
 export const WELCOME_SUBJECT = "You're on the list. Thank you!";
+// Inbox preview line. Deliberately not padded with invisible characters
+// (the usual &#847;&zwnj; filler trick): Outlook.com's filter scored the
+// padded version SCL 5 / Junk even with SPF, DKIM and DMARC all passing.
 const PREHEADER = "Your invite is on its way. Here's what's coming to PawPawCare.";
 
 export const LIST_UNSUBSCRIBE = `<${REMOVE_MAILTO}>`;
@@ -139,7 +142,7 @@ export const WELCOME_HTML = `<!DOCTYPE html>
 </style>
 </head>
 <body style="margin:0;padding:0;background:${C.bg};">
-<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${C.bg};opacity:0;">${PREHEADER}${"&#847;&zwnj;&nbsp;".repeat(40)}</div>
+<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${C.bg};opacity:0;">${PREHEADER}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.bg}" style="background:${C.bg};">
   <tr>
     <td align="center" class="outer" style="padding:36px 16px 40px;">
