@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\JwtService;
 use Closure;
 use Illuminate\Http\Request;
+use Sentry\State\Scope;
 use Symfony\Component\HttpFoundation\Response;
 
 class JwtAuth
@@ -39,6 +40,10 @@ class JwtAuth
         }
 
         $request->setUserResolver(fn () => $user);
+
+        // User isn't Laravel's Authenticatable, so Sentry can't pick it up
+        // automatically. Attach the pseudonymous id only (never email/name).
+        \Sentry\configureScope(fn (Scope $scope) => $scope->setUser(['id' => (string) $user->id]));
 
         return $next($request);
     }

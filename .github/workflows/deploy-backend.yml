@@ -104,6 +104,9 @@ jobs:
             cd backend
             "$PHP_BIN" "$(command -v composer || echo $HOME/bin/composer)" install --no-dev --optimize-autoloader --no-interaction
             "$PHP_BIN" artisan migrate --force
+            # Release (short SHA) for Sentry events and cron check-ins; read by
+            # config/sentry.php, so it also survives a later config:clear.
+            git rev-parse --short HEAD > .release
             "$PHP_BIN" artisan config:cache
             "$PHP_BIN" artisan route:cache
             "$PHP_BIN" artisan queue:restart || true

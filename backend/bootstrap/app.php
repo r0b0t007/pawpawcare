@@ -2,10 +2,13 @@
 
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\JwtAuth;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Validation\ValidationException;
+use Sentry\Laravel\Integration as SentryIntegration;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -22,6 +25,23 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Report unhandled exceptions to Sentry (inert without a DSN).
+        SentryIntegration::handles($exceptions);
+
+        // Laravel ignores every HttpException (any abort()) by default. 4xx are
+        // expected business errors, but a deliberate abort(5xx) means something
+        // server-side is broken (extraction provider down, social login or the
+        // signing key misconfigured) — report those, throttled to one event per
+        // distinct status+message per 10 minutes so a misconfiguration hit on
+        // every request can't burn the Sentry quota.
+        $exceptions->stopIgnoring(HttpException::class);
+        $exceptions->dontReportWhen(
+            fn (Throwable $e) => $e instanceof HttpExceptionInterface && $e->getStatusCode() < 500,
+        );
+        $exceptions->throttle(fn (Throwable $e) => $e instanceof HttpExceptionInterface
+            ? Limit::perMinutes(10, 1)->by('http5xx:'.$e->getStatusCode().':'.md5($e->getMessage()))
+            : null);
+
         // The mobile/web client expects every error as JSON with a `detail` key
         // (preserving the previous FastAPI backend contract).
         $exceptions->shouldRenderJsonWhen(fn () => true);
