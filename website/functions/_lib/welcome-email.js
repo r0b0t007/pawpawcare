@@ -35,6 +35,12 @@ const SHARE_MAILTO =
   );
 
 export const WELCOME_SUBJECT = "You're on the list. Thank you!";
+// Inbox preview line. Rendered in a plain display:none div — no invisible
+// filler characters (&#847;&zwnj; and friends) and no camouflage styling
+// (background-coloured text, 1px font, opacity:0). The first Outlook.com
+// delivery of the padded, camouflaged version went to Junk (SCL 5) with SPF,
+// DKIM and DMARC all passing; hidden-text signals are a suspected cause, new
+// domain reputation the other. tests/website/waitlist.test.mjs guards both.
 const PREHEADER = "Your invite is on its way. Here's what's coming to PawPawCare.";
 
 export const LIST_UNSUBSCRIBE = `<${REMOVE_MAILTO}>`;
@@ -139,7 +145,7 @@ export const WELCOME_HTML = `<!DOCTYPE html>
 </style>
 </head>
 <body style="margin:0;padding:0;background:${C.bg};">
-<div style="display:none;max-height:0;max-width:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${C.bg};opacity:0;">${PREHEADER}${"&#847;&zwnj;&nbsp;".repeat(40)}</div>
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${PREHEADER}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.bg}" style="background:${C.bg};">
   <tr>
     <td align="center" class="outer" style="padding:36px 16px 40px;">
@@ -148,7 +154,7 @@ export const WELCOME_HTML = `<!DOCTYPE html>
         <tr>
           <td align="center" style="padding:0 0 20px;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-              <td valign="middle" style="padding-right:12px;"><img src="${LOGO_URL}" width="52" height="52" alt="PawPawCare" style="display:block;width:52px;height:52px;border-radius:14px;"></td>
+              <td valign="middle" style="padding-right:12px;"><img src="${LOGO_URL}" width="52" height="52" alt="" style="display:block;width:52px;height:52px;border-radius:14px;"></td>
               <td valign="middle" style="font-family:${DISPLAY_FONT};font-size:26px;line-height:30px;font-weight:700;color:${C.bark};">PawPawCare</td>
             </tr></table>
           </td>
@@ -170,7 +176,7 @@ export const WELCOME_HTML = `<!DOCTYPE html>
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${STEPS.map((s, i) => stepRow(s, i === STEPS.length - 1)).join("")}
                 </table>
               </td></tr>
-              <tr><td style="padding:0 0 28px;"><div style="height:1px;line-height:1px;font-size:1px;background:${C.hairline};">&nbsp;</div></td></tr>
+              <tr><td style="padding:0 0 28px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-top:1px solid ${C.hairline};"></td></tr></table></td></tr>
               <tr><td style="padding:0 0 28px;">
                 ${eyebrow("What's coming")}
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${FEATURES.map((f, i) => featureRow(f, i, i === FEATURES.length - 1)).join("")}

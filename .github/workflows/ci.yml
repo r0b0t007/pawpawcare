@@ -1,6 +1,7 @@
 # Continuous integration — runs on every PR and on pushes to main.
 # Backend: PHPUnit suite (SQLite in-memory). Frontend: Metro bundle (catches
-# import/syntax errors). Neither needs external services.
+# import/syntax errors). Website: node:test suite for the waitlist Pages
+# Function and welcome email (fetch is mocked). None needs external services.
 
 name: CI
 
@@ -67,3 +68,18 @@ jobs:
 
       - name: Bundle (type/import/syntax check)
         run: npx expo export --platform android --output-dir ./dist-ci
+
+  website:
+    name: Website (waitlist function)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # 22+ for ESM syntax detection (website/functions/*.js has no
+      # package.json "type") and glob support in --test.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run tests
+        run: node --test "tests/website/*.test.mjs"
