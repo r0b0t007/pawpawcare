@@ -290,13 +290,13 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
 
 /* Hero visual: "grounded duo" (Claude Design option 1a). The phone stands in
    front of the photo and drops below its baseline, so the two read as one
-   layered scene; the notification links the puppy to the product. Sizes are
-   relative to this box (cqw), so the composition holds at any width, and the
-   phone only overlaps the photo's left edge, never the puppy's face. */
+   layered scene. Sizes are relative to this box (cqw), so the composition
+   holds at any width, and the phone only overlaps the photo's left edge,
+   never the puppy's face. */
 .hero-visual {
   container-type: inline-size;
   position: relative;
-  aspect-ratio: 540 / 690;
+  aspect-ratio: 540 / 600;
 }
 
 .hero-photo {
@@ -336,36 +336,6 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
   border-radius: 50%;
   background: radial-gradient(closest-side, rgba(70, 40, 8, 0.22), rgba(70, 40, 8, 0));
 }
-
-.hero-ntf {
-  position: absolute;
-  top: 3%;
-  left: 2%;
-  z-index: 3;
-  width: 55%;
-  display: flex;
-  align-items: flex-start;
-  gap: 2.4cqw;
-  padding: 2.6cqw 3cqw;
-  border-radius: 3.6cqw;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid var(--surface-high);
-  box-shadow: 0 18px 40px -20px rgba(70, 42, 10, 0.35), 0 4px 12px -6px rgba(70, 42, 10, 0.18);
-}
-.hero-ntf p { margin: 0; }
-.hero-ntf-icon { flex: none; width: 7.4cqw; height: 7.4cqw; border-radius: 2cqw; background: var(--surface-low); }
-.hero-ntf-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 2cqw;
-  font-size: max(10px, 2.1cqw);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-.hero-ntf .hero-ntf-title { margin-top: 0.6cqw; font-size: max(12.5px, 2.9cqw); font-weight: 700; line-height: 1.3; color: var(--ink); }
-.hero-ntf .hero-ntf-text { margin-top: 0.3cqw; font-size: max(11px, 2.5cqw); line-height: 1.4; color: var(--ink-soft); }
 
 /* ---------- Phone frame ---------- */
 
@@ -425,13 +395,8 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
    keeps the H1 high on the fold, SEO audit C1), then the visual. */
 @media (max-width: 820px) {
   .hero-grid { grid-template-columns: 1fr; }
-  .hero-visual { width: 100%; max-width: 440px; margin: 8px auto 0; aspect-ratio: 350 / 460; }
+  .hero-visual { width: 100%; max-width: 440px; margin: 8px auto 0; aspect-ratio: 350 / 400; }
   .phone.phone-hero { width: 44%; }
-  .hero-ntf { top: 0; width: 66%; gap: 3cqw; padding: 3.4cqw 3.8cqw; border-radius: 4.6cqw; }
-  .hero-ntf-icon { width: 9cqw; height: 9cqw; border-radius: 2.6cqw; }
-  .hero-ntf-top { font-size: max(10px, 2.8cqw); }
-  .hero-ntf .hero-ntf-title { font-size: max(12.5px, 3.8cqw); }
-  .hero-ntf .hero-ntf-text { font-size: max(11px, 3.3cqw); }
 }
 
 /* ---------- Forms ---------- */
