@@ -5,7 +5,6 @@
 // /thanks.html — an infra hiccup on our side shouldn't look like a form error
 // to a pet owner who just typed their email correctly.
 //
-//
 // Each signup sends two emails through Resend: a notification to WAITLIST_TO,
 // and the branded welcome email (../_lib/welcome-email.js) to the visitor.
 //
@@ -26,7 +25,7 @@ import {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, waitUntil }) {
   const origin = new URL(request.url).origin;
   const thanksUrl = `${origin}/thanks.html`;
   const homeUrl = `${origin}/`;
@@ -60,10 +59,17 @@ export async function onRequestPost({ request, env }) {
   // Anyone can type any address into the form, so the welcome email is the
   // one thing a stranger could aim at someone else. Its content is fixed (no
   // visitor input is rendered) and Resend honours the idempotency key for
-  // 24h, so resubmitting the same address sends it at most once a day.
-  const welcomeKey = `waitlist-welcome/${await sha256Hex(email.toLowerCase())}`;
+  // 24h, so resubmitting the same address sends it at most once a day. The
+  // key is hashed from the exact `to` value: Resend rejects a reused key whose
+  // payload differs (409), so case-folding here would turn a "Foo@" then
+  // "foo@" resubmit into a logged error instead of a dedupe. Spraying many
+  // different addresses is throttled by a Cloudflare rate-limiting rule on
+  // /api/waitlist (see docs/deploy-website-cloudflare.md), not here.
+  const welcomeKey = `waitlist-welcome/${await sha256Hex(email)}`;
 
-  await Promise.all([
+  // Neither send changes the response, so don't make the visitor wait on
+  // Resend: redirect now and let the sends finish in the background.
+  waitUntil(Promise.all([
     sendEmail(env, "notification", {
       from: env.WAITLIST_FROM,
       to: env.WAITLIST_TO,
@@ -85,7 +91,7 @@ export async function onRequestPost({ request, env }) {
       },
       welcomeKey,
     ),
-  ]);
+  ]));
 
   return Response.redirect(thanksUrl, 303);
 }

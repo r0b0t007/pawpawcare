@@ -2,9 +2,11 @@
 // Design source: Claude Design project "PawPawCare waitlist welcome email".
 //
 // This is the email-client-safe build of that design: table layout, inline
-// styles, web fonts with system fallbacks, no flexbox/grid, and every image
-// absolute. Outlook desktop squares the rounded corners and ignores the web
-// fonts — that's expected and still reads fine.
+// styles, no flexbox/grid, and every image absolute. No web fonts are loaded:
+// a remote font request would hand each reader's IP to the font host, which
+// the privacy policy doesn't list. The brand fonts are named first in each
+// stack so readers who have them installed see them; everyone else gets the
+// system fallbacks. Outlook desktop squares the rounded corners — expected.
 //
 // The content is static on purpose: nothing the visitor typed is rendered, so
 // there's no injection surface and every send has an identical payload (which
@@ -120,7 +122,6 @@ export const WELCOME_HTML = `<!DOCTYPE html>
 <meta name="supported-color-schemes" content="light">
 <title>${WELCOME_SUBJECT}</title>
 <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><style>* { font-family: Arial, Helvetica, sans-serif !important; }</style><![endif]-->
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   body { margin: 0; padding: 0; width: 100% !important; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
   table { border-collapse: separate; border-spacing: 0; mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
@@ -222,7 +223,7 @@ ${FEATURES.map((f) => `- ${f.title}: ${f.text}`).join("\n")}
 
 KNOW ANOTHER PET PARENT?
 Share PawPawCare with a friend. They can join the waitlist in seconds:
-${SITE}/#waitlist
+${SIGNUP_URL}
 
 Until then, give someone furry a scratch from us.
 The PawPawCare team
