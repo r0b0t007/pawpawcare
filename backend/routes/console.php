@@ -10,7 +10,10 @@ Artisan::command('inspire', function () {
 
 // Scan for due reminders every minute. Requires a cron entry running
 // `php artisan schedule:run` in production (or `php artisan schedule:work` in dev).
-Schedule::command('reminders:send')->everyMinute()->withoutOverlapping();
+// Sentry Crons check-in: the only alarm if the cPanel cron stops running
+// (reminders are the core feature). Inert without SENTRY_LARAVEL_DSN.
+Schedule::command('reminders:send')->everyMinute()->withoutOverlapping()
+    ->sentryMonitor(checkInMargin: 5, maxRuntime: 10, failureIssueThreshold: 3, recoveryThreshold: 1);
 
 // Keep the refresh_tokens table from growing without bound.
 Schedule::command('auth:prune-tokens')->daily();

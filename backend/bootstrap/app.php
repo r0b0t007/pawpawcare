@@ -6,6 +6,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Validation\ValidationException;
+use Sentry\Laravel\Integration as SentryIntegration;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -22,6 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Report unhandled exceptions to Sentry (inert without a DSN). Laravel's
+        // internal dontReport already skips HttpException (every abort()),
+        // ValidationException and ModelNotFoundException, so expected 4xx
+        // business errors never become Sentry issues.
+        SentryIntegration::handles($exceptions);
+
         // The mobile/web client expects every error as JSON with a `detail` key
         // (preserving the previous FastAPI backend contract).
         $exceptions->shouldRenderJsonWhen(fn () => true);

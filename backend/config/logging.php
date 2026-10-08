@@ -58,6 +58,18 @@ return [
             'ignore_exceptions' => false,
         ],
 
+        // Errors and above become Sentry events (add to LOG_STACK in production:
+        // LOG_STACK=single,sentry). Inert without SENTRY_LARAVEL_DSN.
+        'sentry' => [
+            'driver' => 'sentry',
+            'level' => env('SENTRY_LOG_LEVEL_EVENTS', 'error'),
+            'bubble' => true,
+            // Unhandled exceptions already reach Sentry via Integration::handles()
+            // in bootstrap/app.php; don't capture them a second time when
+            // Laravel also logs them through this channel.
+            'report_exceptions' => false,
+        ],
+
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
