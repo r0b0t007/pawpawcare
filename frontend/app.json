@@ -59,6 +59,14 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.493303263143-81gcusogeirf5gmjj5spk4b17v7m5hv6"
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "organization": "pawpawcare",
+          "project": "pawpawcare-app"
+        }
       ]
     ],
     "extra": {
