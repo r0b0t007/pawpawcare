@@ -174,7 +174,9 @@ jobs:
         # EXPO_PUBLIC_* vars are inlined into the JS bundle at publish time, so
         # every var the eas.json `preview` profile sets MUST also be set here —
         # otherwise the update silently strips them from installed test builds.
-        # Mirrors the preview profile exactly (which sets no PostHog key).
+        # Mirrors the preview profile exactly — CI enforces it
+        # (frontend/scripts/check-public-env.js). No PostHog key on purpose:
+        # tester builds stay out of production analytics.
         run: |
           {
             echo "EXPO_PUBLIC_API_URL=${{ secrets.BACKEND_URL }}"

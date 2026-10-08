@@ -64,6 +64,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: EXPO_PUBLIC env matches between eas.json and OTA workflows
+        run: node scripts/check-public-env.js
+
       - name: Unit tests (Jest)
         run: npm test -- --ci
 
