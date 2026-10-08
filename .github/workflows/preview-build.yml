@@ -171,18 +171,13 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Create env file
-        # EXPO_PUBLIC_* vars are inlined into the JS bundle at publish time, so
-        # every var the eas.json `preview` profile sets MUST also be set here —
-        # otherwise the update silently strips them from installed test builds.
-        # Mirrors the preview profile exactly — CI enforces it
-        # (frontend/scripts/check-public-env.js). No PostHog key on purpose:
-        # tester builds stay out of production analytics.
-        run: |
-          {
-            echo "EXPO_PUBLIC_API_URL=${{ secrets.BACKEND_URL }}"
-            echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=493303263143-srop8lcrhgvavaulh9jlthjjokghl2qd.apps.googleusercontent.com"
-            echo "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=493303263143-81gcusogeirf5gmjj5spk4b17v7m5hv6.apps.googleusercontent.com"
-          } >> .env.local
+        # EXPO_PUBLIC_* vars are inlined into the JS bundle at publish time.
+        # Generated from the eas.json `preview` profile — the same source
+        # store builds use — so an OTA update can never strip or change one.
+        # The script fails on a missing profile or an empty value.
+        # (No PostHog key in that profile on purpose: tester builds stay out
+        # of production analytics.)
+        run: node scripts/eas-env.js preview > .env.local
 
       - name: Publish preview update
         # Commit message passed via env (assigned literally by Actions), never

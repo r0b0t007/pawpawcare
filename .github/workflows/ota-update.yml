@@ -48,22 +48,11 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Create env file
-        # EXPO_PUBLIC_* vars are inlined into the JS bundle at publish time, so
-        # every var the eas.json build profiles set MUST also be set here —
-        # otherwise an OTA update silently strips them from installed apps
-        # (e.g. an empty GOOGLE_WEB_CLIENT_ID hides the Google sign-in button).
-        # Must mirror the eas.json `production` profile exactly — CI enforces it
-        # (frontend/scripts/check-public-env.js). The Google client IDs and the
-        # PostHog project key are public identifiers (they ship inside the app),
-        # so they're committed literally, not read from secrets: a missing
-        # secret silently became an empty key and disabled analytics.
-        run: |
-          {
-            echo "EXPO_PUBLIC_API_URL=${{ secrets.BACKEND_URL }}"
-            echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=493303263143-srop8lcrhgvavaulh9jlthjjokghl2qd.apps.googleusercontent.com"
-            echo "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=493303263143-81gcusogeirf5gmjj5spk4b17v7m5hv6.apps.googleusercontent.com"
-            echo "EXPO_PUBLIC_POSTHOG_KEY=phc_zyVDAZmmKbQaMSBF37L3HqhWBEuVSzZC5yGuKQbxP8jH"
-          } >> .env.local
+        # EXPO_PUBLIC_* vars are inlined into the JS bundle at publish time.
+        # Generated from the eas.json `production` profile — the same source
+        # store builds use — so an OTA update can never strip or change one.
+        # The script fails on a missing profile or an empty value.
+        run: node scripts/eas-env.js production > .env.local
 
       - name: Publish OTA update
         # Pass the commit message via env (assigned literally by Actions), never
