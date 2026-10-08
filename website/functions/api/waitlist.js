@@ -59,13 +59,14 @@ export async function onRequestPost({ request, env, waitUntil }) {
   // Anyone can type any address into the form, so the welcome email is the
   // one thing a stranger could aim at someone else. Its content is fixed (no
   // visitor input is rendered) and Resend honours the idempotency key for
-  // 24h, so resubmitting the same address sends it at most once a day. The
-  // key is hashed from the exact `to` value: Resend rejects a reused key whose
-  // payload differs (409), so case-folding here would turn a "Foo@" then
-  // "foo@" resubmit into a logged error instead of a dedupe. Spraying many
-  // different addresses is throttled by a Cloudflare rate-limiting rule on
-  // /api/waitlist (see docs/deploy-website-cloudflare.md), not here.
-  const welcomeKey = `waitlist-welcome/${await sha256Hex(email)}`;
+  // 24h, so resubmitting the same address sends it at most once a day.
+  // Resend rejects a reused key whose payload differs (409), so the key covers
+  // everything that varies: the exact `to` value (no case-folding — "Foo@"
+  // then "foo@" would 409) and a hash of the template (an email edit deployed
+  // within 24h of someone's signup would otherwise 409 their resubmit).
+  // Spraying many different addresses is throttled by a Cloudflare
+  // rate-limiting rule on /api/waitlist (see docs/deploy-website-cloudflare.md).
+  const welcomeKey = `waitlist-welcome/${await welcomeVersion()}/${await sha256Hex(email)}`;
 
   // Neither send changes the response, so don't make the visitor wait on
   // Resend: redirect now and let the sends finish in the background.
@@ -121,6 +122,12 @@ async function sendEmail(env, label, payload, idempotencyKey) {
   } catch (err) {
     console.error(`waitlist: Resend request failed (${label})`, err);
   }
+}
+
+let welcomeVersionPromise;
+function welcomeVersion() {
+  welcomeVersionPromise ??= sha256Hex(WELCOME_SUBJECT + WELCOME_HTML + WELCOME_TEXT).then((h) => h.slice(0, 12));
+  return welcomeVersionPromise;
 }
 
 async function sha256Hex(value) {
