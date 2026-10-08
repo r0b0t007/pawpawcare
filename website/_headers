@@ -11,6 +11,13 @@
 /images/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Images embedded in emails (functions/_lib/welcome-email.js) are loaded
+# cross-origin by webmail clients, which the site-wide same-origin CORP above
+# would block. Detach it for this folder only.
+/email/*
+  ! Cross-Origin-Resource-Policy
+  Cache-Control: public, max-age=86400
+
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
 

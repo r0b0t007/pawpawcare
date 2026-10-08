@@ -140,9 +140,12 @@ DNS determines which one visitors actually reach.
 
 ## Known limitation
 
-The waitlist Function only sends a Resend notification email per signup — if
-Resend has an outage, the visitor still sees "you're on the list" but no
-email is sent (logged as an error in `wrangler pages deployment tail`
+The waitlist Function sends two Resend emails per signup — a notification
+to `WAITLIST_TO` and the branded welcome email to the visitor
+(`website/functions/_lib/welcome-email.js`, From = `WAITLIST_FROM`, replies
+and removal requests to `hello@pawpawcare.app`, logo served from
+`website/email/` with CORP detached in `_headers`). If Resend has an outage,
+the visitor still sees "you're on the list" but neither email is sent (logged as an error in `wrangler pages deployment tail`
 instead). This mirrors the original Netlify Forms failure mode. If durable
 storage matters more than simplicity, a follow-up could write to a Cloudflare
 KV namespace or D1 table before calling Resend.
