@@ -138,11 +138,26 @@ can stay connected as a fallback for a while, or be unlinked from the repo
 once you're confident in the Cloudflare deploy. No urgency either way since
 DNS determines which one visitors actually reach.
 
+## Abuse throttle
+
+Because the welcome email goes to whatever address is typed into the form,
+`/api/waitlist` is throttled by a Cloudflare **rate limiting rule** (dashboard
+→ pawpawcare.app → Security → Security rules → "Waitlist signup throttle";
+the free plan allows exactly one): URI path equals `/api/waitlist`, per IP,
+more than 3 requests in 10 seconds → Block for 10 seconds. Added 2026-10-08
+and verified live (the 6th rapid POST returned 429; counting is approximate).
+The welcome send also carries a per-address Resend `Idempotency-Key`, so the
+same address gets it at most once per 24h. If abuse gets past this, the next
+step is Cloudflare Turnstile on the form.
+
 ## Known limitation
 
-The waitlist Function only sends a Resend notification email per signup — if
-Resend has an outage, the visitor still sees "you're on the list" but no
-email is sent (logged as an error in `wrangler pages deployment tail`
+The waitlist Function sends two Resend emails per signup — a notification
+to `WAITLIST_TO` and the branded welcome email to the visitor
+(`website/functions/_lib/welcome-email.js`, From = `WAITLIST_FROM`, replies
+and removal requests to `hello@pawpawcare.app`, logo served from
+`website/email/` with CORP detached in `_headers`). If Resend has an outage,
+the visitor still sees "you're on the list" but neither email is sent (logged as an error in `wrangler pages deployment tail`
 instead). This mirrors the original Netlify Forms failure mode. If durable
 storage matters more than simplicity, a follow-up could write to a Cloudflare
 KV namespace or D1 table before calling Resend.
