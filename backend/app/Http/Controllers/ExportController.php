@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Pet;
+use App\Services\Analytics\ProductAnalytics;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ use Illuminate\Support\Collection;
  */
 class ExportController extends Controller
 {
-    public function export(Request $request): Response
+    public function export(Request $request, ProductAnalytics $analytics): Response
     {
         $data = $request->validate([
             'format' => 'required|in:pdf,csv',
@@ -56,14 +57,25 @@ class ExportController extends Controller
 
         $filename = 'pawpawcare-records-'.now()->format('Y-m-d').'.'.$data['format'];
 
+        $body = $data['format'] === 'csv'
+            ? $this->buildCsv($user->name, $bundle)
+            : $this->buildPdf($user->name, $bundle);
+
+        // Only once the file was actually built.
+        $analytics->capture($user, 'server_records_exported', [
+            'format' => $data['format'],
+            'scope' => empty($data['pets']) ? 'all' : 'selected',
+            'pet_count' => $pets->count(),
+        ]);
+
         if ($data['format'] === 'csv') {
-            return response($this->buildCsv($user->name, $bundle), 200, [
+            return response($body, 200, [
                 'Content-Type' => 'text/csv; charset=UTF-8',
                 'Content-Disposition' => 'attachment; filename="'.$filename.'"',
             ]);
         }
 
-        return response($this->buildPdf($user->name, $bundle), 200, [
+        return response($body, 200, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
         ]);

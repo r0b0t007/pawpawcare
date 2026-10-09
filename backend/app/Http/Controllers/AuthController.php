@@ -87,7 +87,7 @@ class AuthController extends Controller
 
         RateLimiter::clear($failKey);
 
-        $reactivated = $this->reactivateOrRejectDisabled($user);
+        $reactivated = $this->reactivateOrRejectDisabled($user, 'password');
 
         return response()->json(
             $this->issueTokens($user) + ($reactivated ? ['reactivated' => true] : [])
@@ -331,8 +331,9 @@ class AuthController extends Controller
 
         // ...so also cancel a pending self-deletion: the user can simply log
         // in with the new password.
-        if (! $user->is_active && $user->deletion_requested_at !== null) {
-            $user->forceFill(['is_active' => true, 'deletion_requested_at' => null])->save();
+        if (! $user->is_active && $user->deletion_requested_at !== null
+            && ! $user->cancelPendingDeletion('password_reset')) {
+            abort(400, 'Invalid or expired code'); // purged meanwhile
         }
 
         // Kill every existing session: stolen refresh tokens, live access
@@ -440,7 +441,7 @@ class AuthController extends Controller
      * `deletion_requested_at`, otherwise this reactivation path would undo
      * the ban on their next login.
      */
-    private function reactivateOrRejectDisabled(User $user): bool
+    private function reactivateOrRejectDisabled(User $user, string $method): bool
     {
         if ($user->is_active) {
             return false;
@@ -450,10 +451,10 @@ class AuthController extends Controller
             abort(403, 'Account is disabled');
         }
 
-        $user->forceFill([
-            'is_active' => true,
-            'deletion_requested_at' => null,
-        ])->save();
+        // False only if the account was purged (or changed) meanwhile.
+        if (! $user->cancelPendingDeletion($method)) {
+            abort(401, 'This account has been deleted');
+        }
 
         return true;
     }
@@ -562,7 +563,7 @@ class AuthController extends Controller
 
         // Existing account (linked or matched): honour the disabled flag,
         // cancelling a pending self-deletion (grace-period reactivation).
-        $reactivated = $this->reactivateOrRejectDisabled($user);
+        $reactivated = $this->reactivateOrRejectDisabled($user, $provider);
 
         return [$user, $reactivated];
     }

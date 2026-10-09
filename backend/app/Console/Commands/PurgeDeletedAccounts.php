@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Services\Analytics\ProductAnalytics;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PurgeDeletedAccounts extends Command
@@ -12,16 +14,71 @@ class PurgeDeletedAccounts extends Command
 
     protected $description = 'Permanently delete accounts whose deletion grace period has passed.';
 
-    public function handle(): int
+    /**
+     * How long a failing third-party deletion (PostHog) may hold up a purge.
+     * Past that, the account is purged locally anyway and the leftover is
+     * logged as an error for manual follow-up.
+     */
+    public const THIRD_PARTY_RETRY_DAYS = 7;
+
+    public function handle(ProductAnalytics $analytics): int
     {
-        $due = User::whereNotNull('deletion_requested_at')
-            ->where('deletion_requested_at', '<=', now()->subDays(User::DELETION_GRACE_DAYS))
-            ->get();
+        $due = User::dueForPurge()->orderBy('deletion_requested_at')->get();
 
         $purged = 0;
-        foreach ($due as $user) {
+        $posthogDown = false;
+        foreach ($due as $listed) {
+            // Re-check before touching anything: the sweep can take a while,
+            // and a user who logged back in since the list was loaded (which
+            // cancels the deletion) must keep both their account and their
+            // analytics history.
+            $user = User::whereKey($listed->id)->dueForPurge()->first();
+            if (! $user) {
+                continue;
+            }
+
+            $giveUpAt = $user->deletion_requested_at->copy()
+                ->addDays(User::DELETION_GRACE_DAYS + self::THIRD_PARTY_RETRY_DAYS);
+            $pastRetryWindow = now()->gte($giveUpAt);
+
+            // Erase the person's product-analytics data first, while we still
+            // know their id. During a PostHog outage the rest of the run stops
+            // calling it (no timeout per account); those accounts retry
+            // tomorrow — except ones out of retry window, which still get
+            // their attempt before being purged.
+            if ($posthogDown && ! $pastRetryWindow) {
+                continue;
+            }
+            $result = $analytics->deletePerson((string) $user->id);
+            if ($result === ProductAnalytics::DELETE_UNAVAILABLE) {
+                $posthogDown = true;
+            }
+            if ($result !== ProductAnalytics::DELETE_OK) {
+                if (! $pastRetryWindow) {
+                    continue;
+                }
+                Log::error('PostHog deletion kept failing; purging the account locally anyway', ['user_id' => $user->id]);
+            }
+
             try {
-                $this->purge($user);
+                // The PostHog call can take seconds: re-check under the row
+                // lock and delete in the same transaction. A concurrent login
+                // (User::cancelPendingDeletion) waits for the lock, then finds
+                // the account gone and is rejected — it can never be told
+                // "restored" and then lose the account. File deletes are
+                // deferred to after commit (Uploads), so a rollback leaves
+                // everything consistent.
+                $stillDue = DB::transaction(function () use ($user) {
+                    $current = User::whereKey($user->id)->dueForPurge()->lockForUpdate()->first();
+                    if ($current) {
+                        $this->purge($current);
+                    }
+
+                    return $current !== null;
+                });
+                if (! $stillDue) {
+                    continue;
+                }
                 $purged++;
             } catch (\Throwable $e) {
                 // One failing account must not block the rest of the sweep.

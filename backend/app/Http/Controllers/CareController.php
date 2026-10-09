@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\CareProfile;
 use App\Models\Pet;
+use App\Services\Analytics\ProductAnalytics;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -59,7 +60,7 @@ class CareController extends Controller
     }
 
     /** Mint a caretaker link (owner or co-owner). */
-    public function createLink(Request $request, string $petId): JsonResponse
+    public function createLink(Request $request, string $petId, ProductAnalytics $analytics): JsonResponse
     {
         $pet = $this->accessiblePetOr404($request, $petId);
 
@@ -71,11 +72,14 @@ class CareController extends Controller
             $pet->forceFill(['care_token' => Str::random(40)])->save();
         }
 
-        $expiresAt = now()->addMinutes(self::EXPIRIES[$data['expires_in'] ?? '7d']);
+        $expiresIn = $data['expires_in'] ?? '7d';
+        $expiresAt = now()->addMinutes(self::EXPIRIES[$expiresIn]);
         $url = URL::temporarySignedRoute('pets.care', $expiresAt, [
             'pet' => $pet->id,
             't' => $pet->care_token,
         ]);
+
+        $analytics->capture($request->user(), 'server_care_link_created', ['expires_in' => $expiresIn]);
 
         return response()->json(['url' => $url, 'expires_at' => $expiresAt->toISOString()]);
     }

@@ -35,6 +35,18 @@ return [
         ],
     ],
 
+    // Server-side product analytics (App\Services\Analytics\ProductAnalytics).
+    // `key` is the public project token (same phc_ key the app ships); empty
+    // disables capture. The personal API key (scope person:write only) and
+    // project id are needed solely to delete a purged user's data.
+    'posthog' => [
+        'key' => env('POSTHOG_PROJECT_KEY'),
+        'host' => env('POSTHOG_HOST', 'https://us.i.posthog.com'),
+        'api_host' => env('POSTHOG_API_HOST', 'https://us.posthog.com'),
+        'personal_api_key' => env('POSTHOG_PERSONAL_API_KEY'),
+        'project_id' => env('POSTHOG_PROJECT_ID'),
+    ],
+
     'anthropic' => [
         'key' => env('ANTHROPIC_API_KEY'),
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-8'),

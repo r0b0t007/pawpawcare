@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Document;
 use App\Models\Pet;
+use App\Services\Analytics\ProductAnalytics;
 use App\Support\WeightInsight;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ class PetShareController extends Controller
     private const EXPIRIES = ['1h' => 60, '24h' => 60 * 24, '7d' => 60 * 24 * 7];
 
     /** Mint a share link (owner or co-owner). */
-    public function create(Request $request, string $petId): JsonResponse
+    public function create(Request $request, string $petId, ProductAnalytics $analytics): JsonResponse
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
@@ -42,11 +43,14 @@ class PetShareController extends Controller
             $pet->forceFill(['share_token' => Str::random(40)])->save();
         }
 
-        $expiresAt = now()->addMinutes(self::EXPIRIES[$data['expires_in'] ?? '24h']);
+        $expiresIn = $data['expires_in'] ?? '24h';
+        $expiresAt = now()->addMinutes(self::EXPIRIES[$expiresIn]);
         $url = URL::temporarySignedRoute('pets.share', $expiresAt, [
             'pet' => $pet->id,
             't' => $pet->share_token,
         ]);
+
+        $analytics->capture($request->user(), 'server_share_link_created', ['expires_in' => $expiresIn]);
 
         return response()->json([
             'url' => $url,

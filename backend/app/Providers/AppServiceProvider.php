@@ -2,11 +2,13 @@
 
 namespace App\Providers;
 
+use App\Services\Analytics\ProductAnalytics;
 use App\Services\Extraction\AnthropicDriver;
 use App\Services\Extraction\ExtractionClient;
 use App\Services\Extraction\OpenAiCompatibleDriver;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,6 +25,9 @@ class AppServiceProvider extends ServiceProvider
             'openai-compatible' => new OpenAiCompatibleDriver,
             default => new AnthropicDriver,
         });
+
+        // One buffer per request/command, flushed after the response is sent.
+        $this->app->singleton(ProductAnalytics::class);
     }
 
     /**
@@ -30,6 +35,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Queue workers never reach app()->terminating between jobs: send any
+        // analytics a job captured once it's done.
+        Queue::after(function () {
+            if ($this->app->resolved(ProductAnalytics::class)) {
+                $this->app->make(ProductAnalytics::class)->flush();
+            }
+        });
+
         // Blanket ceiling for every authenticated route (applied to the
         // auth.jwt group in routes/api.php). Generous enough that no real
         // client ever hits it — it exists so a leaked/abused token can't
