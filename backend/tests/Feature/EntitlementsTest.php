@@ -2,15 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\UpgradeRequired;
 use App\Models\Document;
 use App\Models\Pet;
 use App\Models\User;
 use App\Models\UserEntitlement;
+use App\Services\DocumentExtractor;
 use App\Services\JwtService;
 use App\Services\Subscriptions\Entitlements;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class EntitlementsTest extends TestCase
@@ -192,23 +196,70 @@ class EntitlementsTest extends TestCase
         $this->assertFalse($this->entitlements()->allows($early, 'care_links'));
     }
 
-    public function test_free_ai_extractions_are_counted_per_pet_owner_per_month(): void
+    public function test_free_ai_reads_are_a_monthly_allowance_per_pet_owner(): void
     {
         [$owner] = $this->user();
+        [$member] = $this->user();
         $pet = $this->pet($owner);
         $this->gate('ai_extraction');
         config(['entitlements.free_ai_extractions' => 2]);
-        $read = fn ($when) => (new Document)->forceFill([
-            'pet_id' => $pet->id, 'title' => 'Record', 'file_path' => 'x.jpg',
-            'extraction_status' => 'done', 'extracted_at' => $when,
-        ])->save();
 
-        $read(now()->subMonthNoOverflow()->startOfMonth()); // last month doesn't count
-        $read(now());
+        $this->assertTrue($this->entitlements()->authorize($owner, 'ai_extraction', $pet));
+        // A co-owner draws on the owner's allowance.
+        $this->assertTrue($this->entitlements()->authorize($member, 'ai_extraction', $pet));
+        $this->assertFalse($this->entitlements()->allows($owner, 'ai_extraction', $pet));
+
+        // Deleting documents gives nothing back; a refund (failed read) does.
+        Document::query()->delete();
+        $this->assertFalse($this->entitlements()->allows($owner, 'ai_extraction', $pet));
+        $this->entitlements()->refund($member, 'ai_extraction', $pet);
         $this->assertTrue($this->entitlements()->allows($owner, 'ai_extraction', $pet));
 
-        $read(now());
-        $this->assertFalse($this->entitlements()->allows($owner, 'ai_extraction', $pet));
+        $this->assertTrue($this->entitlements()->authorize($owner, 'ai_extraction', $pet));
+        $this->expectException(UpgradeRequired::class);
+        $this->entitlements()->authorize($owner, 'ai_extraction', $pet);
+    }
+
+    public function test_a_failed_ai_read_does_not_use_the_allowance(): void
+    {
+        Storage::fake('local');
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+        $docId = $this->withToken($token)->post("/pets/{$pet->id}/documents", [
+            'file' => UploadedFile::fake()->image('record.jpg', 200, 200),
+            'title' => 'Vet record',
+        ])->assertCreated()->json('id');
+        $this->gate('ai_extraction');
+        config(['entitlements.free_ai_extractions' => 1]);
+        $extractor = $this->mock(DocumentExtractor::class);
+        $extractor->allows('supports')->andReturnTrue();
+        $extractor->shouldReceive('extract')->once()->andThrow(new \RuntimeException('provider down'));
+
+        $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$docId}/extract")->assertStatus(502);
+
+        $this->assertTrue($this->entitlements()->allows($owner, 'ai_extraction', $pet));
+    }
+
+    public function test_switches_read_off_and_no_as_off(): void
+    {
+        foreach (['off', 'no', '0', 'false', ''] as $value) {
+            $_ENV['PAYWALL_ENABLED'] = $_SERVER['PAYWALL_ENABLED'] = $value;
+            $this->assertFalse((require config_path('entitlements.php'))['paywall_enabled'], $value);
+        }
+        $_ENV['PAYWALL_ENABLED'] = $_SERVER['PAYWALL_ENABLED'] = 'on';
+        $this->assertTrue((require config_path('entitlements.php'))['paywall_enabled']);
+        unset($_ENV['PAYWALL_ENABLED'], $_SERVER['PAYWALL_ENABLED']);
+    }
+
+    public function test_the_grandfather_date_must_be_an_exact_date(): void
+    {
+        [$user] = $this->user();
+        $this->gate('care_links');
+
+        foreach (['tomorrow', '+1 year', '2099-13-01'] as $value) {
+            config(['entitlements.grandfather_before' => $value]);
+            $this->assertFalse($this->entitlements()->allows($user, 'care_links'), $value);
+        }
     }
 
     // ── /users/me + deletion ─────────────────────────────────────────────────

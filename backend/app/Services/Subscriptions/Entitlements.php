@@ -3,11 +3,12 @@
 namespace App\Services\Subscriptions;
 
 use App\Exceptions\UpgradeRequired;
-use App\Models\Document;
 use App\Models\Pet;
 use App\Models\User;
 use App\Models\UserEntitlement;
+use App\Support\ReportOnce;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Who may use what. The only place gating is decided; while the paywall is
@@ -27,6 +28,9 @@ class Entitlements
     /** Features a gate can be switched on for (config entitlements.gates). */
     public const GATEABLE = ['ai_extraction', 'care_links'];
 
+    /** Gated features with a free monthly allowance → its config key. */
+    private const FREE_ALLOWANCE = ['ai_extraction' => 'entitlements.free_ai_extractions'];
+
     /** @var array<string, ?UserEntitlement> per-request cache of the plan row */
     private array $plans = [];
 
@@ -38,30 +42,97 @@ class Entitlements
         if (! in_array($feature, self::GATEABLE, true)) {
             throw new \InvalidArgumentException("Unknown feature: {$feature}");
         }
-        if (! config('entitlements.paywall_enabled') || ! config("entitlements.gates.{$feature}")) {
+        if ($this->unlimited($user, $feature, $pet)) {
+            return true;
+        }
+        $limit = $this->allowance($feature);
+
+        return $limit > 0 && $this->usesThisMonth($this->payer($user, $pet), $feature) < $limit;
+    }
+
+    /**
+     * Enforce a gate. For a metered feature without a plan this also uses one
+     * free allowance unit, atomically (parallel requests can't overshoot) —
+     * returns true when it did, so a failed operation can refund() it.
+     *
+     * @throws UpgradeRequired
+     */
+    public function authorize(User $user, string $feature, ?Pet $pet = null): bool
+    {
+        if ($this->unlimited($user, $feature, $pet)) {
+            return false;
+        }
+        if ($this->consume($this->payer($user, $pet), $feature)) {
             return true;
         }
 
-        $owner = $pet && (string) $pet->owner_id !== (string) $user->id ? $pet->owner : null;
+        throw new UpgradeRequired($feature);
+    }
+
+    /** Give back a unit authorize() used, when the operation failed. */
+    public function refund(User $user, string $feature, ?Pet $pet = null): void
+    {
+        DB::table('feature_usage')
+            ->where(['user_id' => $this->payer($user, $pet)->id, 'feature' => $feature, 'period' => now()->format('Y-m')])
+            ->where('uses', '>', 0)
+            ->decrement('uses');
+    }
+
+    /** Not gated right now, or covered by a plan / grandfathering. */
+    private function unlimited(User $user, string $feature, ?Pet $pet): bool
+    {
+        if (in_array($feature, self::NEVER_GATED, true)) {
+            return true;
+        }
+        if (! in_array($feature, self::GATEABLE, true)) {
+            throw new \InvalidArgumentException("Unknown feature: {$feature}");
+        }
+        if (! config('entitlements.paywall_enabled') || ! config("entitlements.gates.{$feature}")) {
+            return true;
+        }
+        $owner = $this->petOwner($user, $pet);
         foreach (array_filter([$user, $owner]) as $holder) {
             if ($this->hasPlan($holder) || $this->grandfathered($holder)) {
                 return true;
             }
         }
 
-        if ($feature === 'ai_extraction') {
-            return $this->extractionsThisMonth($owner ?? $user) < (int) config('entitlements.free_ai_extractions');
-        }
-
         return false;
     }
 
-    /** @throws UpgradeRequired */
-    public function authorize(User $user, string $feature, ?Pet $pet = null): void
+    /** Free allowances are the pet owner's (co-owners draw on the owner's). */
+    private function payer(User $user, ?Pet $pet): User
     {
-        if (! $this->allows($user, $feature, $pet)) {
-            throw new UpgradeRequired($feature);
+        return $this->petOwner($user, $pet) ?? $user;
+    }
+
+    private function petOwner(User $user, ?Pet $pet): ?User
+    {
+        return $pet && (string) $pet->owner_id !== (string) $user->id ? $pet->owner : null;
+    }
+
+    private function allowance(string $feature): int
+    {
+        return isset(self::FREE_ALLOWANCE[$feature]) ? max(0, (int) config(self::FREE_ALLOWANCE[$feature])) : 0;
+    }
+
+    private function consume(User $payer, string $feature): bool
+    {
+        $limit = $this->allowance($feature);
+        if ($limit === 0) {
+            return false;
         }
+        $key = ['user_id' => $payer->id, 'feature' => $feature, 'period' => now()->format('Y-m')];
+        DB::table('feature_usage')->insertOrIgnore($key + ['uses' => 0]);
+
+        return DB::table('feature_usage')->where($key)->where('uses', '<', $limit)->increment('uses') === 1;
+    }
+
+    private function usesThisMonth(User $payer, string $feature): int
+    {
+        return (int) DB::table('feature_usage')
+            ->where(['user_id' => $payer->id, 'feature' => $feature, 'period' => now()->format('Y-m')])
+            ->value('uses');
     }
 
     /** An active plan (lifetime, unexpired or in billing grace) that counts. */
@@ -147,24 +218,21 @@ class Entitlements
 
     private function grandfathered(User $user): bool
     {
-        $before = config('entitlements.grandfather_before');
-        if (! $before || ! $user->created_at) {
+        $before = (string) config('entitlements.grandfather_before');
+        if ($before === '' || ! $user->created_at) {
             return false;
         }
 
-        try {
-            return $user->created_at->lt(Carbon::parse($before)->startOfDay());
-        } catch (\Throwable) {
-            return false; // a malformed date grandfathers no one
-        }
-    }
+        // Strictly Y-m-d: a relative string ("tomorrow") would grandfather
+        // everyone forever. A malformed value grandfathers no one, loudly.
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $before); // false, not an exception
+        if (! $date || $date->format('Y-m-d') !== $before) {
+            ReportOnce::log('entitlements:grandfather-date', 'error',
+                'PAYWALL_GRANDFATHER_BEFORE must be a date like 2026-12-31; nobody is grandfathered until it is fixed.', 86400);
 
-    /** AI document reads done this calendar month on this owner's pets. */
-    private function extractionsThisMonth(User $owner): int
-    {
-        return Document::whereIn('pet_id', Pet::where('owner_id', $owner->id)->select('id'))
-            ->where('extraction_status', 'done')
-            ->where('extracted_at', '>=', now()->startOfMonth())
-            ->count();
+            return false;
+        }
+
+        return $user->created_at->lt($date);
     }
 }

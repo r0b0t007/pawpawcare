@@ -12,11 +12,13 @@
  */
 
 $list = fn (?string $csv) => array_values(array_filter(array_map('trim', explode(',', (string) $csv))));
+// env() only converts "true"/"false"; "off", "no", "0" must also mean off.
+$flag = fn (string $key) => filter_var(env($key, false), FILTER_VALIDATE_BOOLEAN);
 
 return [
 
     // Master switch. Off = no feature is gated for anyone.
-    'paywall_enabled' => (bool) env('PAYWALL_ENABLED', false),
+    'paywall_enabled' => $flag('PAYWALL_ENABLED'),
 
     // Who sees the subscription UI (paywall, Profile → Subscription):
     // off | admins | all.
@@ -30,12 +32,13 @@ return [
 
     // Per-feature gates (only effective while paywall_enabled is on).
     'gates' => [
-        'ai_extraction' => (bool) env('GATE_AI_EXTRACTION', false),
-        'care_links' => (bool) env('GATE_CARE_LINKS', false),
+        'ai_extraction' => $flag('GATE_AI_EXTRACTION'),
+        'care_links' => $flag('GATE_CARE_LINKS'),
     ],
 
     // Free AI document reads per calendar month (per pet owner) while the
-    // ai_extraction gate is on. 0 = none.
+    // ai_extraction gate is on. 0 = none. Counted in feature_usage, so
+    // deleting documents doesn't give reads back.
     'free_ai_extractions' => (int) env('FREE_AI_EXTRACTIONS', 0),
 
     // User ids (our UUIDs) whose SANDBOX / test-store purchases count — the

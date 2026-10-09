@@ -75,6 +75,9 @@ class SubscriptionSyncTest extends TestCase
     /** Current fake RevenueCat state; tests change it between calls. */
     private ?array $customers = null;
 
+    /** Fake REVENUECAT_PROJECT_ID that RevenueCat doesn't know. */
+    private bool $projectMissing = false;
+
     /**
      * Fake RevenueCat: per-customer subscriptions + purchases (unlisted
      * customers: none). Http::fake stubs don't replace each other, so the
@@ -88,11 +91,20 @@ class SubscriptionSyncTest extends TestCase
             return;
         }
         Http::fake(function (Request $request) {
+            if (str_starts_with($request->url(), rtrim(self::RC, '/').'?')) { // project check
+                return $this->projectMissing ? Http::response(['type' => 'resource_missing'], 404) : Http::response(['items' => []]);
+            }
             if (! str_starts_with($request->url(), self::RC)) {
                 return Http::response([], 404);
             }
             $path = substr(strtok($request->url(), '?'), strlen(self::RC));
             [$customer, $list] = explode('/', $path) + [1 => null];
+            if ($this->projectMissing || ($this->customers[$customer] ?? null) === 404) {
+                return Http::response(['type' => 'resource_missing'], 404);
+            }
+            if (is_int($this->customers[$customer]['status'] ?? null)) {
+                return Http::response([], $this->customers[$customer]['status']);
+            }
             if ($request->method() === 'DELETE') {
                 return Http::response(['customer' => []]);
             }
@@ -225,8 +237,9 @@ class SubscriptionSyncTest extends TestCase
             'id' => (string) Str::uuid(), 'type' => 'EXPIRATION', 'event_timestamp_ms' => $before,
             'app_user_id' => $user->id, 'entitlement_ids' => ['plus'], 'environment' => 'PRODUCTION',
             'expiration_at_ms' => $before,
-        ]], ['Authorization' => $secret])->assertOk()->assertJson(['status' => 'stale']);
+        ]], ['Authorization' => $secret])->assertOk()->assertJson(['status' => 'needs_sync']);
 
+        // Not applied; the reconcile job re-reads RevenueCat for it.
         $this->assertTrue($this->entitlement($user)->isActive());
     }
 
@@ -352,5 +365,95 @@ class SubscriptionSyncTest extends TestCase
         $this->dueForPurge($user, 8); // past the 7-day third-party retry window
         $this->artisan('accounts:purge-deleted')->assertSuccessful();
         $this->assertNull(User::find($user->id));
+    }
+
+    // ── Review fixes ─────────────────────────────────────────────────────────
+
+    public function test_a_newer_webhook_event_applied_during_the_read_is_kept(): void
+    {
+        [$user, $token] = $this->user();
+        (new UserEntitlement)->forceFill([
+            'user_id' => $user->id, 'entitlement' => 'plus', 'environment' => 'PRODUCTION',
+            'expires_at' => now()->addMonth(), 'will_renew' => true,
+            'last_event_ms' => now()->addMinute()->getTimestampMs(), 'last_event_type' => 'RENEWAL',
+        ])->save();
+        $this->fakeRevenueCat([]); // RevenueCat's (older) view: nothing
+
+        $this->withToken($token)->postJson('/users/me/subscription/sync')->assertOk();
+
+        $this->assertTrue($this->entitlement($user)->isActive());
+        $this->assertSame('RENEWAL', $this->entitlement($user)->last_event_type);
+    }
+
+    public function test_a_purchase_without_product_details_is_never_lifetime(): void
+    {
+        [$user, $token] = $this->user();
+        $purchase = $this->purchase();
+        $purchase['entitlements']['items'][0]['products'] = null;
+        $this->fakeRevenueCat([$user->id => ['purchases' => [$purchase]]]);
+
+        $this->withToken($token)->postJson('/users/me/subscription/sync')->assertOk()
+            ->assertJsonPath('plan.tier', 'plus')
+            ->assertJsonPath('plan.is_lifetime', false);
+        $this->assertNotNull($this->entitlement($user)->grace_expires_at);
+    }
+
+    public function test_lifetime_records_its_own_product_after_a_subscription(): void
+    {
+        [$user, $token] = $this->user();
+        $this->fakeRevenueCat([$user->id => ['subscriptions' => [$this->sub()]]]);
+        $this->withToken($token)->postJson('/users/me/subscription/sync')->assertOk();
+        $this->assertSame('plus_monthly', $this->entitlement($user)->product_id);
+
+        $this->fakeRevenueCat([$user->id => ['subscriptions' => [$this->sub()], 'purchases' => [$this->purchase()]]]);
+        $this->withToken($token)->postJson('/users/me/subscription/sync')->assertOk();
+
+        $this->assertTrue($this->entitlement($user)->is_lifetime);
+        $this->assertSame('plus_lifetime', $this->entitlement($user)->product_id);
+    }
+
+    public function test_a_wrong_project_id_is_an_outage_not_a_missing_customer(): void
+    {
+        [$user, $token] = $this->user();
+        $this->fakeRevenueCat([$user->id => ['subscriptions' => [$this->sub()]]]);
+        $this->withToken($token)->postJson('/users/me/subscription/sync')->assertOk();
+
+        $this->projectMissing = true;
+        $this->withToken($token)->postJson('/users/me/subscription/sync')->assertStatus(503);
+        $this->assertTrue($this->entitlement($user)->isActive()); // not revoked
+
+        $this->projectMissing = false;
+        $this->fakeRevenueCat([$user->id => 404]); // genuinely unknown customer
+        $this->withToken($token)->postJson('/users/me/subscription/sync')->assertOk()->assertJsonPath('plan.tier', 'free');
+    }
+
+    public function test_one_failing_customer_does_not_stall_reconcile(): void
+    {
+        [$broken] = $this->user();
+        [$fine] = $this->user();
+        $this->fakeRevenueCat([$broken->id => ['status' => 400], $fine->id => ['subscriptions' => [$this->sub()]]]);
+        $first = $this->ledgerRow('PRODUCT_CHANGE', 'needs_sync', ['app_user' => $broken->id]);
+        $second = $this->ledgerRow('PRODUCT_CHANGE', 'needs_sync', ['app_user' => $fine->id]);
+
+        $this->artisan('subscriptions:reconcile')->assertSuccessful();
+
+        $this->assertSame(1, RevenueCatEvent::find($first)->attempts);
+        $this->assertNull(RevenueCatEvent::find($first)->processed_at);
+        $this->assertSame('synced', RevenueCatEvent::find($second)->status);
+    }
+
+    public function test_the_sweep_ignores_churned_history(): void
+    {
+        [$churned] = $this->user();
+        (new UserEntitlement)->forceFill([
+            'user_id' => $churned->id, 'entitlement' => 'plus', 'environment' => 'PRODUCTION',
+            'expires_at' => now()->subDays(30), 'billing_issue_at' => now()->subDays(40),
+            'will_renew' => false, 'last_event_ms' => 1, 'last_event_type' => 'EXPIRATION',
+        ])->save();
+        $this->fakeRevenueCat([]);
+
+        $this->artisan('subscriptions:reconcile --sweep')->assertSuccessful();
+
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), $churned->id));
     }
 }

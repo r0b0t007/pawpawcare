@@ -103,6 +103,7 @@ class ReconcileRevenueCat extends Command
         $rows = RevenueCatEvent::whereNull('processed_at')
             ->where('status', 'needs_sync')
             ->where('received_at', '<', now()->subMinutes(self::SETTLE_MINUTES))
+            ->where('attempts', '<', self::MAX_ATTEMPTS)
             ->orderBy('received_at')
             ->limit(100)
             ->pluck('id');
@@ -119,16 +120,21 @@ class ReconcileRevenueCat extends Command
                     break;
                 }
             }
-            if ($this->revenueCatDown) {
-                break;
+            if ($this->revenueCatDown || (! $done && $this->budget <= 0)) {
+                break; // outage or out of budget: the rest waits for the next run
             }
-            if ($done) {
-                RevenueCatEvent::whereKey($id)->update([
-                    'processed_at' => now(),
-                    'status' => $userIds->isEmpty() ? 'unknown_user' : 'synced',
-                ]);
-                $count++;
+            if (! $done) {
+                // This customer failed (not an outage): try again later, up
+                // to MAX_ATTEMPTS, without holding up the rows behind it.
+                RevenueCatEvent::whereKey($id)->increment('attempts');
+
+                continue;
             }
+            RevenueCatEvent::whereKey($id)->update([
+                'processed_at' => now(),
+                'status' => $userIds->isEmpty() ? 'unknown_user' : 'synced',
+            ]);
+            $count++;
         }
 
         return $count;
@@ -136,13 +142,18 @@ class ReconcileRevenueCat extends Command
 
     private function sweep(EntitlementSync $sync): int
     {
+        // Access about to change or in doubt — never churned history (an
+        // expired row's billing issue is cleared when access ends). Soonest
+        // first, so the ones about to lose access are checked first.
         $userIds = UserEntitlement::query()
-            ->where(fn ($q) => $q->whereNotNull('billing_issue_at')
-                ->orWhere('grace_expires_at', '>', now()->subDay())
-                ->orWhereBetween('expires_at', [now()->subDay(), now()->addDays(2)]))
-            ->distinct()
-            ->limit(self::SYNC_BUDGET)
-            ->pluck('user_id');
+            ->where('is_lifetime', false)
+            ->where(fn ($q) => $q->where('grace_expires_at', '>', now()->subDay())
+                ->orWhereBetween('expires_at', [now()->subDay(), now()->addDays(2)])
+                ->orWhere(fn ($q) => $q->whereNotNull('billing_issue_at')->where('expires_at', '>', now()->subDays(7))))
+            ->orderByRaw('COALESCE(grace_expires_at, expires_at)')
+            ->limit(self::SYNC_BUDGET * 2)
+            ->pluck('user_id')
+            ->unique();
 
         $count = 0;
         foreach ($userIds as $userId) {
@@ -171,7 +182,8 @@ class ReconcileRevenueCat extends Command
 
         $this->budget--;
         if (! $sync->sync($user)) {
-            $this->revenueCatDown = true; // stop for this run; retry next time
+            // An outage stops the run (retry next time); one failing customer doesn't.
+            $this->revenueCatDown = $sync->lastFailureWasOutage();
 
             return false;
         }

@@ -4,6 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Models\User;
 use App\Models\UserEntitlement;
+use App\Support\ReportOnce;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -20,8 +21,12 @@ use Illuminate\Support\Facades\DB;
  *   lifetime access. Subscriptions count while RevenueCat says they give
  *   access; one past its period end (billing grace, an open-ended pause)
  *   gets a one-day grace that the next sync renews or ends.
- * - Writes are stamped with the sync time, so webhook events older than the
- *   sync can't undo it (the writer's ordering guard).
+ * - Writes are stamped with the time RevenueCat was READ: an event that
+ *   arrives later but happened before that is re-checked by another sync
+ *   (the writer returns needs_sync); a row a newer webhook event updated
+ *   while we were reading is left alone.
+ * - A purchase whose product details are missing is never lifetime: it gets
+ *   the one-day grace and the daily sweep re-checks it.
  */
 class EntitlementSync
 {
@@ -35,9 +40,16 @@ class EntitlementSync
         return $this->client->configured();
     }
 
+    /** After sync() returned false: was RevenueCat down (vs. this one customer failing)? */
+    public function lastFailureWasOutage(): bool
+    {
+        return $this->client->lastFailureWasOutage();
+    }
+
     /** True when the user's entitlements now match RevenueCat; false if it couldn't be reached. */
     public function sync(User $user): bool
     {
+        $readAtMs = now()->getTimestampMs();
         $access = $this->client->customerAccess((string) $user->id);
         if ($access === null) {
             return false;
@@ -61,21 +73,29 @@ class EntitlementSync
             $this->grant($granted, $sub, $state);
         }
         foreach ($access['purchases'] as $purchase) {
-            if (($purchase['status'] ?? null) !== 'owned' || ! $this->counts($purchase, $allowSandbox)
-                || $this->isConsumable($purchase)) {
+            if (($purchase['status'] ?? null) !== 'owned' || ! $this->counts($purchase, $allowSandbox)) {
                 continue;
             }
+            $consumable = $this->isConsumable($purchase);
+            if ($consumable === true) {
+                continue;
+            }
+            $known = $consumable === false && $this->storeProductId($purchase) !== null;
+            if (! $known) {
+                ReportOnce::log('revenuecat-sync:product-details', 'warning',
+                    'RevenueCat returned a one-time purchase without product details; granting a one-day grace instead of lifetime.', 86400);
+            }
             $this->grant($granted, $purchase, [
-                'is_lifetime' => true,
+                'is_lifetime' => $known,
                 'expires_at' => null,
-                'grace_expires_at' => null,
+                'grace_expires_at' => $known ? null : now()->addDay(),
                 'will_renew' => false,
                 'billing_issue' => false,
                 'period_type' => 'NORMAL',
             ]);
         }
 
-        $this->write($user, $granted);
+        $this->write($user, $granted, $readAtMs);
 
         return true;
     }
@@ -111,16 +131,15 @@ class EntitlementSync
     }
 
     /** @param array<string, array> $granted lookup key → state */
-    private function write(User $user, array $granted): void
+    private function write(User $user, array $granted, int $readAtMs): void
     {
-        DB::transaction(function () use ($user, $granted) {
+        DB::transaction(function () use ($user, $granted, $readAtMs) {
             $keys = array_unique(array_merge(
                 array_keys($granted),
                 UserEntitlement::where('user_id', $user->id)->pluck('entitlement')->all(),
             ));
             sort($keys); // same lock order as the webhook writer
 
-            $nowMs = now()->getTimestampMs();
             foreach ($keys as $key) {
                 $state = $granted[$key] ?? null;
                 if ($state !== null) {
@@ -130,16 +149,19 @@ class EntitlementSync
                     ]);
                 }
                 $row = UserEntitlement::where('user_id', $user->id)->where('entitlement', $key)->lockForUpdate()->first();
-                if (! $row) {
+                // A webhook event newer than our read was applied meanwhile:
+                // it knows more than we do.
+                if (! $row || ($row->last_event_ms > $readAtMs && $row->last_event_type !== 'SYNC')) {
                     continue;
                 }
 
-                $changes = ['last_event_ms' => $nowMs, 'last_event_type' => 'SYNC', 'source' => 'sync'];
+                $changes = ['last_event_ms' => max($readAtMs, $row->last_event_ms), 'last_event_type' => 'SYNC', 'source' => 'sync'];
                 if ($state === null) {
                     // No access any more: end it now, keep the history.
                     $changes += [
                         'is_lifetime' => false,
                         'grace_expires_at' => null,
+                        'billing_issue_at' => null,
                         'will_renew' => false,
                         'expires_at' => $row->expires_at !== null && $row->expires_at->isPast() ? $row->expires_at : now(),
                     ];
@@ -154,7 +176,9 @@ class EntitlementSync
                         'period_type' => $state['period_type'],
                         'store' => $state['store'],
                         'environment' => $state['environment'],
-                        'product_id' => $state['product_id'] ?? $row->product_id,
+                        // Lifetime always records its own product: the webhook's
+                        // lifetime guard compares it with each event's product.
+                        'product_id' => $state['is_lifetime'] ? $state['product_id'] : ($state['product_id'] ?? $row->product_id),
                     ];
                 }
                 $row->forceFill($changes)->save();
@@ -190,9 +214,12 @@ class EntitlementSync
         return is_string($id) && $id !== '' ? mb_substr($id, 0, 191) : null;
     }
 
-    private function isConsumable(array $purchase): bool
+    /** true / false, or null when RevenueCat didn't say. */
+    private function isConsumable(array $purchase): ?bool
     {
-        return ($this->productOf($purchase)['one_time']['is_consumable'] ?? false) === true;
+        $value = $this->productOf($purchase)['one_time']['is_consumable'] ?? null;
+
+        return is_bool($value) ? $value : null;
     }
 
     private function instant(mixed $ms): ?Carbon

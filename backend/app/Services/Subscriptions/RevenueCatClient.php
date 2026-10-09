@@ -4,6 +4,7 @@ namespace App\Services\Subscriptions;
 
 use App\Services\Analytics\ProductAnalytics;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +31,14 @@ class RevenueCatClient
 
     public const DELETE_UNAVAILABLE = ProductAnalytics::DELETE_UNAVAILABLE;
 
+    /** Whether the last failure was an outage / misconfiguration (vs. one customer). */
+    private bool $outage = false;
+
+    public function lastFailureWasOutage(): bool
+    {
+        return $this->outage;
+    }
+
     public function configured(): bool
     {
         return (string) config('services.revenuecat.secret_key') !== ''
@@ -45,7 +54,10 @@ class RevenueCatClient
      */
     public function customerAccess(string $appUserId): ?array
     {
+        $this->outage = false;
         if (! $this->configured()) {
+            $this->outage = true;
+
             return null;
         }
 
@@ -93,8 +105,12 @@ class RevenueCatClient
             return self::DELETE_UNAVAILABLE;
         }
 
-        if ($response->successful() || $response->status() === 404) {
-            return self::DELETE_OK; // queued (200) or never existed
+        if ($response->successful()) {
+            return self::DELETE_OK; // queued
+        }
+        if ($response->status() === 404) {
+            // Never existed — but only if the project itself is right.
+            return $this->projectExists() ? self::DELETE_OK : self::DELETE_UNAVAILABLE;
         }
         if ($this->unavailable($response, 'customer deletion')) {
             return self::DELETE_UNAVAILABLE;
@@ -114,19 +130,29 @@ class RevenueCatClient
     {
         $items = [];
         $next = $path.'?limit=100';
+        $prefix = $path.'?';
         for ($page = 0; $next !== null && $page < self::MAX_PAGES; $page++) {
             try {
                 $response = $this->http()->get(self::BASE.$next);
             } catch (\Throwable $e) {
                 Log::warning('RevenueCat request failed', ['error' => class_basename($e)]);
+                $this->outage = true;
 
                 return null;
             }
             if ($response->status() === 404) {
-                return false;
+                // "No such customer" — unless it's the project that's wrong,
+                // which must not read as "nobody has bought anything".
+                if ($this->projectExists()) {
+                    return false;
+                }
+                $this->outage = true;
+
+                return null;
             }
             if (! $response->successful()) {
-                $this->unavailable($response, 'customer lookup') || Log::warning('RevenueCat customer lookup failed', ['status' => $response->status()]);
+                $this->outage = $this->unavailable($response, 'customer lookup');
+                $this->outage || Log::warning('RevenueCat customer lookup failed', ['status' => $response->status()]);
 
                 return null;
             }
@@ -138,14 +164,42 @@ class RevenueCatClient
             }
             array_push($items, ...array_values(array_filter($body['items'], 'is_array')));
 
-            // next_page is a path on the same host ("/v2/projects/…"); never
+            // next_page continues this same list on the same host; never
             // follow anything else.
-            $next = is_string($body['next_page'] ?? null) && str_starts_with($body['next_page'], '/v2/')
+            $next = is_string($body['next_page'] ?? null) && str_starts_with($body['next_page'], $prefix)
                 ? $body['next_page']
                 : null;
         }
 
         return $items;
+    }
+
+    /**
+     * Whether REVENUECAT_PROJECT_ID names a project this key can read
+     * (cached for a day once confirmed). False when RevenueCat can't say.
+     */
+    private function projectExists(): bool
+    {
+        $cacheKey = 'revenuecat:project-ok:'.md5((string) config('services.revenuecat.project_id'));
+        if (Cache::get($cacheKey) === true) {
+            return true;
+        }
+        try {
+            $project = rawurlencode((string) config('services.revenuecat.project_id'));
+            $response = $this->http()->get(self::BASE."/v2/projects/{$project}/customers?limit=1");
+        } catch (\Throwable) {
+            return false;
+        }
+        if ($response->successful()) {
+            Cache::put($cacheKey, true, 86400);
+
+            return true;
+        }
+        if ($response->status() === 404) {
+            Log::error('RevenueCat project not found; check REVENUECAT_PROJECT_ID');
+        }
+
+        return false;
     }
 
     /** Outage / configuration problems; logged here. */
@@ -176,6 +230,7 @@ class RevenueCatClient
     private function http()
     {
         return Http::connectTimeout(5)->timeout(10)
+            ->withoutRedirecting()
             ->withToken((string) config('services.revenuecat.secret_key'))
             ->acceptJson();
     }
