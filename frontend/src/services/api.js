@@ -57,15 +57,19 @@ export async function request(method, path, body, { skipAuth = false } = {}) {
   if (body !== undefined) init.body = JSON.stringify(body);
 
   const url = `${API_URL}${path}`;
-  console.log('[API]', method, url);
+  // Request logs are dev-only: release builds would write record ids and
+  // signed URLs to the device log.
+  if (__DEV__) console.log('[API]', method, url);
   let res;
   try {
     res = await fetch(url, init);
   } catch (e) {
-    console.log('[API ERROR]', e?.message, 'URL was:', url);
-    throw new Error(`Network error: ${e?.message || 'unknown'} (${url})`);
+    if (__DEV__) console.log('[API ERROR]', e?.message, 'URL was:', url);
+    const err = new Error(`Network error: ${e?.message || 'unknown'}${__DEV__ ? ` (${url})` : ''}`);
+    err.isNetworkError = true;
+    throw err;
   }
-  console.log('[API]', res.status, url);
+  if (__DEV__) console.log('[API]', res.status, url);
 
   // Auto-refresh on 401
   if (res.status === 401 && !skipAuth) {
@@ -89,6 +93,7 @@ export async function request(method, path, body, { skipAuth = false } = {}) {
     const msg = data?.detail || `Request failed (${res.status})`;
     const err = new Error(Array.isArray(msg) ? msg[0]?.msg ?? 'Validation error' : msg);
     err.status = res.status;
+    if (data?.code) err.code = data.code;
     throw err;
   }
 

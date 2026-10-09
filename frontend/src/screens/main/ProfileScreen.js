@@ -7,6 +7,7 @@ import { useData } from '../../context/DataContext';
 import { getPref, setPref } from '../../services/prefs';
 import { scheduleLocalReminders, cancelAllLocalReminders } from '../../services/notifications';
 import { exportRecords } from '../../services/exportRecords';
+import { captureException, isSentryEnabled } from '../../services/sentry';
 import { ui, type } from '../../theme';
 import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '../../components';
 
@@ -68,6 +69,17 @@ export default function ProfileScreen({ navigation }) {
   const toggleEngagementPushes = (value) => {
     setEngagementPushes(value);
     updateUser({ engagement_pushes_enabled: value });
+  };
+
+  // Admin-only end-to-end check: the report should appear in Sentry
+  // (pawpawcare-app) symbolicated, tagged with this build's update id.
+  const sendTestErrorReport = () => {
+    if (!isSentryEnabled()) {
+      showToast('Crash reporting is off in this build');
+      return;
+    }
+    captureException(new Error('Test error report from the PawPawCare app'));
+    showToast('Test report sent');
   };
 
   const openExport = () => {
@@ -194,7 +206,7 @@ export default function ProfileScreen({ navigation }) {
 
         {isAdmin && (
           <>
-            <Text style={[type.sectionLabel, styles.sectionLabel]}>Moderation</Text>
+            <Text style={[type.sectionLabel, styles.sectionLabel]}>Admin</Text>
             <Card style={styles.sectionCard}>
               <ListRow
                 icon="shield-check-outline"
@@ -202,6 +214,12 @@ export default function ProfileScreen({ navigation }) {
                 subtitle="Review reported posts"
                 chevron
                 onPress={() => navigation.navigate('Moderation')}
+              />
+              <ListRow
+                icon="bug-outline"
+                title="Send test error report"
+                subtitle="Checks crash reporting end to end"
+                onPress={sendTestErrorReport}
                 last
               />
             </Card>

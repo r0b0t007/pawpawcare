@@ -22,6 +22,10 @@ jest.mock('../../services/analytics', () => ({
   resetAnalytics: jest.fn(),
   track: jest.fn(),
 }));
+jest.mock('../../services/sentry', () => ({
+  setSentryUser: jest.fn(),
+  clearSentryUser: jest.fn(),
+}));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
   setItem: jest.fn(() => Promise.resolve()),
@@ -34,6 +38,7 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
 import { AuthProvider, useAuth } from '../AuthContext';
 import { post, get, request, storeTokens, clearTokens } from '../../services/api';
 import { track } from '../../services/analytics';
+import { clearSentryUser, setSentryUser } from '../../services/sentry';
 
 // A probe that surfaces the latest context value to the test.
 let auth;
@@ -76,6 +81,8 @@ describe('AuthContext.socialLogin', () => {
     // Old created_at → treated as a returning user, not a signup.
     expect(track).toHaveBeenCalledWith('user_logged_in', { method: 'google' });
     expect(auth.user).toEqual(expect.objectContaining({ id: 'u1' }));
+    // Crash reports are tied to the account (Sentry keeps the id only).
+    expect(setSentryUser).toHaveBeenCalledWith(expect.objectContaining({ id: 'u1' }));
   });
 
   it('tracks a signup when the account was just created', async () => {
@@ -126,6 +133,7 @@ describe('AuthContext.logout', () => {
     });
 
     expect(auth.user).toBeNull();
+    expect(clearSentryUser).toHaveBeenCalled();
   });
 
   it('still clears the user when a cleanup step rejects', async () => {

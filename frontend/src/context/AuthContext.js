@@ -7,6 +7,7 @@ import {
   cancelAllLocalReminders,
 } from '../services/notifications';
 import { identifyUser, resetAnalytics, track } from '../services/analytics';
+import { clearSentryUser, setSentryUser } from '../services/sentry';
 import { showToast } from '../components/Toast';
 
 const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
@@ -59,6 +60,7 @@ export function AuthProvider({ children }) {
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
       identifyUser(user); // tie analytics to the restored session
+      setSentryUser(user);
       syncDevice();
     } catch (err) {
       if (err.message === 'SESSION_EXPIRED') await clearTokens();
@@ -74,6 +76,7 @@ export function AuthProvider({ children }) {
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
       identifyUser(user);
+      setSentryUser(user);
       track('user_signed_up');
       syncDevice();
       return true;
@@ -95,6 +98,7 @@ export function AuthProvider({ children }) {
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
       identifyUser(user);
+      setSentryUser(user);
       track('user_logged_in');
       syncDevice();
       return true;
@@ -119,6 +123,7 @@ export function AuthProvider({ children }) {
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
       identifyUser(user);
+      setSentryUser(user);
       // Social auth is find-or-create and the backend doesn't flag which
       // happened, so infer a brand-new account from a just-set created_at to
       // keep the signup funnel accurate (best-effort — analytics only).
@@ -143,6 +148,7 @@ export function AuthProvider({ children }) {
     if (refresh) post('/auth/logout', { refresh_token: refresh }).catch(() => {});
     deregisterDevice().catch(() => {});
     resetAnalytics(); // clear identity so the next user starts fresh
+    clearSentryUser();
     try {
       // Clear the native Google session too, so the next sign-in shows the
       // account picker instead of silently reusing the last account. Guarded
@@ -179,6 +185,7 @@ export function AuthProvider({ children }) {
     await AsyncStorage.removeItem(PUSH_TOKEN_KEY).catch(() => {});
     await cancelAllLocalReminders().catch(() => {});
     resetAnalytics();
+    clearSentryUser();
     try {
       const { GoogleSignin } = require('@react-native-google-signin/google-signin');
       GoogleSignin.signOut().catch(() => {});

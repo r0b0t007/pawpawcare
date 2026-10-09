@@ -187,3 +187,10 @@ jobs:
         run: |
           MESSAGE="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)"
           eas update --channel preview --message "$MESSAGE" --non-interactive
+
+      - name: Upload source maps to Sentry
+        # Same as ota-update.yml; best-effort for tester builds.
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: npx sentry-expo-upload-sourcemaps dist
