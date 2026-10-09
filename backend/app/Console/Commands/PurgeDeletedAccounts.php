@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\User;
 use App\Services\Analytics\ProductAnalytics;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PurgeDeletedAccounts extends Command
@@ -60,14 +61,24 @@ class PurgeDeletedAccounts extends Command
             }
 
             try {
-                // The PostHog call can take seconds; check once more right
-                // before the irreversible part. (No wrapping transaction: the
-                // model hooks delete files, which a rollback can't restore.)
-                $current = User::whereKey($user->id)->dueForPurge()->first();
-                if (! $current) {
+                // The PostHog call can take seconds: re-check under the row
+                // lock and delete in the same transaction. A concurrent login
+                // (User::cancelPendingDeletion) waits for the lock, then finds
+                // the account gone and is rejected — it can never be told
+                // "restored" and then lose the account. File deletes are
+                // deferred to after commit (Uploads), so a rollback leaves
+                // everything consistent.
+                $stillDue = DB::transaction(function () use ($user) {
+                    $current = User::whereKey($user->id)->dueForPurge()->lockForUpdate()->first();
+                    if ($current) {
+                        $this->purge($current);
+                    }
+
+                    return $current !== null;
+                });
+                if (! $stillDue) {
                     continue;
                 }
-                $this->purge($current);
                 $purged++;
             } catch (\Throwable $e) {
                 // One failing account must not block the rest of the sweep.

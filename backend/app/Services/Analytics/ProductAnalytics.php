@@ -156,9 +156,16 @@ class ProductAnalytics
             return self::DELETE_UNAVAILABLE;
         }
 
-        // 202 with an empty deletion_errors list means accepted (or no such
-        // person). Per-person failures are reported there, not in the status.
-        if (! empty($response->json('deletion_errors'))) {
+        // Success is a 2xx that PostHog itself produced: a JSON body carrying
+        // deletion_errors (a misconfigured host could answer 200 with HTML).
+        // Per-person failures are reported in that list, not in the status.
+        $errors = $response->json('deletion_errors');
+        if (! $response->successful() || ! is_array($errors)) {
+            Log::error('PostHog person deletion got an unexpected response; check POSTHOG_API_HOST', ['status' => $status]);
+
+            return self::DELETE_UNAVAILABLE;
+        }
+        if ($errors !== []) {
             Log::warning('PostHog person deletion failed for one person', ['status' => $status]);
 
             return self::DELETE_PERSON_FAILED;

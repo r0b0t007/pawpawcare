@@ -59,14 +59,14 @@ class User extends Model
     ];
 
     /**
-     * Kill every credential issued so far: refresh tokens, all outstanding
-     * access tokens (via the `ver` claim JwtAuth checks), and push-device
-     * bindings. Used whenever control of the account changes hands.
+     * Accounts whose self-deletion grace period has passed. Requiring the
+     * account to still be disabled means an active account can never be
+     * purged, whatever else sets is_active.
      */
-    /** Accounts whose self-deletion grace period has passed. */
     public function scopeDueForPurge(Builder $query): Builder
     {
-        return $query->whereNotNull('deletion_requested_at')
+        return $query->where('is_active', false)
+            ->whereNotNull('deletion_requested_at')
             ->where('deletion_requested_at', '<=', now()->subDays(self::DELETION_GRACE_DAYS));
     }
 
@@ -74,13 +74,33 @@ class User extends Model
      * Cancel a pending self-deletion (the user signed back in or reset their
      * password during the grace period). The single place that reactivates,
      * so every path is tracked the same way.
+     *
+     * A conditional update, not a save: it only succeeds while the deletion
+     * is still pending. If the nightly purge holds this row's lock, the update
+     * waits for it and then changes nothing — returns false, and the caller
+     * must not treat the account as restored.
      */
-    public function cancelPendingDeletion(string $method): void
+    public function cancelPendingDeletion(string $method): bool
     {
-        $this->forceFill(['is_active' => true, 'deletion_requested_at' => null])->save();
+        $changed = static::whereKey($this->id)
+            ->where('is_active', false)
+            ->whereNotNull('deletion_requested_at')
+            ->update(['is_active' => true, 'deletion_requested_at' => null]);
+        if ($changed !== 1) {
+            return false;
+        }
+
+        $this->forceFill(['is_active' => true, 'deletion_requested_at' => null])->syncOriginal();
         app(ProductAnalytics::class)->capture($this, 'server_account_reactivated', ['method' => $method]);
+
+        return true;
     }
 
+    /**
+     * Kill every credential issued so far: refresh tokens, all outstanding
+     * access tokens (via the `ver` claim JwtAuth checks), and push-device
+     * bindings. Used whenever control of the account changes hands.
+     */
     public function revokeAllSessions(): void
     {
         // DB-side increment: concurrent revocations can't collapse into one.

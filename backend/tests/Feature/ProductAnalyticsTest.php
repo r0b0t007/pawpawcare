@@ -176,6 +176,17 @@ class ProductAnalyticsTest extends TestCase
         $this->assertSame(ProductAnalytics::DELETE_UNAVAILABLE, $analytics->deletePerson('a'), 'network');
     }
 
+    public function test_an_unexpected_ok_response_is_not_an_erase(): void
+    {
+        // e.g. a wrong POSTHOG_API_HOST answering 200 with an HTML page.
+        $this->configure();
+        Http::fake(['us.posthog.com/*' => Http::response('<html>Welcome</html>', 200)]);
+        Log::spy();
+
+        $this->assertSame(ProductAnalytics::DELETE_UNAVAILABLE, (new ProductAnalytics)->deletePerson('a'));
+        Log::shouldHaveReceived('error')->once();
+    }
+
     public function test_a_rejected_key_or_project_is_an_error_right_away(): void
     {
         $this->configure();

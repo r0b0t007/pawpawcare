@@ -8,6 +8,7 @@ use App\Models\Post;
 use App\Models\Upload;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -74,11 +75,15 @@ class Uploads
         return self::putPrivate(self::pdfBytes($file), $dir, 'pdf');
     }
 
-    /** Delete a private-disk file by its stored path, if any. */
+    /**
+     * Delete a private-disk file by its stored path, if any. Deferred until
+     * the surrounding transaction commits (immediate when there is none), so
+     * a rolled-back delete never leaves rows pointing at missing files.
+     */
     public static function deletePrivate(?string $path): void
     {
         if ($path) {
-            Storage::disk(self::PRIVATE_DISK)->delete($path);
+            DB::afterCommit(fn () => Storage::disk(self::PRIVATE_DISK)->delete($path));
         }
     }
 
@@ -114,6 +119,13 @@ class Uploads
             return;
         }
 
+        // After commit (immediate when there's no transaction): the reference
+        // check then sees the committed state, and a rollback keeps the file.
+        DB::afterCommit(fn () => self::deleteIfUnreferenced($url, $path));
+    }
+
+    private static function deleteIfUnreferenced(string $url, string $path): void
+    {
         try {
             if (! Upload::where('path', $path)->exists()) {
                 return;

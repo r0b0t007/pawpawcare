@@ -11,10 +11,12 @@ use App\Models\RefreshToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AccountDeletionTest extends TestCase
@@ -314,5 +316,68 @@ class AccountDeletionTest extends TestCase
 
         $this->assertNull(User::find($due->id));
         Log::shouldHaveReceived('error')->withArgs(fn ($message) => str_contains($message, 'PostHog deletion kept failing'));
+    }
+
+    // ── Reactivation vs purge: never "restored" and then lost ───────────────
+
+    public function test_cancel_pending_deletion_only_succeeds_while_the_deletion_is_pending(): void
+    {
+        $user = $this->user();
+        $user->forceFill(['is_active' => false, 'deletion_requested_at' => now()->subDay()])->save();
+
+        $this->assertTrue($user->cancelPendingDeletion('password'));
+        $this->assertTrue($user->fresh()->is_active);
+        $this->assertNull($user->fresh()->deletion_requested_at);
+
+        // A stale copy (e.g. a login that waited on the purge's lock) changes nothing.
+        $stale = $user->replicate()->forceFill(['id' => $user->id, 'is_active' => false, 'deletion_requested_at' => now()]);
+        $this->assertFalse($stale->cancelPendingDeletion('password'));
+    }
+
+    public function test_a_purged_account_cannot_be_reactivated_by_a_late_login(): void
+    {
+        $user = $this->user();
+        $user->forceFill(['is_active' => false, 'deletion_requested_at' => now()->subDay()])->save();
+        $stale = User::find($user->id);
+        User::whereKey($user->id)->delete(); // the purge won the race
+
+        $this->assertFalse($stale->cancelPendingDeletion('password'));
+    }
+
+    public function test_an_active_account_is_never_due_for_purge(): void
+    {
+        $user = $this->user();
+        $user->forceFill([
+            'is_active' => true,
+            'deletion_requested_at' => now()->subDays(User::DELETION_GRACE_DAYS + 5),
+        ])->save();
+
+        $this->assertSame(0, User::dueForPurge()->count());
+        $this->artisan('accounts:purge-deleted')->assertSuccessful();
+        $this->assertNotNull(User::find($user->id));
+    }
+
+    public function test_files_are_only_removed_once_the_delete_commits(): void
+    {
+        Storage::fake('local');
+        $user = $this->user();
+        $pet = Pet::create(['owner_id' => $user->id, 'name' => 'Rex']);
+        Storage::disk('local')->put('documents/rolled-back.pdf', 'pdf');
+        Storage::disk('local')->put('documents/committed.pdf', 'pdf');
+        $rolledBack = Document::create(['pet_id' => $pet->id, 'title' => 'A', 'file_path' => 'documents/rolled-back.pdf', 'mime' => 'application/pdf', 'size_bytes' => 3]);
+        $committed = Document::create(['pet_id' => $pet->id, 'title' => 'B', 'file_path' => 'documents/committed.pdf', 'mime' => 'application/pdf', 'size_bytes' => 3]);
+
+        try {
+            DB::transaction(function () use ($rolledBack) {
+                $rolledBack->delete();
+                throw new \RuntimeException('purge failed half-way');
+            });
+        } catch (\RuntimeException) {
+        }
+        DB::transaction(fn () => $committed->delete());
+
+        $this->assertNotNull(Document::find($rolledBack->id));
+        Storage::disk('local')->assertExists('documents/rolled-back.pdf');
+        Storage::disk('local')->assertMissing('documents/committed.pdf');
     }
 }

@@ -331,8 +331,9 @@ class AuthController extends Controller
 
         // ...so also cancel a pending self-deletion: the user can simply log
         // in with the new password.
-        if (! $user->is_active && $user->deletion_requested_at !== null) {
-            $user->cancelPendingDeletion('password_reset');
+        if (! $user->is_active && $user->deletion_requested_at !== null
+            && ! $user->cancelPendingDeletion('password_reset')) {
+            abort(400, 'Invalid or expired code'); // purged meanwhile
         }
 
         // Kill every existing session: stolen refresh tokens, live access
@@ -450,7 +451,10 @@ class AuthController extends Controller
             abort(403, 'Account is disabled');
         }
 
-        $user->cancelPendingDeletion($method);
+        // False only if the account was purged (or changed) meanwhile.
+        if (! $user->cancelPendingDeletion($method)) {
+            abort(401, 'This account has been deleted');
+        }
 
         return true;
     }
