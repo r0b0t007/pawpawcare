@@ -5,7 +5,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { usePetsQuery, useRefetchOnFocus } from '../../hooks/usePets';
+import { usePetsQuery } from '../../hooks/usePets';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { resolveAsset } from '../../config';
 import { ui, type, PET_COLOR_PAIRS } from '../../theme';
 import { StatusRing, StatusPill, Button, Skeleton } from '../../components';

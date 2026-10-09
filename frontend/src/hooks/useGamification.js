@@ -18,8 +18,17 @@ async function fetchSummary() {
   };
 }
 
+// The summary changes once a night, and DataContext mutations that can move it
+// invalidate gamificationKeys (which refetches regardless of staleTime), so an
+// hour of freshness only skips redundant refetches on screen focus.
+const SUMMARY_STALE_MS = 60 * 60 * 1000;
+
 export function useGamificationSummary() {
-  return useQuery({ queryKey: gamificationKeys.summary, queryFn: fetchSummary });
+  return useQuery({
+    queryKey: gamificationKeys.summary,
+    queryFn: fetchSummary,
+    staleTime: SUMMARY_STALE_MS,
+  });
 }
 
 // Trailing-7-day recap ({ since, per_pet: [{ pet_id, doses, weights,

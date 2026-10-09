@@ -9,7 +9,7 @@ import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
-import { useRefetchOnFocus } from '../../hooks/usePets';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { getPref, setPref } from '../../services/prefs';
 
 const CARD_OUT = FadeOut.duration(150);
@@ -61,8 +61,8 @@ export default function DashboardScreen({ navigation }) {
   }, [dataLoaded, markInteractive]);
 
   // Weekly care streaks + milestones (nightly-computed server-side).
-  const { data: gamification, refetch: refetchGamification } = useGamificationSummary();
-  useRefetchOnFocus(refetchGamification);
+  const { data: gamification, refetch: refetchGamification, isStale: gamificationStale } = useGamificationSummary();
+  useRefetchOnFocus(refetchGamification, { isStale: gamificationStale });
 
   // Join streaks with pet names; pets the store hasn't loaded yet drop out.
   const careStreaks = useMemo(
