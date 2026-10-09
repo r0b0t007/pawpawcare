@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { API_URL } from '../config';
-import { getTokens, refreshAccessToken } from './api';
+import { getTokens, refreshAccessToken, netFetch, networkError } from './api';
 
 // Export center: download the user's full health-record history (CSV/PDF)
 // and hand it to the OS share sheet — or a plain download on web. Kept out
@@ -39,15 +39,9 @@ export async function exportRecords(format, petIds = []) {
   if (Platform.OS === 'web') {
     // No file system / share sheet on web — fetch as a blob and click a link.
     const { access } = await getTokens();
-    let res = await fetch(url, { headers: authHeaders(format, access) });
+    let res = await netFetch(url, { headers: authHeaders(format, access) });
     if (res.status === 401) {
-      let newToken;
-      try {
-        newToken = await refreshAccessToken();
-      } catch {
-        throw new Error('SESSION_EXPIRED');
-      }
-      res = await fetch(url, { headers: authHeaders(format, newToken) });
+      res = await netFetch(url, { headers: authHeaders(format, await refreshAccessToken()) });
     }
     if (!res.ok) throw new Error(`Export failed (${res.status})`);
 
@@ -68,19 +62,15 @@ export async function exportRecords(format, petIds = []) {
   // which is unreliable on Android RN and was throwing "Export failed" there.
   const fileUri = FileSystem.cacheDirectory + filename;
   const download = (token) =>
-    FileSystem.downloadAsync(url, fileUri, { headers: authHeaders(format, token) });
+    FileSystem.downloadAsync(url, fileUri, { headers: authHeaders(format, token) }).catch((e) => {
+      throw networkError(e, url);
+    });
 
   const { access } = await getTokens();
   let result = await download(access);
 
   if (result.status === 401) {
-    let newToken;
-    try {
-      newToken = await refreshAccessToken();
-    } catch {
-      throw new Error('SESSION_EXPIRED');
-    }
-    result = await download(newToken);
+    result = await download(await refreshAccessToken());
   }
 
   if (result.status < 200 || result.status >= 300) {

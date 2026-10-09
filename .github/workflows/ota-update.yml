@@ -63,3 +63,15 @@ jobs:
         run: |
           MESSAGE="$(printf '%s' "$COMMIT_MESSAGE" | head -n 1)"
           eas update --channel production --message "$MESSAGE" --non-interactive
+
+      - name: Upload source maps to Sentry
+        # eas update leaves the exported bundle + maps in dist/. Without this,
+        # crashes in OTA code show minified stack traces. Org/project come from
+        # the @sentry/react-native/expo plugin in app.json. The update is
+        # already live when this runs, so a failure is non-blocking: the job
+        # stays green (a red run should mean the publish failed) and the step
+        # shows up as a warning annotation instead.
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: npx sentry-expo-upload-sourcemaps dist

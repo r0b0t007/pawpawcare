@@ -6,7 +6,35 @@ import { getTokens, storeTokens, clearTokens } from './tokenStorage';
 // Re-exported so callers keep one import surface for auth plumbing.
 export { getTokens, storeTokens, clearTokens };
 
+// ── Transport ────────────────────────────────────────────────────────────────
+
+/**
+ * A transport failure (offline, DNS, TLS) as an Error tagged isNetworkError,
+ * so callers and the crash-report filter (scrub.js) can tell "no connection"
+ * from a bug. The URL (record ids, signed links) is only included in dev.
+ */
+export function networkError(cause, url) {
+  if (__DEV__) console.log('[API ERROR]', cause?.message, 'URL was:', url);
+  const err = new Error(`Network error: ${cause?.message || 'unknown'}${__DEV__ && url ? ` (${url})` : ''}`);
+  err.isNetworkError = true;
+  return err;
+}
+
+/** fetch() whose transport failures are tagged via networkError(). */
+export async function netFetch(url, init) {
+  try {
+    return await fetch(url, init);
+  } catch (e) {
+    throw networkError(e, url);
+  }
+}
+
 // ── Token refresh (deduplicated so parallel 401s only refresh once) ───────────
+
+// Only these mean the refresh token itself was rejected (invalid, expired,
+// revoked, account disabled). Offline and 5xx failures keep the session —
+// logging someone out because the network blipped wiped valid sessions.
+const SESSION_ENDED = new Set([401, 403, 422]);
 
 let _refreshPromise = null;
 
@@ -19,15 +47,20 @@ export async function refreshAccessToken() {
     const { refresh } = await getTokens();
     if (!refresh) throw new Error('SESSION_EXPIRED');
 
-    const res = await fetch(`${API_URL}/auth/refresh`, {
+    const res = await netFetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
       body: JSON.stringify({ refresh_token: refresh }),
     });
 
-    if (!res.ok) {
+    if (SESSION_ENDED.has(res.status)) {
       await clearTokens();
       throw new Error('SESSION_EXPIRED');
+    }
+    if (!res.ok) {
+      const err = new Error(`Couldn't refresh your session (${res.status})`);
+      err.status = res.status;
+      throw err;
     }
 
     const data = await res.json();
@@ -57,25 +90,17 @@ export async function request(method, path, body, { skipAuth = false } = {}) {
   if (body !== undefined) init.body = JSON.stringify(body);
 
   const url = `${API_URL}${path}`;
-  console.log('[API]', method, url);
-  let res;
-  try {
-    res = await fetch(url, init);
-  } catch (e) {
-    console.log('[API ERROR]', e?.message, 'URL was:', url);
-    throw new Error(`Network error: ${e?.message || 'unknown'} (${url})`);
-  }
-  console.log('[API]', res.status, url);
+  // Request logs are dev-only: release builds would write record ids and
+  // signed URLs to the device log.
+  if (__DEV__) console.log('[API]', method, url);
+  let res = await netFetch(url, init);
+  if (__DEV__) console.log('[API]', res.status, url);
 
-  // Auto-refresh on 401
+  // Auto-refresh on 401. A rejected refresh throws SESSION_EXPIRED; offline or
+  // server errors propagate as-is so the session survives them.
   if (res.status === 401 && !skipAuth) {
-    let newToken;
-    try {
-      newToken = await refreshAccessToken();
-    } catch {
-      throw new Error('SESSION_EXPIRED');
-    }
-    res = await fetch(`${API_URL}${path}`, {
+    const newToken = await refreshAccessToken();
+    res = await netFetch(url, {
       ...init,
       headers: { ...headers, Authorization: `Bearer ${newToken}` },
     });
@@ -89,6 +114,7 @@ export async function request(method, path, body, { skipAuth = false } = {}) {
     const msg = data?.detail || `Request failed (${res.status})`;
     const err = new Error(Array.isArray(msg) ? msg[0]?.msg ?? 'Validation error' : msg);
     err.status = res.status;
+    if (data?.code) err.code = data.code;
     throw err;
   }
 
@@ -129,7 +155,7 @@ export async function uploadImage(localUri) {
   const send = (token) => {
     const form = new FormData();
     form.append('file', filePart);
-    return fetch(`${API_URL}/uploads`, {
+    return netFetch(`${API_URL}/uploads`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -145,13 +171,7 @@ export async function uploadImage(localUri) {
 
   // Share the request() refresh path: retry once with a fresh token on 401.
   if (res.status === 401) {
-    let newToken;
-    try {
-      newToken = await refreshAccessToken();
-    } catch {
-      throw new Error('SESSION_EXPIRED');
-    }
-    res = await send(newToken);
+    res = await send(await refreshAccessToken());
   }
 
   if (!res.ok) {
@@ -176,7 +196,7 @@ export async function uploadDocument(petId, file, fields = {}) {
     Object.entries(fields).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') form.append(k, String(v));
     });
-    return fetch(`${API_URL}/pets/${petId}/documents`, {
+    return netFetch(`${API_URL}/pets/${petId}/documents`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -192,13 +212,7 @@ export async function uploadDocument(petId, file, fields = {}) {
 
   // Retry once with a fresh token on 401 (mirrors uploadImage).
   if (res.status === 401) {
-    let newToken;
-    try {
-      newToken = await refreshAccessToken();
-    } catch {
-      throw new Error('SESSION_EXPIRED');
-    }
-    res = await send(newToken);
+    res = await send(await refreshAccessToken());
   }
 
   const data = await res.json().catch(() => null);

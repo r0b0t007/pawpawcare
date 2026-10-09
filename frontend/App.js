@@ -15,16 +15,19 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ObserveRoot, ObserveNavigationContainer, configureObserve } from './src/services/observe';
+import { initSentry, registerNavigation, wrapRoot } from './src/services/sentry';
 
 import { AuthProvider } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
 import { ToastHost } from './src/components';
+import AppErrorBoundary from './src/components/AppErrorBoundary';
 import { track, trackScreen } from './src/services/analytics';
 import { addNotificationResponseListener } from './src/services/notifications';
 import AppNavigator from './src/navigation/AppNavigator';
 import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from './src/config';
 
 // Must run at module scope, before any screen mounts.
+initSentry();
 configureObserve({ integrations: { 'react-navigation': true } });
 
 // Configure Google Sign-In once. webClientId is the audience the backend
@@ -92,12 +95,14 @@ function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        <AppErrorBoundary onReset={() => queryClient.clear()}>
         <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <DataProvider>
             <ObserveNavigationContainer
               ref={navRef}
               onReady={() => {
+                registerNavigation(navRef);
                 routeNameRef.current = navRef.getCurrentRoute()?.name;
                 trackScreen(routeNameRef.current);
               }}
@@ -115,9 +120,10 @@ function App() {
           </DataProvider>
         </AuthProvider>
         </QueryClientProvider>
+        </AppErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
-export default ObserveRoot.wrap(App);
+export default wrapRoot(ObserveRoot.wrap(App));
