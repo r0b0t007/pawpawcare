@@ -34,10 +34,6 @@ describe('eas-env', () => {
     expect(preview.EXPO_PUBLIC_API_URL).toBe('https://api.pawpawcare.app');
     expect(preview.EXPO_PUBLIC_POSTHOG_KEY).toBeUndefined();
 
-    // Crash reporting is on for both store and tester builds (same Sentry project).
-    for (const env of [production, preview]) {
-      expect(env.EXPO_PUBLIC_SENTRY_DSN).toMatch(/^https:\/\/[0-9a-f]+@o\d+\.ingest\.us\.sentry\.io\/\d+$/);
-    }
   });
 
   test.each(Object.entries(OTA_WORKFLOWS))(

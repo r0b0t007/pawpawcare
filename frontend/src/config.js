@@ -10,9 +10,13 @@ export const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY ?? '';
 export const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com';
 
 // Sentry crash reporting (project pawpawcare-app). The DSN is a public client
-// key that ships inside the app; set per profile in eas.json. Unset (dev/CI),
-// reporting stays off.
-export const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? '';
+// key that ships inside the app, so it's committed here rather than in
+// eas.json: eas.json is part of the runtime fingerprint, and editing it would
+// cut OTA updates off from installed builds. Reporting is off in __DEV__
+// (services/sentry.js); set EXPO_PUBLIC_SENTRY_DSN to override.
+export const SENTRY_DSN =
+  process.env.EXPO_PUBLIC_SENTRY_DSN ??
+  'https://ba10a27c2db4831f5d7b45b01d5c12f6@o4512223191105536.ingest.us.sentry.io/4512223210504192';
 
 // Google sign-in OAuth client IDs (from Google Cloud Console → Credentials).
 // WEB is the ID token's audience — it MUST match the backend's GOOGLE_WEB_CLIENT_ID.
