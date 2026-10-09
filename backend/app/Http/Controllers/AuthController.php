@@ -6,7 +6,6 @@ use App\Mail\PasswordResetCodeMail;
 use App\Models\PasswordResetCode;
 use App\Models\RefreshToken;
 use App\Models\User;
-use App\Services\Analytics\ProductAnalytics;
 use App\Services\JwtService;
 use App\Support\JwtSecretGuard;
 use Firebase\JWT\BeforeValidException;
@@ -88,10 +87,7 @@ class AuthController extends Controller
 
         RateLimiter::clear($failKey);
 
-        $reactivated = $this->reactivateOrRejectDisabled($user);
-        if ($reactivated) {
-            $this->trackReactivation($user, 'password');
-        }
+        $reactivated = $this->reactivateOrRejectDisabled($user, 'password');
 
         return response()->json(
             $this->issueTokens($user) + ($reactivated ? ['reactivated' => true] : [])
@@ -336,8 +332,7 @@ class AuthController extends Controller
         // ...so also cancel a pending self-deletion: the user can simply log
         // in with the new password.
         if (! $user->is_active && $user->deletion_requested_at !== null) {
-            $user->forceFill(['is_active' => true, 'deletion_requested_at' => null])->save();
-            $this->trackReactivation($user, 'password_reset');
+            $user->cancelPendingDeletion('password_reset');
         }
 
         // Kill every existing session: stolen refresh tokens, live access
@@ -445,7 +440,7 @@ class AuthController extends Controller
      * `deletion_requested_at`, otherwise this reactivation path would undo
      * the ban on their next login.
      */
-    private function reactivateOrRejectDisabled(User $user): bool
+    private function reactivateOrRejectDisabled(User $user, string $method): bool
     {
         if ($user->is_active) {
             return false;
@@ -455,18 +450,9 @@ class AuthController extends Controller
             abort(403, 'Account is disabled');
         }
 
-        $user->forceFill([
-            'is_active' => true,
-            'deletion_requested_at' => null,
-        ])->save();
+        $user->cancelPendingDeletion($method);
 
         return true;
-    }
-
-    /** A pending self-deletion was cancelled by signing back in. */
-    private function trackReactivation(User $user, string $method): void
-    {
-        app(ProductAnalytics::class)->capture($user, 'server_account_reactivated', ['method' => $method]);
     }
 
     /**
@@ -573,10 +559,7 @@ class AuthController extends Controller
 
         // Existing account (linked or matched): honour the disabled flag,
         // cancelling a pending self-deletion (grace-period reactivation).
-        $reactivated = $this->reactivateOrRejectDisabled($user);
-        if ($reactivated) {
-            $this->trackReactivation($user, $provider);
-        }
+        $reactivated = $this->reactivateOrRejectDisabled($user, $provider);
 
         return [$user, $reactivated];
     }

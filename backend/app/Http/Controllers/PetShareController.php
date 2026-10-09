@@ -43,15 +43,14 @@ class PetShareController extends Controller
             $pet->forceFill(['share_token' => Str::random(40)])->save();
         }
 
-        $expiresAt = now()->addMinutes(self::EXPIRIES[$data['expires_in'] ?? '24h']);
+        $expiresIn = $data['expires_in'] ?? '24h';
+        $expiresAt = now()->addMinutes(self::EXPIRIES[$expiresIn]);
         $url = URL::temporarySignedRoute('pets.share', $expiresAt, [
             'pet' => $pet->id,
             't' => $pet->share_token,
         ]);
 
-        $analytics->capture($request->user(), 'server_share_link_created', [
-            'expires_in' => $data['expires_in'] ?? '24h',
-        ]);
+        $analytics->capture($request->user(), 'server_share_link_created', ['expires_in' => $expiresIn]);
 
         return response()->json([
             'url' => $url,

@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\User;
 use App\Services\Analytics\ProductAnalytics;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PurgeDeletedAccounts extends Command
@@ -23,48 +22,52 @@ class PurgeDeletedAccounts extends Command
 
     public function handle(ProductAnalytics $analytics): int
     {
-        $due = User::whereNotNull('deletion_requested_at')
-            ->where('deletion_requested_at', '<=', now()->subDays(User::DELETION_GRACE_DAYS))
-            ->get();
+        $due = User::dueForPurge()->orderBy('deletion_requested_at')->get();
 
         $purged = 0;
         $posthogDown = false;
-        foreach ($due as $user) {
+        foreach ($due as $listed) {
+            // Re-check before touching anything: the sweep can take a while,
+            // and a user who logged back in since the list was loaded (which
+            // cancels the deletion) must keep both their account and their
+            // analytics history.
+            $user = User::whereKey($listed->id)->dueForPurge()->first();
+            if (! $user) {
+                continue;
+            }
+
+            $giveUpAt = $user->deletion_requested_at->copy()
+                ->addDays(User::DELETION_GRACE_DAYS + self::THIRD_PARTY_RETRY_DAYS);
+            $pastRetryWindow = now()->gte($giveUpAt);
+
             // Erase the person's product-analytics data first, while we still
-            // know their id. A failure skips the account (retried by the next
-            // daily run) until the retry window is over. After one failure the
-            // rest of this run doesn't call PostHog again, so an outage can't
-            // add a timeout per account to the nightly schedule.
-            $erased = ! $posthogDown && $analytics->deletePerson((string) $user->id);
-            if (! $erased) {
+            // know their id. During a PostHog outage the rest of the run stops
+            // calling it (no timeout per account); those accounts retry
+            // tomorrow — except ones out of retry window, which still get
+            // their attempt before being purged.
+            if ($posthogDown && ! $pastRetryWindow) {
+                continue;
+            }
+            $result = $analytics->deletePerson((string) $user->id);
+            if ($result === ProductAnalytics::DELETE_UNAVAILABLE) {
                 $posthogDown = true;
-                $giveUpAt = $user->deletion_requested_at->copy()
-                    ->addDays(User::DELETION_GRACE_DAYS + self::THIRD_PARTY_RETRY_DAYS);
-                if (now()->lt($giveUpAt)) {
+            }
+            if ($result !== ProductAnalytics::DELETE_OK) {
+                if (! $pastRetryWindow) {
                     continue;
                 }
                 Log::error('PostHog deletion kept failing; purging the account locally anyway', ['user_id' => $user->id]);
             }
 
             try {
-                // Re-check under a lock: the sweep can take a while, and a user
-                // who logged back in meanwhile (cancelling the deletion) must
-                // never be purged from the stale list.
-                $stillDue = DB::transaction(function () use ($user) {
-                    $current = User::whereKey($user->id)
-                        ->whereNotNull('deletion_requested_at')
-                        ->where('deletion_requested_at', '<=', now()->subDays(User::DELETION_GRACE_DAYS))
-                        ->lockForUpdate()
-                        ->first();
-                    if ($current) {
-                        $this->purge($current);
-                    }
-
-                    return $current !== null;
-                });
-                if (! $stillDue) {
+                // The PostHog call can take seconds; check once more right
+                // before the irreversible part. (No wrapping transaction: the
+                // model hooks delete files, which a rollback can't restore.)
+                $current = User::whereKey($user->id)->dueForPurge()->first();
+                if (! $current) {
                     continue;
                 }
+                $this->purge($current);
                 $purged++;
             } catch (\Throwable $e) {
                 // One failing account must not block the rest of the sweep.

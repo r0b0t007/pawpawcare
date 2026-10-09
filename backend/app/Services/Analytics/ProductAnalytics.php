@@ -26,10 +26,25 @@ use Ramsey\Uuid\Uuid;
  */
 class ProductAnalytics
 {
+    /** deletePerson(): PostHog accepted the deletion (or nothing to delete). */
+    public const DELETE_OK = 'ok';
+
+    /** deletePerson(): this person failed; retry them, keep going with others. */
+    public const DELETE_PERSON_FAILED = 'person_failed';
+
+    /** deletePerson(): PostHog is down or misconfigured; stop calling it this run. */
+    public const DELETE_UNAVAILABLE = 'unavailable';
+
     /** @var array<int, array<string, mixed>> */
     private array $buffer = [];
 
-    private bool $flushScheduled = false;
+    public function __construct()
+    {
+        // Registered once per instance (a singleton per request/command), so
+        // repeated flushes never pile up terminating callbacks. Queued jobs
+        // are flushed separately (Queue::after in AppServiceProvider).
+        app()->terminating(fn () => $this->flush());
+    }
 
     public function enabled(): bool
     {
@@ -61,11 +76,6 @@ class ProductAnalytics
         }
 
         $this->buffer[] = $payload;
-
-        if (! $this->flushScheduled) {
-            $this->flushScheduled = true;
-            app()->terminating(fn () => $this->flush());
-        }
     }
 
     /** Send buffered events. Best-effort: failures are logged, never thrown. */
@@ -73,7 +83,6 @@ class ProductAnalytics
     {
         $batch = $this->buffer;
         $this->buffer = [];
-        $this->flushScheduled = false;
         if ($batch === [] || ! $this->enabled()) {
             return;
         }
@@ -89,20 +98,21 @@ class ProductAnalytics
             Log::warning('PostHog capture failed', [
                 'events' => count($batch),
                 'error' => class_basename($e),
-                'status' => method_exists($e, 'getCode') ? $e->getCode() : null,
+                'status' => $e->getCode(),
             ]);
         }
     }
 
     /**
-     * Permanently delete the person and their events (account purge). Returns
-     * true when PostHog accepted the deletion (or, outside production, when
-     * deletion isn't configured), false when it must be retried.
+     * Permanently delete the person and their events (account purge).
+     * Returns DELETE_OK when PostHog accepted it (or, outside production, when
+     * deletion isn't configured); DELETE_PERSON_FAILED when only this person
+     * failed; DELETE_UNAVAILABLE when PostHog is down or misconfigured.
      *
-     * Note: events are flushed on app()->terminating, i.e. per HTTP request or
-     * console command. A long-running queue worker would need its own flush.
+     * Note: events are flushed per HTTP request / console command and after
+     * each queued job; anything else long-running needs its own flush().
      */
-    public function deletePerson(string $distinctId): bool
+    public function deletePerson(string $distinctId): string
     {
         $personalKey = (string) config('services.posthog.personal_api_key');
         $projectId = (string) config('services.posthog.project_id');
@@ -111,11 +121,11 @@ class ProductAnalytics
             // not the server captures, so production must be able to erase it.
             // Elsewhere (local, CI) nothing real was ever sent.
             if (! app()->environment('production')) {
-                return true;
+                return self::DELETE_OK;
             }
             Log::error('PostHog person deletion is not configured (POSTHOG_PERSONAL_API_KEY / POSTHOG_PROJECT_ID)');
 
-            return false;
+            return self::DELETE_UNAVAILABLE;
         }
 
         try {
@@ -129,17 +139,31 @@ class ProductAnalytics
         } catch (\Throwable $e) {
             Log::warning('PostHog person deletion failed', ['error' => class_basename($e)]);
 
-            return false;
+            return self::DELETE_UNAVAILABLE;
+        }
+
+        $status = $response->status();
+        if ($status === 429 || $response->serverError()) {
+            Log::warning('PostHog person deletion failed', ['status' => $status]);
+
+            return self::DELETE_UNAVAILABLE;
+        }
+        if ($response->clientError()) {
+            // 401/403/404: wrong key scope or project id — a configuration
+            // problem that won't fix itself, so surface it right away.
+            Log::error('PostHog person deletion rejected; check POSTHOG_PERSONAL_API_KEY (person:write) and POSTHOG_PROJECT_ID', ['status' => $status]);
+
+            return self::DELETE_UNAVAILABLE;
         }
 
         // 202 with an empty deletion_errors list means accepted (or no such
-        // person). Failures are reported in deletion_errors, not the status.
-        if (! $response->successful() || ! empty($response->json('deletion_errors'))) {
-            Log::warning('PostHog person deletion failed', ['status' => $response->status()]);
+        // person). Per-person failures are reported there, not in the status.
+        if (! empty($response->json('deletion_errors'))) {
+            Log::warning('PostHog person deletion failed for one person', ['status' => $status]);
 
-            return false;
+            return self::DELETE_PERSON_FAILED;
         }
 
-        return true;
+        return self::DELETE_OK;
     }
 }

@@ -232,18 +232,75 @@ class AccountDeletionTest extends TestCase
         $this->assertTrue(User::find($due->id)->is_active);
     }
 
-    public function test_one_posthog_failure_stops_calling_it_for_the_rest_of_the_run(): void
+    public function test_a_user_who_logs_back_in_before_the_sweep_reaches_them_keeps_their_analytics(): void
+    {
+        $this->posthogConfigured();
+        $first = $this->dueUser('first@example.com', 2); // most overdue: handled first
+        $later = $this->dueUser('later@example.com', 1);
+        // While the sweep handles $first, $later logs back in.
+        Http::fake(function () use ($later) {
+            $later->forceFill(['is_active' => true, 'deletion_requested_at' => null])->save();
+
+            return Http::response(['deletion_errors' => []], 202);
+        });
+
+        $this->artisan('accounts:purge-deleted')->assertSuccessful();
+
+        Http::assertSentCount(1);
+        Http::assertNotSent(fn (Request $r) => in_array((string) $later->id, $r->data()['distinct_ids'] ?? [], true));
+        $this->assertNull(User::find($first->id));
+        $this->assertNotNull(User::find($later->id));
+    }
+
+    public function test_an_outage_stops_calling_posthog_for_the_rest_of_the_run(): void
     {
         $this->posthogConfigured();
         Http::fake(['us.posthog.com/*' => Http::response('down', 503)]);
-        $this->dueUser('a@example.com');
-        $this->dueUser('b@example.com');
-        $this->dueUser('c@example.com');
+        $this->dueUser('a@example.com', 3);
+        $this->dueUser('b@example.com', 2);
+        $this->dueUser('c@example.com', 1);
 
         $this->artisan('accounts:purge-deleted')->assertSuccessful();
 
         Http::assertSentCount(1);
         $this->assertSame(3, User::whereNotNull('deletion_requested_at')->count());
+    }
+
+    public function test_one_person_failing_does_not_hold_up_the_others(): void
+    {
+        $this->posthogConfigured();
+        $stuck = $this->dueUser('stuck@example.com', 3);
+        $b = $this->dueUser('b@example.com', 2);
+        $c = $this->dueUser('c@example.com', 1);
+        Http::fake(fn (Request $r) => Http::response([
+            'deletion_errors' => in_array((string) $stuck->id, $r->data()['distinct_ids'], true)
+                ? [['person_uuid' => 'x', 'step' => 'person']]
+                : [],
+        ], 202));
+
+        $this->artisan('accounts:purge-deleted')->assertSuccessful();
+
+        Http::assertSentCount(3);
+        $this->assertNotNull(User::find($stuck->id)); // retried tomorrow
+        $this->assertNull(User::find($b->id));
+        $this->assertNull(User::find($c->id));
+    }
+
+    public function test_accounts_past_the_retry_window_still_get_their_attempt_during_an_outage(): void
+    {
+        $this->posthogConfigured();
+        Http::fake(['us.posthog.com/*' => Http::response('down', 503)]);
+        $window = PurgeDeletedAccounts::THIRD_PARTY_RETRY_DAYS;
+        $overdue1 = $this->dueUser('o1@example.com', $window + 3);
+        $overdue2 = $this->dueUser('o2@example.com', $window + 2);
+        $inWindow = $this->dueUser('w@example.com', 1);
+
+        $this->artisan('accounts:purge-deleted')->assertSuccessful();
+
+        Http::assertSentCount(2); // both overdue accounts tried; the in-window one waits
+        $this->assertNull(User::find($overdue1->id));
+        $this->assertNull(User::find($overdue2->id));
+        $this->assertNotNull(User::find($inWindow->id));
     }
 
     public function test_after_the_retry_window_the_account_is_purged_anyway_and_logged(): void

@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Services\Analytics\ProductAnalytics;
 use App\Support\Uploads;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -61,6 +63,24 @@ class User extends Model
      * access tokens (via the `ver` claim JwtAuth checks), and push-device
      * bindings. Used whenever control of the account changes hands.
      */
+    /** Accounts whose self-deletion grace period has passed. */
+    public function scopeDueForPurge(Builder $query): Builder
+    {
+        return $query->whereNotNull('deletion_requested_at')
+            ->where('deletion_requested_at', '<=', now()->subDays(self::DELETION_GRACE_DAYS));
+    }
+
+    /**
+     * Cancel a pending self-deletion (the user signed back in or reset their
+     * password during the grace period). The single place that reactivates,
+     * so every path is tracked the same way.
+     */
+    public function cancelPendingDeletion(string $method): void
+    {
+        $this->forceFill(['is_active' => true, 'deletion_requested_at' => null])->save();
+        app(ProductAnalytics::class)->capture($this, 'server_account_reactivated', ['method' => $method]);
+    }
+
     public function revokeAllSessions(): void
     {
         // DB-side increment: concurrent revocations can't collapse into one.

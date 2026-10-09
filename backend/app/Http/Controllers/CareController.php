@@ -72,15 +72,14 @@ class CareController extends Controller
             $pet->forceFill(['care_token' => Str::random(40)])->save();
         }
 
-        $expiresAt = now()->addMinutes(self::EXPIRIES[$data['expires_in'] ?? '7d']);
+        $expiresIn = $data['expires_in'] ?? '7d';
+        $expiresAt = now()->addMinutes(self::EXPIRIES[$expiresIn]);
         $url = URL::temporarySignedRoute('pets.care', $expiresAt, [
             'pet' => $pet->id,
             't' => $pet->care_token,
         ]);
 
-        $analytics->capture($request->user(), 'server_care_link_created', [
-            'expires_in' => $data['expires_in'] ?? '7d',
-        ]);
+        $analytics->capture($request->user(), 'server_care_link_created', ['expires_in' => $expiresIn]);
 
         return response()->json(['url' => $url, 'expires_at' => $expiresAt->toISOString()]);
     }

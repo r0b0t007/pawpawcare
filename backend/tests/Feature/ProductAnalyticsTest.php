@@ -144,7 +144,7 @@ class ProductAnalyticsTest extends TestCase
         $this->configure();
         Http::fake(['us.posthog.com/*' => Http::response(['persons_found' => 1, 'persons_queued_for_deletion' => 1, 'deletion_errors' => []], 202)]);
 
-        $this->assertTrue((new ProductAnalytics)->deletePerson('user-uuid'));
+        $this->assertSame(ProductAnalytics::DELETE_OK, (new ProductAnalytics)->deletePerson('user-uuid'));
 
         Http::assertSent(fn (Request $request) => $request->url() === 'https://us.posthog.com/api/projects/123/persons/bulk_delete/'
             && $request->method() === 'POST'
@@ -157,21 +157,33 @@ class ProductAnalyticsTest extends TestCase
         $this->configure();
         Http::fake(['us.posthog.com/*' => Http::response(['persons_found' => 0, 'deletion_errors' => []], 202)]);
 
-        $this->assertTrue((new ProductAnalytics)->deletePerson('never-tracked'));
+        $this->assertSame(ProductAnalytics::DELETE_OK, (new ProductAnalytics)->deletePerson('never-tracked'));
     }
 
-    public function test_delete_person_reports_failures_for_retry(): void
+    public function test_delete_person_classifies_failures(): void
     {
         $this->configure();
+        Http::fakeSequence('us.posthog.com/*')
+            ->push(['deletion_errors' => [['person_uuid' => 'x', 'step' => 'person']]], 202)
+            ->push('oops', 500)
+            ->push('slow down', 429)
+            ->pushFailedConnection();
+        $analytics = new ProductAnalytics;
 
-        Http::fake(['us.posthog.com/*' => Http::response(['deletion_errors' => [['person_uuid' => 'x', 'step' => 'person']]], 202)]);
-        $this->assertFalse((new ProductAnalytics)->deletePerson('a'), 'deletion_errors in a 202');
+        $this->assertSame(ProductAnalytics::DELETE_PERSON_FAILED, $analytics->deletePerson('a'), 'deletion_errors in a 202');
+        $this->assertSame(ProductAnalytics::DELETE_UNAVAILABLE, $analytics->deletePerson('a'), '5xx');
+        $this->assertSame(ProductAnalytics::DELETE_UNAVAILABLE, $analytics->deletePerson('a'), '429');
+        $this->assertSame(ProductAnalytics::DELETE_UNAVAILABLE, $analytics->deletePerson('a'), 'network');
+    }
 
-        Http::fake(['us.posthog.com/*' => Http::response('oops', 500)]);
-        $this->assertFalse((new ProductAnalytics)->deletePerson('a'), '5xx');
+    public function test_a_rejected_key_or_project_is_an_error_right_away(): void
+    {
+        $this->configure();
+        Http::fake(['us.posthog.com/*' => Http::response(['detail' => 'forbidden'], 403)]);
+        Log::spy();
 
-        Http::fake(fn () => throw new ConnectionException('timeout'));
-        $this->assertFalse((new ProductAnalytics)->deletePerson('a'), 'network');
+        $this->assertSame(ProductAnalytics::DELETE_UNAVAILABLE, (new ProductAnalytics)->deletePerson('a'));
+        Log::shouldHaveReceived('error')->once()->withArgs(fn ($message) => str_contains($message, 'person:write'));
     }
 
     public function test_deletion_still_runs_when_server_capture_is_off(): void
@@ -181,7 +193,7 @@ class ProductAnalyticsTest extends TestCase
         $this->configure(['key' => '']);
         Http::fake(['us.posthog.com/*' => Http::response(['deletion_errors' => []], 202)]);
 
-        $this->assertTrue((new ProductAnalytics)->deletePerson('a'));
+        $this->assertSame(ProductAnalytics::DELETE_OK, (new ProductAnalytics)->deletePerson('a'));
         Http::assertSentCount(1);
     }
 
@@ -190,7 +202,7 @@ class ProductAnalyticsTest extends TestCase
         $this->configure(['personal_api_key' => '', 'project_id' => '']);
         Http::fake();
 
-        $this->assertTrue((new ProductAnalytics)->deletePerson('a'));
+        $this->assertSame(ProductAnalytics::DELETE_OK, (new ProductAnalytics)->deletePerson('a'));
         Http::assertNothingSent();
     }
 
@@ -201,7 +213,7 @@ class ProductAnalyticsTest extends TestCase
         Http::fake();
         Log::spy();
 
-        $this->assertFalse((new ProductAnalytics)->deletePerson('a'));
+        $this->assertSame(ProductAnalytics::DELETE_UNAVAILABLE, (new ProductAnalytics)->deletePerson('a'));
         Http::assertNothingSent();
         Log::shouldHaveReceived('error')->once();
     }

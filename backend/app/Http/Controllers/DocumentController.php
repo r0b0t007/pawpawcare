@@ -156,7 +156,8 @@ class DocumentController extends Controller
         $startedAt = hrtime(true);
         $track = fn (string $status) => $analytics->capture($request->user(), 'server_document_extracted', [
             'status' => $status,
-            'provider' => (string) config('services.extraction.provider'),
+            // Mirrors the ExtractionClient binding (unknown values fall back to Anthropic).
+            'provider' => config('services.extraction.provider') === 'openai-compatible' ? 'openai-compatible' : 'anthropic',
             'mime_family' => match (true) {
                 str_starts_with((string) $doc->mime, 'image/') => 'image',
                 $doc->mime === 'application/pdf' => 'pdf',
