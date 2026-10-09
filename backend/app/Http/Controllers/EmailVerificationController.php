@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\EmailVerificationCodeMail;
 use App\Models\EmailVerificationCode;
+use App\Services\Analytics\ProductAnalytics;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -104,6 +105,8 @@ class EmailVerificationController extends Controller
             abort(400, 'Invalid or expired code');
         }
         $user->forceFill(['email_verified_at' => now()])->save();
+
+        app(ProductAnalytics::class)->capture($user, 'server_email_verified');
 
         return response()->json($user->toSelfApi());
     }

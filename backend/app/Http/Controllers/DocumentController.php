@@ -10,6 +10,7 @@ use App\Models\Medication;
 use App\Models\Pet;
 use App\Models\Vaccination;
 use App\Models\WeightLog;
+use App\Services\Analytics\ProductAnalytics;
 use App\Services\DocumentExtractor;
 use App\Services\ReminderScheduler;
 use App\Support\Uploads;
@@ -128,7 +129,7 @@ class DocumentController extends Controller
      * completed extraction is returned as-is rather than re-running (and
      * re-paying for) the API call.
      */
-    public function extract(Request $request, string $petId, string $documentId, DocumentExtractor $extractor): JsonResponse
+    public function extract(Request $request, string $petId, string $documentId, DocumentExtractor $extractor, ProductAnalytics $analytics): JsonResponse
     {
         $pet = $this->petOr404($request, $petId);
 
@@ -152,11 +153,24 @@ class DocumentController extends Controller
         // Columns are guarded (not fillable) — set explicitly, never from input.
         $doc->forceFill(['extraction_status' => 'pending'])->save();
 
+        $startedAt = hrtime(true);
+        $track = fn (string $status) => $analytics->capture($request->user(), 'server_document_extracted', [
+            'status' => $status,
+            'provider' => (string) config('services.extraction.provider'),
+            'mime_family' => match (true) {
+                str_starts_with((string) $doc->mime, 'image/') => 'image',
+                $doc->mime === 'application/pdf' => 'pdf',
+                default => 'other',
+            },
+            'duration_ms' => intdiv(hrtime(true) - $startedAt, 1_000_000),
+        ]);
+
         try {
             $extraction = $extractor->extract($doc, $pet);
         } catch (\Throwable $e) {
             Log::warning('Document extraction failed', ['document_id' => $doc->id, 'error' => $e->getMessage()]);
             $doc->forceFill(['extraction_status' => 'failed'])->save();
+            $track('failed');
             abort(502, 'Could not read the document. Please try again.');
         }
 
@@ -165,6 +179,7 @@ class DocumentController extends Controller
             'extraction' => $extraction,
             'extracted_at' => now(),
         ])->save();
+        $track('done');
 
         return response()->json($doc->toApi());
     }

@@ -6,6 +6,7 @@ use App\Mail\PasswordResetCodeMail;
 use App\Models\PasswordResetCode;
 use App\Models\RefreshToken;
 use App\Models\User;
+use App\Services\Analytics\ProductAnalytics;
 use App\Services\JwtService;
 use App\Support\JwtSecretGuard;
 use Firebase\JWT\BeforeValidException;
@@ -88,6 +89,9 @@ class AuthController extends Controller
         RateLimiter::clear($failKey);
 
         $reactivated = $this->reactivateOrRejectDisabled($user);
+        if ($reactivated) {
+            $this->trackReactivation($user, 'password');
+        }
 
         return response()->json(
             $this->issueTokens($user) + ($reactivated ? ['reactivated' => true] : [])
@@ -333,6 +337,7 @@ class AuthController extends Controller
         // in with the new password.
         if (! $user->is_active && $user->deletion_requested_at !== null) {
             $user->forceFill(['is_active' => true, 'deletion_requested_at' => null])->save();
+            $this->trackReactivation($user, 'password_reset');
         }
 
         // Kill every existing session: stolen refresh tokens, live access
@@ -458,6 +463,12 @@ class AuthController extends Controller
         return true;
     }
 
+    /** A pending self-deletion was cancelled by signing back in. */
+    private function trackReactivation(User $user, string $method): void
+    {
+        app(ProductAnalytics::class)->capture($user, 'server_account_reactivated', ['method' => $method]);
+    }
+
     /**
      * Resolve a verified social identity to a user: reuse the linked account,
      * link to an existing account when the provider vouches for a matching
@@ -563,6 +574,9 @@ class AuthController extends Controller
         // Existing account (linked or matched): honour the disabled flag,
         // cancelling a pending self-deletion (grace-period reactivation).
         $reactivated = $this->reactivateOrRejectDisabled($user);
+        if ($reactivated) {
+            $this->trackReactivation($user, $provider);
+        }
 
         return [$user, $reactivated];
     }

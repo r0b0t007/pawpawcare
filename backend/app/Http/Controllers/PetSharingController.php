@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Pet;
 use App\Models\PetInvite;
 use App\Models\User;
+use App\Services\Analytics\ProductAnalytics;
 use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -128,7 +129,7 @@ class PetSharingController extends Controller
     }
 
     /** Accept an invitation → become a co-owner of the pet. */
-    public function accept(Request $request, string $inviteId): JsonResponse
+    public function accept(Request $request, string $inviteId, ProductAnalytics $analytics): JsonResponse
     {
         $user = $request->user();
         $invite = $this->myPendingInviteOr404($inviteId, $user);
@@ -149,6 +150,8 @@ class PetSharingController extends Controller
             // Give the new co-owner their own copy of the pet's care reminders.
             ReminderScheduler::backfillForMember($pet, $user);
         }
+
+        $analytics->capture($user, 'server_invite_accepted');
 
         return response()->json($pet ? $pet->toApi() : null);
     }

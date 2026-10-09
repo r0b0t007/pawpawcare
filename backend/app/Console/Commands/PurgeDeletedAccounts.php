@@ -3,7 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\User;
+use App\Services\Analytics\ProductAnalytics;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PurgeDeletedAccounts extends Command
@@ -12,16 +14,57 @@ class PurgeDeletedAccounts extends Command
 
     protected $description = 'Permanently delete accounts whose deletion grace period has passed.';
 
-    public function handle(): int
+    /**
+     * How long a failing third-party deletion (PostHog) may hold up a purge.
+     * Past that, the account is purged locally anyway and the leftover is
+     * logged as an error for manual follow-up.
+     */
+    public const THIRD_PARTY_RETRY_DAYS = 7;
+
+    public function handle(ProductAnalytics $analytics): int
     {
         $due = User::whereNotNull('deletion_requested_at')
             ->where('deletion_requested_at', '<=', now()->subDays(User::DELETION_GRACE_DAYS))
             ->get();
 
         $purged = 0;
+        $posthogDown = false;
         foreach ($due as $user) {
+            // Erase the person's product-analytics data first, while we still
+            // know their id. A failure skips the account (retried by the next
+            // daily run) until the retry window is over. After one failure the
+            // rest of this run doesn't call PostHog again, so an outage can't
+            // add a timeout per account to the nightly schedule.
+            $erased = ! $posthogDown && $analytics->deletePerson((string) $user->id);
+            if (! $erased) {
+                $posthogDown = true;
+                $giveUpAt = $user->deletion_requested_at->copy()
+                    ->addDays(User::DELETION_GRACE_DAYS + self::THIRD_PARTY_RETRY_DAYS);
+                if (now()->lt($giveUpAt)) {
+                    continue;
+                }
+                Log::error('PostHog deletion kept failing; purging the account locally anyway', ['user_id' => $user->id]);
+            }
+
             try {
-                $this->purge($user);
+                // Re-check under a lock: the sweep can take a while, and a user
+                // who logged back in meanwhile (cancelling the deletion) must
+                // never be purged from the stale list.
+                $stillDue = DB::transaction(function () use ($user) {
+                    $current = User::whereKey($user->id)
+                        ->whereNotNull('deletion_requested_at')
+                        ->where('deletion_requested_at', '<=', now()->subDays(User::DELETION_GRACE_DAYS))
+                        ->lockForUpdate()
+                        ->first();
+                    if ($current) {
+                        $this->purge($current);
+                    }
+
+                    return $current !== null;
+                });
+                if (! $stillDue) {
+                    continue;
+                }
                 $purged++;
             } catch (\Throwable $e) {
                 // One failing account must not block the rest of the sweep.

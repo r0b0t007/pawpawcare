@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\Analytics\ProductAnalytics;
 use App\Services\ReminderScheduler;
 use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
@@ -72,7 +73,7 @@ class UserController extends Controller
      * `accounts:purge-deleted` command after the grace period. Logging back
      * in (or completing a password reset) during the grace period cancels it.
      */
-    public function destroy(Request $request): JsonResponse
+    public function destroy(Request $request, ProductAnalytics $analytics): JsonResponse
     {
         $user = $request->user();
 
@@ -85,6 +86,8 @@ class UserController extends Controller
         // would otherwise revive if the user logs back in during the grace
         // period — and stop push notifications right away.
         $user->revokeAllSessions();
+
+        $analytics->capture($user, 'server_account_deletion_requested');
 
         return response()->json([
             'status' => 'deletion_scheduled',

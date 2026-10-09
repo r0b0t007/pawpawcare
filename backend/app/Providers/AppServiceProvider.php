@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Analytics\ProductAnalytics;
 use App\Services\Extraction\AnthropicDriver;
 use App\Services\Extraction\ExtractionClient;
 use App\Services\Extraction\OpenAiCompatibleDriver;
@@ -23,6 +24,9 @@ class AppServiceProvider extends ServiceProvider
             'openai-compatible' => new OpenAiCompatibleDriver,
             default => new AnthropicDriver,
         });
+
+        // One buffer per request/command, flushed after the response is sent.
+        $this->app->singleton(ProductAnalytics::class);
     }
 
     /**

@@ -33,6 +33,9 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="SENTRY_LARAVEL_DSN" value=""/>
+        <env name="POSTHOG_PROJECT_KEY" value=""/>
+        <env name="POSTHOG_PERSONAL_API_KEY" value=""/>
+        <env name="POSTHOG_PROJECT_ID" value=""/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
     </php>
 </phpunit>
