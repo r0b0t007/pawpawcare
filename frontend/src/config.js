@@ -13,10 +13,14 @@ export const POSTHOG_HOST = process.env.EXPO_PUBLIC_POSTHOG_HOST ?? 'https://us.
 // key that ships inside the app, so it's committed here rather than in
 // eas.json: eas.json is part of the runtime fingerprint, and editing it would
 // cut OTA updates off from installed builds. Reporting is off in __DEV__
-// (services/sentry.js); set EXPO_PUBLIC_SENTRY_DSN to override.
-export const SENTRY_DSN =
-  process.env.EXPO_PUBLIC_SENTRY_DSN ??
+// (services/sentry.js). EXPO_PUBLIC_SENTRY_DSN overrides it; any value that
+// isn't an https DSN (e.g. "off" — EAS rejects empty env values) disables
+// reporting, which e2e/test builds use to stay out of the real project.
+const SENTRY_DSN_DEFAULT =
   'https://ba10a27c2db4831f5d7b45b01d5c12f6@o4512223191105536.ingest.us.sentry.io/4512223210504192';
+const sentryDsnEnv = process.env.EXPO_PUBLIC_SENTRY_DSN;
+export const SENTRY_DSN =
+  sentryDsnEnv === undefined ? SENTRY_DSN_DEFAULT : sentryDsnEnv.startsWith('https://') ? sentryDsnEnv : '';
 
 // Google sign-in OAuth client IDs (from Google Cloud Console → Credentials).
 // WEB is the ID token's audience — it MUST match the backend's GOOGLE_WEB_CLIENT_ID.
