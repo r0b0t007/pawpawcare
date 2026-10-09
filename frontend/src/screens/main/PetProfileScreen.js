@@ -12,7 +12,7 @@ import { resolveAsset } from '../../config';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel } from '../../utils/streaks';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
-import { useRefetchOnFocus } from '../../hooks/usePets';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { track } from '../../services/analytics';
 import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
 import {
@@ -69,6 +69,9 @@ const vaxPill = (v) => (v.status === 'overdue'
     ? { status: 'due', label: 'Due soon' }
     : { status: 'ok', label: 'Scheduled' });
 
+// Stable fallback so the weight memos don't recompute for pets with no entries.
+const NO_WEIGHTS = [];
+
 export default function PetProfileScreen({ navigation, route }) {
   const { petId } = route.params;
   const {
@@ -87,8 +90,8 @@ export default function PetProfileScreen({ navigation, route }) {
   const [segment, setSegment] = useState('overview');
 
   // This pet's weekly care streak + earned milestones (nightly-computed).
-  const { data: gamification, refetch: refetchGamification } = useGamificationSummary();
-  useRefetchOnFocus(refetchGamification);
+  const { data: gamification, refetch: refetchGamification, isStale: gamificationStale } = useGamificationSummary();
+  useRefetchOnFocus(refetchGamification, { isStale: gamificationStale });
   const careStreak = (gamification?.streaks || []).find((s) => s.pet_id === petId);
   const petMilestones = (gamification?.milestones || [])
     .filter((m) => m.pet_id === petId && milestoneLabel(m.key))
@@ -138,6 +141,18 @@ export default function PetProfileScreen({ navigation, route }) {
   }, [getPetShare, petId]);
 
   useEffect(() => { loadShare(); }, [loadShare]);
+
+  // Hooks must run on every render, so these sit above the `!pet` early
+  // return: the profile stays mounted while a deleted/left pet is popped, and
+  // first renders before pets load — a conditional hook count crashes React.
+  const weights = pet?.weights ?? NO_WEIGHTS;
+  const wUnit = pet?.weightUnit || 'kg';
+  // Normalize every entry to the pet's current unit before charting/trend.
+  const normWeights = useMemo(
+    () => weights.map((w) => ({ id: w.id, loggedAt: w.loggedAt, value: convertWeight(w.weight, w.unit, wUnit) })),
+    [weights, wUnit],
+  );
+  const wInsight = useMemo(() => weightInsight(normWeights, wUnit), [normWeights, wUnit]);
 
   if (!pet) {
     return (
@@ -313,15 +328,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const completedVax = vaccinations.filter((v) => v.status === 'completed');
   const { status, label: statusLabel } = petStatus(vaccinations);
 
-  const weights = pet.weights || [];
-  const wUnit = pet.weightUnit || 'kg';
-  // Normalize every entry to the pet's current unit before charting/trend.
-  const normWeights = useMemo(
-    () => weights.map((w) => ({ id: w.id, loggedAt: w.loggedAt, value: convertWeight(w.weight, w.unit, wUnit) })),
-    [weights, wUnit],
-  );
   const latestWeight = normWeights[normWeights.length - 1];
-  const wInsight = useMemo(() => weightInsight(normWeights, wUnit), [normWeights, wUnit]);
 
   const expenses = pet.expenses || [];
   const monthPrefix = new Date().toISOString().slice(0, 7); // YYYY-MM
