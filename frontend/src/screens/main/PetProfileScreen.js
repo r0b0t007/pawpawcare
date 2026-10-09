@@ -12,6 +12,7 @@ import { resolveAsset } from '../../config';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel } from '../../utils/streaks';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
+import { useRefetchOnFocus } from '../../hooks/usePets';
 import { track } from '../../services/analytics';
 import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
 import {
