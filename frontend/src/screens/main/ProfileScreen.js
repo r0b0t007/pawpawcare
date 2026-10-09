@@ -8,6 +8,7 @@ import { getPref, setPref } from '../../services/prefs';
 import { scheduleLocalReminders, cancelAllLocalReminders } from '../../services/notifications';
 import { exportRecords } from '../../services/exportRecords';
 import { captureException, isSentryEnabled } from '../../services/sentry';
+import { isAnalyticsEnabled, setAnalyticsEnabled } from '../../services/analytics';
 import { ui, type } from '../../theme';
 import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '../../components';
 
@@ -69,6 +70,28 @@ export default function ProfileScreen({ navigation }) {
   const toggleEngagementPushes = (value) => {
     setEngagementPushes(value);
     updateUser({ engagement_pushes_enabled: value });
+  };
+
+  // Product analytics opt-out: applied on this device right away and saved on
+  // the account (server value wins at the next sign-in, on any device).
+  // Crash reports are separate and stay on — they carry no usage data.
+  // The switch shows PostHog's real state; while a save is in flight it's
+  // disabled (no racing PATCHes), and a failed save rolls the device back —
+  // otherwise the stale server value would silently undo it at next launch.
+  const [shareAnalytics, setShareAnalytics] = useState(isAnalyticsEnabled);
+  const [savingAnalytics, setSavingAnalytics] = useState(false);
+  const toggleShareAnalytics = async (value) => {
+    const previous = shareAnalytics;
+    setShareAnalytics(value);
+    setSavingAnalytics(true);
+    setAnalyticsEnabled(value);
+    const saved = await updateUser({ analytics_opt_out: !value });
+    setSavingAnalytics(false);
+    if (!saved) {
+      setShareAnalytics(previous);
+      setAnalyticsEnabled(previous);
+      showToast("Couldn't save your choice — try again");
+    }
   };
 
   // Admin-only end-to-end check: the report should appear in Sentry
@@ -203,6 +226,27 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.dataCaption}>
           Your records belong to you — export everything free, anytime.
         </Text>
+
+        <Text style={[type.sectionLabel, styles.sectionLabel]}>Privacy</Text>
+        <Card style={styles.sectionCard}>
+          <ListRow
+            icon="chart-box-outline"
+            title="Share usage analytics"
+            subtitle="Which features you use — never pet records or health data"
+            right={
+              <Switch
+                value={shareAnalytics}
+                onValueChange={toggleShareAnalytics}
+                disabled={savingAnalytics}
+                trackColor={{ false: ui.track, true: ui.accent }}
+                thumbColor="#ffffff"
+                ios_backgroundColor={ui.track}
+                accessibilityLabel="Share usage analytics"
+              />
+            }
+            last
+          />
+        </Card>
 
         {isAdmin && (
           <>
