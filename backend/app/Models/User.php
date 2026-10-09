@@ -49,6 +49,7 @@ class User extends Model
         'deletion_requested_at' => 'datetime',
         // Assigned explicitly in UserController::update, not mass-assigned.
         'engagement_pushes_enabled' => 'boolean',
+        'analytics_opt_out' => 'boolean',
         // Neither is fillable: bumped by revokeAllSessions() / set by the
         // email-verification, password-reset and social-link flows (forceFill).
         'token_version' => 'integer',
@@ -134,6 +135,7 @@ class User extends Model
         return array_merge($this->toApi(), [
             'is_admin' => (bool) $this->is_admin,
             'engagement_pushes_enabled' => (bool) $this->engagement_pushes_enabled,
+            'analytics_opt_out' => (bool) $this->analytics_opt_out,
             'email_verified' => $this->hasVerifiedEmail(),
         ]);
     }

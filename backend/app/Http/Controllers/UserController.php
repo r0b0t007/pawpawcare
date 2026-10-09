@@ -23,6 +23,7 @@ class UserController extends Controller
             'avatar_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
             'timezone' => 'sometimes|nullable|string|max:64',
             'engagement_pushes_enabled' => 'sometimes|boolean',
+            'analytics_opt_out' => 'sometimes|boolean',
         ]);
 
         $user = $request->user();
@@ -38,6 +39,9 @@ class UserController extends Controller
         // Explicit boolean assignment (null falls through to unchanged).
         if (array_key_exists('engagement_pushes_enabled', $data) && $data['engagement_pushes_enabled'] !== null) {
             $user->engagement_pushes_enabled = (bool) $data['engagement_pushes_enabled'];
+        }
+        if (array_key_exists('analytics_opt_out', $data) && $data['analytics_opt_out'] !== null) {
+            $user->analytics_opt_out = (bool) $data['analytics_opt_out'];
         }
 
         // Timezone is validated against the IANA list before applying.

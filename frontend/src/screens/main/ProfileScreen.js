@@ -8,6 +8,7 @@ import { getPref, setPref } from '../../services/prefs';
 import { scheduleLocalReminders, cancelAllLocalReminders } from '../../services/notifications';
 import { exportRecords } from '../../services/exportRecords';
 import { captureException, isSentryEnabled } from '../../services/sentry';
+import { setAnalyticsEnabled } from '../../services/analytics';
 import { ui, type } from '../../theme';
 import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '../../components';
 
@@ -69,6 +70,16 @@ export default function ProfileScreen({ navigation }) {
   const toggleEngagementPushes = (value) => {
     setEngagementPushes(value);
     updateUser({ engagement_pushes_enabled: value });
+  };
+
+  // Product analytics opt-out: applied on this device right away and saved on
+  // the account (server value wins at the next sign-in, on any device).
+  // Crash reports are separate and stay on — they carry no usage data.
+  const [shareAnalytics, setShareAnalytics] = useState(user?.analytics_opt_out !== true);
+  const toggleShareAnalytics = (value) => {
+    setShareAnalytics(value);
+    setAnalyticsEnabled(value);
+    updateUser({ analytics_opt_out: !value });
   };
 
   // Admin-only end-to-end check: the report should appear in Sentry
@@ -203,6 +214,26 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.dataCaption}>
           Your records belong to you — export everything free, anytime.
         </Text>
+
+        <Text style={[type.sectionLabel, styles.sectionLabel]}>Privacy</Text>
+        <Card style={styles.sectionCard}>
+          <ListRow
+            icon="chart-box-outline"
+            title="Share usage analytics"
+            subtitle="Which features you use — never pet records or health data"
+            right={
+              <Switch
+                value={shareAnalytics}
+                onValueChange={toggleShareAnalytics}
+                trackColor={{ false: ui.track, true: ui.accent }}
+                thumbColor="#ffffff"
+                ios_backgroundColor={ui.track}
+                accessibilityLabel="Share usage analytics"
+              />
+            }
+            last
+          />
+        </Card>
 
         {isAdmin && (
           <>
