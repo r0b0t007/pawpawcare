@@ -6,24 +6,26 @@ use App\Models\RevenueCatEvent;
 use App\Models\User;
 use App\Models\UserEntitlement;
 use App\Services\Analytics\ProductAnalytics;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Applies RevenueCat webhook events (stored in the revenuecat_events ledger)
  * to user_entitlements. The only writer of entitlement state besides the API
  * sync (D2). Nothing is gated on it yet.
  *
- * - Users are resolved from app_user_id / original_app_user_id / aliases;
- *   only our own UUIDs count (anonymous "$RCAnonymousID:…" ids are ignored).
+ * - The user comes from revenuecat_event_users (the webhook links only ids
+ *   that are our users): app_user_id first, then original id, then aliases.
+ *   Transfer links only count on TRANSFER events.
  * - Each event type changes only what it means (a support extension doesn't
  *   turn auto-renew back on; an uncancellation doesn't clear a billing issue).
+ * - A missing expiry is never lifetime access: only a one-time purchase with
+ *   no expiry sets is_lifetime. A billing grace period keeps access.
  * - Ordering: an event older than the last one applied is skipped; a
  *   different event with the SAME timestamp is ambiguous and left to the sync.
  * - Plan changes (PRODUCT_CHANGE), TRANSFER and unrecognised types are left to
- *   the API sync (needs_sync): the payload alone can't say what's in effect.
+ *   the API sync (needs_sync) — D2's reconcile job; until it exists they stay
+ *   unprocessed in the ledger.
  * - Sandbox events are recorded too (App Review buys in sandbox); whether
  *   they count is decided where entitlements are read (D2).
  */
@@ -41,7 +43,7 @@ class EntitlementWriter
 
     public const NEEDS_SYNC = 'needs_sync';
 
-    /** Event types this writer applies, mapped to the state each one sets. */
+    /** Event types this writer applies. */
     private const APPLIED_TYPES = [
         'INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'NON_RENEWING_PURCHASE',
         'SUBSCRIPTION_EXTENDED', 'TEMPORARY_ENTITLEMENT_GRANT', 'REFUND_REVERSED',
@@ -54,8 +56,8 @@ class EntitlementWriter
     /** Acknowledged without changing anything. */
     private const INFORMATIONAL = ['TEST', 'INVOICE_ISSUANCE', 'VIRTUAL_CURRENCY_TRANSACTION', 'EXPERIMENT_ENROLLMENT'];
 
-    /** Fields that identify the customer — dropped when they match no user. */
-    private const IDENTITY_FIELDS = ['app_user_id', 'original_app_user_id', 'aliases', 'transferred_from', 'transferred_to'];
+    /** Preference order of the links that identify the customer. */
+    private const CUSTOMER_ROLES = ['app_user', 'original', 'alias'];
 
     /** Server analytics event name per RevenueCat type. */
     private const ANALYTICS_EVENTS = [
@@ -108,14 +110,9 @@ class EntitlementWriter
         $event = $row->payload;
         $type = (string) ($event['type'] ?? '');
 
-        $user = $this->resolveUser($event, $type);
+        $user = $this->resolveUser((string) $row->id, $type);
         if ($user) {
             $row->forceFill(['user_id' => $user->id]);
-        } else {
-            // Keep no customer identifiers for any event that matches no
-            // account (anonymous purchases, or events arriving after an account
-            // was purged — no later purge would find them).
-            $row->forceFill(['payload' => Arr::except($event, self::IDENTITY_FIELDS)]);
         }
 
         if (in_array($type, self::INFORMATIONAL, true)) {
@@ -138,19 +135,14 @@ class EntitlementWriter
         sort($entitlementIds); // a fixed lock order across concurrent events
 
         $results = array_map(fn ($id) => $this->applyToEntitlement($user, $id, $type, $event), $entitlementIds);
-        $status = in_array(self::NEEDS_SYNC, $results, true) ? self::NEEDS_SYNC
-            : (in_array(self::APPLIED, $results, true) ? self::APPLIED : self::STALE);
+        $anyApplied = in_array(self::APPLIED, $results, true);
 
-        if ($status === self::APPLIED && isset(self::ANALYTICS_EVENTS[$type])) {
-            $this->analytics->capture($user, self::ANALYTICS_EVENTS[$type], array_filter([
-                'store' => $this->enum($event['store'] ?? null),
-                'environment' => $this->enum($event['environment'] ?? null),
-                'period_type' => $this->enum($event['period_type'] ?? null),
-                'product_id' => $this->enum($event['product_id'] ?? null),
-            ], fn ($v) => $v !== null), (string) $row->id);
+        if ($anyApplied && isset(self::ANALYTICS_EVENTS[$type])) {
+            $this->captureAfterCommit($user, $type, $event, (string) $row->id);
         }
 
-        return $status;
+        return in_array(self::NEEDS_SYNC, $results, true) ? self::NEEDS_SYNC
+            : ($anyApplied ? self::APPLIED : self::STALE);
     }
 
     private function applyToEntitlement(User $user, string $entitlementId, string $type, array $event): string
@@ -164,6 +156,7 @@ class EntitlementWriter
         UserEntitlement::query()->insertOrIgnore([
             'user_id' => $user->id,
             'entitlement' => $entitlementId,
+            'is_lifetime' => false,
             'will_renew' => false,
             'last_event_ms' => 0,
             'source' => 'webhook',
@@ -185,6 +178,9 @@ class EntitlementWriter
         }
 
         $at = $timestamp > 0 ? Carbon::createFromTimestampMs($timestamp) : now();
+        $expiry = $this->instant($event['expiration_at_ms'] ?? null);
+        $hasExpiryField = array_key_exists('expiration_at_ms', $event);
+
         $changes = [
             'store' => $this->column($event['store'] ?? null, 32) ?? $entitlement->store,
             'environment' => $this->column($event['environment'] ?? null, 16) ?? $entitlement->environment,
@@ -193,10 +189,18 @@ class EntitlementWriter
             'last_event_type' => $type,
             'source' => 'webhook',
         ];
-        if (array_key_exists('expiration_at_ms', $event)) {
-            $changes['expires_at'] = $event['expiration_at_ms'] === null
-                ? null
-                : Carbon::createFromTimestampMs((int) $event['expiration_at_ms']);
+        // A known expiry always applies. A missing / null one never becomes
+        // "lifetime" by accident — only a one-time purchase grants that, and
+        // a revocation of such a purchase ends it now.
+        if ($expiry !== null) {
+            $changes['expires_at'] = $expiry;
+            $changes['is_lifetime'] = false;
+        } elseif ($type === 'NON_RENEWING_PURCHASE' && $hasExpiryField) {
+            $changes['is_lifetime'] = true;
+            $changes['expires_at'] = null;
+        } elseif (in_array($type, ['CANCELLATION', 'EXPIRATION'], true) && $entitlement->is_lifetime) {
+            $changes['is_lifetime'] = false;
+            $changes['expires_at'] = $at;
         }
         if (in_array($type, self::SETS_PRODUCT, true) && is_string($event['product_id'] ?? null)) {
             $changes['product_id'] = mb_substr($event['product_id'], 0, 191);
@@ -204,12 +208,19 @@ class EntitlementWriter
 
         // Each type sets only what it means.
         $changes += match ($type) {
-            'INITIAL_PURCHASE', 'RENEWAL' => ['will_renew' => true, 'billing_issue_at' => null, 'unsubscribed_at' => null],
+            'INITIAL_PURCHASE', 'RENEWAL' => [
+                'will_renew' => true, 'billing_issue_at' => null, 'grace_expires_at' => null, 'unsubscribed_at' => null,
+            ],
             'UNCANCELLATION' => ['will_renew' => true, 'unsubscribed_at' => null],
             'NON_RENEWING_PURCHASE' => ['will_renew' => false],
             'CANCELLATION' => ['will_renew' => false, 'unsubscribed_at' => $at],
-            'EXPIRATION', 'SUBSCRIPTION_PAUSED' => ['will_renew' => false],
-            'BILLING_ISSUE' => ['billing_issue_at' => $at],
+            'EXPIRATION' => ['will_renew' => false, 'grace_expires_at' => null],
+            'SUBSCRIPTION_PAUSED' => ['will_renew' => false],
+            // Store keeps access through the billing grace period.
+            'BILLING_ISSUE' => [
+                'billing_issue_at' => $at,
+                'grace_expires_at' => $this->instant($event['grace_period_expiration_at_ms'] ?? null),
+            ],
             // SUBSCRIPTION_EXTENDED, TEMPORARY_ENTITLEMENT_GRANT, REFUND_REVERSED:
             // only the expiry moves; renewal and billing state stay as they are.
             default => [],
@@ -220,37 +231,44 @@ class EntitlementWriter
         return self::APPLIED;
     }
 
-    /**
-     * The first of our own user ids (UUIDs) named by the event, if any.
-     * Transfer ids only count on TRANSFER events (which change nothing here;
-     * the link is for purge and the API sync).
-     */
-    private function resolveUser(array $event, string $type): ?User
+    /** The customer this event is about, from the webhook's user links. */
+    private function resolveUser(string $eventId, string $type): ?User
     {
-        $transfer = $type === 'TRANSFER'
-            ? array_merge((array) ($event['transferred_to'] ?? []), (array) ($event['transferred_from'] ?? []))
-            : [];
-        $candidates = array_values(array_unique(array_filter(
-            array_merge(
-                [$event['app_user_id'] ?? null, $event['original_app_user_id'] ?? null],
-                (array) ($event['aliases'] ?? []),
-                $transfer,
-            ),
-            fn ($id) => is_string($id) && Str::isUuid($id),
-        )));
-        if ($candidates === []) {
-            return null;
-        }
-
-        // One query; keep the event's own order of preference.
-        $users = User::whereIn('id', $candidates)->get()->keyBy(fn (User $u) => strtolower((string) $u->id));
-        foreach ($candidates as $id) {
-            if ($user = $users->get(strtolower($id))) {
-                return $user;
+        $roles = $type === 'TRANSFER' ? ['transfer_to', 'transfer_from'] : self::CUSTOMER_ROLES;
+        $links = DB::table('revenuecat_event_users')
+            ->where('event_id', $eventId)
+            ->whereIn('role', $roles)
+            ->get(['user_id', 'role']);
+        foreach ($roles as $role) {
+            if ($link = $links->firstWhere('role', $role)) {
+                return User::find($link->user_id);
             }
         }
 
         return null;
+    }
+
+    /**
+     * Analytics only once the change is committed (a rolled-back event must
+     * not be counted), timestamped with the event's own time so a redelivery
+     * on another day dedupes on the same uuid + timestamp.
+     */
+    private function captureAfterCommit(User $user, string $type, array $event, string $eventId): void
+    {
+        $properties = array_filter([
+            'store' => $this->enum($event['store'] ?? null),
+            'environment' => $this->enum($event['environment'] ?? null),
+            'period_type' => $this->enum($event['period_type'] ?? null),
+            'product_id' => $this->enum($event['product_id'] ?? null),
+        ], fn ($v) => $v !== null);
+        $at = $this->instant($event['event_timestamp_ms'] ?? null);
+
+        DB::afterCommit(fn () => $this->analytics->capture($user, self::ANALYTICS_EVENTS[$type], $properties, $eventId, $at));
+    }
+
+    private function instant(mixed $ms): ?Carbon
+    {
+        return is_numeric($ms) && (int) $ms > 0 ? Carbon::createFromTimestampMs((int) $ms) : null;
     }
 
     /** A scalar string that fits its column, or null. */

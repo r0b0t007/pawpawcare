@@ -5,10 +5,13 @@ namespace Tests\Feature;
 use App\Models\RevenueCatEvent;
 use App\Models\User;
 use App\Models\UserEntitlement;
+use App\Services\Analytics\ProductAnalytics;
 use App\Services\Subscriptions\EntitlementWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -416,37 +419,42 @@ class RevenueCatWebhookTest extends TestCase
         $this->assertStringNotContainsString($orphanId, json_encode($stored));
     }
 
-    public function test_purge_removes_every_ledger_row_that_names_the_user(): void
+    public function test_the_ledger_never_stores_customer_ids_and_purge_unlinks_everything(): void
     {
         $user = $this->user();
-        $this->send($this->event('INITIAL_PURCHASE', $user))->assertOk();
-        // A transfer naming the user, and a row that was never linked to them.
-        $this->send([
+        $other = $this->user();
+        $purchase = $this->event('INITIAL_PURCHASE', $user, ['aliases' => [$user->id, '$RCAnonymousID:x']]);
+        $transfer = [
             'id' => (string) Str::uuid(),
             'type' => 'TRANSFER',
             'event_timestamp_ms' => now()->getTimestampMs(),
             'transferred_from' => [$user->id],
-            'transferred_to' => [(string) Str::uuid()],
-        ])->assertOk();
-        RevenueCatEvent::query()->insert([
-            'id' => 'unlinked-'.Str::random(8),
-            'type' => 'TRANSFER',
-            'event_timestamp_ms' => 1,
-            'payload' => json_encode(['transferred_to' => [$user->id]]),
-            'received_at' => now(),
-            'status' => 'needs_sync',
-        ]);
-        $other = $this->user();
+            'transferred_to' => [$other->id],
+        ];
+        $this->send($purchase)->assertOk();
+        $this->send($transfer)->assertOk();
         $this->send($this->event('INITIAL_PURCHASE', $other))->assertOk();
+
+        // Who an event is about lives only in the link table.
+        foreach (RevenueCatEvent::all() as $row) {
+            $this->assertStringNotContainsString((string) $user->id, json_encode($row->payload));
+            $this->assertStringNotContainsString((string) $other->id, json_encode($row->payload));
+        }
+        $this->assertSame(['alias', 'app_user'], DB::table('revenuecat_event_users')
+            ->where('event_id', $purchase['id'])->orderBy('role')->pluck('role')->all());
+        $this->assertSame(1, DB::table('revenuecat_event_users')
+            ->where(['event_id' => $transfer['id'], 'user_id' => $user->id, 'role' => 'transfer_from'])->count());
+
         $user->forceFill([
             'is_active' => false,
             'deletion_requested_at' => now()->subDays(User::DELETION_GRACE_DAYS + 1),
         ])->save();
-
         $this->artisan('accounts:purge-deleted')->assertSuccessful();
 
-        $this->assertSame(0, RevenueCatEvent::where('payload', 'like', '%'.$user->id.'%')->orWhere('user_id', $user->id)->count());
-        $this->assertSame(1, RevenueCatEvent::where('user_id', $other->id)->count()); // others untouched
+        $this->assertSame(0, DB::table('revenuecat_event_users')->where('user_id', $user->id)->count());
+        $this->assertSame(0, RevenueCatEvent::where('user_id', $user->id)->count());
+        $this->assertNotNull(RevenueCatEvent::find($purchase['id'])); // kept, anonymous
+        $this->assertSame(2, DB::table('revenuecat_event_users')->where('user_id', $other->id)->count()); // others untouched
     }
 
     public function test_any_event_matching_no_account_keeps_no_identifiers(): void
@@ -477,5 +485,101 @@ class RevenueCatWebhookTest extends TestCase
         $this->send($event)->assertOk()->assertJson(['status' => 'unknown_user']);
 
         $this->assertNull($this->entitlement($victim));
+    }
+
+    public function test_a_revoking_first_event_never_creates_lifetime_access(): void
+    {
+        $user = $this->user();
+        $withoutExpiry = $this->event('BILLING_ISSUE', $user);
+        unset($withoutExpiry['expiration_at_ms']);
+
+        $this->send($withoutExpiry)->assertOk()->assertJson(['status' => 'applied']);
+        $this->assertFalse($this->entitlement($user)->isActive());
+
+        // Nor does a later event with a null expiry erase a real one.
+        $this->send($this->event('INITIAL_PURCHASE', $user, ['event_timestamp_ms' => now()->getTimestampMs() + 1000]))->assertOk();
+        $this->send($this->event('EXPIRATION', $user, [
+            'event_timestamp_ms' => now()->getTimestampMs() + 2000,
+            'expiration_at_ms' => null,
+        ]))->assertOk();
+        $ent = $this->entitlement($user);
+        $this->assertFalse($ent->is_lifetime);
+        $this->assertNotNull($ent->expires_at);
+    }
+
+    public function test_a_lifetime_purchase_is_active_until_refunded(): void
+    {
+        $user = $this->user();
+        $t = now()->subMinutes(5)->getTimestampMs();
+        $this->send($this->event('NON_RENEWING_PURCHASE', $user, ['event_timestamp_ms' => $t, 'expiration_at_ms' => null]))->assertOk();
+        $this->assertTrue($this->entitlement($user)->is_lifetime);
+        $this->assertTrue($this->entitlement($user)->isActive());
+
+        $this->send($this->event('CANCELLATION', $user, [
+            'event_timestamp_ms' => $t + 1000,
+            'expiration_at_ms' => null,
+            'cancel_reason' => 'CUSTOMER_SUPPORT',
+        ]))->assertOk();
+
+        $this->assertFalse($this->entitlement($user)->isActive());
+    }
+
+    public function test_a_billing_grace_period_keeps_access(): void
+    {
+        $user = $this->user();
+        $t = now()->getTimestampMs();
+        $this->send($this->event('INITIAL_PURCHASE', $user, ['event_timestamp_ms' => $t]))->assertOk();
+
+        $this->send($this->event('BILLING_ISSUE', $user, [
+            'event_timestamp_ms' => $t + 1000,
+            'expiration_at_ms' => now()->subMinute()->getTimestampMs(),
+            'grace_period_expiration_at_ms' => now()->addDays(16)->getTimestampMs(),
+        ]))->assertOk();
+        $this->assertTrue($this->entitlement($user)->isActive());
+
+        $this->send($this->event('EXPIRATION', $user, [
+            'event_timestamp_ms' => $t + 2000,
+            'expiration_at_ms' => now()->subMinute()->getTimestampMs(),
+        ]))->assertOk();
+        $this->assertFalse($this->entitlement($user)->isActive());
+    }
+
+    public function test_analytics_are_only_sent_for_committed_changes_at_the_event_time(): void
+    {
+        config(['services.posthog.key' => 'phc_test', 'services.posthog.host' => 'https://us.i.posthog.com']);
+        Http::fake(['us.i.posthog.com/*' => Http::response(['status' => 'Ok'])]);
+        $user = $this->user();
+        $eventTime = now()->subDays(2)->startOfSecond();
+        $event = $this->event('INITIAL_PURCHASE', $user, ['event_timestamp_ms' => $eventTime->getTimestampMs()]);
+        RevenueCatEvent::query()->insert([
+            'id' => $event['id'], 'type' => $event['type'], 'event_timestamp_ms' => $event['event_timestamp_ms'],
+            'payload' => json_encode(['type' => $event['type'], 'event_timestamp_ms' => $event['event_timestamp_ms'], 'entitlement_ids' => ['plus']]),
+            'received_at' => now(),
+        ]);
+        DB::table('revenuecat_event_users')->insert(['event_id' => $event['id'], 'user_id' => $user->id, 'role' => 'app_user']);
+        $analytics = app(ProductAnalytics::class);
+
+        // Rolled back: nothing is sent.
+        DB::beginTransaction();
+        app(EntitlementWriter::class)->process($event['id']);
+        DB::rollBack();
+        $analytics->flush();
+        Http::assertNothingSent();
+
+        // Committed: sent once, stamped with the event's own time.
+        app(EntitlementWriter::class)->process($event['id']);
+        $analytics->flush();
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $r) => $r->data()['batch'][0]['timestamp'] === $eventTime->toIso8601ZuluString('millisecond'));
+    }
+
+    public function test_an_unconfigured_webhook_is_not_reported_as_an_error(): void
+    {
+        config(['services.revenuecat.webhook_auth' => '']);
+        Exceptions::fake();
+
+        $this->send($this->event('TEST', null))->assertStatus(503);
+
+        Exceptions::assertNothingReported();
     }
 }

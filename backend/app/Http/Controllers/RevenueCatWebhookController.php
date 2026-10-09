@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\RevenueCatEvent;
+use App\Models\User;
 use App\Services\Subscriptions\EntitlementWriter;
 use App\Support\ReportOnce;
 use App\Support\SentryScrubber;
@@ -11,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * POST /webhooks/revenuecat — RevenueCat's server-to-server notifications.
@@ -22,6 +24,10 @@ use Illuminate\Support\Facades\Log;
  * (idempotency — retries reuse the event id), then applied. A failure while
  * applying returns 500 so RevenueCat redelivers it; the ledger makes those
  * retries safe.
+ *
+ * Customer identifiers never enter the ledger payload: the ids that are our
+ * users are recorded in revenuecat_event_users (foreign keys, so deleting an
+ * account erases the link), and any other id is simply not stored.
  */
 class RevenueCatWebhookController extends Controller
 {
@@ -29,28 +35,38 @@ class RevenueCatWebhookController extends Controller
     public const MIN_SECRET_LENGTH = 32;
 
     /**
-     * The only event fields kept in the ledger: what applying and auditing an
-     * event needs. Everything else RevenueCat sends (subscriber attributes
-     * with the email, country, price, store transaction ids, fields added in
-     * future) is dropped.
+     * The only event fields kept in the ledger payload. No customer ids, and
+     * nothing else RevenueCat sends (subscriber attributes with the email,
+     * country, price, store transaction ids, fields added in future).
      */
     private const STORED_FIELDS = [
         'id', 'type', 'event_timestamp_ms', 'environment', 'store', 'period_type',
-        'product_id', 'new_product_id', 'entitlement_ids', 'entitlement_id', 'expiration_at_ms',
-        'app_user_id', 'original_app_user_id', 'aliases', 'transferred_from', 'transferred_to',
-        'cancel_reason', 'expiration_reason',
+        'product_id', 'new_product_id', 'entitlement_ids', 'entitlement_id',
+        'expiration_at_ms', 'grace_period_expiration_at_ms', 'cancel_reason', 'expiration_reason',
+    ];
+
+    /** Customer-id fields → the role recorded for ids that are our users. */
+    private const IDENTITY_ROLES = [
+        'app_user_id' => 'app_user',
+        'original_app_user_id' => 'original',
+        'aliases' => 'alias',
+        'transferred_to' => 'transfer_to',
+        'transferred_from' => 'transfer_from',
     ];
 
     public function handle(Request $request, EntitlementWriter $writer): JsonResponse
     {
+        // Plain responses (not abort()): an unconfigured webhook is an
+        // expected state, not an error to report for every scanner request.
         $secret = (string) config('services.revenuecat.webhook_auth');
         if ($secret === '') {
-            abort(503, 'Subscriptions are not configured');
+            return response()->json(['detail' => 'Subscriptions are not configured'], 503);
         }
         if (strlen($secret) < self::MIN_SECRET_LENGTH) {
             ReportOnce::log('revenuecat-webhook:weak-secret', 'critical',
                 'REVENUECAT_WEBHOOK_AUTH is shorter than '.self::MIN_SECRET_LENGTH.' characters; the webhook refuses all events until it is a long random value.');
-            abort(503, 'Subscriptions are not configured');
+
+            return response()->json(['detail' => 'Subscriptions are not configured'], 503);
         }
         if (! hash_equals($secret, (string) $request->header('Authorization'))) {
             ReportOnce::log('revenuecat-webhook:bad-auth', 'warning', 'RevenueCat webhook rejected: wrong Authorization header');
@@ -65,35 +81,38 @@ class RevenueCatWebhookController extends Controller
             'event.environment' => 'sometimes|nullable|string|max:16',
         ]);
         $event = $request->input('event');
-
-        $payload = Arr::only($event, self::STORED_FIELDS);
-
-        RevenueCatEvent::query()->insertOrIgnore([
-            'id' => $data['event']['id'],
-            'type' => $data['event']['type'],
-            'environment' => $data['event']['environment'] ?? null,
-            'event_timestamp_ms' => $data['event']['event_timestamp_ms'],
-            'payload' => json_encode($payload),
-            'received_at' => now(),
-            'attempts' => 0,
-        ]);
+        $eventId = $data['event']['id'];
 
         try {
+            DB::transaction(function () use ($event, $data, $eventId) {
+                RevenueCatEvent::query()->insertOrIgnore([
+                    'id' => $eventId,
+                    'type' => $data['event']['type'],
+                    'environment' => $data['event']['environment'] ?? null,
+                    'event_timestamp_ms' => $data['event']['event_timestamp_ms'],
+                    'payload' => json_encode(Arr::only($event, self::STORED_FIELDS)),
+                    'received_at' => now(),
+                ]);
+                // A user purged meanwhile: the link is dropped (INSERT IGNORE)
+                // or fails its foreign key (→ 500, and the retry stores none).
+                DB::table('revenuecat_event_users')->insertOrIgnore($this->userLinks($eventId, $event));
+            });
+
             // Locks the ledger row: concurrent deliveries of the same event are
             // applied once (the second sees it processed → duplicate). If the
             // insert above was silently dropped (INSERT IGNORE also swallows
             // data errors), process() throws and RevenueCat retries.
-            $status = $writer->process($data['event']['id']);
+            $status = $writer->process($eventId);
         } catch (\Throwable $e) {
             report($e);
             try {
-                RevenueCatEvent::whereKey($data['event']['id'])->update([
+                RevenueCatEvent::whereKey($eventId)->update([
                     'status' => 'failed',
                     'attempts' => DB::raw('attempts + 1'),
                     'error' => mb_strcut(SentryScrubber::scrubText(class_basename($e).': '.$e->getMessage()), 0, 255),
                 ]);
             } catch (\Throwable $inner) {
-                Log::warning('Could not record a RevenueCat event failure', ['event_id' => $data['event']['id']]);
+                Log::warning('Could not record a RevenueCat event failure', ['event_id' => $eventId]);
             }
 
             // Non-2xx: RevenueCat redelivers; the ledger keeps that idempotent.
@@ -101,5 +120,38 @@ class RevenueCatWebhookController extends Controller
         }
 
         return response()->json(['status' => $status]);
+    }
+
+    /** Link rows for every id in the event that is one of our users. */
+    private function userLinks(string $eventId, array $event): array
+    {
+        $byRole = [];
+        foreach (self::IDENTITY_ROLES as $field => $role) {
+            // Transfer ids only identify anyone on a TRANSFER event.
+            if (str_starts_with($field, 'transferred_') && ($event['type'] ?? null) !== 'TRANSFER') {
+                continue;
+            }
+            foreach ((array) ($event[$field] ?? []) as $id) {
+                if (is_string($id) && Str::isUuid($id)) {
+                    $byRole[$role][] = strtolower($id);
+                }
+            }
+        }
+        if ($byRole === []) {
+            return [];
+        }
+
+        $existing = User::whereIn('id', array_unique(array_merge(...array_values($byRole))))
+            ->pluck('id')
+            ->map(fn ($id) => strtolower((string) $id))
+            ->all();
+        $links = [];
+        foreach ($byRole as $role => $ids) {
+            foreach (array_unique(array_intersect($ids, $existing)) as $id) {
+                $links[] = ['event_id' => $eventId, 'user_id' => $id, 'role' => $role];
+            }
+        }
+
+        return $links;
     }
 }

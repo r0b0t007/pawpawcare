@@ -3,6 +3,7 @@
 namespace App\Services\Analytics;
 
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Ramsey\Uuid\Uuid;
@@ -54,9 +55,10 @@ class ProductAnalytics
     /**
      * Queue an event for $user. $properties must be enums/counts only.
      * $dedupeKey gives the event a stable UUID so a retried source (e.g. a
-     * re-delivered webhook) doesn't count twice.
+     * re-delivered webhook) doesn't count twice; pass the source's own time
+     * as $at too, since PostHog dedupes on uuid + timestamp.
      */
-    public function capture(User $user, string $event, array $properties = [], ?string $dedupeKey = null): void
+    public function capture(User $user, string $event, array $properties = [], ?string $dedupeKey = null, ?\DateTimeInterface $at = null): void
     {
         if (! $this->enabled() || $user->analytics_opt_out) {
             return;
@@ -64,7 +66,7 @@ class ProductAnalytics
 
         $payload = [
             'event' => $event,
-            'timestamp' => now()->toIso8601ZuluString('millisecond'),
+            'timestamp' => Carbon::instance($at ?? now())->toIso8601ZuluString('millisecond'),
             'properties' => array_merge($properties, [
                 'distinct_id' => (string) $user->id,
                 '$geoip_disable' => true,
