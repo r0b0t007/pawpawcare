@@ -4,14 +4,16 @@
 // the native module is required defensively so an OTA update landing on an older
 // build (without the PostHog native deps) degrades to no-op instead of crashing.
 import { POSTHOG_HOST, POSTHOG_KEY } from '../config';
-import { getPref, setPref } from './prefs';
 
 let posthog = null;
+// Persisted properties that survive logout's reset() (see resetAnalytics).
+let keepOnReset = [];
 try {
   if (POSTHOG_KEY) {
     // eslint-disable-next-line global-require
-    const PostHog = require('posthog-react-native').default;
+    const { default: PostHog, PostHogPersistedProperty } = require('posthog-react-native');
     posthog = new PostHog(POSTHOG_KEY, { host: POSTHOG_HOST });
+    keepOnReset = [PostHogPersistedProperty.OptedOut];
   }
 } catch (e) {
   // Native module absent (e.g. OTA onto a build without PostHog) — stay silent.
@@ -23,35 +25,29 @@ try {
 // backgrounded app. Call the helpers below directly.
 
 // ── Opt-out ("Share usage analytics" in Profile → Privacy) ────────────────────
-// PostHog persists optOut() itself, so captures right after launch already
-// respect it — but reset() (every logout) clears it. A device-local copy is
-// kept so the choice is re-applied after reset, and the account's server value
-// (users.analytics_opt_out) wins whenever a user is identified.
-const OPT_OUT_PREF = 'analyticsOptOut';
-let optedOut = false;
+// PostHog persists optIn()/optOut() itself — the single source of truth on the
+// device, so captures right after launch already respect it. Logout's reset()
+// keeps that property; the account's server value (users.analytics_opt_out)
+// wins whenever a user is identified, so the choice follows the account.
 let currentUserId = null;
 
-const applyOptOut = () => {
-  try { if (optedOut) posthog?.optOut(); else posthog?.optIn(); } catch {}
+/** Whether product analytics is on for this device (PostHog's own state). */
+export const isAnalyticsEnabled = () => {
+  try { return !(posthog?.optedOut ?? false); } catch { return true; }
 };
-
-// Load the stored choice; only re-apply an opt-out (PostHog's own persisted
-// state already covers the default).
-export const analyticsReady = getPref(OPT_OUT_PREF, false).then((stored) => {
-  optedOut = stored === true;
-  if (optedOut) applyOptOut();
-});
 
 /** Opt in or out of product analytics on this device. */
 export const setAnalyticsEnabled = (enabled) => {
-  optedOut = !enabled;
-  setPref(OPT_OUT_PREF, optedOut);
-  applyOptOut();
-  // Identification is skipped while opted out; tie events back on opt-in.
-  try { if (enabled && currentUserId) posthog?.identify(currentUserId); } catch {}
+  try {
+    if (enabled) {
+      posthog?.optIn();
+      // Identification is skipped while opted out; tie events back on opt-in.
+      if (currentUserId) posthog?.identify(currentUserId);
+    } else {
+      posthog?.optOut();
+    }
+  } catch {}
 };
-
-export const isAnalyticsEnabled = () => !optedOut;
 
 /** Capture a product event. Keep props non-sensitive — no names or record content. */
 export const track = (event, props) => {
@@ -65,20 +61,22 @@ export const track = (event, props) => {
 export const identifyUser = (user) => {
   if (!user?.id) return;
   currentUserId = String(user.id);
-  if (typeof user.analytics_opt_out === 'boolean' && user.analytics_opt_out !== optedOut) {
-    optedOut = user.analytics_opt_out;
-    setPref(OPT_OUT_PREF, optedOut);
-    applyOptOut();
-  }
-  try { if (!optedOut) posthog?.identify(currentUserId); } catch {}
+  try {
+    let optedOut = posthog?.optedOut ?? false;
+    if (typeof user.analytics_opt_out === 'boolean') {
+      optedOut = user.analytics_opt_out;
+      if (optedOut) posthog?.optOut();
+      else posthog?.optIn();
+    }
+    if (!optedOut) posthog?.identify(currentUserId);
+  } catch {}
 };
 
 /** Clear identity on logout so the next user starts a fresh anonymous id. */
 export const resetAnalytics = () => {
   currentUserId = null;
-  try { posthog?.reset(); } catch {}
-  // reset() also clears PostHog's persisted opt-out; keep the device's choice.
-  if (optedOut) applyOptOut();
+  // reset() would also clear the persisted opt-out; keep the device's choice.
+  try { posthog?.reset(keepOnReset); } catch {}
 };
 
 /** Record a screen view (route name only — never screen content). */

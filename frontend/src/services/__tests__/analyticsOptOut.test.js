@@ -1,69 +1,74 @@
-// Analytics opt-out (Profile → Privacy): PostHog's own optOut() is cleared by
-// reset() on every logout, so the device keeps its choice and re-applies it;
-// the account's server value (analytics_opt_out) wins when a user signs in.
+// Analytics opt-out (Profile → Privacy). PostHog's own persisted OptedOut flag
+// is the single source of truth on the device; logout's reset() must keep it,
+// and the account's server value (analytics_opt_out) wins when a user signs in.
 
-const mockPosthog = {
-  capture: jest.fn(),
-  identify: jest.fn(),
-  reset: jest.fn(),
-  screen: jest.fn(),
-  optIn: jest.fn(),
-  optOut: jest.fn(),
-};
-const mockPrefs = {};
-
-function load({ stored } = {}) {
-  jest.resetModules();
-  Object.keys(mockPrefs).forEach((k) => delete mockPrefs[k]);
-  if (stored !== undefined) mockPrefs.analyticsOptOut = stored;
-  Object.values(mockPosthog).forEach((fn) => fn.mockClear());
-  jest.doMock('../../config', () => ({ POSTHOG_KEY: 'phc_test', POSTHOG_HOST: 'https://us.i.posthog.com' }));
-  jest.doMock('posthog-react-native', () => ({ __esModule: true, default: jest.fn(() => mockPosthog) }));
-  jest.doMock('../prefs', () => ({
-    getPref: jest.fn((key, fallback) => Promise.resolve(key in mockPrefs ? mockPrefs[key] : fallback)),
-    setPref: jest.fn((key, value) => {
-      mockPrefs[key] = value;
-      return Promise.resolve();
+// A stand-in that behaves like posthog-react-native: optIn/optOut persist,
+// reset(keep) clears every persisted property except those listed.
+function makePosthog() {
+  const persisted = {};
+  return {
+    persisted,
+    get optedOut() {
+      return persisted.opted_out ?? false;
+    },
+    optIn: jest.fn(() => {
+      persisted.opted_out = false;
     }),
+    optOut: jest.fn(() => {
+      persisted.opted_out = true;
+    }),
+    identify: jest.fn(),
+    capture: jest.fn(),
+    screen: jest.fn(),
+    reset: jest.fn((keep = []) => {
+      for (const key of Object.keys(persisted)) if (!keep.includes(key)) delete persisted[key];
+    }),
+  };
+}
+
+let mockPosthog;
+function load() {
+  jest.resetModules();
+  mockPosthog = makePosthog();
+  jest.doMock('../../config', () => ({ POSTHOG_KEY: 'phc_test', POSTHOG_HOST: 'https://us.i.posthog.com' }));
+  jest.doMock('posthog-react-native', () => ({
+    __esModule: true,
+    default: jest.fn(() => mockPosthog),
+    PostHogPersistedProperty: { OptedOut: 'opted_out' },
   }));
   return require('../analytics');
 }
 
-test('a stored opt-out is applied at launch', async () => {
-  const analytics = load({ stored: true });
-  await analytics.analyticsReady;
-  expect(mockPosthog.optOut).toHaveBeenCalled();
+test('the switch state is PostHog’s persisted state', () => {
+  const analytics = load();
+  expect(analytics.isAnalyticsEnabled()).toBe(true);
+  analytics.setAnalyticsEnabled(false);
   expect(analytics.isAnalyticsEnabled()).toBe(false);
 });
 
-test('opting out persists on the device, and survives the reset() at logout', async () => {
+test('an opt-out survives the reset() at logout', () => {
   const analytics = load();
-  await analytics.analyticsReady;
-
   analytics.setAnalyticsEnabled(false);
-  expect(mockPosthog.optOut).toHaveBeenCalledTimes(1);
-  expect(mockPrefs.analyticsOptOut).toBe(true);
 
   analytics.resetAnalytics();
-  expect(mockPosthog.reset).toHaveBeenCalled();
-  expect(mockPosthog.optOut).toHaveBeenCalledTimes(2); // re-applied after reset
+
+  expect(mockPosthog.reset).toHaveBeenCalledWith(['opted_out']);
+  expect(analytics.isAnalyticsEnabled()).toBe(false);
 });
 
-test('the account value wins at sign-in, and no one is identified while opted out', async () => {
-  const analytics = load(); // device says: sharing
-  await analytics.analyticsReady;
+test('the account value wins at sign-in, and no one is identified while opted out', () => {
+  const analytics = load(); // device: sharing
 
   analytics.identifyUser({ id: 7, analytics_opt_out: true });
 
   expect(mockPosthog.optOut).toHaveBeenCalled();
   expect(mockPosthog.identify).not.toHaveBeenCalled();
-  expect(mockPrefs.analyticsOptOut).toBe(true);
   expect(analytics.isAnalyticsEnabled()).toBe(false);
 });
 
-test('an account that shares overrides a stale device opt-out', async () => {
-  const analytics = load({ stored: true });
-  await analytics.analyticsReady;
+test('an account that shares overrides a stale device opt-out', () => {
+  const analytics = load();
+  analytics.setAnalyticsEnabled(false); // device: opted out
 
   analytics.identifyUser({ id: 7, analytics_opt_out: false });
 
@@ -72,14 +77,22 @@ test('an account that shares overrides a stale device opt-out', async () => {
   expect(analytics.isAnalyticsEnabled()).toBe(true);
 });
 
-test('opting back in re-identifies the signed-in user', async () => {
+test('without an account value the device state decides', () => {
   const analytics = load();
-  await analytics.analyticsReady;
+  analytics.setAnalyticsEnabled(false);
+
+  analytics.identifyUser({ id: 7 }); // e.g. a /users/me payload from before the migration
+
+  expect(mockPosthog.identify).not.toHaveBeenCalled();
+  expect(analytics.isAnalyticsEnabled()).toBe(false);
+});
+
+test('opting back in re-identifies the signed-in user', () => {
+  const analytics = load();
   analytics.identifyUser({ id: 7, analytics_opt_out: true });
 
   analytics.setAnalyticsEnabled(true);
 
-  expect(mockPosthog.optIn).toHaveBeenCalled();
   expect(mockPosthog.identify).toHaveBeenCalledWith('7');
-  expect(mockPrefs.analyticsOptOut).toBe(false);
+  expect(analytics.isAnalyticsEnabled()).toBe(true);
 });

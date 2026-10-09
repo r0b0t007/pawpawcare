@@ -158,11 +158,16 @@ export function AuthProvider({ children }) {
     dispatch({ type: 'LOGOUT' });
   };
 
+  // Resolves true when saved, false on failure (never throws), so callers
+  // with optimistic UI can roll back.
   const updateUser = async (updates) => {
     try {
       const updated = await patch('/users/me', updates);
       dispatch({ type: 'SET_USER', payload: updated });
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   };
 
   // GDPR account deletion: the server disables the account immediately,

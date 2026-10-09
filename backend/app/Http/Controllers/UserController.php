@@ -42,7 +42,7 @@ class UserController extends Controller
         if (array_key_exists('engagement_pushes_enabled', $data) && $data['engagement_pushes_enabled'] !== null) {
             $user->engagement_pushes_enabled = (bool) $data['engagement_pushes_enabled'];
         }
-        if (array_key_exists('analytics_opt_out', $data) && $data['analytics_opt_out'] !== null) {
+        if (array_key_exists('analytics_opt_out', $data)) {
             $user->analytics_opt_out = (bool) $data['analytics_opt_out'];
         }
 

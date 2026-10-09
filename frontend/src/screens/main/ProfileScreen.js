@@ -8,7 +8,7 @@ import { getPref, setPref } from '../../services/prefs';
 import { scheduleLocalReminders, cancelAllLocalReminders } from '../../services/notifications';
 import { exportRecords } from '../../services/exportRecords';
 import { captureException, isSentryEnabled } from '../../services/sentry';
-import { setAnalyticsEnabled } from '../../services/analytics';
+import { isAnalyticsEnabled, setAnalyticsEnabled } from '../../services/analytics';
 import { ui, type } from '../../theme';
 import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '../../components';
 
@@ -75,11 +75,23 @@ export default function ProfileScreen({ navigation }) {
   // Product analytics opt-out: applied on this device right away and saved on
   // the account (server value wins at the next sign-in, on any device).
   // Crash reports are separate and stay on — they carry no usage data.
-  const [shareAnalytics, setShareAnalytics] = useState(user?.analytics_opt_out !== true);
-  const toggleShareAnalytics = (value) => {
+  // The switch shows PostHog's real state; while a save is in flight it's
+  // disabled (no racing PATCHes), and a failed save rolls the device back —
+  // otherwise the stale server value would silently undo it at next launch.
+  const [shareAnalytics, setShareAnalytics] = useState(isAnalyticsEnabled);
+  const [savingAnalytics, setSavingAnalytics] = useState(false);
+  const toggleShareAnalytics = async (value) => {
+    const previous = shareAnalytics;
     setShareAnalytics(value);
+    setSavingAnalytics(true);
     setAnalyticsEnabled(value);
-    updateUser({ analytics_opt_out: !value });
+    const saved = await updateUser({ analytics_opt_out: !value });
+    setSavingAnalytics(false);
+    if (!saved) {
+      setShareAnalytics(previous);
+      setAnalyticsEnabled(previous);
+      showToast("Couldn't save your choice — try again");
+    }
   };
 
   // Admin-only end-to-end check: the report should appear in Sentry
@@ -225,6 +237,7 @@ export default function ProfileScreen({ navigation }) {
               <Switch
                 value={shareAnalytics}
                 onValueChange={toggleShareAnalytics}
+                disabled={savingAnalytics}
                 trackColor={{ false: ui.track, true: ui.accent }}
                 thumbColor="#ffffff"
                 ios_backgroundColor={ui.track}
