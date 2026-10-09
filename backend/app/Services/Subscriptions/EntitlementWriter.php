@@ -78,6 +78,8 @@ class EntitlementWriter
      */
     public function process(string $eventId): string
     {
+        // 3 attempts: two different events for the same subscriber can
+        // deadlock on the entitlement row under InnoDB; Laravel retries it.
         return DB::transaction(function () use ($eventId) {
             $row = RevenueCatEvent::whereKey($eventId)->lockForUpdate()->first();
             if (! $row) {
@@ -98,7 +100,7 @@ class EntitlementWriter
             ])->save();
 
             return $status;
-        });
+        }, 3);
     }
 
     private function apply(RevenueCatEvent $row): string
@@ -106,24 +108,24 @@ class EntitlementWriter
         $event = $row->payload;
         $type = (string) ($event['type'] ?? '');
 
+        $user = $this->resolveUser($event, $type);
+        if ($user) {
+            $row->forceFill(['user_id' => $user->id]);
+        } else {
+            // Keep no customer identifiers for any event that matches no
+            // account (anonymous purchases, or events arriving after an account
+            // was purged — no later purge would find them).
+            $row->forceFill(['payload' => Arr::except($event, self::IDENTITY_FIELDS)]);
+        }
+
         if (in_array($type, self::INFORMATIONAL, true)) {
             return self::IGNORED;
         }
-
-        $user = $this->resolveUser($event);
-        if ($user) {
-            $row->forceFill(['user_id' => $user->id]);
+        if (! $user) {
+            return self::UNKNOWN_USER;
         }
-
         if (! in_array($type, self::APPLIED_TYPES, true)) {
             return self::NEEDS_SYNC; // PRODUCT_CHANGE, TRANSFER, or a type we don't know yet
-        }
-        if (! $user) {
-            // Keep no customer identifiers for events that match no account
-            // (anonymous purchases, or events for an account already purged).
-            $row->forceFill(['payload' => Arr::except($event, self::IDENTITY_FIELDS)]);
-
-            return self::UNKNOWN_USER;
         }
 
         $entitlementIds = array_values(array_filter(
@@ -133,6 +135,7 @@ class EntitlementWriter
         if ($entitlementIds === []) {
             return self::IGNORED;
         }
+        sort($entitlementIds); // a fixed lock order across concurrent events
 
         $results = array_map(fn ($id) => $this->applyToEntitlement($user, $id, $type, $event), $entitlementIds);
         $status = in_array(self::NEEDS_SYNC, $results, true) ? self::NEEDS_SYNC
@@ -217,15 +220,21 @@ class EntitlementWriter
         return self::APPLIED;
     }
 
-    /** The first of our own user ids (UUIDs) named by the event, if any. */
-    private function resolveUser(array $event): ?User
+    /**
+     * The first of our own user ids (UUIDs) named by the event, if any.
+     * Transfer ids only count on TRANSFER events (which change nothing here;
+     * the link is for purge and the API sync).
+     */
+    private function resolveUser(array $event, string $type): ?User
     {
+        $transfer = $type === 'TRANSFER'
+            ? array_merge((array) ($event['transferred_to'] ?? []), (array) ($event['transferred_from'] ?? []))
+            : [];
         $candidates = array_values(array_unique(array_filter(
             array_merge(
                 [$event['app_user_id'] ?? null, $event['original_app_user_id'] ?? null],
                 (array) ($event['aliases'] ?? []),
-                (array) ($event['transferred_to'] ?? []),
-                (array) ($event['transferred_from'] ?? []),
+                $transfer,
             ),
             fn ($id) => is_string($id) && Str::isUuid($id),
         )));

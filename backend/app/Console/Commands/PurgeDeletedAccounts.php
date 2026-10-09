@@ -81,6 +81,7 @@ class PurgeDeletedAccounts extends Command
                     continue;
                 }
                 $purged++;
+                $this->eraseSubscriptionLedger((string) $user->id);
             } catch (\Throwable $e) {
                 // One failing account must not block the rest of the sweep.
                 Log::error('Account purge failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
@@ -90,6 +91,25 @@ class PurgeDeletedAccounts extends Command
         $this->info("Purged {$purged} of {$due->count()} due account(s).");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The subscription event ledger has no FK (events can name unknown users):
+     * drop every row linked to OR naming this user (customer ids, aliases,
+     * transfers). Run after the account transaction commits, as a non-locking
+     * read plus deletes by primary key — the scan must not hold locks that
+     * block incoming webhooks for the whole purge. Events arriving after the
+     * account is gone match no user and are stored without identifiers.
+     * UUIDs contain no LIKE wildcards. user_entitlements cascades.
+     */
+    private function eraseSubscriptionLedger(string $userId): void
+    {
+        $ids = RevenueCatEvent::where('user_id', $userId)
+            ->orWhere('payload', 'like', '%'.$userId.'%')
+            ->pluck('id');
+        foreach ($ids->chunk(500) as $chunk) {
+            RevenueCatEvent::whereIn('id', $chunk)->delete();
+        }
     }
 
     /**
@@ -117,14 +137,6 @@ class PurgeDeletedAccounts extends Command
         if ($user->avatar_url !== null) {
             $user->forceFill(['avatar_url' => null])->save();
         }
-
-        // The subscription event ledger has no FK (events can name unknown
-        // users): drop every row linked to OR naming this user (customer ids,
-        // aliases, transfers). UUIDs contain no LIKE wildcards.
-        // user_entitlements cascades with the user row.
-        RevenueCatEvent::where('user_id', $user->id)
-            ->orWhere('payload', 'like', '%'.$user->id.'%')
-            ->delete();
 
         $user->delete();
     }

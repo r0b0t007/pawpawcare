@@ -448,4 +448,34 @@ class RevenueCatWebhookTest extends TestCase
         $this->assertSame(0, RevenueCatEvent::where('payload', 'like', '%'.$user->id.'%')->orWhere('user_id', $user->id)->count());
         $this->assertSame(1, RevenueCatEvent::where('user_id', $other->id)->count()); // others untouched
     }
+
+    public function test_any_event_matching_no_account_keeps_no_identifiers(): void
+    {
+        $gone = (string) Str::uuid(); // e.g. purged earlier
+        $info = $this->event('INVOICE_ISSUANCE', $gone, ['aliases' => [$gone]]);
+        $transfer = [
+            'id' => (string) Str::uuid(),
+            'type' => 'TRANSFER',
+            'event_timestamp_ms' => now()->getTimestampMs(),
+            'transferred_from' => [$gone],
+            'transferred_to' => ['$RCAnonymousID:x'],
+        ];
+
+        $this->send($info)->assertOk()->assertJson(['status' => 'ignored']);
+        $this->send($transfer)->assertOk()->assertJson(['status' => 'unknown_user']);
+
+        foreach ([$info['id'], $transfer['id']] as $id) {
+            $this->assertStringNotContainsString($gone, json_encode(RevenueCatEvent::find($id)->payload));
+        }
+    }
+
+    public function test_transfer_ids_only_identify_the_user_on_transfer_events(): void
+    {
+        $victim = $this->user();
+        $event = $this->event('INITIAL_PURCHASE', '$RCAnonymousID:abc', ['transferred_to' => [$victim->id]]);
+
+        $this->send($event)->assertOk()->assertJson(['status' => 'unknown_user']);
+
+        $this->assertNull($this->entitlement($victim));
+    }
 }
