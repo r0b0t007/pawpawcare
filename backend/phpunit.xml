@@ -36,6 +36,8 @@
         <env name="POSTHOG_PROJECT_KEY" value=""/>
         <env name="POSTHOG_PERSONAL_API_KEY" value=""/>
         <env name="POSTHOG_PROJECT_ID" value=""/>
+        <env name="REVENUECAT_WEBHOOK_AUTH" value=""/>
+        <env name="REVENUECAT_SECRET_KEY" value=""/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
     </php>
 </phpunit>
