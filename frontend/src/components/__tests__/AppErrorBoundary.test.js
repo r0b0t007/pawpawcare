@@ -17,16 +17,18 @@ const texts = (tree) => tree.root.findAllByType(Text).map((t) => [].concat(t.pro
 
 test('shows the crash screen on a render error and recovers on "Try again"', () => {
   const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const onReset = jest.fn(); // App.js clears the React Query cache here
   let tree;
   act(() => {
     tree = TestRenderer.create(
-      <AppErrorBoundary>
+      <AppErrorBoundary onReset={onReset}>
         <Screen />
       </AppErrorBoundary>,
     );
   });
 
   expect(texts(tree)).toContain('Something went wrong');
+  expect(texts(tree).join(' ')).toContain('hello@pawpawcare.app');
   expect(texts(tree)).not.toContain('Dashboard');
 
   shouldThrow = false;
@@ -34,5 +36,6 @@ test('shows the crash screen on a render error and recovers on "Try again"', () 
   act(() => tryAgain.props.onPress());
 
   expect(texts(tree)).toContain('Dashboard');
+  expect(onReset).toHaveBeenCalledTimes(1);
   spy.mockRestore();
 });

@@ -10,10 +10,10 @@ const mockSentry = {
   ErrorBoundary: () => null,
 };
 
-function load({ dsn, dev }) {
+function load({ dsn, dev, channel = 'preview' }) {
   jest.resetModules();
   jest.doMock('@sentry/react-native', () => mockSentry);
-  jest.doMock('expo-updates', () => ({ channel: 'preview' }));
+  jest.doMock('expo-updates', () => ({ channel }));
   jest.doMock('../../config', () => ({ SENTRY_DSN: dsn }));
   global.__DEV__ = dev;
   return require('../sentry');
@@ -37,6 +37,13 @@ test('stays off in development even with a DSN', () => {
   const sentry = load({ dsn: 'https://k@o1.ingest.sentry.io/2', dev: true });
   sentry.initSentry();
   expect(mockSentry.init).not.toHaveBeenCalled();
+});
+
+test('stays off on e2e/test builds even with a DSN', () => {
+  const sentry = load({ dsn: 'https://k@o1.ingest.sentry.io/2', dev: false, channel: 'e2e' });
+  sentry.initSentry();
+  expect(mockSentry.init).not.toHaveBeenCalled();
+  expect(sentry.isSentryEnabled()).toBe(false);
 });
 
 test('initialises with privacy settings and the scrubbers', () => {

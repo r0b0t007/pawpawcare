@@ -13,8 +13,12 @@ const navigationIntegration = Sentry.reactNavigationIntegration();
 
 let enabled = false;
 
+// e2e/test builds (channel "e2e") never report into the real project, even
+// if their profile forgets EXPO_PUBLIC_SENTRY_DSN=off.
+const TEST_CHANNELS = new Set(['e2e']);
+
 export function initSentry() {
-  if (!SENTRY_DSN || __DEV__) return;
+  if (!SENTRY_DSN || __DEV__ || TEST_CHANNELS.has(Updates.channel)) return;
   Sentry.init({
     dsn: SENTRY_DSN,
     // "production" for store builds, "preview" for tester builds.

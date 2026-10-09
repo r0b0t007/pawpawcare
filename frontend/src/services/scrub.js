@@ -32,22 +32,24 @@ export function scrubText(text) {
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]');
 }
 
+const URL_KEYS = new Set(['url', 'http.url', 'to', 'from']);
+
+function scrubValue(value) {
+  if (typeof value === 'string') return scrubText(value);
+  if (Array.isArray(value)) return value.map(scrubValue);
+  if (value && typeof value === 'object') return scrubData(value);
+  return value;
+}
+
 function scrubData(data) {
   if (!data || typeof data !== 'object') return data;
+  if (Array.isArray(data)) return data.map(scrubValue);
   const out = {};
   for (const [key, value] of Object.entries(data)) {
-    if (PARAM_KEYS.has(key)) continue;
-    if (key === 'url' || key === 'http.url' || key === 'to' || key === 'from') {
-      out[key] = typeof value === 'string' ? scrubUrl(value) : value;
-    } else if (key === 'http.query' || key === 'http.fragment') {
-      continue;
-    } else if (typeof value === 'string') {
-      out[key] = scrubText(value);
-    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
-      out[key] = scrubData(value);
-    } else {
-      out[key] = value;
-    }
+    if (PARAM_KEYS.has(key) || key === 'http.query' || key === 'http.fragment') continue;
+    // URLs: template ids/drop the query, then redact anything left in the path
+    // (e.g. an email in /users/by-email/…).
+    out[key] = URL_KEYS.has(key) && typeof value === 'string' ? scrubText(scrubUrl(value)) : scrubValue(value);
   }
   return out;
 }
@@ -62,16 +64,20 @@ export function scrubBreadcrumb(breadcrumb) {
   };
 }
 
-/**
- * Errors the app already handles and shows to the user — not bugs:
- * expired sessions, 4xx API responses (validation, not found, forbidden)
- * and offline/network failures.
- */
+// API responses that are normal outcomes, not bugs: unauthenticated,
+// forbidden (e.g. a revoked share), conflict and rate-limited. Other 4xx — a
+// 404 from a wrong path, a 400/422 from a malformed request — usually mean a
+// client bug and are reported.
+const EXPECTED_STATUSES = new Set([401, 403, 409, 429]);
+const EXPECTED_CODES = new Set(['upgrade_required']);
+
+/** Errors the app already handles and shows to the user — not bugs. */
 export function isExpectedError(error) {
   if (!error) return false;
   if (error.message === 'SESSION_EXPIRED') return true;
   if (error.isNetworkError) return true;
-  return typeof error.status === 'number' && error.status >= 400 && error.status < 500;
+  if (error.code && EXPECTED_CODES.has(error.code)) return true;
+  return EXPECTED_STATUSES.has(error.status);
 }
 
 function scrubStringsIn(obj) {

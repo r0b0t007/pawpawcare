@@ -33,7 +33,6 @@ describe('eas-env', () => {
     const preview = publicEnv(easJson, 'preview');
     expect(preview.EXPO_PUBLIC_API_URL).toBe('https://api.pawpawcare.app');
     expect(preview.EXPO_PUBLIC_POSTHOG_KEY).toBeUndefined();
-
   });
 
   test.each(Object.entries(OTA_WORKFLOWS))(

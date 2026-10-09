@@ -57,11 +57,18 @@ describe('scrubBreadcrumb', () => {
 });
 
 describe('isExpectedError', () => {
-  test('session expiry, 4xx and network failures are expected; 5xx and bugs are not', () => {
+  const api = (status, code) => Object.assign(new Error('x'), { status, code });
+
+  test('session expiry, offline and normal-outcome statuses are expected', () => {
     expect(isExpectedError(new Error('SESSION_EXPIRED'))).toBe(true);
-    expect(isExpectedError(Object.assign(new Error('Not found'), { status: 404 }))).toBe(true);
     expect(isExpectedError(Object.assign(new Error('offline'), { isNetworkError: true }))).toBe(true);
-    expect(isExpectedError(Object.assign(new Error('boom'), { status: 500 }))).toBe(false);
+    for (const status of [401, 403, 409, 429]) expect(isExpectedError(api(status))).toBe(true);
+    expect(isExpectedError(api(402, 'upgrade_required'))).toBe(true);
+  });
+
+  test('client-bug 4xx, 5xx and plain bugs are reported', () => {
+    // A 404 from a wrong path or a 400/422 from a malformed payload is a bug.
+    for (const status of [400, 404, 405, 413, 422, 500, 503]) expect(isExpectedError(api(status))).toBe(false);
     expect(isExpectedError(new TypeError("Cannot read properties of undefined (reading 'name')"))).toBe(false);
     expect(isExpectedError(undefined)).toBe(false);
   });
@@ -69,7 +76,7 @@ describe('isExpectedError', () => {
 
 describe('scrubEvent', () => {
   test('drops expected errors', () => {
-    const err = Object.assign(new Error('Validation failed'), { status: 422 });
+    const err = Object.assign(new Error('Forbidden'), { status: 403 });
     expect(scrubEvent({ message: 'x' }, { originalException: err })).toBeNull();
   });
 
@@ -97,6 +104,20 @@ describe('scrubEvent', () => {
     expect(out.breadcrumbs).toEqual([{ category: 'navigation', message: undefined, data: { to: 'PetProfile' } }]);
     expect(out.extra).toEqual({ note: 'mail [email]', nested: { url: 'https://x.test/a' } });
     expect(out.tags).toEqual({ screen: 'PetProfile', who: '[email]' });
+  });
+
+  test('scrubs inside arrays and redacts emails left in URL paths', () => {
+    const out = scrubEvent(
+      {
+        extra: {
+          args: ['owner@example.com', 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.sig', { url: 'https://x.test/a?signature=s' }],
+        },
+        breadcrumbs: [{ category: 'xhr', data: { url: 'https://api.pawpawcare.app/users/by-email/owner@example.com?x=1' } }],
+      },
+      { originalException: new Error('boom') },
+    );
+    expect(out.extra.args).toEqual(['[email]', '[jwt]', { url: 'https://x.test/a' }]);
+    expect(out.breadcrumbs[0].data.url).toBe('https://api.pawpawcare.app/users/by-email/[email]');
   });
 });
 

@@ -6,8 +6,8 @@ import {
   deviceTimezone,
   cancelAllLocalReminders,
 } from '../services/notifications';
-import { identifyUser, resetAnalytics, track } from '../services/analytics';
-import { clearSentryUser, setSentryUser } from '../services/sentry';
+import { track } from '../services/analytics';
+import { identify, resetIdentity } from '../services/identity';
 import { showToast } from '../components/Toast';
 
 const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
@@ -59,8 +59,7 @@ export function AuthProvider({ children }) {
     try {
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
-      identifyUser(user); // tie analytics to the restored session
-      setSentryUser(user);
+      identify(user); // tie analytics to the restored session
       syncDevice();
     } catch (err) {
       if (err.message === 'SESSION_EXPIRED') await clearTokens();
@@ -75,8 +74,7 @@ export function AuthProvider({ children }) {
       await storeTokens(tokens.access_token, tokens.refresh_token);
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
-      identifyUser(user);
-      setSentryUser(user);
+      identify(user);
       track('user_signed_up');
       syncDevice();
       return true;
@@ -97,8 +95,7 @@ export function AuthProvider({ children }) {
       }
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
-      identifyUser(user);
-      setSentryUser(user);
+      identify(user);
       track('user_logged_in');
       syncDevice();
       return true;
@@ -122,8 +119,7 @@ export function AuthProvider({ children }) {
       }
       const user = await get('/users/me');
       dispatch({ type: 'SET_USER', payload: user });
-      identifyUser(user);
-      setSentryUser(user);
+      identify(user);
       // Social auth is find-or-create and the backend doesn't flag which
       // happened, so infer a brand-new account from a just-set created_at to
       // keep the signup funnel accurate (best-effort — analytics only).
@@ -147,8 +143,7 @@ export function AuthProvider({ children }) {
     // screen nor trap the user in a logged-in state if it throws.
     if (refresh) post('/auth/logout', { refresh_token: refresh }).catch(() => {});
     deregisterDevice().catch(() => {});
-    resetAnalytics(); // clear identity so the next user starts fresh
-    clearSentryUser();
+    resetIdentity(); // clear identity so the next user starts fresh
     try {
       // Clear the native Google session too, so the next sign-in shows the
       // account picker instead of silently reusing the last account. Guarded
@@ -184,8 +179,7 @@ export function AuthProvider({ children }) {
     // may prevent reaching the LOGOUT dispatch below.
     await AsyncStorage.removeItem(PUSH_TOKEN_KEY).catch(() => {});
     await cancelAllLocalReminders().catch(() => {});
-    resetAnalytics();
-    clearSentryUser();
+    resetIdentity();
     try {
       const { GoogleSignin } = require('@react-native-google-signin/google-signin');
       GoogleSignin.signOut().catch(() => {});

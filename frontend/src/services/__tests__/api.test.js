@@ -7,7 +7,8 @@ jest.mock('../tokenStorage', () => ({
 }));
 jest.mock('expo-file-system', () => ({ File: function File() {} }));
 
-import { get } from '../api';
+import { get, uploadImage } from '../api';
+import { clearTokens } from '../tokenStorage';
 
 const originalDev = global.__DEV__;
 const originalFetch = global.fetch;
@@ -44,4 +45,67 @@ test('API errors keep their status and the server error code', async () => {
   expect(err.message).toBe('Upgrade to use this feature');
   expect(err.status).toBe(402);
   expect(err.code).toBe('upgrade_required');
+});
+
+const json = (status, body = {}) => ({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });
+
+describe('expired access token', () => {
+  beforeEach(() => {
+    global.__DEV__ = false;
+    clearTokens.mockClear();
+  });
+
+  test('offline during the refresh keeps the session and reports a network error', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(json(401)) // access token expired
+      .mockRejectedValueOnce(new TypeError('Network request failed')); // refresh call
+
+    const err = await get('/pets').catch((e) => e);
+
+    expect(err.isNetworkError).toBe(true);
+    expect(err.message).not.toBe('SESSION_EXPIRED');
+    expect(clearTokens).not.toHaveBeenCalled();
+  });
+
+  test('a server error during the refresh keeps the session', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce(json(401)).mockResolvedValueOnce(json(503));
+
+    const err = await get('/pets').catch((e) => e);
+
+    expect(err.status).toBe(503);
+    expect(err.message).not.toBe('SESSION_EXPIRED');
+    expect(clearTokens).not.toHaveBeenCalled();
+  });
+
+  test('a rejected refresh token ends the session', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce(json(401)).mockResolvedValueOnce(json(401, { detail: 'Invalid refresh token' }));
+
+    const err = await get('/pets').catch((e) => e);
+
+    expect(err.message).toBe('SESSION_EXPIRED');
+    expect(clearTokens).toHaveBeenCalled();
+  });
+
+  test('offline on the retried request is still a network error', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(json(401))
+      .mockResolvedValueOnce(json(200, { access_token: 'a2', refresh_token: 'r2' }))
+      .mockRejectedValueOnce(new TypeError('Network request failed'));
+
+    const err = await get('/pets').catch((e) => e);
+
+    expect(err.isNetworkError).toBe(true);
+  });
+});
+
+test('uploads tag offline failures as network errors too', async () => {
+  global.__DEV__ = false;
+  global.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed')));
+
+  const err = await uploadImage('file:///tmp/photo.jpg').catch((e) => e);
+
+  expect(err.isNetworkError).toBe(true);
+  expect(err.message).toBe('Network error: Network request failed');
 });

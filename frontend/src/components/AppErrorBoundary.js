@@ -8,7 +8,10 @@ import Button from './Button';
 
 // Last-resort screen when rendering throws. Sentry's ErrorBoundary reports
 // the crash (through the scrubber) and "Try again" remounts the tree.
-// Deliberately navigation-free: it sits outside the navigator it protects.
+// It wraps the auth/data providers too, so a retry reloads their state instead
+// of re-rendering the same bad data; callers pass onReset to clear caches that
+// live outside the tree (React Query). Navigation-free and context-free: it
+// renders when everything below it is gone.
 export function CrashFallback({ resetError }) {
   return (
     <View
@@ -22,7 +25,7 @@ export function CrashFallback({ resetError }) {
         </Text>
         <Text style={[type.body, { color: ui.sub, textAlign: 'center' }]}>
           The app hit an unexpected error. Your pets and records are safe — try again, and
-          if it keeps happening, contact support from your Profile.
+          if it keeps happening, email hello@pawpawcare.app.
         </Text>
         <Button label="Try again" onPress={resetError} style={{ alignSelf: 'stretch' }} />
       </Card>
@@ -30,9 +33,9 @@ export function CrashFallback({ resetError }) {
   );
 }
 
-export default function AppErrorBoundary({ children }) {
+export default function AppErrorBoundary({ children, onReset }) {
   return (
-    <ErrorBoundary fallback={({ resetError }) => <CrashFallback resetError={resetError} />}>
+    <ErrorBoundary onReset={onReset} fallback={({ resetError }) => <CrashFallback resetError={resetError} />}>
       {children}
     </ErrorBoundary>
   );

@@ -95,6 +95,7 @@ function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        <AppErrorBoundary onReset={() => queryClient.clear()}>
         <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <DataProvider>
@@ -113,14 +114,13 @@ function App() {
               }}
             >
               <StatusBar style="dark" backgroundColor="#fffaf6" />
-              <AppErrorBoundary>
-                <AppNavigator />
-              </AppErrorBoundary>
+              <AppNavigator />
               <ToastHost />
             </ObserveNavigationContainer>
           </DataProvider>
         </AuthProvider>
         </QueryClientProvider>
+        </AppErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

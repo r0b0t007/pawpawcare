@@ -15,6 +15,8 @@ jest.mock('../../config', () => ({ API_URL: 'https://api.test' }));
 jest.mock('../api', () => ({
   getTokens: jest.fn(() => Promise.resolve({ access: 'access-1' })),
   refreshAccessToken: jest.fn(),
+  netFetch: jest.fn(),
+  networkError: (cause) => Object.assign(new Error(`Network error: ${cause?.message}`), { isNetworkError: true }),
 }));
 
 import { exportRecords } from '../exportRecords';
@@ -92,12 +94,28 @@ describe('exportRecords (native)', () => {
     expect(FileSystem.deleteAsync).toHaveBeenCalled();
   });
 
-  it('throws SESSION_EXPIRED (no retry, no share) when the token refresh fails', async () => {
+  it('passes the refresh outcome through (no retry, no share) when the token refresh fails', async () => {
     FileSystem.downloadAsync.mockResolvedValue({ status: 401, uri: 'file:///cache/x.pdf' });
-    refreshAccessToken.mockRejectedValue(new Error('refresh rejected'));
 
+    // A rejected refresh token ends the session…
+    refreshAccessToken.mockRejectedValueOnce(new Error('SESSION_EXPIRED'));
     await expect(exportRecords('pdf', [])).rejects.toThrow('SESSION_EXPIRED');
-    expect(FileSystem.downloadAsync).toHaveBeenCalledTimes(1); // no second attempt
+
+    // …but going offline mid-refresh does not (refreshAccessToken decides).
+    const offline = Object.assign(new Error('Network error: offline'), { isNetworkError: true });
+    refreshAccessToken.mockRejectedValueOnce(offline);
+    await expect(exportRecords('pdf', [])).rejects.toBe(offline);
+
+    expect(FileSystem.downloadAsync).toHaveBeenCalledTimes(2); // one per attempt, no retry
+    expect(Sharing.shareAsync).not.toHaveBeenCalled();
+  });
+
+  it('tags a failed download (offline) as a network error', async () => {
+    FileSystem.downloadAsync.mockRejectedValue(new Error('Unable to resolve host'));
+
+    const err = await exportRecords('pdf', []).catch((e) => e);
+
+    expect(err.isNetworkError).toBe(true);
     expect(Sharing.shareAsync).not.toHaveBeenCalled();
   });
 });
