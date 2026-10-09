@@ -20,6 +20,7 @@ use App\Http\Controllers\PetShareController;
 use App\Http\Controllers\PetSharingController;
 use App\Http\Controllers\ReminderController;
 use App\Http\Controllers\RevenueCatWebhookController;
+use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
@@ -92,6 +93,8 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
     Route::patch('/users/me', [UserController::class, 'update']);
     // GDPR deletion: disables now, purges after the 30-day grace period.
     Route::delete('/users/me', [UserController::class, 'destroy'])->middleware('throttle:5,60');
+    // After a purchase / restore: re-read the caller's plan from RevenueCat.
+    Route::post('/users/me/subscription/sync', [SubscriptionController::class, 'sync'])->middleware('throttle:10,1');
 
     // Email ownership (emailed 6-digit code). Required before pet invites —
     // which are addressed by email alone — can be seen or accepted.

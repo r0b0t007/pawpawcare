@@ -31,3 +31,9 @@ Schedule::command('gamification:nightly')->daily()->withoutOverlapping();
 // hourly so every timezone gets its morning; the engagement_pushes unique
 // ledger makes reruns no-ops.
 Schedule::command('engagement:send')->hourly()->withoutOverlapping(55);
+
+// RevenueCat: retry webhook events that failed, and sync from RevenueCat's API
+// what webhooks can't settle alone (transfers, plan changes). The daily sweep
+// re-checks users near expiry / with billing issues and prunes the ledger.
+Schedule::command('subscriptions:reconcile')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('subscriptions:reconcile --sweep')->dailyAt('04:40')->withoutOverlapping();

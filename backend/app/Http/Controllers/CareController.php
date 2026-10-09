@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CareProfile;
 use App\Models\Pet;
 use App\Services\Analytics\ProductAnalytics;
+use App\Services\Subscriptions\Entitlements;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -60,9 +61,11 @@ class CareController extends Controller
     }
 
     /** Mint a caretaker link (owner or co-owner). */
-    public function createLink(Request $request, string $petId, ProductAnalytics $analytics): JsonResponse
+    public function createLink(Request $request, string $petId, ProductAnalytics $analytics, Entitlements $entitlements): JsonResponse
     {
         $pet = $this->accessiblePetOr404($request, $petId);
+        // Plan gate (inert unless PAYWALL_ENABLED + GATE_CARE_LINKS).
+        $entitlements->authorize($request->user(), 'care_links', $pet);
 
         $data = $request->validate([
             'expires_in' => 'sometimes|in:1d,3d,7d,14d',

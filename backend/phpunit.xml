@@ -38,6 +38,13 @@
         <env name="POSTHOG_PROJECT_ID" value=""/>
         <env name="REVENUECAT_WEBHOOK_AUTH" value=""/>
         <env name="REVENUECAT_SECRET_KEY" value=""/>
+        <env name="REVENUECAT_PROJECT_ID" value=""/>
+        <env name="REVENUECAT_SANDBOX_USER_IDS" value=""/>
+        <env name="PAYWALL_ENABLED" value="false"/>
+        <env name="SUBSCRIPTIONS_VISIBLE" value="off"/>
+        <env name="PAYWALL_GRANDFATHER_BEFORE" value=""/>
+        <env name="GATE_AI_EXTRACTION" value="false"/>
+        <env name="GATE_CARE_LINKS" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
     </php>
 </phpunit>
