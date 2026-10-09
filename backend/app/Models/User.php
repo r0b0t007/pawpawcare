@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\Analytics\ProductAnalytics;
+use App\Services\Subscriptions\Entitlements;
 use App\Support\Uploads;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -172,11 +173,17 @@ class User extends Model
      */
     public function toSelfApi(): array
     {
+        $entitlements = app(Entitlements::class);
+
         return array_merge($this->toApi(), [
             'is_admin' => (bool) $this->is_admin,
             'engagement_pushes_enabled' => (bool) $this->engagement_pushes_enabled,
             'analytics_opt_out' => (bool) $this->analytics_opt_out,
             'email_verified' => $this->hasVerifiedEmail(),
+            // Subscription state + server-side switches (paywall, visibility,
+            // which features would ask this user to upgrade).
+            'plan' => $entitlements->snapshot($this),
+            'features' => $entitlements->features($this),
         ]);
     }
 }

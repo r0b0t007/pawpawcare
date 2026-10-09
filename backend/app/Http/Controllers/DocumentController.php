@@ -13,6 +13,7 @@ use App\Models\WeightLog;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\DocumentExtractor;
 use App\Services\ReminderScheduler;
+use App\Services\Subscriptions\Entitlements;
 use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -129,7 +130,7 @@ class DocumentController extends Controller
      * completed extraction is returned as-is rather than re-running (and
      * re-paying for) the API call.
      */
-    public function extract(Request $request, string $petId, string $documentId, DocumentExtractor $extractor, ProductAnalytics $analytics): JsonResponse
+    public function extract(Request $request, string $petId, string $documentId, DocumentExtractor $extractor, ProductAnalytics $analytics, Entitlements $entitlements): JsonResponse
     {
         $pet = $this->petOr404($request, $petId);
 
@@ -149,6 +150,10 @@ class DocumentController extends Controller
         if (! $extractor->supports($doc)) {
             abort(422, 'The configured AI provider cannot read this document type.');
         }
+        // Plan gate (inert unless PAYWALL_ENABLED + GATE_AI_EXTRACTION): 402
+        // upgrade_required. The pet owner's plan covers co-owners; without a
+        // plan this uses one of the owner's free monthly reads.
+        $usedFreeRead = $entitlements->authorize($request->user(), 'ai_extraction', $pet);
 
         // Columns are guarded (not fillable) — set explicitly, never from input.
         $doc->forceFill(['extraction_status' => 'pending'])->save();
@@ -171,6 +176,9 @@ class DocumentController extends Controller
         } catch (\Throwable $e) {
             Log::warning('Document extraction failed', ['document_id' => $doc->id, 'error' => $e->getMessage()]);
             $doc->forceFill(['extraction_status' => 'failed'])->save();
+            if ($usedFreeRead) {
+                $entitlements->refund($request->user(), 'ai_extraction', $pet);
+            }
             $track('failed');
             abort(502, 'Could not read the document. Please try again.');
         }

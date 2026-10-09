@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\ReminderScheduler;
+use App\Services\Subscriptions\Entitlements;
 use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,7 +74,7 @@ class UserController extends Controller
      * `accounts:purge-deleted` command after the grace period. Logging back
      * in (or completing a password reset) during the grace period cancels it.
      */
-    public function destroy(Request $request, ProductAnalytics $analytics): JsonResponse
+    public function destroy(Request $request, ProductAnalytics $analytics, Entitlements $entitlements): JsonResponse
     {
         $user = $request->user();
 
@@ -92,6 +93,9 @@ class UserController extends Controller
         return response()->json([
             'status' => 'deletion_scheduled',
             'purge_after' => now()->addDays(User::DELETION_GRACE_DAYS)->toISOString(),
+            // Deleting the account doesn't cancel an App Store / Google Play
+            // subscription — the app tells the user to cancel it there.
+            'has_active_subscription' => $entitlements->hasRenewingSubscription($user),
         ]);
     }
 }

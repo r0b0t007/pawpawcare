@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\UpgradeRequired;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\JwtAuth;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -35,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // distinct status+message per 10 minutes so a misconfiguration hit on
         // every request can't burn the Sentry quota.
         $exceptions->stopIgnoring(HttpException::class);
+        $exceptions->dontReport([UpgradeRequired::class]);
         $exceptions->dontReportWhen(
             fn (Throwable $e) => $e instanceof HttpExceptionInterface && $e->getStatusCode() < 500,
         );
@@ -47,6 +49,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(fn () => true);
 
         $exceptions->render(function (Throwable $e, $request) {
+            if ($e instanceof UpgradeRequired) {
+                return response()->json([
+                    'detail' => $e->getMessage(),
+                    'code' => 'upgrade_required',
+                    'feature' => $e->feature,
+                ], 402);
+            }
             if ($e instanceof ValidationException) {
                 $msg = collect($e->errors())->flatten()->first() ?? 'Validation error';
 

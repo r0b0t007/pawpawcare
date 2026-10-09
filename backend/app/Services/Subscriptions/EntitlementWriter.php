@@ -178,7 +178,9 @@ class EntitlementWriter
 
         if ($entitlement->last_event_type !== null) {
             if ($entitlement->last_event_ms > $timestamp) {
-                return self::STALE;
+                // Older than a sync: the sync may have read RevenueCat just
+                // before this event happened, so re-check instead of dropping.
+                return $entitlement->last_event_type === 'SYNC' ? self::NEEDS_SYNC : self::STALE;
             }
             if ($entitlement->last_event_ms === $timestamp && $entitlement->last_event_type !== $type) {
                 return self::NEEDS_SYNC; // same instant, different event: order unknown
@@ -231,7 +233,8 @@ class EntitlementWriter
             'UNCANCELLATION' => ['will_renew' => true, 'unsubscribed_at' => null],
             'NON_RENEWING_PURCHASE' => ['will_renew' => false],
             'CANCELLATION' => ['will_renew' => false, 'unsubscribed_at' => $at, 'grace_expires_at' => null],
-            'EXPIRATION', 'SUBSCRIPTION_PAUSED' => ['will_renew' => false, 'grace_expires_at' => null],
+            'EXPIRATION' => ['will_renew' => false, 'grace_expires_at' => null, 'billing_issue_at' => null],
+            'SUBSCRIPTION_PAUSED' => ['will_renew' => false, 'grace_expires_at' => null],
             // Store keeps access through the billing grace period.
             'BILLING_ISSUE' => [
                 'billing_issue_at' => $at,
