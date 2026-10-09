@@ -78,6 +78,14 @@ class RevenueCatWebhookTest extends TestCase
         $this->assertSame(0, RevenueCatEvent::count());
     }
 
+    public function test_refuses_everything_with_a_guessable_secret(): void
+    {
+        config(['services.revenuecat.webhook_auth' => 'short-secret']);
+
+        $this->send($this->event('TEST', null), 'short-secret')->assertStatus(503);
+        $this->assertSame(0, RevenueCatEvent::count());
+    }
+
     public function test_rejects_a_wrong_or_missing_authorization_header(): void
     {
         $this->send($this->event('TEST', null), 'Bearer wrong')->assertStatus(401);
@@ -104,15 +112,23 @@ class RevenueCatWebhookTest extends TestCase
         $this->assertSame(0, UserEntitlement::count());
     }
 
-    public function test_subscriber_attributes_are_never_stored(): void
+    public function test_only_the_needed_event_fields_are_stored(): void
     {
-        $event = $this->event('INITIAL_PURCHASE', $this->user());
+        $event = $this->event('INITIAL_PURCHASE', $this->user(), [
+            'country_code' => 'DE',
+            'price' => 8.14,
+            'transaction_id' => '123456789012345',
+            'some_future_field' => 'x',
+        ]);
 
         $this->send($event)->assertOk();
 
-        $stored = RevenueCatEvent::find($event['id'])->getRawOriginal('payload');
-        $this->assertStringNotContainsString('subscriber_attributes', $stored);
-        $this->assertStringNotContainsString('owner@example.com', $stored);
+        $stored = RevenueCatEvent::find($event['id'])->payload;
+        foreach (['subscriber_attributes', 'country_code', 'price', 'transaction_id', 'some_future_field'] as $field) {
+            $this->assertArrayNotHasKey($field, $stored);
+        }
+        $this->assertStringNotContainsString('owner@example.com', json_encode($stored));
+        $this->assertSame(['plus'], $stored['entitlement_ids']);
     }
 
     public function test_a_redelivered_event_is_applied_once(): void
@@ -257,7 +273,8 @@ class RevenueCatWebhookTest extends TestCase
         $event = $this->event('INITIAL_PURCHASE', $user);
         $this->mock(EntitlementWriter::class)->shouldReceive('process')->once()->andThrow(new \RuntimeException('db down'));
 
-        $this->send($event)->assertOk()->assertJson(['status' => 'queued_for_retry']);
+        // Non-2xx so RevenueCat redelivers it.
+        $this->send($event)->assertStatus(500)->assertJson(['status' => 'retry']);
 
         $row = RevenueCatEvent::find($event['id']);
         $this->assertNull($row->processed_at);
@@ -289,5 +306,22 @@ class RevenueCatWebhookTest extends TestCase
                 && isset($e['uuid'])
                 && ! str_contains(json_encode($request->data()), 'owner@example.com');
         });
+    }
+
+    // ── Erasure ──────────────────────────────────────────────────────────────
+
+    public function test_purging_the_account_removes_its_subscription_records(): void
+    {
+        $user = $this->user();
+        $this->send($this->event('INITIAL_PURCHASE', $user))->assertOk();
+        $user->forceFill([
+            'is_active' => false,
+            'deletion_requested_at' => now()->subDays(User::DELETION_GRACE_DAYS + 1),
+        ])->save();
+
+        $this->artisan('accounts:purge-deleted')->assertSuccessful();
+
+        $this->assertSame(0, RevenueCatEvent::where('user_id', $user->id)->count());
+        $this->assertSame(0, UserEntitlement::where('user_id', $user->id)->count());
     }
 }

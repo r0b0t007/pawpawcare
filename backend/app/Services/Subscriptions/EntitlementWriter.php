@@ -139,9 +139,9 @@ class EntitlementWriter
 
         $at = $timestamp > 0 ? Carbon::createFromTimestampMs($timestamp) : now();
         $changes = [
-            'store' => $event['store'] ?? $entitlement->store,
-            'environment' => $event['environment'] ?? $entitlement->environment,
-            'period_type' => $event['period_type'] ?? $entitlement->period_type,
+            'store' => $this->column($event['store'] ?? null, 32) ?? $entitlement->store,
+            'environment' => $this->column($event['environment'] ?? null, 16) ?? $entitlement->environment,
+            'period_type' => $this->column($event['period_type'] ?? null, 16) ?? $entitlement->period_type,
             'last_event_ms' => $timestamp,
             'last_event_type' => $type,
             'source' => 'webhook',
@@ -189,6 +189,12 @@ class EntitlementWriter
         }
 
         return null;
+    }
+
+    /** A scalar string that fits its column, or null. */
+    private function column(mixed $value, int $max): ?string
+    {
+        return is_string($value) && $value !== '' ? mb_substr($value, 0, $max) : null;
     }
 
     /** Short, identifier-shaped values only (store names, product ids). */

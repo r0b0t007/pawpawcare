@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\RevenueCatEvent;
 use App\Models\User;
 use App\Services\Analytics\ProductAnalytics;
 use Illuminate\Console\Command;
@@ -116,6 +117,10 @@ class PurgeDeletedAccounts extends Command
         if ($user->avatar_url !== null) {
             $user->forceFill(['avatar_url' => null])->save();
         }
+
+        // The subscription event ledger has no FK (events can name unknown
+        // users); drop this user's rows explicitly. user_entitlements cascades.
+        RevenueCatEvent::where('user_id', $user->id)->delete();
 
         $user->delete();
     }

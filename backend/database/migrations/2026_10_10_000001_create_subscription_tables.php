@@ -35,8 +35,10 @@ return new class extends Migration
 
         // Ledger of every RevenueCat webhook event: idempotency (the event id
         // is the key — retries reuse it) and an audit trail for failures the
-        // reconcile job retries. Payloads are stored WITHOUT
-        // subscriber_attributes (they can hold the user's email).
+        // reconcile job retries. Only an allowlist of event fields is stored
+        // (see RevenueCatWebhookController::STORED_FIELDS) — never subscriber
+        // attributes (email), prices, country or store transaction ids. Rows
+        // are deleted with the user at account purge.
         Schema::create('revenuecat_events', function (Blueprint $table) {
             $table->string('id', 100)->primary();
             $table->string('type', 40);
@@ -44,7 +46,9 @@ return new class extends Migration
             $table->string('environment', 16)->nullable();
             $table->unsignedBigInteger('event_timestamp_ms');
             $table->json('payload');
-            $table->timestamp('received_at');
+            // useCurrent(): an explicit default, so MySQL/MariaDB with
+            // explicit_defaults_for_timestamp=OFF can't add ON UPDATE to it.
+            $table->timestamp('received_at')->useCurrent();
             $table->timestamp('processed_at')->nullable()->index();
             $table->unsignedInteger('attempts')->default(0);
             $table->string('error', 255)->nullable();

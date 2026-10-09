@@ -57,9 +57,11 @@ Route::get('/care/{pet}', [CareController::class, 'page'])
 
 // ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
 // RevenueCat server-to-server webhook: authenticated by its shared secret
-// (Authorization header), not a user JWT.
+// (Authorization header), not a user JWT. The limit is per IP and RevenueCat
+// delivers from a small pool, so it's generous; unauthenticated requests are
+// rejected before any database work.
 Route::post('/webhooks/revenuecat', [RevenueCatWebhookController::class, 'handle'])
-    ->middleware('throttle:120,1');
+    ->middleware('throttle:600,1');
 
 Route::middleware('throttle:20,1')->group(function () {
     Route::post('/auth/signup', [AuthController::class, 'signup']);

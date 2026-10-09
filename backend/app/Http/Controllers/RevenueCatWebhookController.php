@@ -5,27 +5,50 @@ namespace App\Http\Controllers;
 use App\Models\RevenueCatEvent;
 use App\Services\Subscriptions\EntitlementWriter;
 use App\Support\ReportOnce;
+use App\Support\SentryScrubber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 
 /**
  * POST /webhooks/revenuecat — RevenueCat's server-to-server notifications.
  *
  * Authenticated by the shared secret RevenueCat sends verbatim in the
  * Authorization header (configured on both sides). Fails closed: without a
- * configured secret every request is refused. Every event is recorded in the
- * revenuecat_events ledger first (idempotency — retries reuse the event id),
- * then applied. A failure while applying still returns 200: the ledger row
- * stays unprocessed and the reconcile job retries it, rather than RevenueCat
- * retrying on its own schedule.
+ * configured secret (or with one too short to be safe) every request is
+ * refused. Every event is recorded in the revenuecat_events ledger first
+ * (idempotency — retries reuse the event id), then applied. A failure while
+ * applying returns 500 so RevenueCat redelivers it; the ledger makes those
+ * retries safe.
  */
 class RevenueCatWebhookController extends Controller
 {
+    /** A guessable shared secret would let anyone grant entitlements. */
+    public const MIN_SECRET_LENGTH = 32;
+
+    /**
+     * The only event fields kept in the ledger: what applying and auditing an
+     * event needs. Everything else RevenueCat sends (subscriber attributes
+     * with the email, country, price, store transaction ids, fields added in
+     * future) is dropped.
+     */
+    private const STORED_FIELDS = [
+        'id', 'type', 'event_timestamp_ms', 'environment', 'store', 'period_type',
+        'product_id', 'new_product_id', 'entitlement_ids', 'entitlement_id', 'expiration_at_ms',
+        'app_user_id', 'original_app_user_id', 'aliases', 'transferred_from', 'transferred_to',
+        'cancel_reason', 'expiration_reason',
+    ];
+
     public function handle(Request $request, EntitlementWriter $writer): JsonResponse
     {
         $secret = (string) config('services.revenuecat.webhook_auth');
         if ($secret === '') {
+            abort(503, 'Subscriptions are not configured');
+        }
+        if (strlen($secret) < self::MIN_SECRET_LENGTH) {
+            ReportOnce::log('revenuecat-webhook:weak-secret', 'critical',
+                'REVENUECAT_WEBHOOK_AUTH is shorter than '.self::MIN_SECRET_LENGTH.' characters; the webhook refuses all events until it is a long random value.');
             abort(503, 'Subscriptions are not configured');
         }
         if (! hash_equals($secret, (string) $request->header('Authorization'))) {
@@ -42,9 +65,7 @@ class RevenueCatWebhookController extends Controller
         ]);
         $event = $request->input('event');
 
-        // Never persist subscriber attributes: they can carry the email and
-        // other profile data RevenueCat collected.
-        $payload = Arr::except($event, ['subscriber_attributes']);
+        $payload = Arr::only($event, self::STORED_FIELDS);
 
         $inserted = RevenueCatEvent::query()->insertOrIgnore([
             'id' => $data['event']['id'],
@@ -65,9 +86,16 @@ class RevenueCatWebhookController extends Controller
             $status = $writer->process($row);
         } catch (\Throwable $e) {
             report($e);
-            $row->forceFill(['error' => substr(class_basename($e).': '.$e->getMessage(), 0, 255)])->save();
+            try {
+                $row->forceFill([
+                    'error' => mb_strcut(SentryScrubber::scrubText(class_basename($e).': '.$e->getMessage()), 0, 255),
+                ])->save();
+            } catch (\Throwable $inner) {
+                Log::warning('Could not record a RevenueCat event failure', ['event_id' => $row->id]);
+            }
 
-            return response()->json(['status' => 'queued_for_retry']);
+            // Non-2xx: RevenueCat redelivers; the ledger keeps that idempotent.
+            return response()->json(['status' => 'retry'], 500);
         }
 
         return response()->json(['status' => $status]);
