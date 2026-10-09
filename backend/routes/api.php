@@ -19,6 +19,7 @@ use App\Http\Controllers\PetController;
 use App\Http\Controllers\PetShareController;
 use App\Http\Controllers\PetSharingController;
 use App\Http\Controllers\ReminderController;
+use App\Http\Controllers\RevenueCatWebhookController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
@@ -55,6 +56,11 @@ Route::get('/care/{pet}', [CareController::class, 'page'])
     ->name('pets.care');
 
 // ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
+// RevenueCat server-to-server webhook: authenticated by its shared secret
+// (Authorization header), not a user JWT.
+Route::post('/webhooks/revenuecat', [RevenueCatWebhookController::class, 'handle'])
+    ->middleware('throttle:120,1');
+
 Route::middleware('throttle:20,1')->group(function () {
     Route::post('/auth/signup', [AuthController::class, 'signup']);
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');

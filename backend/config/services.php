@@ -47,6 +47,16 @@ return [
         'project_id' => env('POSTHOG_PROJECT_ID'),
     ],
 
+    // RevenueCat subscriptions. `webhook_auth` is the exact Authorization
+    // header value configured on the RevenueCat webhook (empty = the webhook
+    // refuses everything). The v2 secret key (sk_) and project id are used by
+    // the API sync (D2).
+    'revenuecat' => [
+        'webhook_auth' => env('REVENUECAT_WEBHOOK_AUTH'),
+        'secret_key' => env('REVENUECAT_SECRET_KEY'),
+        'project_id' => env('REVENUECAT_PROJECT_ID'),
+    ],
+
     'anthropic' => [
         'key' => env('ANTHROPIC_API_KEY'),
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-8'),

@@ -2,9 +2,6 @@
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Log;
-
 /**
  * Refuses to sign or accept tokens with a guessable JWT signing key. Anyone
  * who knows the key can mint an access token for any user id, and the shipped
@@ -76,22 +73,11 @@ class JwtSecretGuard
             return;
         }
 
-        self::reportOnce('jwt-secret-guard:unsafe', 'critical',
+        ReportOnce::log('jwt-secret-guard:unsafe', 'critical',
             "Refusing to sign or verify tokens: {$problem}. Set a random SECRET_KEY of at least "
-            .self::MIN_LENGTH.' characters in .env (e.g. `openssl rand -base64 48`), then run `php artisan config:cache`.');
+            .self::MIN_LENGTH.' characters in .env (e.g. `openssl rand -base64 48`), then run `php artisan config:cache`.',
+            self::REPORT_EVERY_SECONDS);
 
         abort(503, 'Sign-in is temporarily unavailable.');
-    }
-
-    private static function reportOnce(string $key, string $level, string $message): void
-    {
-        try {
-            if (! Cache::add($key, true, self::REPORT_EVERY_SECONDS)) {
-                return;
-            }
-        } catch (\Throwable) {
-            // Cache unavailable: still log rather than stay silent.
-        }
-        Log::log($level, $message);
     }
 }
