@@ -19,10 +19,12 @@ return new class extends Migration
             $table->string('store', 32)->nullable();          // APP_STORE, PLAY_STORE, …
             $table->string('environment', 16)->nullable();    // PRODUCTION | SANDBOX
             $table->string('period_type', 16)->nullable();    // NORMAL | TRIAL | INTRO | PREPAID
-            $table->timestamp('expires_at')->nullable();      // null = lifetime / non-expiring
+            // DATETIME, not TIMESTAMP: MySQL's TIMESTAMP stops at 2038, and
+            // lifetime / long promotional grants can expire after that.
+            $table->dateTime('expires_at')->nullable();       // null = lifetime / non-expiring
             $table->boolean('will_renew')->default(false);
-            $table->timestamp('billing_issue_at')->nullable();
-            $table->timestamp('unsubscribed_at')->nullable();
+            $table->dateTime('billing_issue_at')->nullable();
+            $table->dateTime('unsubscribed_at')->nullable();
             // Ordering guard: events can arrive out of order; an older event
             // never overwrites state written by a newer one.
             $table->unsignedBigInteger('last_event_ms')->default(0);
@@ -46,11 +48,13 @@ return new class extends Migration
             $table->string('environment', 16)->nullable();
             $table->unsignedBigInteger('event_timestamp_ms');
             $table->json('payload');
-            // useCurrent(): an explicit default, so MySQL/MariaDB with
-            // explicit_defaults_for_timestamp=OFF can't add ON UPDATE to it.
-            $table->timestamp('received_at')->useCurrent();
-            $table->timestamp('processed_at')->nullable()->index();
+            $table->dateTime('received_at')->useCurrent();
+            $table->dateTime('processed_at')->nullable()->index();
             $table->unsignedInteger('attempts')->default(0);
+            // Outcome of processing: pending | applied | stale | ignored |
+            // unknown_user | needs_sync | failed. `error` holds exception text
+            // only (for failed).
+            $table->string('status', 20)->default('pending')->index();
             $table->string('error', 255)->nullable();
         });
     }

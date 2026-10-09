@@ -9,6 +9,7 @@ use App\Support\SentryScrubber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -67,7 +68,7 @@ class RevenueCatWebhookController extends Controller
 
         $payload = Arr::only($event, self::STORED_FIELDS);
 
-        $inserted = RevenueCatEvent::query()->insertOrIgnore([
+        RevenueCatEvent::query()->insertOrIgnore([
             'id' => $data['event']['id'],
             'type' => $data['event']['type'],
             'environment' => $data['event']['environment'] ?? null,
@@ -77,21 +78,22 @@ class RevenueCatWebhookController extends Controller
             'attempts' => 0,
         ]);
 
-        $row = RevenueCatEvent::find($data['event']['id']);
-        if (! $inserted && $row->processed_at !== null) {
-            return response()->json(['status' => 'duplicate']);
-        }
-
         try {
-            $status = $writer->process($row);
+            // Locks the ledger row: concurrent deliveries of the same event are
+            // applied once (the second sees it processed → duplicate). If the
+            // insert above was silently dropped (INSERT IGNORE also swallows
+            // data errors), process() throws and RevenueCat retries.
+            $status = $writer->process($data['event']['id']);
         } catch (\Throwable $e) {
             report($e);
             try {
-                $row->forceFill([
+                RevenueCatEvent::whereKey($data['event']['id'])->update([
+                    'status' => 'failed',
+                    'attempts' => DB::raw('attempts + 1'),
                     'error' => mb_strcut(SentryScrubber::scrubText(class_basename($e).': '.$e->getMessage()), 0, 255),
-                ])->save();
+                ]);
             } catch (\Throwable $inner) {
-                Log::warning('Could not record a RevenueCat event failure', ['event_id' => $row->id]);
+                Log::warning('Could not record a RevenueCat event failure', ['event_id' => $data['event']['id']]);
             }
 
             // Non-2xx: RevenueCat redelivers; the ledger keeps that idempotent.

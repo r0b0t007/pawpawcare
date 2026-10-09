@@ -8,6 +8,7 @@ use App\Models\UserEntitlement;
 use App\Services\Subscriptions\EntitlementWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -138,6 +139,7 @@ class RevenueCatWebhookTest extends TestCase
 
         $this->send($event)->assertOk()->assertJson(['status' => 'applied']);
         $this->send($event)->assertOk()->assertJson(['status' => 'duplicate']);
+        $this->assertSame('applied', RevenueCatEvent::find($event['id'])->status);
 
         $this->assertSame(1, RevenueCatEvent::count());
         $this->assertSame(1, RevenueCatEvent::find($event['id'])->attempts);
@@ -263,7 +265,8 @@ class RevenueCatWebhookTest extends TestCase
 
         $row = RevenueCatEvent::find($event['id']);
         $this->assertNull($row->processed_at);
-        $this->assertSame('needs_sync', $row->error);
+        $this->assertSame('needs_sync', $row->status);
+        $this->assertNull($row->error);
         $this->assertSame(0, UserEntitlement::count());
     }
 
@@ -278,6 +281,7 @@ class RevenueCatWebhookTest extends TestCase
 
         $row = RevenueCatEvent::find($event['id']);
         $this->assertNull($row->processed_at);
+        $this->assertSame('failed', $row->status);
         $this->assertStringContainsString('db down', $row->error);
 
         // RevenueCat redelivering an unprocessed event applies it then.
@@ -323,5 +327,125 @@ class RevenueCatWebhookTest extends TestCase
 
         $this->assertSame(0, RevenueCatEvent::where('user_id', $user->id)->count());
         $this->assertSame(0, UserEntitlement::where('user_id', $user->id)->count());
+    }
+
+    // ── Code-review fixes ────────────────────────────────────────────────────
+
+    public function test_plan_changes_are_left_for_the_api_sync(): void
+    {
+        $user = $this->user();
+        $t = now()->getTimestampMs();
+        $this->send($this->event('INITIAL_PURCHASE', $user, ['event_timestamp_ms' => $t, 'product_id' => 'plus_yearly']))->assertOk();
+
+        $this->send($this->event('PRODUCT_CHANGE', $user, [
+            'event_timestamp_ms' => $t + 1000,
+            'product_id' => 'plus_yearly',
+            'new_product_id' => 'plus_monthly',
+        ]))->assertOk()->assertJson(['status' => 'needs_sync']);
+
+        // The yearly plan is still what's running until RevenueCat says otherwise.
+        $this->assertSame('plus_yearly', $this->entitlement($user)->product_id);
+    }
+
+    public function test_each_event_only_changes_what_it_means(): void
+    {
+        $user = $this->user();
+        $t = now()->getTimestampMs();
+        $this->send($this->event('INITIAL_PURCHASE', $user, ['event_timestamp_ms' => $t]))->assertOk();
+        $this->send($this->event('CANCELLATION', $user, ['event_timestamp_ms' => $t + 1]))->assertOk();
+        $this->send($this->event('BILLING_ISSUE', $user, ['event_timestamp_ms' => $t + 2]))->assertOk();
+
+        // A support extension moves the expiry only.
+        $this->send($this->event('SUBSCRIPTION_EXTENDED', $user, [
+            'event_timestamp_ms' => $t + 3,
+            'expiration_at_ms' => now()->addYear()->getTimestampMs(),
+        ]))->assertOk();
+        $ent = $this->entitlement($user);
+        $this->assertFalse($ent->will_renew);
+        $this->assertNotNull($ent->unsubscribed_at);
+        $this->assertNotNull($ent->billing_issue_at);
+
+        // Un-cancelling turns renewal back on but doesn't fix the payment.
+        $this->send($this->event('UNCANCELLATION', $user, ['event_timestamp_ms' => $t + 4]))->assertOk();
+        $ent = $this->entitlement($user);
+        $this->assertTrue($ent->will_renew);
+        $this->assertNull($ent->unsubscribed_at);
+        $this->assertNotNull($ent->billing_issue_at);
+    }
+
+    public function test_expiry_dates_after_2038_are_stored(): void
+    {
+        $user = $this->user();
+        $farFuture = Carbon::create(2099, 1, 1)->getTimestampMs();
+
+        $this->send($this->event('TEMPORARY_ENTITLEMENT_GRANT', $user, ['expiration_at_ms' => $farFuture]))->assertOk();
+
+        $this->assertSame(2099, $this->entitlement($user)->expires_at->year);
+    }
+
+    public function test_different_events_at_the_same_instant_are_left_for_the_sync(): void
+    {
+        $user = $this->user();
+        $t = now()->getTimestampMs();
+        $this->send($this->event('RENEWAL', $user, ['event_timestamp_ms' => $t]))->assertOk();
+
+        $this->send($this->event('BILLING_ISSUE', $user, ['event_timestamp_ms' => $t]))
+            ->assertOk()->assertJson(['status' => 'needs_sync']);
+
+        $this->assertNull($this->entitlement($user)->billing_issue_at);
+    }
+
+    public function test_an_event_missing_from_the_ledger_is_a_failure_not_a_crash(): void
+    {
+        $this->expectException(\RuntimeException::class);
+
+        app(EntitlementWriter::class)->process('never-recorded');
+    }
+
+    public function test_events_for_unknown_customers_keep_no_identifiers(): void
+    {
+        $orphanId = (string) Str::uuid(); // e.g. an account already purged
+        $event = $this->event('EXPIRATION', $orphanId, ['aliases' => [$orphanId, '$RCAnonymousID:x']]);
+
+        $this->send($event)->assertOk()->assertJson(['status' => 'unknown_user']);
+
+        $stored = RevenueCatEvent::find($event['id'])->payload;
+        foreach (['app_user_id', 'original_app_user_id', 'aliases'] as $field) {
+            $this->assertArrayNotHasKey($field, $stored);
+        }
+        $this->assertStringNotContainsString($orphanId, json_encode($stored));
+    }
+
+    public function test_purge_removes_every_ledger_row_that_names_the_user(): void
+    {
+        $user = $this->user();
+        $this->send($this->event('INITIAL_PURCHASE', $user))->assertOk();
+        // A transfer naming the user, and a row that was never linked to them.
+        $this->send([
+            'id' => (string) Str::uuid(),
+            'type' => 'TRANSFER',
+            'event_timestamp_ms' => now()->getTimestampMs(),
+            'transferred_from' => [$user->id],
+            'transferred_to' => [(string) Str::uuid()],
+        ])->assertOk();
+        RevenueCatEvent::query()->insert([
+            'id' => 'unlinked-'.Str::random(8),
+            'type' => 'TRANSFER',
+            'event_timestamp_ms' => 1,
+            'payload' => json_encode(['transferred_to' => [$user->id]]),
+            'received_at' => now(),
+            'status' => 'needs_sync',
+        ]);
+        $other = $this->user();
+        $this->send($this->event('INITIAL_PURCHASE', $other))->assertOk();
+        $user->forceFill([
+            'is_active' => false,
+            'deletion_requested_at' => now()->subDays(User::DELETION_GRACE_DAYS + 1),
+        ])->save();
+
+        $this->artisan('accounts:purge-deleted')->assertSuccessful();
+
+        $this->assertSame(0, RevenueCatEvent::where('payload', 'like', '%'.$user->id.'%')->orWhere('user_id', $user->id)->count());
+        $this->assertSame(1, RevenueCatEvent::where('user_id', $other->id)->count()); // others untouched
     }
 }

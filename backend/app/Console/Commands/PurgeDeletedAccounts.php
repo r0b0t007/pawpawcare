@@ -119,8 +119,12 @@ class PurgeDeletedAccounts extends Command
         }
 
         // The subscription event ledger has no FK (events can name unknown
-        // users); drop this user's rows explicitly. user_entitlements cascades.
-        RevenueCatEvent::where('user_id', $user->id)->delete();
+        // users): drop every row linked to OR naming this user (customer ids,
+        // aliases, transfers). UUIDs contain no LIKE wildcards.
+        // user_entitlements cascades with the user row.
+        RevenueCatEvent::where('user_id', $user->id)
+            ->orWhere('payload', 'like', '%'.$user->id.'%')
+            ->delete();
 
         $user->delete();
     }
