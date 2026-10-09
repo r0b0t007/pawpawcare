@@ -23,7 +23,9 @@ class UserController extends Controller
             'avatar_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
             'timezone' => 'sometimes|nullable|string|max:64',
             'engagement_pushes_enabled' => 'sometimes|boolean',
-            'analytics_opt_out' => 'sometimes|boolean',
+            // `required`: an empty value must never silently re-enable analytics,
+            // independent of the global ConvertEmptyStringsToNull middleware.
+            'analytics_opt_out' => 'sometimes|required|boolean',
         ]);
 
         $user = $request->user();

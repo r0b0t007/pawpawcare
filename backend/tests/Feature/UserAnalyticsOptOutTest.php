@@ -49,9 +49,14 @@ class UserAnalyticsOptOutTest extends TestCase
     {
         [$user, $token] = $this->actingUser();
 
-        $this->withToken($token)->patchJson('/users/me', ['analytics_opt_out' => 'sometimes'])
-            ->assertStatus(422);
-        $this->assertFalse($user->fresh()->analytics_opt_out);
+        $user->forceFill(['analytics_opt_out' => true])->save();
+
+        // An empty or null value must not quietly opt the user back in.
+        foreach (['sometimes', 'true', '', null, []] as $value) {
+            $this->withToken($token)->patchJson('/users/me', ['analytics_opt_out' => $value])
+                ->assertStatus(422);
+        }
+        $this->assertTrue($user->fresh()->analytics_opt_out);
     }
 
     public function test_unrelated_updates_leave_it_unchanged(): void
