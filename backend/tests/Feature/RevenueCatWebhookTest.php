@@ -582,4 +582,76 @@ class RevenueCatWebhookTest extends TestCase
 
         Exceptions::assertNothingReported();
     }
+
+    public function test_events_for_another_product_never_shorten_a_lifetime_purchase(): void
+    {
+        $user = $this->user();
+        $t = now()->subMinutes(5)->getTimestampMs();
+        $this->send($this->event('NON_RENEWING_PURCHASE', $user, [
+            'event_timestamp_ms' => $t, 'product_id' => 'plus_lifetime', 'expiration_at_ms' => null,
+        ]))->assertOk();
+
+        // Turning off the old monthly plan's auto-renew, then it expiring.
+        $this->send($this->event('CANCELLATION', $user, [
+            'event_timestamp_ms' => $t + 1000, 'product_id' => 'plus_monthly',
+            'expiration_at_ms' => now()->subMinute()->getTimestampMs(),
+        ]))->assertOk()->assertJson(['status' => 'ignored']);
+
+        $ent = $this->entitlement($user);
+        $this->assertTrue($ent->is_lifetime);
+        $this->assertTrue($ent->isActive());
+    }
+
+    public function test_a_non_null_junk_expiry_never_grants_lifetime(): void
+    {
+        $user = $this->user();
+
+        $this->send($this->event('NON_RENEWING_PURCHASE', $user, ['expiration_at_ms' => 0]))->assertOk();
+
+        $this->assertFalse($this->entitlement($user)->isActive());
+    }
+
+    public function test_a_refund_during_the_grace_period_ends_access(): void
+    {
+        $user = $this->user();
+        $t = now()->subMinutes(5)->getTimestampMs();
+        $this->send($this->event('INITIAL_PURCHASE', $user, ['event_timestamp_ms' => $t]))->assertOk();
+        $this->send($this->event('BILLING_ISSUE', $user, [
+            'event_timestamp_ms' => $t + 1000,
+            'expiration_at_ms' => now()->subMinute()->getTimestampMs(),
+            'grace_period_expiration_at_ms' => now()->addDays(16)->getTimestampMs(),
+        ]))->assertOk();
+
+        $this->send($this->event('CANCELLATION', $user, [
+            'event_timestamp_ms' => $t + 2000,
+            'expiration_at_ms' => now()->subMinute()->getTimestampMs(),
+            'cancel_reason' => 'CUSTOMER_SUPPORT',
+        ]))->assertOk();
+
+        $this->assertFalse($this->entitlement($user)->isActive());
+    }
+
+    public function test_an_event_naming_two_of_our_accounts_is_left_for_the_sync(): void
+    {
+        $a = $this->user();
+        $b = $this->user();
+
+        $this->send($this->event('INITIAL_PURCHASE', '$RCAnonymousID:x', ['aliases' => [$a->id, $b->id]]))
+            ->assertOk()->assertJson(['status' => 'needs_sync']);
+
+        $this->assertSame(0, UserEntitlement::count());
+    }
+
+    public function test_no_analytics_for_an_account_pending_deletion(): void
+    {
+        config(['services.posthog.key' => 'phc_test', 'services.posthog.host' => 'https://us.i.posthog.com']);
+        Http::fake(['us.i.posthog.com/*' => Http::response(['status' => 'Ok'])]);
+        $user = $this->user();
+        $user->forceFill(['deletion_requested_at' => now()])->save();
+
+        $this->send($this->event('CANCELLATION', $user))->assertOk();
+        app(ProductAnalytics::class)->flush();
+
+        Http::assertNothingSent();
+    }
 }

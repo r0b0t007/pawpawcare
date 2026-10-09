@@ -110,7 +110,11 @@ class EntitlementWriter
         $event = $row->payload;
         $type = (string) ($event['type'] ?? '');
 
-        $user = $this->resolveUser((string) $row->id, $type);
+        try {
+            $user = $this->resolveUser((string) $row->id, $type);
+        } catch (AmbiguousCustomer) {
+            return self::NEEDS_SYNC; // several of our accounts at the same rank
+        }
         if ($user) {
             $row->forceFill(['user_id' => $user->id]);
         }
@@ -141,8 +145,12 @@ class EntitlementWriter
             $this->captureAfterCommit($user, $type, $event, (string) $row->id);
         }
 
-        return in_array(self::NEEDS_SYNC, $results, true) ? self::NEEDS_SYNC
-            : ($anyApplied ? self::APPLIED : self::STALE);
+        return match (true) {
+            in_array(self::NEEDS_SYNC, $results, true) => self::NEEDS_SYNC,
+            $anyApplied => self::APPLIED,
+            in_array(self::STALE, $results, true) => self::STALE,
+            default => self::IGNORED,
+        };
     }
 
     private function applyToEntitlement(User $user, string $entitlementId, string $type, array $event): string
@@ -177,9 +185,18 @@ class EntitlementWriter
             }
         }
 
+        // A lifetime purchase outranks every subscription: events for another
+        // product granting the same entitlement (e.g. cancelling the monthly
+        // plan after buying lifetime) must not shorten it.
+        $product = is_string($event['product_id'] ?? null) ? mb_substr($event['product_id'], 0, 191) : null;
+        if ($entitlement->is_lifetime && $product !== $entitlement->product_id) {
+            return self::IGNORED;
+        }
+
         $at = $timestamp > 0 ? Carbon::createFromTimestampMs($timestamp) : now();
         $expiry = $this->instant($event['expiration_at_ms'] ?? null);
-        $hasExpiryField = array_key_exists('expiration_at_ms', $event);
+        // Only an explicit null means "no expiry" (not 0, negative or junk).
+        $noExpiry = array_key_exists('expiration_at_ms', $event) && $event['expiration_at_ms'] === null;
 
         $changes = [
             'store' => $this->column($event['store'] ?? null, 32) ?? $entitlement->store,
@@ -195,15 +212,15 @@ class EntitlementWriter
         if ($expiry !== null) {
             $changes['expires_at'] = $expiry;
             $changes['is_lifetime'] = false;
-        } elseif ($type === 'NON_RENEWING_PURCHASE' && $hasExpiryField) {
+        } elseif ($type === 'NON_RENEWING_PURCHASE' && $noExpiry) {
             $changes['is_lifetime'] = true;
             $changes['expires_at'] = null;
         } elseif (in_array($type, ['CANCELLATION', 'EXPIRATION'], true) && $entitlement->is_lifetime) {
             $changes['is_lifetime'] = false;
             $changes['expires_at'] = $at;
         }
-        if (in_array($type, self::SETS_PRODUCT, true) && is_string($event['product_id'] ?? null)) {
-            $changes['product_id'] = mb_substr($event['product_id'], 0, 191);
+        if (in_array($type, self::SETS_PRODUCT, true) && $product !== null) {
+            $changes['product_id'] = $product;
         }
 
         // Each type sets only what it means.
@@ -213,9 +230,8 @@ class EntitlementWriter
             ],
             'UNCANCELLATION' => ['will_renew' => true, 'unsubscribed_at' => null],
             'NON_RENEWING_PURCHASE' => ['will_renew' => false],
-            'CANCELLATION' => ['will_renew' => false, 'unsubscribed_at' => $at],
-            'EXPIRATION' => ['will_renew' => false, 'grace_expires_at' => null],
-            'SUBSCRIPTION_PAUSED' => ['will_renew' => false],
+            'CANCELLATION' => ['will_renew' => false, 'unsubscribed_at' => $at, 'grace_expires_at' => null],
+            'EXPIRATION', 'SUBSCRIPTION_PAUSED' => ['will_renew' => false, 'grace_expires_at' => null],
             // Store keeps access through the billing grace period.
             'BILLING_ISSUE' => [
                 'billing_issue_at' => $at,
@@ -240,8 +256,12 @@ class EntitlementWriter
             ->whereIn('role', $roles)
             ->get(['user_id', 'role']);
         foreach ($roles as $role) {
-            if ($link = $links->firstWhere('role', $role)) {
-                return User::find($link->user_id);
+            $ids = $links->where('role', $role)->pluck('user_id')->unique();
+            if ($ids->count() > 1) {
+                throw new AmbiguousCustomer;
+            }
+            if ($ids->isNotEmpty()) {
+                return User::find($ids->first());
             }
         }
 
@@ -263,6 +283,10 @@ class EntitlementWriter
         ], fn ($v) => $v !== null);
         $at = $this->instant($event['event_timestamp_ms'] ?? null);
 
+        if ($user->deletion_requested_at !== null) {
+            return; // purge deletes the PostHog person; don't recreate it
+        }
+
         DB::afterCommit(fn () => $this->analytics->capture($user, self::ANALYTICS_EVENTS[$type], $properties, $eventId, $at));
     }
 
@@ -283,3 +307,6 @@ class EntitlementWriter
         return is_string($value) && preg_match('/^[A-Za-z0-9_.\-]{1,100}$/', $value) ? strtolower($value) : null;
     }
 }
+
+/** @internal Several of our accounts match an event at the same rank. */
+final class AmbiguousCustomer extends \RuntimeException {}

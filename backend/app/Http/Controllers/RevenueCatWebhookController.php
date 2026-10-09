@@ -60,6 +60,10 @@ class RevenueCatWebhookController extends Controller
         // expected state, not an error to report for every scanner request.
         $secret = (string) config('services.revenuecat.webhook_auth');
         if ($secret === '') {
+            if (app()->environment('production')) {
+                ReportOnce::log('revenuecat-webhook:unset', 'error', 'REVENUECAT_WEBHOOK_AUTH is not set; RevenueCat webhook events are being refused.', 86400);
+            }
+
             return response()->json(['detail' => 'Subscriptions are not configured'], 503);
         }
         if (strlen($secret) < self::MIN_SECRET_LENGTH) {
@@ -93,8 +97,9 @@ class RevenueCatWebhookController extends Controller
                     'payload' => json_encode(Arr::only($event, self::STORED_FIELDS)),
                     'received_at' => now(),
                 ]);
-                // A user purged meanwhile: the link is dropped (INSERT IGNORE)
-                // or fails its foreign key (→ 500, and the retry stores none).
+                // A user being purged: InnoDB makes this wait for the purge,
+                // then INSERT IGNORE drops the link (FK error → warning). On
+                // SQLite (tests) the FK error throws → 500 → retry stores none.
                 DB::table('revenuecat_event_users')->insertOrIgnore($this->userLinks($eventId, $event));
             });
 
