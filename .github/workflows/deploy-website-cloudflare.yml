@@ -1,17 +1,15 @@
 # Deploys the marketing site (website/, including website/functions/) to
 # Cloudflare Pages.
 #
-# A CLI fallback: Cloudflare's own Git integration normally deploys every push
-# to main, so this is usually redundant — see docs/deploy-website-cloudflare.md.
+# Manual fallback only. Cloudflare's own Git integration deploys every push to
+# main; running this on push too would race it (an older commit's slower CLI
+# deploy can land after a newer one). Run it by hand if the Git integration is
+# down. It needs the CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID repo secrets
+# — see docs/deploy-website-cloudflare.md.
 
 name: Deploy website (Cloudflare Pages)
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "website/**"
-      - "wrangler.toml"
   workflow_dispatch:
 
 jobs:

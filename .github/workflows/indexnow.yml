@@ -60,6 +60,7 @@ jobs:
                 website/*.html)             rel="${f#website/}"; urls="$urls https://$HOST/$rel" ;;
                 website/sitemap.xml|website/robots.txt|website/_headers) ;;  # not pages
                 website/fonts/*|website/images/*|website/*.png|website/*.txt) ;;  # assets don't change indexed content
+                website/functions/*|website/email/*|website/_routes.json) ;;  # server code and email assets, not pages
                 *)                          full=1 ;;  # shared CSS/JS etc. → resubmit everything
               esac
             done <<< "$changed"
@@ -70,17 +71,20 @@ jobs:
           echo "urls=$urls" >> "$GITHUB_OUTPUT"
           echo "Will submit: ${urls:-<nothing>}"
 
-      - name: Wait for Cloudflare Pages to serve the new commit
+      - name: Give Cloudflare Pages time to deploy the new commit
         if: steps.urls.outputs.urls != ''
         shell: bash
         run: |
-          # Cloudflare's git deploy usually lands in ~30s. Poll the key file (always
-          # present) as a liveness check, then give the CDN a moment to settle.
+          # Cloudflare's git deploy usually lands in ~30-60s. Nothing here
+          # proves the new commit is live: the key file is in every deploy, so
+          # polling it only checks the site is up. The fixed wait is the real
+          # margin; a deploy slower than that gets submitted early (harmless,
+          # the crawler revisits).
           for i in $(seq 1 12); do
             if curl -fsS "https://$HOST/$KEY.txt" | grep -q "$KEY"; then break; fi
             sleep 10
           done
-          sleep 45
+          sleep 75
 
       - name: POST to api.indexnow.org
         if: steps.urls.outputs.urls != ''
