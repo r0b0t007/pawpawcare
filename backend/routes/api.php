@@ -31,7 +31,8 @@ use Illuminate\Support\Facades\Route;
 // 503 when logins can't be signed, the database is unreachable, or storage
 // can't be written, so the post-deploy check in deploy-backend.yml and the
 // Sentry uptime monitor fail loudly. (The reason is logged, never returned.)
-Route::get('/health', HealthController::class)->middleware('throttle:60,1');
+// Own throttle prefix: unprefixed numeric throttles share one per-IP counter.
+Route::get('/health', HealthController::class)->middleware('throttle:60,1,health');
 
 // ── Signed document delivery (no JWT — the signature is the authorization) ────
 // The URL is minted only for users with pet access via /pets/{pet}/documents/{id}/url

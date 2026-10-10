@@ -4,7 +4,7 @@ Everything alerts through Sentry (org `pawpawcare`, project `pawpawcare-api`). T
 
 | Monitor | Kind | What fails it |
 |---|---|---|
-| API health: `GET https://api.pawpawcare.app/health` every 60 s | Uptime | 3 failed checks in a row (timeout 10 s). `/health` is 503 unless the app can sign logins, reach the database, and write to `storage/` (a full disk quota). The reason is logged as "Health check degraded: …", never returned. |
+| API health: `GET https://api.pawpawcare.app/health` every 60 s | Uptime | 3 failed checks in a row (timeout 10 s). `/health` is 503 unless the app can sign logins, reach the database, and write a fresh file to `storage/` (catches a full disk or inode quota). The reason is logged as "Health check degraded: …", never returned. |
 | Website: `GET https://pawpawcare.app/` every 5 min | Uptime | 2 failed checks in a row. |
 | `reminders:send`, every minute | Cron (`->sentryMonitor()` in `routes/console.php`) | No check-in within 5 minutes, i.e. the cPanel `schedule:run` cron stopped. |
 | `backup:run`, nightly at 03:15 | Cron | Missed or failed run (see `docs/backups.md`). |
