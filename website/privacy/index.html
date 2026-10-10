@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <title>Privacy Policy — PawPawCare</title>
-  <meta name="description" content="How PawPawCare handles your account, your pets' health records, and your photos: what we collect, what we never do with it, and how to delete it.">
+  <meta name="description" content="How PawPawCare handles your account, your pets' health records, photos, crash reports, analytics and subscriptions: what we collect, what we never do with it, and how to delete it.">
   <link rel="canonical" href="https://pawpawcare.app/privacy/">
 
   <meta name="theme-color" content="#fff8f4">
@@ -47,23 +47,25 @@
     <section class="section" aria-labelledby="privacy-title">
       <div class="container container-narrow legal">
         <h1 id="privacy-title">Privacy Policy</h1>
-        <p class="effective">Effective July 7, 2026 · Applies to the PawPawCare app and this website</p>
+        <p class="effective">Effective October 10, 2026 · Applies to the PawPawCare app and this website</p>
 
         <p>PawPawCare exists to keep your pets' health organized — not to make a business out of your data. This page explains, in plain language, what we collect, why, and what we will never do with it.</p>
 
         <h2>What we collect</h2>
         <ul>
-          <li><strong>Your account</strong> — name, email address, and a password (stored only as a secure hash; we can't read it).</li>
+          <li><strong>Your account</strong> — name, email address, and a password (stored only as a secure hash; we can't read it). If you sign in with Google or Apple, we receive your name, email, and an account identifier from them instead of a password.</li>
           <li><strong>Your pets' records</strong> — the profiles, vaccinations, medications, weights, expenses, appointments, notes, photos, and documents you add. This is your data; we store it to show it back to you and the people you invite.</li>
           <li><strong>Community content</strong> — posts, comments, and lost-pet reports you choose to publish are visible to other PawPawCare users.</li>
-          <li><strong>Device information for reminders</strong> — a push-notification token, so reminders can reach your phone.</li>
-          <li><strong>Usage analytics</strong> — which screens and features are used, collected through PostHog to help us improve the app. Analytics events carry feature names, not your pets' medical details.</li>
+          <li><strong>Device information for reminders</strong> — a push-notification token and your time zone, so reminders reach your phone at the right local time.</li>
+          <li><strong>Usage analytics</strong> — which screens and features are used, collected through PostHog to help us improve the app. Events carry feature names and counts, never your pets' medical details, and they're tied to your account ID, not your name or email. You can turn this off anytime in the app under <strong>Profile → Privacy → Share usage analytics</strong>; your choice is saved on your account and applies on all your devices.</li>
+          <li><strong>Crash reports</strong> — when the app or our server hits an error, a report (what failed and where in the code) is sent to Sentry so we can fix it. Reports carry your account ID only — no name, email, IP address, screenshots, or pets' records — and are scrubbed of personal details before they leave the device.</li>
+          <li><strong>Purchases</strong> — if you subscribe to PawPawCare Plus, Apple or Google handle the payment; we never see your card details. RevenueCat tells us what you bought, its status, and when it renews or ends, linked to your account ID.</li>
           <li><strong>Waitlist email</strong> — if you join the waitlist on this site, your email is sent to us (via Cloudflare and Resend) solely to confirm your signup and send your invite.</li>
           <li><strong>Website analytics (opt-in)</strong> — only if you accept the cookie banner on this site, Google Analytics sets a cookie to count visits and see which pages help. Decline it and nothing is loaded. It never receives your name, email, or pets' records.</li>
         </ul>
 
         <h2>How we use it</h2>
-        <p>To run the product: syncing your records across devices, sending the reminders you set, powering the community feed, and understanding — in aggregate — which features are worth improving. That's the whole list.</p>
+        <p>To run the product: syncing your records across devices, sending the reminders you set, powering the community feed, processing subscriptions, fixing crashes, and understanding — in aggregate — which features are worth improving. That's the whole list. We don't use your data for advertising, and we don't track you across other companies' apps or websites.</p>
 
         <h2>AI record scanning</h2>
         <p>When you scan a vet document, the image is sent to our AI provider (Anthropic) to extract details like vaccine names and dosages. The results come straight back to you for review — nothing is saved to your pet's file until you approve it, and your documents are not used to train AI models.</p>
@@ -76,13 +78,34 @@
         </ul>
 
         <h2>Services we rely on</h2>
-        <p>A small set of processors help us run PawPawCare: Expo (app infrastructure and push-notification delivery), PostHog (in-app usage analytics), Anthropic (AI document extraction, only when you scan), Cloudflare (this website and its waitlist form), Resend (waitlist emails), and Google Analytics (website visits, only if you accept the cookie banner). Each receives only what its job requires.</p>
+        <p>A small set of processors help us run PawPawCare. Each receives only what its job requires:</p>
+        <ul>
+          <li><strong>Namecheap</strong> — hosts our server and database, where your account and pets' records are stored.</li>
+          <li><strong>Expo</strong> — app updates and push-notification delivery.</li>
+          <li><strong>Google and Apple</strong> — sign-in, if you choose it; and payments for PawPawCare Plus through the App Store or Google Play.</li>
+          <li><strong>RevenueCat</strong> — manages subscriptions: purchase status and history, linked to your account ID.</li>
+          <li><strong>Sentry</strong> — crash and error reports, as described above.</li>
+          <li><strong>PostHog</strong> — usage analytics, from the app and our server, unless you turn it off.</li>
+          <li><strong>Anthropic</strong> — AI document extraction, only when you scan.</li>
+          <li><strong>Our email provider</strong> — account emails such as verification and password-reset codes.</li>
+          <li><strong>Cloudflare and Resend</strong> — this website and its waitlist form.</li>
+          <li><strong>Google Analytics</strong> — website visits, only if you accept the cookie banner.</li>
+        </ul>
+
+        <h2>Where your data is processed</h2>
+        <p>Several of these providers — including PostHog, Sentry, and RevenueCat — process data in the United States. When your data moves across borders, it's protected under the providers' data-protection terms, such as the European Commission's Standard Contractual Clauses where they apply.</p>
 
         <h2>Security</h2>
         <p>Data moves over encrypted connections (HTTPS). Passwords are hashed, sessions use short-lived tokens, and share links are signed and time-limited.</p>
 
-        <h2>Deleting your data</h2>
-        <p>Email us and we'll delete your account and every record attached to it. Waitlist emails are deleted on request or once invites have gone out.</p>
+        <h2 id="delete">Deleting your data</h2>
+        <ul>
+          <li><strong>In the app:</strong> go to <strong>Profile → Edit → Delete account</strong>. Your account is deactivated right away, every session is signed out, and everything is permanently deleted after 30 days — pets, records, photos, documents, and posts. Signing back in within those 30 days cancels the deletion.</li>
+          <li><strong>Without the app:</strong> email <a href="mailto:privacy@pawpawcare.app">privacy@pawpawcare.app</a> from your account's address and we'll delete it the same way.</li>
+          <li><strong>With our providers:</strong> when your account is permanently deleted, we also delete your analytics profile at PostHog and your customer record at RevenueCat. Crash reports at Sentry carry only your account ID and expire automatically.</li>
+          <li><strong>Subscriptions:</strong> deleting your account doesn't cancel a PawPawCare Plus subscription — Apple or Google keep billing until you cancel it in your App Store or Google Play settings. The app reminds you before you delete.</li>
+          <li><strong>Waitlist emails</strong> are deleted on request or once invites have gone out.</li>
+        </ul>
 
         <h2>Children</h2>
         <p>PawPawCare is for pet owners and is not directed at children under 13. We don't knowingly collect data from them.</p>
