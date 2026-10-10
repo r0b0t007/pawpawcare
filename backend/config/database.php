@@ -3,6 +3,18 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
+// mysqldump options for nightly backups (config/backup.php). Shared-host DB
+// users lack the PROCESS privilege that tablespace dumps need; cache rows are
+// disposable.
+$backupDump = [
+    'use_single_transaction',
+    'timeout' => 60 * 10,
+    'add_extra_option' => '--no-tablespaces',
+    // Only if mysqldump isn't on the cron PATH: the folder, without the binary name.
+    'dump_binary_path' => env('DB_DUMP_BINARY_PATH', ''),
+    'exclude_tables' => ['cache', 'cache_locks'],
+];
+
 return [
 
     /*
@@ -64,6 +76,7 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+            'dump' => $backupDump,
         ],
 
         'mariadb' => [
@@ -86,6 +99,7 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+            'dump' => $backupDump,
         ],
 
         'pgsql' => [

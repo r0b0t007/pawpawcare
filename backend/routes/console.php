@@ -1,7 +1,9 @@
 <?php
 
+use App\Support\Backups;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -37,3 +39,18 @@ Schedule::command('engagement:send')->hourly()->withoutOverlapping(55);
 // re-checks users near expiry / with billing issues and prunes the ledger.
 Schedule::command('subscriptions:reconcile')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('subscriptions:reconcile --sweep')->dailyAt('04:40')->withoutOverlapping();
+
+// Nightly encrypted backup of the database + uploads to Cloudflare R2
+// (config/backup.php, docs/backups.md). Clean first so a full bucket can't
+// block tonight's run; monitor later so a missed night alerts the same day.
+// Never silently off: until it's configured, an error is logged every night.
+Schedule::command('backup:clean')->dailyAt('03:00')->withoutOverlapping()
+    ->when(fn () => Backups::ready());
+Schedule::command('backup:run')->dailyAt('03:15')->withoutOverlapping()
+    ->when(fn () => Backups::ready())
+    ->sentryMonitor(checkInMargin: 30, maxRuntime: 60, failureIssueThreshold: 1, recoveryThreshold: 1);
+Schedule::command('backup:monitor')->dailyAt('09:00')
+    ->when(fn () => Backups::ready());
+Schedule::call(fn () => Log::error('Backups are not configured', ['missing' => Backups::missing()]))
+    ->name('backup:not-configured')->dailyAt('03:15')
+    ->skip(fn () => Backups::ready());
