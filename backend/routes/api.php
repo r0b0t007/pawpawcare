@@ -12,6 +12,7 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\GamificationController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\LostPetController;
 use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\NotificationController;
@@ -24,16 +25,13 @@ use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
-use App\Support\JwtSecretGuard;
 use Illuminate\Support\Facades\Route;
 
 // ── Health ──────────────────────────────────────────────────────────────────
-// 503 when the JWT signing key is unsafe, so the post-deploy health check in
-// deploy-backend.yml fails loudly instead of going green with broken logins.
-// (The reason is logged, never returned.)
-Route::get('/health', fn () => JwtSecretGuard::isConfigured()
-    ? response()->json(['status' => 'ok', 'version' => '1.0.0'])
-    : response()->json(['status' => 'degraded', 'version' => '1.0.0'], 503));
+// 503 when logins can't be signed, the database is unreachable, or storage
+// can't be written, so the post-deploy check in deploy-backend.yml and the
+// Sentry uptime monitor fail loudly. (The reason is logged, never returned.)
+Route::get('/health', HealthController::class)->middleware('throttle:60,1');
 
 // ── Signed document delivery (no JWT — the signature is the authorization) ────
 // The URL is minted only for users with pet access via /pets/{pet}/documents/{id}/url
