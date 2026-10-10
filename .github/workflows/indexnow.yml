@@ -2,8 +2,8 @@
 # Copilot) whenever marketing-site pages change. Google does not consume
 # IndexNow; it relies on the sitemap submitted in Search Console instead.
 #
-# Triggers on pushes to main that touch website/ (Netlify auto-deploys the
-# same commit — see docs/deploy-marketing-website), and on manual dispatch.
+# Triggers on pushes to main that touch website/ (Cloudflare Pages auto-deploys
+# the same commit — see docs/deploy-website-cloudflare.md), and on manual dispatch.
 # The IndexNow key is intentionally public: it is served from the site root
 # as proof of host ownership (https://pawpawcare.app/<key>.txt).
 
@@ -70,11 +70,11 @@ jobs:
           echo "urls=$urls" >> "$GITHUB_OUTPUT"
           echo "Will submit: ${urls:-<nothing>}"
 
-      - name: Wait for Netlify to serve the new commit
+      - name: Wait for Cloudflare Pages to serve the new commit
         if: steps.urls.outputs.urls != ''
         shell: bash
         run: |
-          # Netlify's git deploy usually lands in ~30s. Poll the key file (always
+          # Cloudflare's git deploy usually lands in ~30s. Poll the key file (always
           # present) as a liveness check, then give the CDN a moment to settle.
           for i in $(seq 1 12); do
             if curl -fsS "https://$HOST/$KEY.txt" | grep -q "$KEY"; then break; fi

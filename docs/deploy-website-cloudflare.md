@@ -4,15 +4,10 @@ Migration off Netlify for `website/`. This document is the manual runbook —
 everything here needs your own Cloudflare/Resend accounts and cannot be
 scripted by an agent.
 
-## ⚠️ Do not merge `migrate/cloudflare-pages` into `main` yet
+## Status
 
-`main` still auto-deploys to **Netlify** (git-connected, see
-`docs/deploy-marketing-website.md` in memory / commit history). This branch
-changes both waitlist forms to POST to `/api/waitlist`, a route that only
-exists as a **Cloudflare Pages Function** — Netlify has no handler for it and
-would 404 every signup. Merge only after Cloudflare Pages is live and
-receiving real traffic (Step 6+), or add the route back to Netlify first if
-you want a slower rollout.
+Live since 2026-08-31: Cloudflare Pages deploys `website/` on every push to
+`main`. The old Netlify site was decommissioned on 2026-10-10 (see step 9).
 
 ## What's already built (this branch)
 
@@ -131,12 +126,12 @@ site + waitlist form live at the real domain, merge `migrate/cloudflare-pages`
 into `main`. From then on, `deploy-website-cloudflare.yml` keeps it in sync
 automatically.
 
-### 9. Decommission Netlify (optional, your call)
+### 9. Decommission Netlify (done 2026-10-10)
 
-Netlify site `pawpawcare-app` (siteId `c57e434e-0991-4a8b-9e80-044af3fe5565`)
-can stay connected as a fallback for a while, or be unlinked from the repo
-once you're confident in the Cloudflare deploy. No urgency either way since
-DNS determines which one visitors actually reach.
+The Netlify site `pawpawcare-app` (siteId `c57e434e-0991-4a8b-9e80-044af3fe5565`)
+was deleted and `netlify.toml` removed, so pull requests no longer get
+Netlify checks. The Netlify GitHub app can also be removed from the repo
+(GitHub → Settings → Applications) if nothing else uses it.
 
 ## Abuse throttle
 

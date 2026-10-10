@@ -1,4 +1,0 @@
-# Netlify config for git-connected deploys from the repo root.
-# Response headers live in website/_headers (works for folder deploys too).
-[build]
-  publish = "website"

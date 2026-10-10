@@ -1,9 +1,8 @@
 # Deploys the marketing site (website/, including website/functions/) to
 # Cloudflare Pages.
 #
-# NOT active until the repo secrets below exist and DNS points pawpawcare.app
-# at Cloudflare Pages — see docs/deploy-website-cloudflare.md. Netlify remains
-# the live host (auto-deploy from main) until that migration is complete.
+# A CLI fallback: Cloudflare's own Git integration normally deploys every push
+# to main, so this is usually redundant — see docs/deploy-website-cloudflare.md.
 
 name: Deploy website (Cloudflare Pages)
 
