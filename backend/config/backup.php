@@ -53,6 +53,7 @@ return [
             'compression_method' => ZipArchive::CM_DEFAULT,
             'compression_level' => 6,
             'filename_prefix' => '',
+            // Only `backups` (R2) or `backups-local` — Backups::DISKS.
             'disks' => [
                 env('BACKUP_DISK', 'backups'),
             ],
@@ -61,8 +62,9 @@ return [
 
         'temporary_directory' => storage_path('app/backup-temp'),
 
-        // Archives hold pets' medical records: always AES-256. Backups::ready()
-        // refuses to run without a password, so nothing leaves unencrypted.
+        // Archives hold pets' medical records: always AES-256. Backups::
+        // assertEncryptable() aborts every run (manual ones too) unless the
+        // password is set and ext-zip really supports AES.
         'password' => env('BACKUP_ARCHIVE_PASSWORD'),
         'encryption' => 'aes256',
 
@@ -97,7 +99,9 @@ return [
         'webhook' => ['url' => ''],
     ],
 
-    'log_channel' => null,
+    // Spatie's own step-by-step log (with stack traces) stays in a file on the
+    // host; the listeners in AppServiceProvider are the Sentry signal.
+    'log_channel' => env('BACKUP_LOG_CHANNEL', 'single'),
 
     'monitor_backups' => [
         [

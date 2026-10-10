@@ -79,6 +79,17 @@ return [
             'report' => false,
         ],
 
+        // Local backup target for restore drills / testing only. Outside
+        // storage/app/private and /public, so archives are never served and
+        // never nested inside later backups. Delete its contents afterwards.
+        'backups-local' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups-local'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

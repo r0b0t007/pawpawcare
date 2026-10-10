@@ -44,8 +44,10 @@ Schedule::command('subscriptions:reconcile --sweep')->dailyAt('04:40')->withoutO
 // (config/backup.php, docs/backups.md). Clean first so a full bucket can't
 // block tonight's run; monitor later so a missed night alerts the same day.
 // Never silently off: until it's configured, an error is logged every night.
+// Cleanup needs only the destination, so retention keeps being enforced even
+// if the archive password goes missing.
 Schedule::command('backup:clean')->dailyAt('03:00')->withoutOverlapping()
-    ->when(fn () => Backups::ready());
+    ->when(fn () => Backups::destinationReady());
 Schedule::command('backup:run')->dailyAt('03:15')->withoutOverlapping()
     ->when(fn () => Backups::ready())
     ->sentryMonitor(checkInMargin: 30, maxRuntime: 60, failureIssueThreshold: 1, recoveryThreshold: 1);
