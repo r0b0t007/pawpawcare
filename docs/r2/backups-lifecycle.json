@@ -1,0 +1,14 @@
+[
+  {
+    "id": "expire-backups-after-88-days",
+    "enabled": true,
+    "conditions": { "prefix": "pawpawcare/" },
+    "deleteObjectsTransition": { "condition": { "type": "Age", "maxAge": 7603200 } }
+  },
+  {
+    "id": "abort-stalled-uploads-after-1-day",
+    "enabled": true,
+    "conditions": { "prefix": "" },
+    "abortMultipartUploadsTransition": { "condition": { "type": "Age", "maxAge": 86400 } }
+  }
+]

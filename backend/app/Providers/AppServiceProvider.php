@@ -6,11 +6,18 @@ use App\Services\Analytics\ProductAnalytics;
 use App\Services\Extraction\AnthropicDriver;
 use App\Services\Extraction\ExtractionClient;
 use App\Services\Extraction\OpenAiCompatibleDriver;
+use App\Support\Backups;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Backup\Events\BackupHasFailed;
+use Spatie\Backup\Events\BackupManifestWasCreated;
+use Spatie\Backup\Events\CleanupHasFailed;
+use Spatie\Backup\Events\UnhealthyBackupWasFound;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -35,6 +42,26 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // spatie writes a plain zip when the password is empty or ext-zip has
+        // no AES. This fires inside the backup job before zipping, so throwing
+        // aborts the run (manual or scheduled) and raises BackupHasFailed.
+        Event::listen(BackupManifestWasCreated::class, fn () => Backups::assertEncryptable());
+
+        // Backups send no mail (config/backup.php): every failure is an error
+        // log, which the sentry log channel turns into an alert.
+        Event::listen(BackupHasFailed::class, fn (BackupHasFailed $e) => Log::error('Backup failed', [
+            'disk' => $e->diskName,
+            'error' => $e->exception->getMessage(),
+        ]));
+        Event::listen(CleanupHasFailed::class, fn (CleanupHasFailed $e) => Log::error('Backup cleanup failed', [
+            'disk' => $e->diskName,
+            'error' => $e->exception->getMessage(),
+        ]));
+        Event::listen(UnhealthyBackupWasFound::class, fn (UnhealthyBackupWasFound $e) => Log::error('Backups are unhealthy', [
+            'disk' => $e->diskName,
+            'problems' => $e->failureMessages->pluck('message')->filter()->values()->all(),
+        ]));
+
         // Queue workers never reach app()->terminating between jobs: send any
         // analytics a job captured once it's done.
         Queue::after(function () {

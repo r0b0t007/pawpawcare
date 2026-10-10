@@ -33,6 +33,12 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="SENTRY_LARAVEL_DSN" value=""/>
+        <env name="BACKUP_DISK" value="backups"/>
+        <env name="BACKUP_ARCHIVE_PASSWORD" value=""/>
+        <env name="BACKUP_R2_BUCKET" value=""/>
+        <env name="BACKUP_R2_ENDPOINT" value=""/>
+        <env name="BACKUP_R2_ACCESS_KEY_ID" value=""/>
+        <env name="BACKUP_R2_SECRET_ACCESS_KEY" value=""/>
         <env name="POSTHOG_PROJECT_KEY" value=""/>
         <env name="POSTHOG_PERSONAL_API_KEY" value=""/>
         <env name="POSTHOG_PROJECT_ID" value=""/>

@@ -60,6 +60,36 @@ return [
             'report' => false,
         ],
 
+        // Private Cloudflare R2 bucket for config/backup.php. The key pair is
+        // an R2 token scoped to this one bucket (docs/backups.md). Endpoint:
+        // https://<account-id>.r2.cloudflarestorage.com
+        'backups' => [
+            'driver' => 's3',
+            'key' => env('BACKUP_R2_ACCESS_KEY_ID'),
+            'secret' => env('BACKUP_R2_SECRET_ACCESS_KEY'),
+            'region' => 'auto',
+            'bucket' => env('BACKUP_R2_BUCKET'),
+            'endpoint' => env('BACKUP_R2_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            // R2 rejects some of the AWS SDK's newer default checksum headers.
+            'request_checksum_calculation' => 'when_required',
+            'response_checksum_validation' => 'when_required',
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
+        // Local backup target for restore drills / testing only. Outside
+        // storage/app/private and /public, so archives are never served and
+        // never nested inside later backups. Delete its contents afterwards.
+        'backups-local' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups-local'),
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

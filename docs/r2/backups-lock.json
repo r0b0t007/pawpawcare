@@ -1,0 +1,8 @@
+[
+  {
+    "id": "lock-new-backups-6-days",
+    "enabled": true,
+    "prefix": "pawpawcare/",
+    "condition": { "type": "Age", "maxAgeSeconds": 518400 }
+  }
+]
