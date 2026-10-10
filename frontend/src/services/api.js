@@ -115,6 +115,7 @@ export async function request(method, path, body, { skipAuth = false } = {}) {
     const err = new Error(Array.isArray(msg) ? msg[0]?.msg ?? 'Validation error' : msg);
     err.status = res.status;
     if (data?.code) err.code = data.code;
+    if (data?.feature) err.feature = data.feature; // 402 upgrade_required
     throw err;
   }
 
@@ -220,4 +221,13 @@ export async function uploadDocument(petId, file, fields = {}) {
     throw new Error(data?.detail || `Document upload failed (${res.status})`);
   }
   return data; // the created document record
+}
+
+/**
+ * A plan gate refused the request (402 upgrade_required): offer the paywall,
+ * navigation.navigate('Paywall', { feature: err.feature }). Unused while every
+ * gate is off on the server.
+ */
+export function isUpgradeRequired(err) {
+  return err?.status === 402 && err?.code === 'upgrade_required';
 }

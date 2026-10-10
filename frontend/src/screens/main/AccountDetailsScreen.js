@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { ui, type, radii, motion } from '../../theme';
 import { Button, ConfirmDialog, showToast } from '../../components';
+import { storeName } from '../../utils/subscription';
 
 // Account details (Profile → Edit). PATCH /users/me only accepts name / bio /
 // avatar_url / timezone, so name is the one editable field here; email is
@@ -22,6 +23,8 @@ import { Button, ConfirmDialog, showToast } from '../../components';
 
 export default function AccountDetailsScreen({ navigation }) {
   const { user, updateUser, deleteAccount } = useAuth();
+  // Deleting the account doesn't stop store billing — say so before it happens.
+  const renewingSubscription = !!(user?.plan?.active && user.plan.will_renew && !user.plan.is_lifetime);
   const [name, setName] = useState(user?.name || '');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -132,7 +135,12 @@ export default function AccountDetailsScreen({ navigation }) {
       <ConfirmDialog
         visible={confirmDelete}
         title="Delete your account?"
-        message="Your account will be deactivated now and permanently deleted in 30 days — pets, records, photos and posts included. Logging back in before then cancels the deletion."
+        message={
+          'Your account will be deactivated now and permanently deleted in 30 days — pets, records, photos and posts included. Logging back in before then cancels the deletion.' +
+          (renewingSubscription
+            ? ` Your PawPawCare Plus subscription keeps billing through ${storeName(user.plan.store)} — cancel it there too.`
+            : '')
+        }
         confirmLabel="Delete account"
         destructive
         onConfirm={handleDelete}
