@@ -31,6 +31,28 @@ export const SENTRY_DSN =
 export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
 export const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
 
+// RevenueCat public SDK keys (RevenueCat → Apps: appl_… for iOS, goog_… for
+// Android; test_… for its Test Store, accepted in development builds only —
+// a store build with one would run fake purchases that unlock nothing). Public client keys that
+// ship inside the app — committed here like the Sentry DSN rather than in
+// eas.json, which is part of the runtime fingerprint. Empty = in-app purchases
+// unavailable (the default until the store apps are set up).
+// EXPO_PUBLIC_REVENUECAT_IOS_KEY / _ANDROID_KEY override. Anything else — above
+// all a secret sk_ key — is refused: it must never ship in the app.
+const REVENUECAT_IOS_KEY_DEFAULT = '';
+const REVENUECAT_ANDROID_KEY_DEFAULT = '';
+const publicSdkKey = (value, prefixes) =>
+  typeof value === 'string' && prefixes.some((p) => value.startsWith(p)) ? value : '';
+const TEST_STORE = typeof __DEV__ !== 'undefined' && __DEV__ ? ['test_'] : [];
+export const REVENUECAT_IOS_KEY = publicSdkKey(
+  process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? REVENUECAT_IOS_KEY_DEFAULT,
+  ['appl_', ...TEST_STORE],
+);
+export const REVENUECAT_ANDROID_KEY = publicSdkKey(
+  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? REVENUECAT_ANDROID_KEY_DEFAULT,
+  ['goog_', ...TEST_STORE],
+);
+
 // Resolve a stored asset path to a loadable URL. Server uploads are stored as a
 // relative `/storage/...` path so the same value works across emulator/device/tunnel.
 export const resolveAsset = (path) => {

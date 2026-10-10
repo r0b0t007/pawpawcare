@@ -26,6 +26,11 @@ jest.mock('../../services/sentry', () => ({
   setSentryUser: jest.fn(),
   clearSentryUser: jest.fn(),
 }));
+jest.mock('../../services/purchases', () => ({
+  shouldUsePurchases: jest.requireActual('../../services/purchases').shouldUsePurchases,
+  loginPurchases: jest.fn(() => Promise.resolve(true)),
+  logoutPurchases: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
   setItem: jest.fn(() => Promise.resolve()),
@@ -39,6 +44,7 @@ import { AuthProvider, useAuth } from '../AuthContext';
 import { post, get, request, storeTokens, clearTokens } from '../../services/api';
 import { track } from '../../services/analytics';
 import { clearSentryUser, setSentryUser } from '../../services/sentry';
+import { loginPurchases, logoutPurchases } from '../../services/purchases';
 
 // A probe that surfaces the latest context value to the test.
 let auth;
@@ -195,3 +201,111 @@ describe('AuthContext.deleteAccount', () => {
     expect(auth.user).toBeTruthy();
   });
 });
+
+describe('AuthContext subscriptions plumbing', () => {
+  it('identifies to RevenueCat only when subscriptions are visible, and forgets on logout', async () => {
+    await mount();
+    post.mockResolvedValueOnce({ access_token: 'a', refresh_token: 'r' });
+    get.mockResolvedValueOnce({ id: 'u1', features: { subscriptions_visible: false } });
+    await act(async () => {
+      await auth.login({ email: 'a@b.c', password: 'x' });
+    });
+    expect(loginPurchases).not.toHaveBeenCalled();
+
+    // The server flips visibility on; the next refresh picks it up.
+    get.mockResolvedValueOnce({ id: 'u1', features: { subscriptions_visible: true } });
+    await act(async () => {
+      await auth.refreshUser();
+    });
+    expect(loginPurchases).toHaveBeenCalledWith('u1');
+    expect(auth.user.features.subscriptions_visible).toBe(true);
+
+    await act(async () => {
+      await auth.logout();
+    });
+    expect(logoutPurchases).toHaveBeenCalled();
+  });
+
+  it('refreshUser does nothing to state when logged out', async () => {
+    await mount();
+    get.mockResolvedValueOnce({ id: 'u1' });
+    await act(async () => {
+      await auth.refreshUser();
+    });
+    expect(auth.user).toBeNull();
+  });
+});
+
+describe('AuthContext refresh (review fixes)', () => {
+  async function signIn(user) {
+    post.mockResolvedValueOnce({ access_token: 'a', refresh_token: 'r' });
+    get.mockResolvedValueOnce(user);
+    await act(async () => {
+      await auth.login({ email: 'a@b.c', password: 'x' });
+    });
+  }
+
+  it('drops a refresh that was in flight for the previous session', async () => {
+    await mount();
+    await signIn({ id: 'A' });
+    let resolveA;
+    get.mockImplementationOnce(() => new Promise((r) => { resolveA = r; }));
+    let pending;
+    act(() => {
+      pending = auth.refreshUser();
+    });
+
+    await act(async () => {
+      await auth.logout();
+    });
+    await signIn({ id: 'B' });
+    await act(async () => {
+      resolveA({ id: 'A', plan: { tier: 'plus' } });
+      await expect(pending).resolves.toBeNull();
+    });
+
+    expect(auth.user.id).toBe('B');
+  });
+
+  it('an expired session found on refresh logs out locally', async () => {
+    await mount();
+    await signIn({ id: 'A' });
+    get.mockRejectedValueOnce(new Error('SESSION_EXPIRED'));
+
+    await act(async () => {
+      await expect(auth.refreshUser()).rejects.toThrow('SESSION_EXPIRED');
+    });
+
+    expect(auth.user).toBeNull();
+    expect(clearTokens).toHaveBeenCalled();
+    expect(clearSentryUser).toHaveBeenCalled();
+  });
+
+  it('switching subscriptions off again logs the account out of RevenueCat', async () => {
+    await mount();
+    await signIn({ id: 'A', features: { subscriptions_visible: true } });
+    expect(loginPurchases).toHaveBeenCalledWith('A');
+    logoutPurchases.mockClear();
+
+    get.mockResolvedValueOnce({ id: 'A', features: { subscriptions_visible: false } });
+    await act(async () => {
+      await auth.refreshUser();
+    });
+
+    expect(logoutPurchases).toHaveBeenCalled();
+  });
+
+  it('applyPlan merges the sync response without another request', async () => {
+    await mount();
+    await signIn({ id: 'A', name: 'Sam', plan: { tier: 'free' } });
+    get.mockClear();
+
+    await act(async () => {
+      auth.applyPlan({ plan: { tier: 'plus', active: true }, features: { subscriptions_visible: true } });
+    });
+
+    expect(auth.user).toMatchObject({ id: 'A', name: 'Sam', plan: { tier: 'plus' } });
+    expect(get).not.toHaveBeenCalled();
+  });
+});
+
