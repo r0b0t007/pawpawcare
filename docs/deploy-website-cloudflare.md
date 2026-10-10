@@ -4,17 +4,16 @@ Migration off Netlify for `website/`. This document is the manual runbook —
 everything here needs your own Cloudflare/Resend accounts and cannot be
 scripted by an agent.
 
-## ⚠️ Do not merge `migrate/cloudflare-pages` into `main` yet
+## Status
 
-`main` still auto-deploys to **Netlify** (git-connected, see
-`docs/deploy-marketing-website.md` in memory / commit history). This branch
-changes both waitlist forms to POST to `/api/waitlist`, a route that only
-exists as a **Cloudflare Pages Function** — Netlify has no handler for it and
-would 404 every signup. Merge only after Cloudflare Pages is live and
-receiving real traffic (Step 6+), or add the route back to Netlify first if
-you want a slower rollout.
+Live since 2026-08-31: Cloudflare's Git integration deploys `website/` on
+every push to `main`. `deploy-website-cloudflare.yml` is a manual-only
+fallback. Netlify is being retired (see step 9).
 
-## What's already built (this branch)
+Steps 1–8 below are the original migration runbook, kept for history and for
+rebuilding the setup.
+
+## What was built for the migration
 
 - `website/functions/api/waitlist.js` — Pages Function that replaces Netlify Forms.
   Validates the honeypot + email server-side, then emails a notification via
@@ -30,11 +29,10 @@ you want a slower rollout.
 - `website/_headers` (unchanged) — Cloudflare Pages reads this file in the
   same format Netlify does, confirmed via `wrangler pages dev` ("Parsed 6
   valid header rules").
-- `.github/workflows/deploy-website-cloudflare.yml` — mirrors the existing
-  `deploy-backend.yml`/`indexnow.yml` pattern: deploys on push to `main`
-  touching `website/**`. **Disabled until you add the two repo secrets in
-  step 5** (it will fail loudly otherwise, which is fine — nothing merges to
-  `main` until then anyway).
+- `.github/workflows/deploy-website-cloudflare.yml` — a CLI deploy. It was
+  first triggered on push to `main`; it is now **manual-only**
+  (`workflow_dispatch`), because the Git integration does the real deploys.
+  It needs the two repo secrets from step 5, which are not set today.
 
 **Gotcha found while testing against the real Cloudflare account (not just
 `wrangler pages dev`):** `wrangler pages deploy <dir>` does **not** bundle
@@ -80,7 +78,7 @@ Resend requires a verified domain to send from (no anonymous/sandbox
 sending — see [resend.com/docs/dashboard/domains/introduction](https://resend.com/docs/dashboard/domains/introduction)).
 Add `pawpawcare.app` (or a subdomain like `mail.pawpawcare.app`) in the
 Resend dashboard and add the TXT/CNAME records it gives you at your DNS
-provider (Namecheap, per `docs/deploy-backend.md`). This is additive — it
+provider — Cloudflare since the nameserver move (`cf` CLI or dashboard → DNS). This is additive — it
 does not touch or remove any existing DNS record.
 
 ### 5. Set the three config values
@@ -128,15 +126,20 @@ this won't disrupt `api.pawpawcare.app` (backend, on Namecheap/cPanel per
 
 Once `pawpawcare.app` resolves to Cloudflare Pages and you've verified the
 site + waitlist form live at the real domain, merge `migrate/cloudflare-pages`
-into `main`. From then on, `deploy-website-cloudflare.yml` keeps it in sync
-automatically.
+into `main`. From then on, Cloudflare's Git integration keeps it in sync
+on every push to `main` (done 2026-08-31).
 
-### 9. Decommission Netlify (optional, your call)
+### 9. Decommission Netlify
 
-Netlify site `pawpawcare-app` (siteId `c57e434e-0991-4a8b-9e80-044af3fe5565`)
-can stay connected as a fallback for a while, or be unlinked from the repo
-once you're confident in the Cloudflare deploy. No urgency either way since
-DNS determines which one visitors actually reach.
+- `netlify.toml` and the Netlify ignore entries were removed on 2026-10-10.
+- **Owner step:** delete the Netlify site `pawpawcare-app` (siteId
+  `c57e434e-0991-4a8b-9e80-044af3fe5565`) in Netlify → Project configuration →
+  Delete project. Until then, its always-failing "Header rules" check keeps
+  showing on PRs. (Its own settings publish only `website/`, so it exposes
+  nothing.)
+- Optionally, remove the repo from the Netlify GitHub App: GitHub → your
+  avatar → Settings → Applications → Installed GitHub Apps → Netlify →
+  Configure (or repo → Settings → Integrations → GitHub Apps).
 
 ## Abuse throttle
 

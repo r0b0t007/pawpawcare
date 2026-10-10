@@ -1,7 +1,8 @@
 # Deploying the Laravel backend to Namecheap shared hosting (cPanel)
 
 Production API lives at **https://api.pawpawcare.app**. The marketing site
-stays on Netlify (`pawpawcare.app`); this document covers only the backend.
+(`pawpawcare.app`) is on Cloudflare Pages (`docs/deploy-website-cloudflare.md`);
+this document covers only the backend.
 
 ## 0. Prerequisite — PHP version
 
@@ -51,18 +52,17 @@ that's expected — finish steps 3–4 first.
 
 ## 3. DNS
 
-Where the domain's DNS is managed (Namecheap → Domain List → **Advanced DNS**
-if using Namecheap BasicDNS):
+`pawpawcare.app`'s DNS is on Cloudflare (manage it with the `cf` CLI). The
+API needs one record, **DNS-only (unproxied)**:
 
 | Type  | Host | Value |
 |-------|------|-------|
 | A     | `api` | `<hosting server IP>` (cPanel right sidebar → "Shared IP Address") |
-| A     | `@`   | `75.2.60.5` (Netlify — marketing site) |
-| CNAME | `www` | `pawpawcare-app.netlify.app` |
 
-If instead the domain's nameservers point at the hosting package, cPanel
-creates the `api` record automatically when the subdomain is created — but
-then the apex/`www` records for Netlify must be added in cPanel → Zone Editor.
+The apex and `www` belong to Cloudflare Pages (`docs/deploy-website-cloudflare.md`).
+Keep `api` unproxied: the backend reads the client IP from `REMOTE_ADDR` and
+trusts no proxy headers, so proxying it would put every client behind a few
+Cloudflare IPs for rate limiting.
 
 ## 4. HTTPS (mandatory)
 
