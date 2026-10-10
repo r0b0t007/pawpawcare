@@ -39,6 +39,13 @@ export const type = {
     lineHeight: 30,
     letterSpacing: -0.4,
   },
+  // Pushed-screen header next to the back button.
+  headerTitle: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: -0.3,
+  },
   cardTitle: {
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 19,

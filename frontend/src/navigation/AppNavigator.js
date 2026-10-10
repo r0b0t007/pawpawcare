@@ -28,6 +28,8 @@ import InvitesScreen from '../screens/main/InvitesScreen';
 import MedicalRecordsScreen from '../screens/main/MedicalRecordsScreen';
 import SupportScreen from '../screens/main/SupportScreen';
 import ModerationScreen from '../screens/main/ModerationScreen';
+import SubscriptionScreen from '../screens/main/SubscriptionScreen';
+import PaywallScreen from '../screens/main/PaywallScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -98,6 +100,7 @@ function ProfileStack() {
       <Stack.Screen name="Support" component={SupportScreen} />
       <Stack.Screen name="Moderation" component={ModerationScreen} />
       <Stack.Screen name="Invites" component={InvitesScreen} />
+      <Stack.Screen name="Subscription" component={SubscriptionScreen} />
     </Stack.Navigator>
   );
 }
@@ -162,7 +165,15 @@ export default function AppNavigator() {
     // Login/logout swaps the whole tree — crossfade instead of a hard cut.
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
       {user ? (
-        <Stack.Screen name="Main" component={MainTabs} />
+        <>
+          <Stack.Screen name="Main" component={MainTabs} />
+          {/* Reachable from anywhere: navigation.navigate('Paywall', { feature }). */}
+          <Stack.Screen
+            name="Paywall"
+            component={PaywallScreen}
+            options={{ presentation: 'modal', animation: 'slide_from_bottom', contentStyle: { backgroundColor: ui.background } }}
+          />
+        </>
       ) : (
         <Stack.Screen name="Auth" component={AuthStack} />
       )}

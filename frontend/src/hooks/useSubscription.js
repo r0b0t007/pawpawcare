@@ -5,7 +5,7 @@ import { track } from '../services/analytics';
 import {
   ensurePurchases,
   getOfferings,
-  isAvailable,
+  purchasesStatus,
   purchasePackage,
   restorePurchases,
 } from '../services/purchases';
@@ -35,12 +35,17 @@ const NO_FEATURES = { paywall_enabled: false, subscriptions_visible: false, gate
 export function usePlan() {
   const { user } = useAuth();
   const features = user?.features ?? NO_FEATURES;
+  const plan = user?.plan ?? FREE_PLAN;
+  const availability = purchasesStatus();
   return {
-    plan: user?.plan ?? FREE_PLAN,
+    plan,
     features,
     visible: !!features.subscriptions_visible,
+    // Plus features without paying (early members): never sell to them.
+    included: !!plan.active || !!plan.grandfathered,
     // Old builds (no native module) and builds without a store key can't buy.
-    canPurchase: !!features.subscriptions_visible && isAvailable(),
+    canPurchase: !!features.subscriptions_visible && availability === 'ready',
+    availability,
   };
 }
 
@@ -49,8 +54,11 @@ const OFFERINGS_STALE_MS = 60 * 60 * 1000;
 
 const isUnavailable = (err) => err?.code === 'PURCHASES_UNAVAILABLE';
 
-/** The packages to offer — only fetched when the user can see subscriptions. */
-export function useOfferings() {
+/**
+ * The packages to offer — only fetched when the user can see subscriptions
+ * (and the caller has something to sell: pass false when not).
+ */
+export function useOfferings(wanted = true) {
   const { user } = useAuth();
   const { canPurchase } = usePlan();
   return useQuery({
@@ -59,7 +67,7 @@ export function useOfferings() {
       await ensurePurchases(user.id); // identified as THIS account first
       return getOfferings();
     },
-    enabled: canPurchase && !!user?.id,
+    enabled: wanted && canPurchase && !!user?.id,
     staleTime: OFFERINGS_STALE_MS,
     // Not set up on this device (old build / no key / offline login): retrying won't help.
     retry: (count, err) => !isUnavailable(err) && count < 2,

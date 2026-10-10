@@ -9,6 +9,8 @@ import { scheduleLocalReminders, cancelAllLocalReminders } from '../../services/
 import { exportRecords } from '../../services/exportRecords';
 import { captureException, isSentryEnabled } from '../../services/sentry';
 import { isAnalyticsEnabled, setAnalyticsEnabled } from '../../services/analytics';
+import { usePlan } from '../../hooks/useSubscription';
+import { planStatus, planTitle } from '../../utils/subscription';
 import { ui, type } from '../../theme';
 import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '../../components';
 
@@ -18,6 +20,10 @@ import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '..
 export default function ProfileScreen({ navigation }) {
   const { user, isAdmin, logout, updateUser } = useAuth();
   const { invites, reminders, pets } = useData();
+  // Subscription row: only once the server shows subscriptions to this
+  // account (or it already has a plan) — invisible while the feature is dark.
+  const { plan, included, visible: subscriptionsVisible } = usePlan();
+  const planLine = planStatus(plan);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [careReminders, setCareReminders] = useState(true);
   const [communityDigest, setCommunityDigest] = useState(true);
@@ -151,6 +157,22 @@ export default function ProfileScreen({ navigation }) {
             <Text style={styles.editLink}>Edit</Text>
           </Pressable>
         </Card>
+
+        {(subscriptionsVisible || plan.active) && (
+          <>
+            <Text style={[type.sectionLabel, styles.sectionLabel]}>Subscription</Text>
+            <Card style={styles.sectionCard}>
+              <ListRow
+                icon="star-four-points-outline"
+                title={planTitle(plan, included)}
+                subtitle={planLine ? planLine.label : included ? 'Thanks for being an early member' : 'Records and exports free forever'}
+                chevron
+                onPress={() => navigation.navigate('Subscription')}
+                last
+              />
+            </Card>
+          </>
+        )}
 
         <Text style={[type.sectionLabel, styles.sectionLabel]}>Notifications</Text>
         <Card style={styles.sectionCard}>
