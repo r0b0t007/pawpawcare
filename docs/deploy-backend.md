@@ -98,6 +98,22 @@ SECRET_KEY=<fresh random string, ≥ 32 chars — do NOT reuse the dev value>
 ANTHROPIC_API_KEY=<key>    # AI document intake
 
 QUEUE_CONNECTION=sync      # start simple; see cron section to move to database
+
+# Email (password-reset and verification codes, support forwards) via Resend.
+# Without these the codes are silently not sent: with a `log` mailer, a missing
+# key or an example.com From, every attempt logs "Email not delivered: …"
+# (an error in Sentry).
+MAIL_MAILER=resend
+RESEND_API_KEY=<re_… — Resend → API Keys → "Sending access", domain pawpawcare.app>
+MAIL_FROM_ADDRESS=hello@pawpawcare.app   # must be on the Resend-verified domain
+MAIL_FROM_NAME=PawPawCare
+SUPPORT_INBOX=<your inbox>  # optional: forwards in-app "Contact us" messages
+```
+
+After `config:cache`, prove delivery end to end:
+
+```sh
+php artisan mail:send-test you@example.com
 ```
 
 Then:
