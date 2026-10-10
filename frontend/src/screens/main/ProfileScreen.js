@@ -10,7 +10,7 @@ import { exportRecords } from '../../services/exportRecords';
 import { captureException, isSentryEnabled } from '../../services/sentry';
 import { isAnalyticsEnabled, setAnalyticsEnabled } from '../../services/analytics';
 import { usePlan } from '../../hooks/useSubscription';
-import { planStatus } from '../../utils/subscription';
+import { planStatus, planTitle } from '../../utils/subscription';
 import { ui, type } from '../../theme';
 import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '../../components';
 
@@ -164,7 +164,7 @@ export default function ProfileScreen({ navigation }) {
             <Card style={styles.sectionCard}>
               <ListRow
                 icon="star-four-points-outline"
-                title={plan.active ? 'PawPawCare Plus' : included ? 'Plus features included' : 'Free plan'}
+                title={planTitle(plan, included)}
                 subtitle={planLine ? planLine.label : included ? 'Thanks for being an early member' : 'Records and exports free forever'}
                 chevron
                 onPress={() => navigation.navigate('Subscription')}

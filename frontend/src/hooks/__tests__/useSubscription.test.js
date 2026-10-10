@@ -23,7 +23,7 @@ jest.mock('../../services/purchases', () => ({
 
 import { post } from '../../services/api';
 import { track } from '../../services/analytics';
-import { ensurePurchases, getOfferings, isAvailable, purchasePackage, restorePurchases } from '../../services/purchases';
+import { ensurePurchases, getOfferings, purchasePackage, purchasesStatus, restorePurchases } from '../../services/purchases';
 import { useOfferings, usePlan, usePurchase, useRestore } from '../useSubscription';
 
 let hook;
@@ -79,7 +79,7 @@ describe('usePlan', () => {
   it('can purchase only when visible and the build supports it', () => {
     render(usePlan);
     expect(hook.canPurchase).toBe(true);
-    isAvailable.mockReturnValueOnce(false);
+    purchasesStatus.mockReturnValueOnce('no_key');
     render(usePlan);
     expect(hook.canPurchase).toBe(false);
   });

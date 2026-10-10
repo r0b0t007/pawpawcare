@@ -13,11 +13,15 @@ jest.mock('../../../services/purchases', () => ({
 
 let mockPlan;
 let mockOfferings;
+let mockOfferingsWanted;
 const mockPurchase = { mutateAsync: jest.fn(), isPending: false };
 const mockRestore = { mutateAsync: jest.fn(), isPending: false };
 jest.mock('../../../hooks/useSubscription', () => ({
   usePlan: () => mockPlan,
-  useOfferings: () => mockOfferings,
+  useOfferings: (wanted) => {
+    mockOfferingsWanted = wanted;
+    return mockOfferings;
+  },
   usePurchase: () => mockPurchase,
   useRestore: () => mockRestore,
 }));
@@ -39,7 +43,13 @@ const pkg = (packageType, priceString, price, subscriptionPeriod, extra = {}) =>
 const MONTHLY = pkg('MONTHLY', '$4.99', 4.99, 'P1M');
 const ANNUAL = pkg('ANNUAL', '$39.99', 39.99, 'P1Y');
 
-const navigation = { goBack: jest.fn(), navigate: jest.fn(), canGoBack: jest.fn(() => true) };
+const navigation = {
+  goBack: jest.fn(),
+  navigate: jest.fn(),
+  canGoBack: jest.fn(() => true),
+  setOptions: jest.fn(),
+  addListener: jest.fn(() => () => {}),
+};
 
 async function render(params) {
   let tree;
@@ -121,7 +131,8 @@ test('a free trial changes the call to action', async () => {
 
   expect(button(tree, 'Start free trial')).toBeDefined();
   expect(hasText(tree, /Try 1 week free, then \$39\.99 \/ year/)).toBe(true);
-  expect(hasText(tree, /unused part of a free trial/)).toBe(true);
+  expect(hasText(tree, /free trial becomes a paid subscription unless you cancel at least 24 hours before it ends/)).toBe(true);
+  expect(hasText(tree, /unused part/)).toBe(false);
 });
 
 test('restore reports what it found', async () => {
@@ -250,5 +261,73 @@ describe('review fixes', () => {
 
     expect(navigation.goBack).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith('Welcome to Plus!');
+  });
+});
+
+describe('review round 2', () => {
+  it('a paid intro price is never called a free trial', async () => {
+    mockOfferings.data.packages = [
+      pkg('MONTHLY', '$4.99', 4.99, 'P1M', { introPrice: { price: 0.99, priceString: '$0.99', periodUnit: 'MONTH', periodNumberOfUnits: 1, cycles: 3 } }),
+    ];
+    const tree = await render();
+
+    expect(button(tree, 'Subscribe')).toBeDefined();
+    expect(button(tree, 'Start free trial')).toBeUndefined();
+    expect(hasText(tree, /\$0\.99 \/ month for 3 months, then \$4\.99 \/ month/)).toBe(true);
+    expect(hasText(tree, /introductory price applies for the period shown/)).toBe(true);
+    expect(hasText(tree, /free trial/)).toBe(false);
+  });
+
+  it('a lifetime-only offering is a one-time purchase, not a subscription', async () => {
+    mockOfferings.data.packages = [pkg('LIFETIME', '$99.99', 99.99, null)];
+    const tree = await render();
+
+    expect(button(tree, 'Buy')).toBeDefined();
+    expect(button(tree, 'Subscribe')).toBeUndefined();
+    expect(hasText(tree, /\$99\.99 · one-time/)).toBe(true);
+    expect(hasText(tree, /one-time purchase — it never renews/)).toBe(true);
+    expect(hasText(tree, /renews automatically/)).toBe(false);
+  });
+
+  it('swipe-down and back cannot leave mid-purchase, but the paywall can close itself', async () => {
+    let finish;
+    mockPurchase.mutateAsync.mockImplementationOnce(() => new Promise((r) => { finish = r; }));
+    const tree = await render();
+    const beforeRemove = navigation.addListener.mock.calls.find(([event]) => event === 'beforeRemove')[1];
+
+    let pending;
+    act(() => {
+      pending = button(tree, 'Subscribe').props.onPress();
+    });
+    const swipe = { preventDefault: jest.fn() };
+    beforeRemove(swipe);
+    expect(swipe.preventDefault).toHaveBeenCalled();
+
+    navigation.goBack.mockImplementationOnce(() => {
+      const own = { preventDefault: jest.fn() };
+      beforeRemove(own); // the paywall's own close after success
+      expect(own.preventDefault).not.toHaveBeenCalled();
+    });
+    await act(async () => {
+      finish({ status: 'purchased', synced: true, plan: { active: true } });
+      await pending;
+    });
+    expect(navigation.goBack).toHaveBeenCalled();
+  });
+
+  it('turns the swipe gesture off while busy', async () => {
+    mockPurchase.isPending = true;
+    await render();
+    expect(navigation.setOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+  });
+
+  it('does not load prices for someone with nothing to buy', async () => {
+    mockPlan = { ...mockPlan, plan: { active: true }, included: true };
+    await render();
+    expect(mockOfferingsWanted).toBe(false);
+
+    mockPlan = { ...mockPlan, plan: { active: false }, included: false };
+    await render();
+    expect(mockOfferingsWanted).toBe(true);
   });
 });

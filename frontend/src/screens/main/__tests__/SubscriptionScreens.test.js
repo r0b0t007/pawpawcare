@@ -147,3 +147,23 @@ describe('Subscription screen (review fixes)', () => {
     expect(details.root.findByType(ConfirmDialog).props.message).not.toMatch(/billing/);
   });
 });
+
+test('a double tap on Restore restores once', async () => {
+  mockPlanState = { plan: { active: false }, included: false, visible: true, canPurchase: true };
+  let finish;
+  mockRestore.mutateAsync.mockImplementationOnce(() => new Promise((r) => { finish = r; }));
+  const tree = await render(SubscriptionScreen);
+  const row = tree.root.findAll((n) => n.props.title === 'Restore purchases' && typeof n.props.onPress === 'function')[0];
+
+  let first;
+  act(() => {
+    first = row.props.onPress();
+    row.props.onPress();
+  });
+  await act(async () => {
+    finish({ status: 'restored', synced: true, plan: { active: false } });
+    await first;
+  });
+
+  expect(mockRestore.mutateAsync).toHaveBeenCalledTimes(1);
+});

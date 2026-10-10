@@ -28,16 +28,30 @@ export function annualSavings(monthly, annual) {
   return pct >= 5 ? pct : null; // not worth shouting about below 5%
 }
 
-/** "Try 1 week free" / "$0.99 for the first month", or null. */
+/** Whether the product's (eligible) intro offer is a free trial — not a paid intro price. */
+export const isFreeTrial = (product) => product?.introPrice?.price === 0;
+
+/** Whether the product renews (has a subscription period) — vs a one-time purchase. */
+export const isRenewing = (product) => formatPeriod(product?.subscriptionPeriod) !== null;
+
+/**
+ * "Try 1 week free", "$0.99 for the first month" or, for an intro price
+ * that repeats, "$0.99 / month for 3 months". null without an intro offer.
+ */
 export function introOfferText(product) {
   const intro = product?.introPrice;
   if (!intro) return null;
   const unit = RC_UNITS[intro.periodUnit] ?? null;
-  const span = unit ? formatPeriod(`P${intro.periodNumberOfUnits || 1}${unit}`) : null;
-  if (!span) return null;
   const units = intro.periodNumberOfUnits || 1;
-  const spanWithCount = units === 1 ? `1 ${span}` : span;
-  return intro.price === 0 ? `Try ${spanWithCount} free` : `${intro.priceString} for the first ${span}`;
+  const span = unit ? formatPeriod(`P${units}${unit}`) : null;
+  if (!span) return null;
+  if (intro.price === 0) return `Try ${units === 1 ? `1 ${span}` : span} free`;
+  const cycles = intro.cycles || 1;
+  if (cycles > 1) {
+    const total = formatPeriod(`P${units * cycles}${unit}`);
+    return `${intro.priceString} / ${span} for ${total}`;
+  }
+  return `${intro.priceString} for the first ${span}`;
 }
 
 const STORE_NAMES = { app_store: 'the App Store', mac_app_store: 'the App Store', play_store: 'Google Play' };
@@ -48,6 +62,23 @@ export const isStoreBilled = (plan) =>
 
 /** Store billing that keeps charging — e.g. after the account is deleted. */
 export const isRenewingStoreSubscription = (plan) => isStoreBilled(plan) && !!plan.will_renew;
+
+/** The plan's name for titles: Plus, included Plus features (early members), or free. */
+export function planTitle(plan, included) {
+  if (plan?.active) return 'PawPawCare Plus';
+  return included ? 'Plus features included' : 'Free plan';
+}
+
+/**
+ * What to tell the user after a restore, and whether the job is done
+ * (close the paywall). A restore the server couldn't confirm yet isn't
+ * "nothing found".
+ */
+export function restoreOutcome(result) {
+  if (result?.plan?.active) return { message: 'Purchases restored', done: true };
+  if (result?.synced === false) return { message: 'Restored — it may take a minute to show up', done: true };
+  return { message: 'No purchases found to restore', done: false };
+}
 
 /** Where the subscription is billed, for copy ("the App Store"). */
 export const storeName = (store) => STORE_NAMES[store] ?? 'your app store';

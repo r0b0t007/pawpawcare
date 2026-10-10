@@ -1,4 +1,15 @@
-import { annualSavings, formatPeriod, introOfferText, planStatus, priceWithPeriod, storeName } from '../subscription';
+import {
+  annualSavings,
+  formatPeriod,
+  introOfferText,
+  isFreeTrial,
+  isRenewing,
+  planStatus,
+  planTitle,
+  priceWithPeriod,
+  restoreOutcome,
+  storeName,
+} from '../subscription';
 import { isUpgradeRequired } from '../../services/api';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -63,4 +74,30 @@ test('isUpgradeRequired recognises the server gate', () => {
   expect(isUpgradeRequired({ status: 402, code: 'upgrade_required' })).toBe(true);
   expect(isUpgradeRequired({ status: 402 })).toBe(false);
   expect(isUpgradeRequired({ status: 403, code: 'upgrade_required' })).toBe(false);
+});
+
+describe('review round 2', () => {
+  it('describes repeating intro prices over their whole span', () => {
+    expect(introOfferText({ introPrice: { price: 0.99, priceString: '$0.99', periodUnit: 'MONTH', periodNumberOfUnits: 1, cycles: 3 } }))
+      .toBe('$0.99 / month for 3 months');
+    expect(introOfferText({ introPrice: { price: 1.99, priceString: '$1.99', periodUnit: 'WEEK', periodNumberOfUnits: 1, cycles: 1 } }))
+      .toBe('$1.99 for the first week');
+  });
+
+  it('tells a free trial from a paid intro, and renewing from one-time', () => {
+    expect(isFreeTrial({ introPrice: { price: 0 } })).toBe(true);
+    expect(isFreeTrial({ introPrice: { price: 0.99 } })).toBe(false);
+    expect(isFreeTrial({ introPrice: null })).toBe(false);
+    expect(isRenewing({ subscriptionPeriod: 'P1M' })).toBe(true);
+    expect(isRenewing({ subscriptionPeriod: null })).toBe(false);
+  });
+
+  it('shares plan titles and restore messages', () => {
+    expect(planTitle({ active: true }, true)).toBe('PawPawCare Plus');
+    expect(planTitle({ active: false }, true)).toBe('Plus features included');
+    expect(planTitle({ active: false }, false)).toBe('Free plan');
+    expect(restoreOutcome({ plan: { active: true } })).toEqual({ message: 'Purchases restored', done: true });
+    expect(restoreOutcome({ synced: false, plan: null })).toEqual({ message: 'Restored — it may take a minute to show up', done: true });
+    expect(restoreOutcome({ synced: true, plan: { active: false } })).toEqual({ message: 'No purchases found to restore', done: false });
+  });
 });

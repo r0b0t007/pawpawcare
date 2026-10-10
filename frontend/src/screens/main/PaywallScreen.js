@@ -5,7 +5,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useOfferings, usePlan, usePurchase, useRestore } from '../../hooks/useSubscription';
 import { track } from '../../services/analytics';
 import { purchaseErrorKind } from '../../services/purchases';
-import { annualSavings, introOfferText, priceWithPeriod } from '../../utils/subscription';
+import {
+  annualSavings,
+  introOfferText,
+  isFreeTrial,
+  isRenewing,
+  priceWithPeriod,
+  restoreOutcome,
+} from '../../utils/subscription';
 import { ui, type, radii, motion } from '../../theme';
 import { Card, ListRow, SegmentedControl, StatusPill, Button, Skeleton, showToast } from '../../components';
 
@@ -39,6 +46,23 @@ const PURCHASE_ERRORS = {
   other: "Couldn't complete the purchase — try again",
 };
 
+/** Apple 3.1.2 disclosure for what's being bought. */
+function legalText(renewing, freeTrial, hasIntro) {
+  if (!renewing) {
+    return `Payment is charged to your ${STORE} when you confirm. This is a one-time purchase — it never renews.`;
+  }
+  const trial = freeTrial
+    ? ' Your free trial becomes a paid subscription unless you cancel at least 24 hours before it ends.'
+    : hasIntro
+      ? ' The introductory price applies for the period shown, then the regular price.'
+      : '';
+  return (
+    `Payment is charged to your ${STORE} when you confirm.${trial} The subscription renews automatically at ` +
+    'the same price unless you cancel at least 24 hours before the end of the current period. Manage or ' +
+    `cancel anytime in your ${STORE_SETTINGS} settings.`
+  );
+}
+
 /** A full-width explanation card (states where nothing can be bought). */
 function StateCard({ title, message, action }) {
   return (
@@ -53,7 +77,7 @@ function StateCard({ title, message, action }) {
 export default function PaywallScreen({ navigation, route }) {
   const feature = route?.params?.feature;
   const { plan, visible, included, canPurchase, availability } = usePlan();
-  const offerings = useOfferings();
+  const offerings = useOfferings(!included); // nothing to sell to Plus / early members
   const purchase = usePurchase();
   const restore = useRestore();
 
@@ -63,6 +87,8 @@ export default function PaywallScreen({ navigation, route }) {
   useEffect(() => () => { mounted.current = false; }, []);
   // A second tap before isPending re-renders must not start a second purchase.
   const inFlight = useRef(false);
+  // Set when the paywall closes itself, so the guard below lets that through.
+  const closing = useRef(false);
 
   useEffect(() => {
     track('paywall_viewed', feature ? { feature } : {});
@@ -76,10 +102,29 @@ export default function PaywallScreen({ navigation, route }) {
   const selected = choices.find((p) => p.packageType === choice) ?? annual ?? monthly ?? packages[0] ?? null;
   const savings = annualSavings(monthly, annual);
   const intro = introOfferText(selected?.product);
+  const freeTrial = isFreeTrial(selected?.product);
+  // Lifetime / one-time packages are bought, not subscribed to.
+  const renewing = isRenewing(selected?.product);
   const busy = purchase.isPending || restore.isPending;
 
+  // Mid-purchase, swipe-down (iOS) and hardware back (Android) follow the
+  // same rule as the locked X: the user can't leave halfway through.
+  useEffect(() => {
+    navigation.setOptions?.({ gestureEnabled: !busy });
+  }, [navigation, busy]);
+  useEffect(
+    () =>
+      navigation.addListener?.('beforeRemove', (e) => {
+        if (inFlight.current && !closing.current) e.preventDefault();
+      }),
+    [navigation],
+  );
+
   const close = () => {
-    if (mounted.current && navigation.canGoBack()) navigation.goBack();
+    if (mounted.current && navigation.canGoBack()) {
+      closing.current = true;
+      navigation.goBack();
+    }
   };
 
   const runOnce = async (task) => {
@@ -114,17 +159,9 @@ export default function PaywallScreen({ navigation, route }) {
   const handleRestore = () =>
     runOnce(async () => {
       try {
-        const result = await restore.mutateAsync();
-        if (result.plan?.active) {
-          showToast('Purchases restored');
-          close();
-        } else if (result.synced === false) {
-          // Restored in the store, but our server couldn't confirm yet.
-          showToast('Restored — it may take a minute to show up');
-          close();
-        } else {
-          showToast('No purchases found to restore');
-        }
+        const { message, done } = restoreOutcome(await restore.mutateAsync());
+        showToast(message);
+        if (done) close();
       } catch (_) {
         showToast("Couldn't restore purchases — try again");
       }
@@ -199,12 +236,16 @@ export default function PaywallScreen({ navigation, route }) {
           />
         )}
         <View style={styles.priceRow}>
-          <Text style={[type.cardTitle, styles.ink]}>{priceWithPeriod(selected.product)}</Text>
+          <Text style={[type.cardTitle, styles.ink]}>
+            {renewing ? priceWithPeriod(selected.product) : `${selected.product.priceString} · one-time`}
+          </Text>
           {selected.packageType === 'ANNUAL' && savings ? <StatusPill status="ok" label={`Save ${savings}%`} /> : null}
         </View>
-        {intro ? <Text style={[type.secondary, styles.sub]}>{intro}, then {priceWithPeriod(selected.product)}</Text> : null}
+        {renewing && intro ? (
+          <Text style={[type.secondary, styles.sub]}>{intro}, then {priceWithPeriod(selected.product)}</Text>
+        ) : null}
         <Button
-          label={purchase.isPending ? 'Processing…' : intro ? 'Start free trial' : 'Subscribe'}
+          label={purchase.isPending ? 'Processing…' : !renewing ? 'Buy' : freeTrial ? 'Start free trial' : 'Subscribe'}
           onPress={handlePurchase}
           disabled={busy}
         />
@@ -261,11 +302,7 @@ export default function PaywallScreen({ navigation, route }) {
               <Text style={[type.rowTitle, styles.link]}>{restore.isPending ? 'Restoring…' : 'Restore purchases'}</Text>
             </Pressable>
 
-            <Text style={[type.secondary, styles.legal]}>
-              Payment is charged to your {STORE} when you confirm. The subscription renews automatically at
-              the same price unless you cancel at least 24 hours before the end of the current period. Manage
-              or cancel anytime in your {STORE_SETTINGS} settings.{intro ? ' Any unused part of a free trial ends when you subscribe.' : ''}
-            </Text>
+            <Text style={[type.secondary, styles.legal]}>{legalText(renewing, freeTrial, !!intro)}</Text>
             <View style={styles.legalLinks}>
               <Text style={[type.secondary, styles.link]} onPress={() => Linking.openURL(TERMS_URL)} accessibilityRole="link">
                 Terms of Use

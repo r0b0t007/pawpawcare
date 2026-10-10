@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { View, Text, ScrollView, Pressable, Linking, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { usePlan, useRestore } from '../../hooks/useSubscription';
 import { getManagementUrl } from '../../services/purchases';
-import { isRenewingStoreSubscription, isStoreBilled, planStatus, storeName } from '../../utils/subscription';
+import {
+  isRenewingStoreSubscription,
+  isStoreBilled,
+  planStatus,
+  planTitle,
+  restoreOutcome,
+  storeName,
+} from '../../utils/subscription';
 import { ui, type, radii, motion } from '../../theme';
 import { Card, ListRow, StatusPill, Button, showToast } from '../../components';
 
@@ -24,18 +31,17 @@ export default function SubscriptionScreen({ navigation }) {
     else showToast('Manage it from your app store settings');
   };
 
+  // A double tap before isPending re-renders must not restore twice.
+  const inFlight = useRef(false);
   const handleRestore = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     try {
-      const result = await restore.mutateAsync();
-      showToast(
-        result.plan?.active
-          ? 'Purchases restored'
-          : result.synced === false
-            ? 'Restored — it may take a minute to show up'
-            : 'No purchases found to restore',
-      );
+      showToast(restoreOutcome(await restore.mutateAsync()).message);
     } catch (_) {
       showToast("Couldn't restore purchases — try again");
+    } finally {
+      inFlight.current = false;
     }
   };
 
@@ -51,13 +57,11 @@ export default function SubscriptionScreen({ navigation }) {
           >
             <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
           </Pressable>
-          <Text style={styles.headerTitle}>Subscription</Text>
+          <Text style={[type.headerTitle, styles.ink]}>Subscription</Text>
         </View>
 
         <Card style={styles.planCard}>
-          <Text style={[type.cardTitle, styles.ink]}>
-            {plan.active ? 'PawPawCare Plus' : included ? 'Plus features included' : 'Free plan'}
-          </Text>
+          <Text style={[type.cardTitle, styles.ink]}>{planTitle(plan, included)}</Text>
           {status ? <StatusPill status={status.status} label={status.label} /> : null}
           <Text style={[type.body, styles.sub]}>
             {plan.active
@@ -124,7 +128,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 22, letterSpacing: -0.3, color: ui.ink },
   ink: { color: ui.ink },
   sub: { color: ui.sub },
   planCard: { marginHorizontal: 24, marginBottom: 22, padding: 18, gap: 12 },

@@ -42,15 +42,15 @@ function serial(task) {
   return run;
 }
 
-/** Whether this build can make purchases at all (native module + key present). */
-export const isAvailable = () => !!Purchases && !!apiKey();
-
 /**
  * Why purchases are (un)available here: 'ready', 'no_module' (a build from
  * before purchases — updating the app fixes it) or 'no_key' (this build has
  * no store key — updating won't help).
  */
 export const purchasesStatus = () => (!Purchases ? 'no_module' : !apiKey() ? 'no_key' : 'ready');
+
+/** Whether this build can make purchases at all (native module + key present). */
+export const isAvailable = () => purchasesStatus() === 'ready';
 
 /**
  * What kind of failure a purchase error is, for the message shown:
