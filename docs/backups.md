@@ -44,7 +44,8 @@ Nightly encrypted backups of the production database and user uploads, sent to a
    # host can't wipe the last week. (6 < keep_all_backups_for_days, so cleanup never hits a lock.)
    cf r2 buckets locks update pawpawcare-backups --rules @docs/r2/backups-lock.json
    # Check: no public r2.dev URL and no custom domain.
-   cf r2 buckets domains managed list pawpawcare-backups
+   cf r2 buckets domains managed list --bucket-name pawpawcare-backups
+   cf r2 buckets domains custom list --bucket-name pawpawcare-backups
    cf r2 buckets lifecycle get pawpawcare-backups && cf r2 buckets locks get pawpawcare-backups
    ```
 3. **Create the access keys** (owner). R2 → Manage API tokens → Create API token:
