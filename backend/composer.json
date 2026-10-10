@@ -18,7 +18,6 @@
         "laravel/framework": "^13.8",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
-        "resend/resend-php": "^1.16",
         "sentry/sentry-laravel": "^4.29",
         "spatie/laravel-backup": "^10.3"
     },

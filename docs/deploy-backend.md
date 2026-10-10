@@ -99,13 +99,19 @@ ANTHROPIC_API_KEY=<key>    # AI document intake
 
 QUEUE_CONNECTION=sync      # start simple; see cron section to move to database
 
-# Email (password-reset and verification codes, support forwards) via Resend.
-# Without these the codes are silently not sent: with a `log` mailer, a missing
-# key or an example.com From, every attempt logs "Email not delivered: …"
+# Email (password-reset and verification codes, support forwards) over SMTP
+# through a cPanel mailbox (cPanel → Email Accounts). SPF (include:spf.web-hosting.com)
+# and DKIM (default._domainkey) for pawpawcare.app already cover this server.
+# With a `log` mailer, MAIL_HOST left at 127.0.0.1 or an example.com From, the
+# codes are silently not sent; every attempt logs "Email not delivered: …"
 # (an error in Sentry).
-MAIL_MAILER=resend
-RESEND_API_KEY=<re_… — Resend → API Keys → "Sending access", domain pawpawcare.app>
-MAIL_FROM_ADDRESS=hello@pawpawcare.app   # must be on the Resend-verified domain
+MAIL_MAILER=smtp
+MAIL_SCHEME=smtps
+MAIL_HOST=server215.web-hosting.com
+MAIL_PORT=465
+MAIL_USERNAME=no-reply@pawpawcare.app
+MAIL_PASSWORD=<the mailbox password>
+MAIL_FROM_ADDRESS=no-reply@pawpawcare.app
 MAIL_FROM_NAME=PawPawCare
 SUPPORT_INBOX=<your inbox>  # optional: forwards in-app "Contact us" messages
 ```

@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Support\MailDelivery;
-use Illuminate\Mail\Transport\ResendTransport;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -14,20 +13,13 @@ class MailDeliveryTest extends TestCase
     {
         $this->app['env'] = 'production';
         config(array_merge([
-            'mail.default' => 'resend',
-            'services.resend.key' => 're_test_key',
-            'mail.from.address' => 'hello@pawpawcare.app',
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.host' => 'server215.web-hosting.com',
+            'mail.from.address' => 'no-reply@pawpawcare.app',
         ], $config));
     }
 
-    public function test_the_resend_mailer_is_available(): void
-    {
-        config(['services.resend.key' => 're_test_key']);
-
-        $this->assertInstanceOf(ResendTransport::class, Mail::mailer('resend')->getSymfonyTransport());
-    }
-
-    public function test_a_complete_resend_config_is_fine_in_production(): void
+    public function test_the_production_smtp_config_is_fine(): void
     {
         $this->production();
 
@@ -40,7 +32,8 @@ class MailDeliveryTest extends TestCase
             'log mailer' => [['mail.default' => 'log'], 'MAIL_MAILER=log discards every email'],
             'array mailer' => [['mail.default' => 'array'], 'MAIL_MAILER=array discards every email'],
             'unknown mailer' => [['mail.default' => 'resnd'], 'MAIL_MAILER=resnd is not a configured mailer'],
-            'missing key' => [['services.resend.key' => null], 'RESEND_API_KEY is not set'],
+            'resend without a key' => [['mail.default' => 'resend', 'services.resend.key' => null], 'RESEND_API_KEY is not set'],
+            'smtp to the local default' => [['mail.mailers.smtp.host' => '127.0.0.1'], 'MAIL_HOST is still the local default'],
             'placeholder from' => [['mail.from.address' => 'hello@example.com'], 'MAIL_FROM_ADDRESS is still the example.com placeholder'],
         ];
 
@@ -72,10 +65,10 @@ class MailDeliveryTest extends TestCase
 
     public function test_send_test_refuses_a_broken_config(): void
     {
-        $this->production(['services.resend.key' => '']);
+        $this->production(['mail.default' => 'log']);
 
         $this->artisan('mail:send-test', ['to' => 'owner@example.org'])
-            ->expectsOutputToContain('Not sent: MAIL_MAILER=resend but RESEND_API_KEY is not set')
+            ->expectsOutputToContain('Not sent: MAIL_MAILER=log discards every email')
             ->assertFailed();
     }
 

@@ -29,6 +29,9 @@ final class MailDelivery
         if (in_array($transport, self::DISCARDING, true)) {
             return "MAIL_MAILER={$mailer} discards every email (password resets, verification codes)";
         }
+        if ($transport === 'smtp' && in_array(config("mail.mailers.{$mailer}.host"), ['127.0.0.1', 'localhost', null], true)) {
+            return 'MAIL_HOST is still the local default, so every send fails to connect';
+        }
         if ($transport === 'resend' && blank(config('services.resend.key'))) {
             return 'MAIL_MAILER=resend but RESEND_API_KEY is not set';
         }
