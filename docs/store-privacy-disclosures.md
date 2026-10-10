@@ -32,6 +32,8 @@ For every type below: **Linked to the user = Yes** (all keyed by account ID), **
 | Diagnostics → Crash Data | Sentry crash reports (account ID only, scrubbed) | App Functionality |
 | Diagnostics → Performance Data | Sentry performance traces (10% sample) and Expo Observe launch metrics | App Functionality |
 
+IP addresses appear only in server logs (14 days) and rate limiting, for security; they are never used to derive location, so neither form gets a location row for them. Re-check this if anything starts geolocating requests.
+
 Do **not** tick: Health & Fitness (pet records aren't the user's health data), Location (lost-pet reports are typed text, no GPS), Financial Info (Apple/Google take payment; we never see cards), Device ID (no advertising identifiers; the push token isn't an Apple "Device ID"), Browsing/Search History, Contacts, Sensitive Info.
 
 ## Google Play — Data safety

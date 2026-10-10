@@ -51,11 +51,16 @@
 
         <p>PawPawCare exists to keep your pets' health organized — not to make a business out of your data. This page explains, in plain language, what we collect, why, and what we will never do with it.</p>
 
+        <h2>Who we are</h2>
+        <p>PawPawCare is built and run by Ahmed Chioua ("PawPawCare," "we," "us"), who decides how your personal data is used and is responsible for it — the "controller" under data-protection laws such as the GDPR. You can reach us about anything on this page at <a href="mailto:privacy@pawpawcare.app">privacy@pawpawcare.app</a>.</p>
+
         <h2>What we collect</h2>
         <ul>
           <li><strong>Your account</strong> — name, email address, and a password (stored only as a secure hash; we can't read it). If you sign in with Google or Apple, we receive your name, email, and an account identifier from them instead of a password.</li>
           <li><strong>Your pets' records</strong> — the profiles, vaccinations, medications, weights, expenses, appointments, notes, photos, and documents you add. This is your data; we store it to show it back to you and the people you invite.</li>
           <li><strong>Community content</strong> — posts, comments, and lost-pet reports you choose to publish are visible to other PawPawCare users.</li>
+          <li><strong>People you invite</strong> — when you invite someone to share a pet, we store the email address you enter so the invitation can find them when they sign in. Please only invite people who'd expect to hear from you.</li>
+          <li><strong>Server logs</strong> — like any online service, our server records technical details of each request (such as your IP address, the time, and what was requested) to keep the Service secure, limit abuse, and diagnose problems. Our crash reports and analytics are set not to keep your IP address.</li>
           <li><strong>Device information for reminders</strong> — a push-notification token and your time zone, so reminders reach your phone at the right local time.</li>
           <li><strong>Usage analytics</strong> — which screens and features are used, collected through PostHog to help us improve the app. Events carry feature names and counts, never your pets' medical details, and they're tied to your account ID, not your name or email. You can turn this off anytime in the app under <strong>Profile → Privacy → Share usage analytics</strong>; your choice is saved on your account and applies on all your devices.</li>
           <li><strong>Crash reports</strong> — when the app or our server hits an error, a report (what failed and where in the code) is sent to Sentry so we can fix it. Reports carry your account ID only — no name, email, IP address, screenshots, or pets' records — and are scrubbed of personal details before they leave the device.</li>
@@ -65,7 +70,16 @@
         </ul>
 
         <h2>How we use it</h2>
-        <p>To run the product: syncing your records across devices, sending the reminders you set, powering the community feed, processing subscriptions, fixing crashes, and understanding — in aggregate — which features are worth improving. That's the whole list. We don't use your data for advertising, and we don't track you across other companies' apps or websites.</p>
+        <p>To run the product: syncing your records across devices, sending the reminders you set, powering the community feed, processing subscriptions, fixing crashes, and understanding — in aggregate — which features are worth improving. We also use it where needed to keep the Service secure, prevent abuse, and meet our legal obligations. That's the whole list. We don't use your data for advertising, we don't track you across other companies' apps or websites, and we don't make automated decisions about you that have legal or similarly significant effects.</p>
+
+        <h2>Our legal bases</h2>
+        <p>Data-protection laws such as the GDPR require a legal reason for each use of personal data. Ours are:</p>
+        <ul>
+          <li><strong>Providing the Service you signed up for</strong> — your account, pets' records, reminders, sharing, community features, document scanning you ask for, account emails, and subscriptions.</li>
+          <li><strong>Our legitimate interests</strong> — crash reports, server logs, and security measures, so PawPawCare keeps working safely; and usage analytics in the app, so we can see which features help and improve them. We keep analytics to feature names and counts, never your pets' records, and you can object at any time with the <strong>Share usage analytics</strong> switch.</li>
+          <li><strong>Your consent</strong> — website analytics (the cookie banner) and the waitlist. You can withdraw it anytime through <strong>Cookie settings</strong> at the bottom of this site, or by asking us to remove your waitlist email.</li>
+          <li><strong>Legal obligations</strong> — when the law requires us to keep or disclose information.</li>
+        </ul>
 
         <h2>AI record scanning</h2>
         <p>When you scan a vet document, the image is sent to our AI provider (Anthropic) to extract details like vaccine names and dosages. The results come straight back to you for review — nothing is saved to your pet's file until you approve it, and your documents are not used to train AI models.</p>
@@ -74,8 +88,9 @@
         <ul>
           <li><strong>Vet share links and caretaker pages</strong> exist only when you create them. They are read-only, expire automatically on the schedule you pick, and you can revoke them at any time.</li>
           <li><strong>Family sharing</strong> shows a pet's records only to people you explicitly invite.</li>
-          <li><strong>We never sell your data.</strong> No data brokers, no advertising networks, no exceptions.</li>
+          <li><strong>We never sell your data.</strong> No data brokers, no advertising networks.</li>
         </ul>
+        <p>Beyond the services listed below, we disclose personal data only in two situations: when the law requires it (for example, a valid court order), or if PawPawCare is merged, acquired, or transferred — in which case your data stays protected by this policy and we'll tell you before it's governed by a different one.</p>
 
         <h2>Services we rely on</h2>
         <p>A small set of processors help us run PawPawCare. Each receives only what its job requires:</p>
@@ -93,10 +108,32 @@
         </ul>
 
         <h2>Where your data is processed</h2>
-        <p>Several of these providers — including PostHog, Sentry, and RevenueCat — process data in the United States. When your data moves across borders, it's protected under the providers' data-protection terms, such as the European Commission's Standard Contractual Clauses where they apply.</p>
+        <p>Our server and database are in the United States (Namecheap's data center in Arizona), and several providers — including PostHog, Sentry, and RevenueCat — also process data there. So if you use PawPawCare from outside the US, your data is transferred to the US. Where data-protection laws such as the GDPR apply, we rely on safeguards for those transfers: the EU–US Data Privacy Framework for providers certified under it, and otherwise the providers' data-protection terms, such as the European Commission's Standard Contractual Clauses. Email us for details of the safeguard that covers a given provider.</p>
 
         <h2>Security</h2>
         <p>Data moves over encrypted connections (HTTPS). Passwords are hashed, sessions use short-lived tokens, and share links are signed and time-limited.</p>
+
+        <h2>How long we keep it</h2>
+        <ul>
+          <li><strong>Your account, pets' records, and support messages</strong> — as long as your account exists, then permanently deleted 30 days after you delete it (see below). A copy of each support message also reaches our support inbox and is kept only as long as needed to handle your request.</li>
+          <li><strong>Invitations</strong> — until they're accepted, declined, or cancelled, or the pet is deleted.</li>
+          <li><strong>Server logs</strong> — 14 days.</li>
+          <li><strong>Crash reports</strong> — deleted automatically by Sentry under its retention period, at most 90 days.</li>
+          <li><strong>Usage analytics</strong> — until your account is deleted, when your analytics profile and its events are deleted too. Turning analytics off stops new events.</li>
+          <li><strong>Subscription records</strong> — your plan status is deleted with your account; the subscription notices RevenueCat sends us are deleted after 90 days. Apple and Google keep their own purchase records under their policies.</li>
+        </ul>
+
+        <h2>Your rights</h2>
+        <p>Depending on where you live, data-protection laws give you rights over your personal data. You can always:</p>
+        <ul>
+          <li><strong>See and correct it</strong> — most of it is in the app, and you can edit your profile and records there. Ask us for a copy of anything else we hold about you.</li>
+          <li><strong>Take it with you</strong> — <strong>Profile → Export health records</strong> gives you your pets' records as PDF or CSV, free. For a machine-readable copy of the rest, email us.</li>
+          <li><strong>Delete it</strong> — see <a href="#delete">Deleting your data</a>.</li>
+          <li><strong>Object or restrict</strong> — turn off usage analytics in the app, or ask us to stop or limit another use of your data.</li>
+          <li><strong>Withdraw consent</strong> — through Cookie settings on this site, without affecting what happened before.</li>
+          <li><strong>Complain</strong> — to the data-protection authority where you live (for example, your national authority in the EU or UK, or the CNDP in Morocco). We'd appreciate the chance to fix things first.</li>
+        </ul>
+        <p>Email <a href="mailto:privacy@pawpawcare.app">privacy@pawpawcare.app</a> from your account's address to make a request; we may ask you to confirm it's you. We'll reply within one month, and we won't treat you differently for using these rights.</p>
 
         <h2 id="delete">Deleting your data</h2>
         <ul>
