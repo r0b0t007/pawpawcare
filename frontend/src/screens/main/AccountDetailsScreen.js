@@ -14,7 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { ui, type, radii, motion } from '../../theme';
 import { Button, ConfirmDialog, showToast } from '../../components';
-import { storeName } from '../../utils/subscription';
+import { isRenewingStoreSubscription, storeName } from '../../utils/subscription';
 
 // Account details (Profile → Edit). PATCH /users/me only accepts name / bio /
 // avatar_url / timezone, so name is the one editable field here; email is
@@ -24,7 +24,7 @@ import { storeName } from '../../utils/subscription';
 export default function AccountDetailsScreen({ navigation }) {
   const { user, updateUser, deleteAccount } = useAuth();
   // Deleting the account doesn't stop store billing — say so before it happens.
-  const renewingSubscription = !!(user?.plan?.active && user.plan.will_renew && !user.plan.is_lifetime);
+  const renewingSubscription = isRenewingStoreSubscription(user?.plan);
   const [name, setName] = useState(user?.name || '');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);

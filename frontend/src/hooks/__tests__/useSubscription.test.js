@@ -14,6 +14,7 @@ jest.mock('../../services/api', () => ({ post: jest.fn() }));
 jest.mock('../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../services/purchases', () => ({
   isAvailable: jest.fn(() => true),
+  purchasesStatus: jest.fn(() => 'ready'),
   ensurePurchases: jest.fn(() => Promise.resolve()),
   getOfferings: jest.fn(),
   purchasePackage: jest.fn(),

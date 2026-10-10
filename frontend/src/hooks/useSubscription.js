@@ -6,6 +6,7 @@ import {
   ensurePurchases,
   getOfferings,
   isAvailable,
+  purchasesStatus,
   purchasePackage,
   restorePurchases,
 } from '../services/purchases';
@@ -35,12 +36,16 @@ const NO_FEATURES = { paywall_enabled: false, subscriptions_visible: false, gate
 export function usePlan() {
   const { user } = useAuth();
   const features = user?.features ?? NO_FEATURES;
+  const plan = user?.plan ?? FREE_PLAN;
   return {
-    plan: user?.plan ?? FREE_PLAN,
+    plan,
     features,
     visible: !!features.subscriptions_visible,
+    // Plus features without paying (early members): never sell to them.
+    included: !!plan.active || !!plan.grandfathered,
     // Old builds (no native module) and builds without a store key can't buy.
     canPurchase: !!features.subscriptions_visible && isAvailable(),
+    availability: purchasesStatus(),
   };
 }
 

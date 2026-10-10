@@ -4,21 +4,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { usePlan, useRestore } from '../../hooks/useSubscription';
 import { getManagementUrl } from '../../services/purchases';
-import { planStatus, storeName } from '../../utils/subscription';
-import { ui, type, motion } from '../../theme';
+import { isRenewingStoreSubscription, isStoreBilled, planStatus, storeName } from '../../utils/subscription';
+import { ui, type, radii, motion } from '../../theme';
 import { Card, ListRow, StatusPill, Button, showToast } from '../../components';
 
 // Profile → Subscription. The plan comes from the server (/users/me); billing
 // itself lives in the user's App Store / Google Play account, so managing or
 // cancelling opens the store. Status is shown once, in the pill.
 
-const STORE_BILLED = new Set(['app_store', 'mac_app_store', 'play_store']);
-
 export default function SubscriptionScreen({ navigation }) {
-  const { plan, canPurchase } = usePlan();
+  const { plan, included, canPurchase } = usePlan();
   const restore = useRestore();
   const status = planStatus(plan);
-  const storeBilled = plan.active && !plan.is_lifetime && STORE_BILLED.has(plan.store);
+  const storeBilled = isStoreBilled(plan);
 
   const openManagement = async () => {
     const url = await getManagementUrl();
@@ -29,7 +27,13 @@ export default function SubscriptionScreen({ navigation }) {
   const handleRestore = async () => {
     try {
       const result = await restore.mutateAsync();
-      showToast(result.plan?.active ? 'Purchases restored' : 'No purchases found to restore');
+      showToast(
+        result.plan?.active
+          ? 'Purchases restored'
+          : result.synced === false
+            ? 'Restored — it may take a minute to show up'
+            : 'No purchases found to restore',
+      );
     } catch (_) {
       showToast("Couldn't restore purchases — try again");
     }
@@ -51,7 +55,9 @@ export default function SubscriptionScreen({ navigation }) {
         </View>
 
         <Card style={styles.planCard}>
-          <Text style={[type.cardTitle, styles.ink]}>{plan.active ? 'PawPawCare Plus' : 'Free plan'}</Text>
+          <Text style={[type.cardTitle, styles.ink]}>
+            {plan.active ? 'PawPawCare Plus' : included ? 'Plus features included' : 'Free plan'}
+          </Text>
           {status ? <StatusPill status={status.status} label={status.label} /> : null}
           <Text style={[type.body, styles.sub]}>
             {plan.active
@@ -62,11 +68,12 @@ export default function SubscriptionScreen({ navigation }) {
                 ? 'As an early member, Plus features are included for you.'
                 : 'Your pets, records and exports are free forever.'}
           </Text>
-          {!plan.active && canPurchase ? (
+          {!included && canPurchase ? (
             <Button label="See PawPawCare Plus" onPress={() => navigation.navigate('Paywall')} />
           ) : null}
         </Card>
 
+        {storeBilled || canPurchase ? (
         <Card style={styles.sectionCard}>
           {plan.billing_issue && storeBilled ? (
             <ListRow icon="credit-card-outline" title="Update payment method" chevron onPress={openManagement} />
@@ -78,19 +85,23 @@ export default function SubscriptionScreen({ navigation }) {
               subtitle={`Change or cancel in ${storeName(plan.store)}`}
               chevron
               onPress={openManagement}
+              last={!canPurchase}
             />
           ) : null}
-          <ListRow
-            icon="restore"
-            title={restore.isPending ? 'Restoring…' : 'Restore purchases'}
-            subtitle="Bought on another device or account"
-            onPress={restore.isPending ? undefined : handleRestore}
-            last
-          />
+          {canPurchase ? (
+            <ListRow
+              icon="restore"
+              title={restore.isPending ? 'Restoring…' : 'Restore purchases'}
+              subtitle="Bought on another device or account"
+              onPress={restore.isPending ? undefined : handleRestore}
+              last
+            />
+          ) : null}
         </Card>
+        ) : null}
 
-        {storeBilled ? (
-          <Text style={styles.caption}>
+        {isRenewingStoreSubscription(plan) ? (
+          <Text style={[type.secondary, styles.caption]}>
             Deleting your PawPawCare account doesn't cancel billing — cancel in {storeName(plan.store)} first.
           </Text>
         ) : null}
@@ -106,7 +117,7 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: radii.full,
     backgroundColor: ui.surface,
     borderWidth: 1,
     borderColor: ui.border,
@@ -118,10 +129,5 @@ const styles = StyleSheet.create({
   sub: { color: ui.sub },
   planCard: { marginHorizontal: 24, marginBottom: 22, padding: 18, gap: 12 },
   sectionCard: { marginHorizontal: 24, marginBottom: 12 },
-  caption: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 11.5,
-    color: ui.subtle,
-    marginHorizontal: 24,
-  },
+  caption: { color: ui.subtle, marginHorizontal: 24 },
 });

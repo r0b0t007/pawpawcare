@@ -1,12 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, Pressable, Linking, Platform, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useOfferings, usePlan, usePurchase, useRestore } from '../../hooks/useSubscription';
 import { track } from '../../services/analytics';
-import { isAvailable } from '../../services/purchases';
+import { purchaseErrorKind } from '../../services/purchases';
 import { annualSavings, introOfferText, priceWithPeriod } from '../../utils/subscription';
-import { ui, type, motion } from '../../theme';
+import { ui, type, radii, motion } from '../../theme';
 import { Card, ListRow, SegmentedControl, StatusPill, Button, Skeleton, showToast } from '../../components';
 
 // PawPawCare Plus paywall — a modal on the root stack:
@@ -32,12 +32,37 @@ const BENEFITS = [
 const STORE = Platform.select({ ios: 'Apple ID', android: 'Google Play account', default: 'store account' });
 const STORE_SETTINGS = Platform.select({ ios: 'App Store', android: 'Google Play', default: 'store' });
 
+const PURCHASE_ERRORS = {
+  already_owned: `Your ${STORE} already has Plus — tap Restore purchases to use it here`,
+  network: 'No connection — check it and try again',
+  unavailable: "Purchases aren't available right now — try again later",
+  other: "Couldn't complete the purchase — try again",
+};
+
+/** A full-width explanation card (states where nothing can be bought). */
+function StateCard({ title, message, action }) {
+  return (
+    <Card style={styles.stateCard}>
+      <Text style={[type.cardTitleSm, styles.ink]}>{title}</Text>
+      <Text selectable style={[type.body, styles.sub]}>{message}</Text>
+      {action}
+    </Card>
+  );
+}
+
 export default function PaywallScreen({ navigation, route }) {
   const feature = route?.params?.feature;
-  const { plan, visible } = usePlan();
+  const { plan, visible, included, canPurchase, availability } = usePlan();
   const offerings = useOfferings();
   const purchase = usePurchase();
   const restore = useRestore();
+
+  // The modal can be dismissed (swipe / back) while a purchase finishes;
+  // never navigate from a screen that's gone.
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
+  // A second tap before isPending re-renders must not start a second purchase.
+  const inFlight = useRef(false);
 
   useEffect(() => {
     track('paywall_viewed', feature ? { feature } : {});
@@ -48,82 +73,118 @@ export default function PaywallScreen({ navigation, route }) {
   const annual = packages.find((p) => p.packageType === 'ANNUAL');
   const choices = [monthly, annual].filter(Boolean);
   const [choice, setChoice] = useState(null);
-  const selected = useMemo(
-    () => choices.find((p) => p.packageType === choice) ?? annual ?? monthly ?? packages[0] ?? null,
-    [choice, annual, monthly, packages],
-  );
+  const selected = choices.find((p) => p.packageType === choice) ?? annual ?? monthly ?? packages[0] ?? null;
   const savings = annualSavings(monthly, annual);
   const intro = introOfferText(selected?.product);
   const busy = purchase.isPending || restore.isPending;
 
-  const close = () => navigation.goBack();
+  const close = () => {
+    if (mounted.current && navigation.canGoBack()) navigation.goBack();
+  };
 
-  const handlePurchase = async () => {
-    if (!selected) return;
+  const runOnce = async (task) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     try {
-      const result = await purchase.mutateAsync(selected);
-      if (result.status === 'cancelled') return;
-      if (result.status === 'pending') {
-        showToast('Purchase pending — it will unlock once approved');
-      } else if (result.plan?.active) {
-        showToast('Welcome to Plus!');
-      } else {
-        showToast('Purchase complete — it may take a minute to show up');
-      }
-      close();
-    } catch (_) {
-      showToast("Couldn't complete the purchase — try again");
+      await task();
+    } finally {
+      inFlight.current = false;
     }
   };
 
-  const handleRestore = async () => {
-    try {
-      const result = await restore.mutateAsync();
-      if (result.plan?.active) {
-        showToast('Purchases restored');
+  const handlePurchase = () =>
+    runOnce(async () => {
+      if (!selected) return;
+      try {
+        const result = await purchase.mutateAsync(selected);
+        if (result.status === 'cancelled') return;
+        if (result.status === 'pending') {
+          showToast('Purchase pending — it will unlock once approved');
+        } else if (result.plan?.active) {
+          showToast('Welcome to Plus!');
+        } else {
+          showToast('Purchase complete — it may take a minute to show up');
+        }
         close();
-      } else {
-        showToast('No purchases found to restore');
+      } catch (err) {
+        showToast(PURCHASE_ERRORS[purchaseErrorKind(err)]);
       }
-    } catch (_) {
-      showToast("Couldn't restore purchases — try again");
-    }
-  };
+    });
+
+  const handleRestore = () =>
+    runOnce(async () => {
+      try {
+        const result = await restore.mutateAsync();
+        if (result.plan?.active) {
+          showToast('Purchases restored');
+          close();
+        } else if (result.synced === false) {
+          // Restored in the store, but our server couldn't confirm yet.
+          showToast('Restored — it may take a minute to show up');
+          close();
+        } else {
+          showToast('No purchases found to restore');
+        }
+      } catch (_) {
+        showToast("Couldn't restore purchases — try again");
+      }
+    });
 
   let body;
   if (plan.active) {
     body = (
-      <Card style={styles.stateCard}>
-        <Text style={[type.cardTitleSm, styles.ink]}>You're on Plus</Text>
-        <Text style={[type.body, styles.sub]}>Thanks for supporting PawPawCare. Manage it from Profile → Subscription.</Text>
-        <Button label="Done" onPress={close} />
-      </Card>
+      <StateCard
+        title="You're on Plus"
+        message="Thanks for supporting PawPawCare. Manage it from Profile → Subscription."
+        action={<Button label="Done" onPress={close} />}
+      />
     );
-  } else if (!visible || !isAvailable()) {
-    // Old build (no purchases module) or not offered yet.
+  } else if (included) {
     body = (
-      <Card style={styles.stateCard}>
-        <Text style={[type.cardTitleSm, styles.ink]}>Update the app to subscribe</Text>
-        <Text style={[type.body, styles.sub]}>
-          Subscriptions need the latest version of PawPawCare. Everything you use today stays free.
-        </Text>
-        <Button label="Close" variant="ghost" onPress={close} />
-      </Card>
+      <StateCard
+        title="Plus features are included for you"
+        message="As an early member you already have them — nothing to buy."
+        action={<Button label="Done" onPress={close} />}
+      />
+    );
+  } else if (!visible) {
+    body = (
+      <StateCard
+        title="Plus isn't available yet"
+        message="Everything you use today stays free."
+        action={<Button label="Close" variant="ghost" onPress={close} />}
+      />
+    );
+  } else if (availability === 'no_module') {
+    body = (
+      <StateCard
+        title="Update the app to subscribe"
+        message="Subscriptions need the latest version of PawPawCare. Everything you use today stays free."
+        action={<Button label="Close" variant="ghost" onPress={close} />}
+      />
+    );
+  } else if (!canPurchase) {
+    body = (
+      <StateCard
+        title="Subscriptions aren't available on this device yet"
+        message="Everything you use today stays free."
+        action={<Button label="Close" variant="ghost" onPress={close} />}
+      />
     );
   } else if (offerings.isLoading) {
     body = (
       <View style={styles.loading}>
-        <Skeleton height={44} radius={14} />
-        <Skeleton height={52} radius={14} />
+        <Skeleton height={44} radius={radii.control} />
+        <Skeleton height={52} radius={radii.control} />
       </View>
     );
   } else if (offerings.isError || !selected) {
     body = (
-      <Card style={styles.stateCard}>
-        <Text style={[type.cardTitleSm, styles.ink]}>Plans aren't available right now</Text>
-        <Text selectable style={[type.body, styles.sub]}>Check your connection and try again in a moment.</Text>
-        <Button label="Try again" variant="ghost" onPress={() => offerings.refetch()} />
-      </Card>
+      <StateCard
+        title="Plans aren't available right now"
+        message="Check your connection and try again in a moment."
+        action={<Button label="Try again" variant="ghost" onPress={() => offerings.refetch()} />}
+      />
     );
   } else {
     body = (
@@ -132,11 +193,13 @@ export default function PaywallScreen({ navigation, route }) {
           <SegmentedControl
             segments={choices.map((p) => ({ value: p.packageType, label: p.packageType === 'ANNUAL' ? 'Annual' : 'Monthly' }))}
             value={selected.packageType}
-            onChange={setChoice}
+            onChange={(value) => {
+              if (!busy) setChoice(value); // never switch what's being charged
+            }}
           />
         )}
         <View style={styles.priceRow}>
-          <Text style={styles.price}>{priceWithPeriod(selected.product)}</Text>
+          <Text style={[type.cardTitle, styles.ink]}>{priceWithPeriod(selected.product)}</Text>
           {selected.packageType === 'ANNUAL' && savings ? <StatusPill status="ok" label={`Save ${savings}%`} /> : null}
         </View>
         {intro ? <Text style={[type.secondary, styles.sub]}>{intro}, then {priceWithPeriod(selected.product)}</Text> : null}
@@ -149,7 +212,7 @@ export default function PaywallScreen({ navigation, route }) {
     );
   }
 
-  const showPurchaseExtras = !plan.active && visible && isAvailable();
+  const showPurchaseExtras = !included && canPurchase;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -157,10 +220,12 @@ export default function PaywallScreen({ navigation, route }) {
         <View style={styles.header}>
           <Text style={[type.screenTitle, styles.ink, { flex: 1 }]}>PawPawCare Plus</Text>
           <Pressable
-            style={({ pressed }) => [styles.closeBtn, pressed && { opacity: motion.pressOpacity }]}
+            style={({ pressed }) => [styles.closeBtn, pressed && { opacity: motion.pressOpacity }, busy && styles.dim]}
             onPress={close}
+            disabled={busy}
             accessibilityRole="button"
             accessibilityLabel="Close"
+            accessibilityState={{ disabled: busy }}
           >
             <MaterialCommunityIcons name="close" size={19} color={ui.ink} />
           </Pressable>
@@ -177,7 +242,7 @@ export default function PaywallScreen({ navigation, route }) {
           </Text>
         </Card>
 
-        <Card style={styles.benefits}>
+        <Card>
           {BENEFITS.map((b, i) => (
             <ListRow key={b.title} icon={b.icon} title={b.title} subtitle={b.subtitle} last={i === BENEFITS.length - 1} />
           ))}
@@ -193,20 +258,20 @@ export default function PaywallScreen({ navigation, route }) {
               style={({ pressed }) => [styles.restore, pressed && { opacity: motion.pressOpacity }]}
               accessibilityRole="button"
             >
-              <Text style={styles.link}>{restore.isPending ? 'Restoring…' : 'Restore purchases'}</Text>
+              <Text style={[type.rowTitle, styles.link]}>{restore.isPending ? 'Restoring…' : 'Restore purchases'}</Text>
             </Pressable>
 
-            <Text style={styles.legal}>
+            <Text style={[type.secondary, styles.legal]}>
               Payment is charged to your {STORE} when you confirm. The subscription renews automatically at
               the same price unless you cancel at least 24 hours before the end of the current period. Manage
               or cancel anytime in your {STORE_SETTINGS} settings.{intro ? ' Any unused part of a free trial ends when you subscribe.' : ''}
             </Text>
             <View style={styles.legalLinks}>
-              <Text style={styles.legalLink} onPress={() => Linking.openURL(TERMS_URL)} accessibilityRole="link">
+              <Text style={[type.secondary, styles.link]} onPress={() => Linking.openURL(TERMS_URL)} accessibilityRole="link">
                 Terms of Use
               </Text>
-              <Text style={styles.legalDot}>·</Text>
-              <Text style={styles.legalLink} onPress={() => Linking.openURL(PRIVACY_URL)} accessibilityRole="link">
+              <Text style={[type.secondary, styles.legal]}>·</Text>
+              <Text style={[type.secondary, styles.link]} onPress={() => Linking.openURL(PRIVACY_URL)} accessibilityRole="link">
                 Privacy Policy
               </Text>
             </View>
@@ -224,27 +289,24 @@ const styles = StyleSheet.create({
   closeBtn: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: radii.full,
     backgroundColor: ui.surface,
     borderWidth: 1,
     borderColor: ui.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dim: { opacity: motion.pressOpacity },
   ink: { color: ui.ink },
   sub: { color: ui.sub },
   reason: { marginTop: -6 },
   promise: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
-  benefits: {},
   stateCard: { padding: 18, gap: 12 },
   loading: { gap: 12 },
   purchase: { gap: 12 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' },
-  price: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 22, letterSpacing: -0.3, color: ui.ink },
   restore: { alignSelf: 'center', paddingVertical: 6 },
-  link: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.accent },
-  legal: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16, color: ui.subtle, textAlign: 'center' },
+  link: { color: ui.accent },
+  legal: { color: ui.subtle, textAlign: 'center' },
   legalLinks: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  legalLink: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11.5, color: ui.accent },
-  legalDot: { fontSize: 11.5, color: ui.faint },
 });

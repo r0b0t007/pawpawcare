@@ -46,6 +46,46 @@ function serial(task) {
 export const isAvailable = () => !!Purchases && !!apiKey();
 
 /**
+ * Why purchases are (un)available here: 'ready', 'no_module' (a build from
+ * before purchases — updating the app fixes it) or 'no_key' (this build has
+ * no store key — updating won't help).
+ */
+export const purchasesStatus = () => (!Purchases ? 'no_module' : !apiKey() ? 'no_key' : 'ready');
+
+/**
+ * What kind of failure a purchase error is, for the message shown:
+ * 'already_owned' (the store account already holds it — Restore fixes it),
+ * 'unavailable', 'network' or 'other'.
+ */
+export function purchaseErrorKind(err) {
+  const codes = Purchases?.PURCHASES_ERROR_CODE || {};
+  const code = err?.code;
+  if (code === 'PURCHASES_UNAVAILABLE' || (code && code === codes.PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR)) return 'unavailable';
+  if (code && (code === codes.PRODUCT_ALREADY_PURCHASED_ERROR || code === codes.RECEIPT_ALREADY_IN_USE_ERROR)) return 'already_owned';
+  if (code && code === codes.NETWORK_ERROR) return 'network';
+  return 'other';
+}
+
+// INTRO_ELIGIBILITY_STATUS_ELIGIBLE in react-native-purchases.
+const INTRO_ELIGIBLE = 2;
+
+/**
+ * iOS reports a product's intro offer whether or not this Apple ID already
+ * used it, so ask StoreKit. Anything but a clear "eligible" hides the trial:
+ * promising a free trial and then charging is worse than not mentioning it.
+ * (Google Play only returns offers the account is eligible for.)
+ */
+async function introEligibleProducts(productIds) {
+  if (Platform.OS !== 'ios' || productIds.length === 0) return null;
+  try {
+    const result = await Purchases.checkTrialOrIntroductoryPriceEligibility(productIds);
+    return new Set(productIds.filter((id) => result?.[id]?.status === INTRO_ELIGIBLE));
+  } catch (e) {
+    return new Set();
+  }
+}
+
+/**
  * Only accounts that can see subscriptions — or already have a plan — are
  * identified to RevenueCat, so no RevenueCat customer exists for anyone while
  * the feature is dark.
@@ -122,9 +162,14 @@ export async function getOfferings() {
   const offerings = await Purchases.getOfferings();
   const current = offerings?.current;
   if (!current) return null;
+  const available = current.availablePackages || [];
+  const withIntro = available.filter((p) => p.product?.introPrice).map((p) => p.product.identifier);
+  const eligible = await introEligibleProducts(withIntro);
+  const introFor = (product) =>
+    product?.introPrice && (eligible === null || eligible.has(product.identifier)) ? product.introPrice : null;
   return {
     identifier: current.identifier,
-    packages: (current.availablePackages || []).map((pkg) => ({
+    packages: available.map((pkg) => ({
       identifier: pkg.identifier,
       packageType: pkg.packageType, // MONTHLY | ANNUAL | LIFETIME | …
       product: {
@@ -134,7 +179,7 @@ export async function getOfferings() {
         price: pkg.product?.price,
         currencyCode: pkg.product?.currencyCode,
         subscriptionPeriod: pkg.product?.subscriptionPeriod ?? null, // ISO 8601, e.g. P1M
-        introPrice: pkg.product?.introPrice ?? null,
+        introPrice: introFor(pkg.product),
       },
       raw: pkg, // what purchasePackage() needs
     })),

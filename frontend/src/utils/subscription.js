@@ -42,6 +42,13 @@ export function introOfferText(product) {
 
 const STORE_NAMES = { app_store: 'the App Store', mac_app_store: 'the App Store', play_store: 'Google Play' };
 
+/** Billed by Apple / Google (so managed and cancelled in their settings). */
+export const isStoreBilled = (plan) =>
+  !!(plan?.active && !plan.is_lifetime && Object.prototype.hasOwnProperty.call(STORE_NAMES, plan.store));
+
+/** Store billing that keeps charging — e.g. after the account is deleted. */
+export const isRenewingStoreSubscription = (plan) => isStoreBilled(plan) && !!plan.will_renew;
+
 /** Where the subscription is billed, for copy ("the App Store"). */
 export const storeName = (store) => STORE_NAMES[store] ?? 'your app store';
 

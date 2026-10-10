@@ -22,7 +22,7 @@ export default function ProfileScreen({ navigation }) {
   const { invites, reminders, pets } = useData();
   // Subscription row: only once the server shows subscriptions to this
   // account (or it already has a plan) — invisible while the feature is dark.
-  const { plan, visible: subscriptionsVisible } = usePlan();
+  const { plan, included, visible: subscriptionsVisible } = usePlan();
   const planLine = planStatus(plan);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [careReminders, setCareReminders] = useState(true);
@@ -164,8 +164,8 @@ export default function ProfileScreen({ navigation }) {
             <Card style={styles.sectionCard}>
               <ListRow
                 icon="star-four-points-outline"
-                title={plan.active ? 'PawPawCare Plus' : 'Free plan'}
-                subtitle={planLine ? planLine.label : 'Records and exports free forever'}
+                title={plan.active ? 'PawPawCare Plus' : included ? 'Plus features included' : 'Free plan'}
+                subtitle={planLine ? planLine.label : included ? 'Thanks for being an early member' : 'Records and exports free forever'}
                 chevron
                 onPress={() => navigation.navigate('Subscription')}
                 last

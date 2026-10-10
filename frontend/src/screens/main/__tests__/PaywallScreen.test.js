@@ -7,7 +7,9 @@ jest.mock('react-native-safe-area-context', () => {
 });
 jest.mock('../../../components/Toast', () => ({ showToast: jest.fn(), ToastHost: () => null }));
 jest.mock('../../../services/analytics', () => ({ track: jest.fn() }));
-jest.mock('../../../services/purchases', () => ({ isAvailable: jest.fn(() => true) }));
+jest.mock('../../../services/purchases', () => ({
+  purchaseErrorKind: jest.fn(() => 'other'),
+}));
 
 let mockPlan;
 let mockOfferings;
@@ -26,7 +28,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import PaywallScreen from '../PaywallScreen';
 import { showToast } from '../../../components/Toast';
 import { track } from '../../../services/analytics';
-import { isAvailable } from '../../../services/purchases';
+import { purchaseErrorKind } from '../../../services/purchases';
 
 const pkg = (packageType, priceString, price, subscriptionPeriod, extra = {}) => ({
   identifier: `$rc_${packageType.toLowerCase()}`,
@@ -37,7 +39,7 @@ const pkg = (packageType, priceString, price, subscriptionPeriod, extra = {}) =>
 const MONTHLY = pkg('MONTHLY', '$4.99', 4.99, 'P1M');
 const ANNUAL = pkg('ANNUAL', '$39.99', 39.99, 'P1Y');
 
-const navigation = { goBack: jest.fn(), navigate: jest.fn() };
+const navigation = { goBack: jest.fn(), navigate: jest.fn(), canGoBack: jest.fn(() => true) };
 
 async function render(params) {
   let tree;
@@ -54,11 +56,10 @@ const button = (tree, label) => tree.root.findAll((n) => n.props.label === label
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockPlan = { plan: { active: false }, visible: true, canPurchase: true };
+  mockPlan = { plan: { active: false }, visible: true, included: false, canPurchase: true, availability: 'ready' };
   mockOfferings = { data: { packages: [MONTHLY, ANNUAL] }, isLoading: false, isError: false, refetch: jest.fn() };
   mockPurchase.isPending = false;
   mockRestore.isPending = false;
-  isAvailable.mockReturnValue(true);
 });
 
 test('promises free records, defaults to annual with its saving, and shows the renewal terms', async () => {
@@ -138,7 +139,7 @@ test('restore reports what it found', async () => {
 });
 
 test('an old build without purchases asks for an update instead', async () => {
-  isAvailable.mockReturnValue(false);
+  mockPlan = { ...mockPlan, canPurchase: false, availability: 'no_module' };
   const tree = await render();
 
   expect(hasText(tree, /Update the app to subscribe/)).toBe(true);
@@ -156,9 +157,98 @@ test('a load failure offers a retry', async () => {
 });
 
 test('someone already on Plus is not sold to again', async () => {
-  mockPlan = { plan: { active: true }, visible: true, canPurchase: true };
+  mockPlan = { ...mockPlan, plan: { active: true }, included: true };
   const tree = await render();
 
   expect(hasText(tree, /You're on Plus/)).toBe(true);
   expect(button(tree, 'Subscribe')).toBeUndefined();
+});
+
+const restoreLinkOf = (tree) =>
+  tree.root.findAll((n) => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function'
+    && n.findAll((c) => c.type === Text && [].concat(c.props.children).join('') === 'Restore purchases').length > 0)[0];
+
+describe('review fixes', () => {
+  it('early members are never sold to', async () => {
+    mockPlan = { ...mockPlan, plan: { active: false, grandfathered: true }, included: true };
+    const tree = await render();
+    expect(hasText(tree, /Plus features are included for you/)).toBe(true);
+    expect(button(tree, 'Subscribe')).toBeUndefined();
+    expect(hasText(tree, /Restore purchases/)).toBe(false);
+  });
+
+  it('says the right thing when nothing can be bought', async () => {
+    mockPlan = { ...mockPlan, visible: false, canPurchase: false };
+    expect(hasText(await render(), /Plus isn't available yet/)).toBe(true);
+
+    mockPlan = { ...mockPlan, visible: true, canPurchase: false, availability: 'no_key' };
+    const tree = await render();
+    expect(hasText(tree, /aren't available on this device yet/)).toBe(true);
+    expect(hasText(tree, /Update the app/)).toBe(false); // updating wouldn't help
+  });
+
+  it('points to Restore when the store account already owns Plus', async () => {
+    purchaseErrorKind.mockReturnValueOnce('already_owned');
+    mockPurchase.mutateAsync.mockRejectedValueOnce({ code: '7' });
+    const tree = await render();
+
+    await act(async () => {
+      await button(tree, 'Subscribe').props.onPress();
+    });
+
+    expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/Restore purchases/));
+  });
+
+  it('a restore the server has not confirmed yet is not reported as nothing found', async () => {
+    mockRestore.mutateAsync.mockResolvedValueOnce({ status: 'restored', synced: false, plan: null });
+    const tree = await render();
+
+    await act(async () => {
+      await restoreLinkOf(tree).props.onPress();
+    });
+
+    expect(showToast).toHaveBeenCalledWith('Restored — it may take a minute to show up');
+  });
+
+  it('locks close during a purchase and ignores a second tap', async () => {
+    let finish;
+    mockPurchase.mutateAsync.mockImplementationOnce(() => new Promise((r) => { finish = r; }));
+    const tree = await render();
+
+    let first;
+    act(() => {
+      first = button(tree, 'Subscribe').props.onPress();
+      button(tree, 'Subscribe').props.onPress(); // double tap
+    });
+    expect(mockPurchase.mutateAsync).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finish({ status: 'cancelled' });
+      await first;
+    });
+
+    // While a purchase is in flight, the modal can't be closed from its button.
+    mockPurchase.isPending = true;
+    const busy = await render();
+    const closeBtn = busy.root.findAll((n) => n.props.accessibilityLabel === 'Close' && 'disabled' in n.props)[0];
+    expect(closeBtn.props.disabled).toBe(true);
+  });
+
+  it('never navigates after the paywall was dismissed mid-purchase', async () => {
+    let finish;
+    mockPurchase.mutateAsync.mockImplementationOnce(() => new Promise((r) => { finish = r; }));
+    const tree = await render();
+    let pending;
+    act(() => {
+      pending = button(tree, 'Subscribe').props.onPress();
+    });
+
+    act(() => tree.unmount()); // swiped away
+    await act(async () => {
+      finish({ status: 'purchased', synced: true, plan: { active: true } });
+      await pending;
+    });
+
+    expect(navigation.goBack).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith('Welcome to Plus!');
+  });
 });

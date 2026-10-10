@@ -9,7 +9,11 @@ jest.mock('react-native-purchases', () => ({
     purchasePackage: jest.fn(),
     restorePurchases: jest.fn(() => Promise.resolve({})),
     getCustomerInfo: jest.fn(),
-    PURCHASES_ERROR_CODE: { PURCHASE_CANCELLED_ERROR: '1', PAYMENT_PENDING_ERROR: '20' },
+    checkTrialOrIntroductoryPriceEligibility: jest.fn(),
+    PURCHASES_ERROR_CODE: {
+      PURCHASE_CANCELLED_ERROR: '1', PRODUCT_NOT_AVAILABLE_FOR_PURCHASE_ERROR: '5', PRODUCT_ALREADY_PURCHASED_ERROR: '6',
+      RECEIPT_ALREADY_IN_USE_ERROR: '7', NETWORK_ERROR: '10', PAYMENT_PENDING_ERROR: '20',
+    },
   },
 }));
 jest.mock('../../config', () => ({
@@ -21,6 +25,8 @@ import Purchases from 'react-native-purchases';
 import {
   __resetForTests,
   ensurePurchases,
+  purchaseErrorKind,
+  purchasesStatus,
   getManagementUrl,
   getOfferings,
   isAvailable,
@@ -154,3 +160,35 @@ describe('ordering (review fixes)', () => {
   });
 });
 
+describe('trial eligibility and error kinds (review fixes)', () => {
+  const offering = () => ({ current: { identifier: 'default', availablePackages: [
+    { identifier: '$rc_annual', packageType: 'ANNUAL', product: { identifier: 'plus_annual', priceString: '$39.99', introPrice: { price: 0, periodUnit: 'WEEK', periodNumberOfUnits: 1 } } },
+  ] } });
+
+  it('on iOS, shows a trial only to Apple IDs StoreKit says are eligible', async () => {
+    const { Platform } = require('react-native');
+    expect(Platform.OS).toBe('ios'); // jest-expo default
+    await loginPurchases('u1');
+
+    Purchases.getOfferings.mockResolvedValueOnce(offering());
+    Purchases.checkTrialOrIntroductoryPriceEligibility.mockResolvedValueOnce({ plus_annual: { status: 1 } }); // ineligible
+    expect((await getOfferings()).packages[0].product.introPrice).toBeNull();
+
+    Purchases.getOfferings.mockResolvedValueOnce(offering());
+    Purchases.checkTrialOrIntroductoryPriceEligibility.mockResolvedValueOnce({ plus_annual: { status: 2 } }); // eligible
+    expect((await getOfferings()).packages[0].product.introPrice).not.toBeNull();
+
+    Purchases.getOfferings.mockResolvedValueOnce(offering());
+    Purchases.checkTrialOrIntroductoryPriceEligibility.mockRejectedValueOnce(new Error('storekit'));
+    expect((await getOfferings()).packages[0].product.introPrice).toBeNull(); // unknown means no promise
+  });
+
+  it('classifies purchase failures', () => {
+    expect(purchaseErrorKind({ code: '6' })).toBe('already_owned');
+    expect(purchaseErrorKind({ code: '7' })).toBe('already_owned');
+    expect(purchaseErrorKind({ code: '10' })).toBe('network');
+    expect(purchaseErrorKind({ code: 'PURCHASES_UNAVAILABLE' })).toBe('unavailable');
+    expect(purchaseErrorKind({ code: '2' })).toBe('other');
+    expect(purchasesStatus()).toBe('ready');
+  });
+});

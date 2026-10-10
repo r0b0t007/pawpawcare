@@ -125,3 +125,25 @@ describe('Delete account', () => {
     expect(tree.root.findByType(ConfirmDialog).props.message).not.toMatch(/billing/);
   });
 });
+
+describe('Subscription screen (review fixes)', () => {
+  it('hides Restore where purchases cannot run, and never sells to early members', async () => {
+    mockPlanState = { plan: { active: false, grandfathered: true }, included: true, visible: true, canPurchase: false };
+    const tree = await render(SubscriptionScreen);
+
+    expect(tree.root.findAll((n) => n.props.title === 'Restore purchases').length).toBe(0);
+    expect(tree.root.findAll((n) => n.props.label === 'See PawPawCare Plus').length).toBe(0);
+    expect(allText(tree)).toContain('Plus features included');
+  });
+
+  it('a promotional grant shows no store actions and no billing warning', async () => {
+    mockPlanState = { plan: { active: true, will_renew: true, store: 'promotional' }, included: true, visible: true, canPurchase: true };
+    const tree = await render(SubscriptionScreen);
+    expect(rowTitled(tree, 'Manage subscription')).toBeUndefined();
+    expect(allText(tree).some((t) => /doesn't cancel billing/.test(t))).toBe(false);
+
+    mockUser = { ...mockUser, plan: { active: true, will_renew: true, is_lifetime: false, store: 'promotional' } };
+    const details = await render(AccountDetailsScreen);
+    expect(details.root.findByType(ConfirmDialog).props.message).not.toMatch(/billing/);
+  });
+});
