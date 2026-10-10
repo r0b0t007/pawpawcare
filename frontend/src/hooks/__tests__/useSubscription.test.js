@@ -24,20 +24,37 @@ import { getOfferings, isAvailable, purchasePackage, restorePurchases } from '..
 import { useOfferings, usePlan, usePurchase, useRestore } from '../useSubscription';
 
 let hook;
+let mounted = [];
 function render(useHook) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  // gcTime Infinity: React Query schedules no garbage-collection timers, so
+  // nothing outlives the test (CI fails when Jest can't exit).
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false, gcTime: Infinity } },
+  });
   function Probe() {
     hook = useHook();
     return null;
   }
+  let renderer;
   act(() => {
-    TestRenderer.create(
+    renderer = TestRenderer.create(
       <QueryClientProvider client={client}>
         <Probe />
       </QueryClientProvider>,
     );
   });
+  mounted.push({ renderer, client });
 }
+
+afterEach(async () => {
+  // Let React Query's batched notifications land inside act, then tear down.
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 0));
+    mounted.forEach(({ renderer }) => renderer.unmount());
+  });
+  mounted.forEach(({ client }) => client.clear());
+  mounted = [];
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
