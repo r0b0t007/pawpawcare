@@ -8,9 +8,11 @@ import { clearSentryUser, setSentryUser } from './sentry';
 export function identify(user) {
   identifyUser(user);
   setSentryUser(user);
-  // RevenueCat only once subscriptions are visible to the account (or it has a
-  // plan), so no RevenueCat customer is created while the feature is dark.
+  // RevenueCat only while subscriptions are visible to the account (or it has
+  // a plan): no RevenueCat customer is created while the feature is dark, and
+  // switching visibility off again logs the account back out.
   if (shouldUsePurchases(user)) loginPurchases(user.id);
+  else logoutPurchases();
 }
 
 export function resetIdentity() {

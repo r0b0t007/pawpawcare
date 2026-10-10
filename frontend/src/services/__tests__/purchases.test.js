@@ -20,6 +20,7 @@ jest.mock('../../config', () => ({
 import Purchases from 'react-native-purchases';
 import {
   __resetForTests,
+  ensurePurchases,
   getManagementUrl,
   getOfferings,
   isAvailable,
@@ -125,3 +126,31 @@ describe('store calls', () => {
     expect(await getManagementUrl()).toBe('https://example.test/manage');
   });
 });
+
+describe('ordering (review fixes)', () => {
+  it('the next account logs in only after the previous logout finished', async () => {
+    await loginPurchases('A');
+    let finishLogout;
+    Purchases.logOut.mockImplementationOnce(() => new Promise((r) => { finishLogout = r; }));
+    const order = [];
+    Purchases.logIn.mockImplementationOnce(async (id) => { order.push(`logIn:${id}`); return {}; });
+
+    const out = logoutPurchases();
+    const inB = loginPurchases('B');
+    await Promise.resolve();
+    expect(Purchases.logIn).not.toHaveBeenCalled(); // still waiting for logOut
+
+    order.push('logOut done');
+    finishLogout({});
+    await out;
+    await expect(inB).resolves.toBe(true);
+    expect(order).toEqual(['logOut done', 'logIn:B']);
+  });
+
+  it('ensurePurchases identifies the account or throws PURCHASES_UNAVAILABLE', async () => {
+    await expect(ensurePurchases('u1')).resolves.toBeUndefined();
+    Purchases.logIn.mockRejectedValueOnce(new Error('offline'));
+    await expect(ensurePurchases('u2')).rejects.toMatchObject({ code: 'PURCHASES_UNAVAILABLE' });
+  });
+});
+

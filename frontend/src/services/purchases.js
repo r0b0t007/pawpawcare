@@ -32,6 +32,16 @@ const apiKey = () =>
 let configured = false;
 let currentUserId = null;
 
+// Identity changes run strictly one after another: a logOut still in flight
+// must never land after the next account's logIn (the purchase would be
+// recorded anonymously and never unlock anything).
+let queue = Promise.resolve();
+function serial(task) {
+  const run = queue.then(task);
+  queue = run.catch(() => {});
+  return run;
+}
+
 /** Whether this build can make purchases at all (native module + key present). */
 export const isAvailable = () => !!Purchases && !!apiKey();
 
@@ -48,40 +58,58 @@ export const shouldUsePurchases = (user) =>
  * server stores it (the webhook and sync look customers up by it). Safe to
  * call repeatedly. Resolves false when unavailable or on error (never throws).
  */
-export async function loginPurchases(userId) {
-  if (!isAvailable() || !userId) return false;
+export function loginPurchases(userId) {
+  if (!isAvailable() || !userId) return Promise.resolve(false);
   const id = String(userId);
-  try {
-    if (!configured) {
-      Purchases.configure({ apiKey: apiKey(), appUserID: id });
-      configured = true;
-      currentUserId = id;
-    } else if (currentUserId !== id) {
-      await Purchases.logIn(id);
-      currentUserId = id;
+  return serial(async () => {
+    try {
+      if (!configured) {
+        Purchases.configure({ apiKey: apiKey(), appUserID: id });
+        configured = true;
+        currentUserId = id;
+      } else if (currentUserId !== id) {
+        await Purchases.logIn(id);
+        currentUserId = id;
+      }
+      return true;
+    } catch (e) {
+      return false;
     }
-    return true;
-  } catch (e) {
-    return false;
-  }
+  });
 }
 
 /** Forget the account on this device (logout / account deletion). Never throws. */
-export async function logoutPurchases() {
-  if (!configured || currentUserId === null) return;
-  currentUserId = null;
-  try {
-    await Purchases.logOut();
-  } catch (e) {
-    // Already anonymous — nothing to do.
+export function logoutPurchases() {
+  return serial(async () => {
+    if (!configured || currentUserId === null) return;
+    try {
+      await Purchases.logOut();
+    } catch (e) {
+      // Already anonymous — nothing to do.
+    }
+    currentUserId = null;
+  });
+}
+
+/**
+ * Make sure RevenueCat is identified as this account before a store call.
+ * Throws PURCHASES_UNAVAILABLE when it can't be (no key / old build / offline).
+ */
+export async function ensurePurchases(userId) {
+  if (!(await loginPurchases(userId)) || currentUserId !== String(userId)) {
+    throw unavailable();
   }
+}
+
+function unavailable() {
+  const err = new Error('PURCHASES_UNAVAILABLE');
+  err.code = 'PURCHASES_UNAVAILABLE';
+  return err;
 }
 
 function requireReady() {
   if (!configured || currentUserId === null) {
-    const err = new Error('PURCHASES_UNAVAILABLE');
-    err.code = 'PURCHASES_UNAVAILABLE';
-    throw err;
+    throw unavailable();
   }
 }
 
@@ -159,4 +187,5 @@ export async function getManagementUrl() {
 export function __resetForTests() {
   configured = false;
   currentUserId = null;
+  queue = Promise.resolve();
 }

@@ -5,7 +5,9 @@ export const petsKeys = {
 };
 
 export const subscriptionKeys = {
-  offerings: ['subscription', 'offerings'],
+  all: ['subscription'],
+  // Per account: RevenueCat can target different offerings per customer.
+  offerings: (userId) => ['subscription', 'offerings', userId ?? null],
 };
 
 export const gamificationKeys = {

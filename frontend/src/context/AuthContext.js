@@ -35,18 +35,59 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { loadUser(); }, []);
 
-  // Re-read the account (plan + feature switches). Resolves the fresh user;
-  // throws on failure so callers can decide.
   const userRef = useRef(null);
   userRef.current = state.user;
+  // Bumped whenever a session ends, so a /users/me response that was in
+  // flight for the previous session can never land on the next one.
+  const sessionRef = useRef(0);
   const lastRefresh = useRef(0);
-  const refreshUser = useCallback(async () => {
-    const user = await get('/users/me');
+
+  // Every sign-in path and refresh applies the account through here: state,
+  // identity (analytics / crash reports / purchases) and the refresh clock.
+  const applyUser = (user) => {
     lastRefresh.current = Date.now();
-    if (userRef.current) {
-      dispatch({ type: 'SET_USER', payload: user });
-      identify(user);
+    userRef.current = user;
+    dispatch({ type: 'SET_USER', payload: user });
+    identify(user);
+  };
+
+  const endSession = () => {
+    sessionRef.current += 1;
+    userRef.current = null;
+  };
+
+  // Re-read the account (plan + feature switches). Resolves the fresh user,
+  // or null when the session changed meanwhile; throws on failure. A session
+  // that expired is logged out locally (the api client already cleared the
+  // tokens), exactly like at app start.
+  const refreshUser = useCallback(async () => {
+    const session = sessionRef.current;
+    let user;
+    try {
+      user = await get('/users/me');
+    } catch (err) {
+      if (err?.message === 'SESSION_EXPIRED' && session === sessionRef.current && userRef.current) {
+        endSession();
+        resetIdentity();
+        await clearTokens().catch(() => {});
+        dispatch({ type: 'LOGOUT' });
+      }
+      throw err;
     }
+    if (session !== sessionRef.current || !userRef.current || userRef.current.id !== user?.id) {
+      return null; // a different session or account by now — drop it
+    }
+    applyUser(user);
+    return user;
+  }, []);
+
+  // Apply the { plan, features } POST /users/me/subscription/sync returns,
+  // without another round trip (same session/account checks).
+  const applyPlan = useCallback(({ plan, features } = {}) => {
+    const current = userRef.current;
+    if (!current || !plan) return null;
+    const user = { ...current, plan, features: features ?? current.features };
+    applyUser(user);
     return user;
   }, []);
 
@@ -88,9 +129,7 @@ export function AuthProvider({ children }) {
   const loadUser = async () => {
     try {
       const user = await get('/users/me');
-      lastRefresh.current = Date.now();
-      dispatch({ type: 'SET_USER', payload: user });
-      identify(user); // tie analytics to the restored session
+      applyUser(user); // tie analytics to the restored session
       syncDevice();
     } catch (err) {
       if (err.message === 'SESSION_EXPIRED') await clearTokens();
@@ -104,8 +143,7 @@ export function AuthProvider({ children }) {
       const tokens = await post('/auth/signup', { name, email, password }, { skipAuth: true });
       await storeTokens(tokens.access_token, tokens.refresh_token);
       const user = await get('/users/me');
-      dispatch({ type: 'SET_USER', payload: user });
-      identify(user);
+      applyUser(user);
       track('user_signed_up');
       syncDevice();
       return true;
@@ -125,8 +163,7 @@ export function AuthProvider({ children }) {
         showToast('Welcome back — your account deletion was cancelled.');
       }
       const user = await get('/users/me');
-      dispatch({ type: 'SET_USER', payload: user });
-      identify(user);
+      applyUser(user);
       track('user_logged_in');
       syncDevice();
       return true;
@@ -149,8 +186,7 @@ export function AuthProvider({ children }) {
         showToast('Welcome back — your account deletion was cancelled.');
       }
       const user = await get('/users/me');
-      dispatch({ type: 'SET_USER', payload: user });
-      identify(user);
+      applyUser(user);
       // Social auth is find-or-create and the backend doesn't flag which
       // happened, so infer a brand-new account from a just-set created_at to
       // keep the signup funnel accurate (best-effort — analytics only).
@@ -166,6 +202,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    endSession();
     // Grab the refresh token before we wipe local state (needed to revoke it).
     const { refresh } = await getTokens().catch(() => ({ refresh: null }));
 
@@ -208,6 +245,7 @@ export function AuthProvider({ children }) {
   const deleteAccount = async () => {
     const res = await request('DELETE', '/users/me');
     track('account_deletion_requested');
+    endSession();
 
     // Local cleanup mirrors logout(); no /auth/logout or /devices call is
     // needed — the server already revoked everything. Every step is
@@ -264,6 +302,7 @@ export function AuthProvider({ children }) {
         logout,
         updateUser,
         refreshUser,
+        applyPlan,
         deleteAccount,
         sendEmailVerification,
         confirmEmailVerification,

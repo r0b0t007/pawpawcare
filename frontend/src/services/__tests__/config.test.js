@@ -54,3 +54,14 @@ test('RevenueCat keys refuse secret keys and cross-platform keys', () => {
   expect(rcKeys('goog_abc', 'appl_abc')).toEqual(['', '']);
 });
 
+test('Test Store keys are refused outside development builds', () => {
+  const dev = global.__DEV__;
+  global.__DEV__ = false;
+  try {
+    expect(rcKeys('test_abc', 'test_abc')).toEqual(['', '']);
+    expect(rcKeys('appl_abc', 'goog_abc')).toEqual(['appl_abc', 'goog_abc']);
+  } finally {
+    global.__DEV__ = dev;
+  }
+});
+

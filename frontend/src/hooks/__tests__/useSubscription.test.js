@@ -5,14 +5,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // The purchase flow: store call → server verifies with RevenueCat → user
 // refreshed. The server's answer is what counts; cancelling isn't an error.
 const mockRefreshUser = jest.fn();
+const mockApplyPlan = jest.fn();
 let mockUser = null;
 jest.mock('../../context/AuthContext', () => ({
-  useAuth: () => ({ user: mockUser, refreshUser: mockRefreshUser }),
+  useAuth: () => ({ user: mockUser, refreshUser: mockRefreshUser, applyPlan: mockApplyPlan }),
 }));
 jest.mock('../../services/api', () => ({ post: jest.fn() }));
 jest.mock('../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../services/purchases', () => ({
   isAvailable: jest.fn(() => true),
+  ensurePurchases: jest.fn(() => Promise.resolve()),
   getOfferings: jest.fn(),
   purchasePackage: jest.fn(),
   restorePurchases: jest.fn(),
@@ -20,7 +22,7 @@ jest.mock('../../services/purchases', () => ({
 
 import { post } from '../../services/api';
 import { track } from '../../services/analytics';
-import { getOfferings, isAvailable, purchasePackage, restorePurchases } from '../../services/purchases';
+import { ensurePurchases, getOfferings, isAvailable, purchasePackage, restorePurchases } from '../../services/purchases';
 import { useOfferings, usePlan, usePurchase, useRestore } from '../useSubscription';
 
 let hook;
@@ -60,6 +62,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockUser = { id: 'u1', plan: { tier: 'free', active: false }, features: { subscriptions_visible: true, paywall_enabled: false, gated: {} } };
   mockRefreshUser.mockResolvedValue({ id: 'u1', plan: { tier: 'plus', active: true } });
+  mockApplyPlan.mockImplementation((res) => (res?.plan ? { id: 'u1', plan: res.plan } : null));
+  ensurePurchases.mockResolvedValue();
 });
 
 describe('usePlan', () => {
@@ -99,9 +103,12 @@ describe('usePurchase', () => {
       result = await hook.mutateAsync({ packageType: 'ANNUAL', raw: {} });
     });
 
+    expect(ensurePurchases).toHaveBeenCalledWith('u1');
     expect(post).toHaveBeenCalledWith('/users/me/subscription/sync');
-    expect(mockRefreshUser).toHaveBeenCalled();
-    expect(result).toEqual({ status: 'purchased', synced: true, plan: { tier: 'plus', active: true } });
+    // The plan the sync returned is applied — no second /users/me round trip.
+    expect(mockApplyPlan).toHaveBeenCalledWith({ plan: { tier: 'plus' } });
+    expect(mockRefreshUser).not.toHaveBeenCalled();
+    expect(result).toEqual({ status: 'purchased', synced: true, plan: { tier: 'plus' } });
     expect(track).toHaveBeenCalledWith('subscription_purchase', { result: 'purchased', synced: true, package_type: 'annual' });
   });
 
@@ -160,3 +167,51 @@ describe('useRestore', () => {
     expect(track).toHaveBeenCalledWith('purchases_restore', { result: 'restored', synced: true });
   });
 });
+
+describe('review fixes', () => {
+  it('caches offerings per account and identifies the account first', async () => {
+    getOfferings.mockResolvedValue({ packages: [] });
+    render(useOfferings);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(ensurePurchases).toHaveBeenCalledWith('u1');
+    expect(getOfferings).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry when purchases are unavailable on this device', async () => {
+    const err = Object.assign(new Error('PURCHASES_UNAVAILABLE'), { code: 'PURCHASES_UNAVAILABLE' });
+    ensurePurchases.mockRejectedValue(err);
+    const client = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, retryDelay: 0 } } });
+    let probe;
+    function Probe() {
+      probe = useOfferings();
+      return null;
+    }
+    let renderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <Probe />
+        </QueryClientProvider>,
+      );
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(ensurePurchases).toHaveBeenCalledTimes(1);
+    expect(probe.isError).toBe(true);
+    await act(async () => renderer.unmount());
+    client.clear();
+  });
+
+  it('a purchase that cannot start never reaches the store', async () => {
+    ensurePurchases.mockRejectedValueOnce(Object.assign(new Error('PURCHASES_UNAVAILABLE'), { code: 'PURCHASES_UNAVAILABLE' }));
+    render(usePurchase);
+    await act(async () => {
+      await expect(hook.mutateAsync({ raw: {} })).rejects.toThrow('PURCHASES_UNAVAILABLE');
+    });
+    expect(purchasePackage).not.toHaveBeenCalled();
+  });
+});
+

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { post } from '../services/api';
 import { track } from '../services/analytics';
 import {
+  ensurePurchases,
   getOfferings,
   isAvailable,
   purchasePackage,
@@ -46,35 +47,46 @@ export function usePlan() {
 // Store prices change rarely; an hour avoids refetching on every paywall open.
 const OFFERINGS_STALE_MS = 60 * 60 * 1000;
 
+const isUnavailable = (err) => err?.code === 'PURCHASES_UNAVAILABLE';
+
 /** The packages to offer — only fetched when the user can see subscriptions. */
 export function useOfferings() {
+  const { user } = useAuth();
   const { canPurchase } = usePlan();
   return useQuery({
-    queryKey: subscriptionKeys.offerings,
-    queryFn: getOfferings,
-    enabled: canPurchase,
+    queryKey: subscriptionKeys.offerings(user?.id),
+    queryFn: async () => {
+      await ensurePurchases(user.id); // identified as THIS account first
+      return getOfferings();
+    },
+    enabled: canPurchase && !!user?.id,
     staleTime: OFFERINGS_STALE_MS,
+    // Not set up on this device (old build / no key / offline login): retrying won't help.
+    retry: (count, err) => !isUnavailable(err) && count < 2,
   });
 }
 
 function useStoreAction(kind, storeCall) {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser, applyPlan } = useAuth();
   return useMutation({
     mutationFn: async (arg) => {
+      await ensurePurchases(user?.id);
       const result = await storeCall(arg);
       if (result.status !== 'purchased' && result.status !== 'restored') return result;
 
       // The webhook would get there too, but the user is waiting: ask the
-      // server to verify with RevenueCat now. A failure here doesn't undo the
-      // purchase — the webhook / reconcile job settle it shortly.
+      // server to verify with RevenueCat now and apply the plan it returns.
+      // A failure here doesn't undo the purchase — the webhook / reconcile
+      // job settle it shortly; refresh the account then.
       let synced = true;
+      let updated = null;
       try {
-        await post('/users/me/subscription/sync');
+        updated = applyPlan(await post('/users/me/subscription/sync'));
       } catch (e) {
         synced = false;
       }
-      const user = await refreshUser().catch(() => null);
-      return { ...result, synced, plan: user?.plan ?? null };
+      if (!updated) updated = await refreshUser().catch(() => null);
+      return { ...result, synced, plan: updated?.plan ?? null };
     },
     onSuccess: (result, arg) => {
       track(kind === 'purchase' ? 'subscription_purchase' : 'purchases_restore', {
