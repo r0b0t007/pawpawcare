@@ -4,6 +4,10 @@ export const petsKeys = {
   all: ['pets'],
 };
 
+export const subscriptionKeys = {
+  offerings: ['subscription', 'offerings'],
+};
+
 export const gamificationKeys = {
   summary: ['gamification', 'summary'],
   recap: ['gamification', 'recap'],

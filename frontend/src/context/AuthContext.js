@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react';
+import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { get, post, patch, request, getTokens, storeTokens, clearTokens } from '../services/api';
 import {
@@ -11,6 +12,11 @@ import { identify, resetIdentity } from '../services/identity';
 import { showToast } from '../components/Toast';
 
 const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
+
+// Server-side switches (plan, subscriptions visibility) reach the app through
+// /users/me; re-read it when the app comes back to the foreground, at most
+// this often.
+const FOREGROUND_REFRESH_MS = 5 * 60 * 1000;
 
 const AuthContext = createContext(null);
 
@@ -28,6 +34,30 @@ export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, { user: null, isLoading: true, error: null });
 
   useEffect(() => { loadUser(); }, []);
+
+  // Re-read the account (plan + feature switches). Resolves the fresh user;
+  // throws on failure so callers can decide.
+  const userRef = useRef(null);
+  userRef.current = state.user;
+  const lastRefresh = useRef(0);
+  const refreshUser = useCallback(async () => {
+    const user = await get('/users/me');
+    lastRefresh.current = Date.now();
+    if (userRef.current) {
+      dispatch({ type: 'SET_USER', payload: user });
+      identify(user);
+    }
+    return user;
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active' || !userRef.current) return;
+      if (Date.now() - lastRefresh.current < FOREGROUND_REFRESH_MS) return;
+      refreshUser().catch(() => {});
+    });
+    return () => sub.remove();
+  }, [refreshUser]);
 
   // Register this device's push token + timezone with the backend so reminders
   // fire at the right local time. Safe to call repeatedly (idempotent upsert).
@@ -58,6 +88,7 @@ export function AuthProvider({ children }) {
   const loadUser = async () => {
     try {
       const user = await get('/users/me');
+      lastRefresh.current = Date.now();
       dispatch({ type: 'SET_USER', payload: user });
       identify(user); // tie analytics to the restored session
       syncDevice();
@@ -232,6 +263,7 @@ export function AuthProvider({ children }) {
         socialLogin,
         logout,
         updateUser,
+        refreshUser,
         deleteAccount,
         sendEmailVerification,
         confirmEmailVerification,

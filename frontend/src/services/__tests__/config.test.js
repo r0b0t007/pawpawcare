@@ -29,3 +29,28 @@ test('"off" (or anything that is not an https DSN) disables reporting', () => {
   expect(dsnWith('off')).toBe('');
   expect(dsnWith('')).toBe('');
 });
+
+// RevenueCat SDK keys: public keys only — a secret key must never ship.
+function rcKeys(ios, android) {
+  const set = (k, v) => (v === undefined ? delete process.env[k] : (process.env[k] = v));
+  set('EXPO_PUBLIC_REVENUECAT_IOS_KEY', ios);
+  set('EXPO_PUBLIC_REVENUECAT_ANDROID_KEY', android);
+  let cfg;
+  jest.isolateModules(() => {
+    cfg = require('../../config');
+  });
+  delete process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY;
+  delete process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY;
+  return [cfg.REVENUECAT_IOS_KEY, cfg.REVENUECAT_ANDROID_KEY];
+}
+
+test('RevenueCat keys accept public SDK keys per platform', () => {
+  expect(rcKeys('appl_abc', 'goog_abc')).toEqual(['appl_abc', 'goog_abc']);
+  expect(rcKeys('test_abc', 'test_abc')).toEqual(['test_abc', 'test_abc']);
+});
+
+test('RevenueCat keys refuse secret keys and cross-platform keys', () => {
+  expect(rcKeys('sk_secret', 'sk_secret')).toEqual(['', '']);
+  expect(rcKeys('goog_abc', 'appl_abc')).toEqual(['', '']);
+});
+
