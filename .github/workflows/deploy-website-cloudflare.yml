@@ -17,7 +17,7 @@ jobs:
     name: wrangler pages deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # `wrangler pages deploy` only picks up a Functions route if it finds a
       # pre-built _worker.js in the deploy directory — it does NOT bundle
@@ -25,7 +25,7 @@ jobs:
       # deploy without this step silently serves 200 instead of routing to
       # the Function at all).
       - name: Build Pages Functions
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -36,7 +36,7 @@ jobs:
             --compatibility-date=2026-08-30
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
