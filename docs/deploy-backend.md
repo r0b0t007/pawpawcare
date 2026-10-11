@@ -130,7 +130,7 @@ Then:
 ```sh
 php artisan key:generate
 php artisan migrate --force
-php artisan storage:link          # serves uploaded pet photos/documents
+php artisan storage:link          # serves uploaded photos while they're on the local disk (see docs/uploads-r2.md)
 php artisan config:cache && php artisan route:cache
 ```
 

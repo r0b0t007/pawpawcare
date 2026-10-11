@@ -2,6 +2,8 @@
 
 Nightly encrypted backups of the production database and user uploads, sent to a private Cloudflare R2 bucket. Built on `spatie/laravel-backup`: config in `backend/config/backup.php`, the R2 disk in `backend/config/filesystems.php` (`backups`), and the schedule in `backend/routes/console.php`.
 
+> **Once uploads move to R2** ([uploads-r2.md](uploads-r2.md)), `storage/app/private` and `storage/app/public` are empty and the zip holds only the database. The R2 buckets themselves aren't backed up.
+
 ## What runs
 
 | When (server time) | Command | What it does |

@@ -10,7 +10,6 @@ use App\Models\Upload;
 use App\Models\User;
 use App\Support\Uploads;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 
 class PruneOrphanUploads extends Command
 {
@@ -33,11 +32,11 @@ class PruneOrphanUploads extends Command
             ->map(fn ($url) => Uploads::pathFromUrl($url))
             ->filter()
             ->flip();
-        $deleted += $this->prune(Storage::disk('public'), 'uploads', $publicRefs, $cutoff, fn ($path) => Upload::where('path', $path)->delete());
+        $deleted += $this->prune(Uploads::publicDisk(), 'uploads', $publicRefs, $cutoff, fn ($path) => Upload::where('path', $path)->delete());
 
         // Private disk: medical documents under documents/ (paths stored verbatim).
         $docRefs = Document::whereNotNull('file_path')->pluck('file_path')->flip();
-        $deleted += $this->prune(Storage::disk(Uploads::PRIVATE_DISK), 'documents', $docRefs, $cutoff);
+        $deleted += $this->prune(Uploads::privateDisk(), 'documents', $docRefs, $cutoff);
 
         $this->info("Pruned {$deleted} orphaned file(s).");
 

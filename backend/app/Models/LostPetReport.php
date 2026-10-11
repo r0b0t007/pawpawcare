@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Uploads;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,6 +21,12 @@ class LostPetReport extends Model
         'last_seen_location', 'last_seen_at', 'latitude', 'longitude',
         'description', 'contact_phone', 'photo_url', 'resolution_note', 'resolved_at',
     ];
+
+    /** Managed upload urls are stored in their current form (see Uploads::canonicalUrl). */
+    protected function photoUrl(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value) => Uploads::canonicalUrl($value));
+    }
 
     protected $casts = [
         'last_seen_at' => 'datetime',

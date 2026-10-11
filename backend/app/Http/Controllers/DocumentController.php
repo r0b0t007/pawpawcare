@@ -20,9 +20,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\HeaderUtils;
+use Symfony\Component\HttpFoundation\Response;
 
 class DocumentController extends Controller
 {
@@ -80,7 +81,7 @@ class DocumentController extends Controller
             'file_path' => $path,
             'mime' => $isPdf ? 'application/pdf' : $file->getMimeType(),
             // Record the actual stored size (images are re-encoded, so it differs).
-            'size_bytes' => Storage::disk(Uploads::PRIVATE_DISK)->size($path),
+            'size_bytes' => Uploads::privateDisk()->size($path),
         ]);
 
         return response()->json($doc->toApi(), 201);
@@ -106,21 +107,50 @@ class DocumentController extends Controller
     }
 
     /**
-     * Stream the file behind a valid signed URL. This route is NOT JWT-guarded
+     * Serve the file behind a valid signed URL. This route is NOT JWT-guarded
      * (a browser can't send the token) — the signature, minted only for an
-     * authorized user and valid for minutes, is the authorization.
+     * authorized user and valid for minutes, is the authorization. On R2 the
+     * file never passes through PHP: the browser is sent on to a 5-minute
+     * presigned URL for this one object, minted fresh on every visit (so the
+     * vet share page's longer-lived links keep working).
      */
-    public function raw(string $documentId): StreamedResponse
+    public function raw(string $documentId): Response
     {
         $doc = Document::find($documentId);
-        $disk = Storage::disk(Uploads::PRIVATE_DISK);
+        $disk = Uploads::privateDisk();
         if (! $doc || ! $disk->exists($doc->file_path)) {
             abort(404, 'Document not found');
         }
 
-        return $disk->response($doc->file_path, $doc->title, [
-            'Content-Type' => $doc->mime ?: 'application/octet-stream',
+        $name = self::downloadName($doc->title);
+        $type = $doc->mime ?: 'application/octet-stream';
+
+        if (Uploads::privateDiskName() === 'local') {
+            return $disk->response($doc->file_path, $name, ['Content-Type' => $type]);
+        }
+
+        $url = $disk->temporaryUrl($doc->file_path, now()->addMinutes(5), [
+            'ResponseContentType' => $type,
+            'ResponseContentDisposition' => HeaderUtils::makeDisposition('inline', $name, self::asciiName($name)),
         ]);
+
+        // no-referrer: the presigned URL must not leak to whatever the PDF links to.
+        return redirect()->away($url)->withHeaders(['Cache-Control' => 'no-store', 'Referrer-Policy' => 'no-referrer']);
+    }
+
+    /** The title as a filename: path separators would make the disposition header throw. */
+    private static function downloadName(string $title): string
+    {
+        $name = trim(str_replace(['/', '\\'], '-', $title));
+
+        return $name !== '' ? $name : 'document';
+    }
+
+    private static function asciiName(string $name): string
+    {
+        $ascii = trim(str_replace('%', '', Str::ascii($name)));
+
+        return $ascii !== '' ? $ascii : 'document';
     }
 
     /**

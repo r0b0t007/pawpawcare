@@ -39,6 +39,9 @@
         <env name="BACKUP_R2_ENDPOINT" value=""/>
         <env name="BACKUP_R2_ACCESS_KEY_ID" value=""/>
         <env name="BACKUP_R2_SECRET_ACCESS_KEY" value=""/>
+        <env name="UPLOADS_PUBLIC_DISK" value="public"/>
+        <env name="UPLOADS_PRIVATE_DISK" value="local"/>
+        <env name="MEDIA_URL" value=""/>
         <env name="POSTHOG_PROJECT_KEY" value=""/>
         <env name="POSTHOG_PERSONAL_API_KEY" value=""/>
         <env name="POSTHOG_PROJECT_ID" value=""/>

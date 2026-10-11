@@ -7,6 +7,7 @@ use App\Models\Pet;
 use App\Models\Post;
 use App\Models\Upload;
 use App\Models\User;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -15,43 +16,115 @@ use Illuminate\Validation\ValidationException;
 
 class Uploads
 {
-    /** The private disk holding sensitive files (medical documents). */
-    public const PRIVATE_DISK = 'local';
+    /** Disks that may hold public images: local (served at /storage) or R2 (served at MEDIA_URL). */
+    public const PUBLIC_DISKS = ['public', 'r2-media'];
+
+    /** Disks that may hold medical documents: never web-accessible without a signed URL. */
+    public const PRIVATE_DISKS = ['local', 'r2-documents'];
+
+    /** A managed upload's path: a 40-char random name in uploads/ (see pathFromUrl). */
+    private const MANAGED_PATH = 'uploads/[A-Za-z0-9]{40}\.[A-Za-z0-9]{2,5}';
+
+    // ── Disks ────────────────────────────────────────────────────────────────
+
+    public static function publicDiskName(): string
+    {
+        return self::diskName('public_disk', self::PUBLIC_DISKS);
+    }
+
+    public static function privateDiskName(): string
+    {
+        return self::diskName('private_disk', self::PRIVATE_DISKS);
+    }
+
+    public static function publicDisk(): Filesystem
+    {
+        return Storage::disk(self::publicDiskName());
+    }
+
+    /** The disk holding sensitive files (medical documents). */
+    public static function privateDisk(): Filesystem
+    {
+        return Storage::disk(self::privateDiskName());
+    }
 
     // ── Public images (avatars, post photos) ─────────────────────────────────
 
     /**
      * Re-encode an uploaded image via GD (strips EXIF/metadata, guarantees the
-     * bytes are a real image) and store it on the public disk. Returns the
-     * relative /storage/... url. Aborts (422) if the file isn't a valid image.
+     * bytes are a real image) and store it on the public disk. Returns its
+     * url (see publicUrl). Aborts (422) if the file isn't a valid image.
      */
     public static function storeImage(UploadedFile $file, string $ownerId): string
     {
         [$binary, $ext] = self::encodeImage($file);
         $path = self::randomPath('uploads', $ext);
-        Storage::disk('public')->put($path, $binary);
+        $url = self::publicUrl($path); // before the write: a missing MEDIA_URL stores nothing
+        self::publicDisk()->put($path, $binary);
         Upload::create(['path' => $path, 'user_id' => $ownerId]);
 
-        return '/storage/'.$path;
+        return $url;
+    }
+
+    /**
+     * The url stored for a public-disk path: relative /storage/... on the
+     * local disk (the app resolves it against its API base), absolute
+     * MEDIA_URL/... on R2.
+     */
+    public static function publicUrl(string $path): string
+    {
+        if (self::publicDiskName() === 'public') {
+            return '/storage/'.$path;
+        }
+        $base = self::mediaBase();
+        if ($base === null) {
+            throw new \RuntimeException('MEDIA_URL must be set when uploads use the r2-media disk.');
+        }
+
+        return $base.'/'.$path;
+    }
+
+    /**
+     * A managed upload url in its current form, so an old /storage/... value
+     * a client sends back becomes MEDIA_URL/... once images are on R2 (and
+     * matches what's stored). Anything else is returned unchanged. Never
+     * throws: a misconfigured disk must not block saving a record.
+     */
+    public static function canonicalUrl(?string $url): ?string
+    {
+        $path = self::pathFromUrl($url);
+        if ($path === null) {
+            return $url;
+        }
+
+        try {
+            return self::publicUrl($path);
+        } catch (\RuntimeException) {
+            return $url;
+        }
     }
 
     /**
      * Guard for every client-supplied image URL field (avatars, post images,
-     * lost-pet photos). Accepts an external http(s) URL, the field's current
-     * value unchanged, or a `/storage/...` upload made by one of $uploaderIds.
-     * Anything else — another user's upload, a hand-written or traversal-shaped
-     * path — is a 422, so a record can never point at a file its owner may not
-     * delete.
+     * lost-pet photos). Accepts the field's current value unchanged (in
+     * either url form), an upload made by one of $uploaderIds, or an
+     * external http(s) URL. Anything else — another user's upload (also by
+     * its MEDIA_URL address), a hand-written or traversal-shaped path — is a
+     * 422, so a record can never point at a file its owner may not delete.
      *
      * @param  list<string>  $uploaderIds
      */
     public static function assertUsableUrl(?string $url, array $uploaderIds, ?string $current, string $field): void
     {
-        if ($url === null || $url === '' || $url === $current || preg_match('#^https?://#i', $url)) {
+        if ($url === null || $url === '' || self::canonicalUrl($url) === self::canonicalUrl($current)) {
             return;
         }
 
         $path = self::pathFromUrl($url);
+        if ($path === null && preg_match('#^https?://#i', $url)) {
+            return; // an external image
+        }
+
         $owned = $path && Upload::where('path', $path)->whereIn('user_id', $uploaderIds)->exists();
 
         if (! $owned) {
@@ -83,26 +156,46 @@ class Uploads
     public static function deletePrivate(?string $path): void
     {
         if ($path) {
-            DB::afterCommit(fn () => Storage::disk(self::PRIVATE_DISK)->delete($path));
+            DB::afterCommit(fn () => self::privateDisk()->delete($path));
         }
     }
 
     // ── Public-disk path helpers (used by the prune command) ─────────────────
 
     /**
-     * Extract the public-disk path from a managed /storage/... url, or null.
-     * Only the shape the app generates is managed — a 40-char random name in
-     * uploads/ (storeImage() today; Laravel's hashName() for older uploads,
-     * whose extension could be e.g. .jpeg or .bmp). Anything else (external,
+     * Extract the public-disk path from a managed upload url, or null: the
+     * /storage/... form, or MEDIA_URL/... when MEDIA_URL is set. Only the
+     * shape the app generates is managed — a 40-char random name in uploads/
+     * (storeImage() today; Laravel's hashName() for older uploads, whose
+     * extension could be e.g. .jpeg or .bmp). Anything else (external,
      * hand-written, traversal-shaped) is left alone.
      */
     public static function pathFromUrl(?string $url): ?string
     {
-        if (! $url || ! preg_match('#^/storage/(uploads/[A-Za-z0-9]{40}\.[A-Za-z0-9]{2,5})$#', $url, $m)) {
+        if (! $url) {
             return null;
         }
 
-        return $m[1];
+        foreach (array_filter(['/storage', self::mediaBase()]) as $prefix) {
+            if (preg_match('#^'.preg_quote($prefix, '#').'/('.self::MANAGED_PATH.')$#', $url, $m)) {
+                return $m[1];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Every url a record may hold for this path: rows written before the move
+     * to R2 keep /storage/... until `uploads:migrate` rewrites them.
+     *
+     * @return list<string>
+     */
+    public static function urlForms(string $path): array
+    {
+        $base = self::mediaBase();
+
+        return $base === null ? ['/storage/'.$path] : ['/storage/'.$path, $base.'/'.$path];
     }
 
     /**
@@ -121,25 +214,26 @@ class Uploads
 
         // After commit (immediate when there's no transaction): the reference
         // check then sees the committed state, and a rollback keeps the file.
-        DB::afterCommit(fn () => self::deleteIfUnreferenced($url, $path));
+        DB::afterCommit(fn () => self::deleteIfUnreferenced($path));
     }
 
-    private static function deleteIfUnreferenced(string $url, string $path): void
+    private static function deleteIfUnreferenced(string $path): void
     {
         try {
             if (! Upload::where('path', $path)->exists()) {
                 return;
             }
 
-            $stillReferenced = User::where('avatar_url', $url)->exists()
-                || Pet::where('avatar_url', $url)->exists()
-                || Post::where('image_url', $url)->exists()
-                || LostPetReport::where('photo_url', $url)->exists();
+            $urls = self::urlForms($path);
+            $stillReferenced = User::whereIn('avatar_url', $urls)->exists()
+                || Pet::whereIn('avatar_url', $urls)->exists()
+                || Post::whereIn('image_url', $urls)->exists()
+                || LostPetReport::whereIn('photo_url', $urls)->exists();
             if ($stillReferenced) {
                 return;
             }
 
-            Storage::disk('public')->delete($path);
+            self::publicDisk()->delete($path);
             Upload::where('path', $path)->delete();
         } catch (\Throwable $e) {
             report($e);
@@ -202,9 +296,28 @@ class Uploads
     private static function putPrivate(string $binary, string $dir, string $ext): string
     {
         $path = self::randomPath($dir, $ext);
-        Storage::disk(self::PRIVATE_DISK)->put($path, $binary);
+        self::privateDisk()->put($path, $binary);
 
         return $path;
+    }
+
+    /** @param  list<string>  $allowed */
+    private static function diskName(string $key, array $allowed): string
+    {
+        $name = (string) config("filesystems.uploads.{$key}");
+        if (! in_array($name, $allowed, true)) {
+            throw new \RuntimeException("filesystems.uploads.{$key} must be one of ".implode(', ', $allowed).", not '{$name}'.");
+        }
+
+        return $name;
+    }
+
+    /** MEDIA_URL without a trailing slash, or null when unset. */
+    private static function mediaBase(): ?string
+    {
+        $base = rtrim((string) config('filesystems.disks.r2-media.url'), '/');
+
+        return $base === '' ? null : $base;
     }
 
     private static function randomPath(string $dir, string $ext): string

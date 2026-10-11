@@ -6,6 +6,7 @@ use App\Services\Analytics\ProductAnalytics;
 use App\Services\Subscriptions\Entitlements;
 use App\Support\Uploads;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -40,6 +41,12 @@ class User extends Model
         'name', 'email', 'hashed_password', 'avatar_url', 'bio', 'is_active', 'timezone',
         'provider', 'provider_id',
     ];
+
+    /** Managed upload urls are stored in their current form (see Uploads::canonicalUrl). */
+    protected function avatarUrl(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value) => Uploads::canonicalUrl($value));
+    }
 
     protected $hidden = ['hashed_password', 'provider', 'provider_id'];
 
