@@ -20,7 +20,7 @@ jobs:
       run:
         working-directory: ./backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -30,7 +30,7 @@ jobs:
           coverage: none
 
       - name: Cache Composer packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: backend/vendor
           key: composer-${{ hashFiles('backend/composer.lock') }}
@@ -54,9 +54,9 @@ jobs:
       run:
         working-directory: ./frontend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
           cache: npm
@@ -75,11 +75,11 @@ jobs:
     name: Website tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # 22+ for ESM syntax detection (website/functions/*.js has no
       # package.json "type") and glob support in --test.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -90,7 +90,7 @@ jobs:
     name: Dependency audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -104,7 +104,7 @@ jobs:
         working-directory: ./backend
         run: composer audit --locked --abandoned=report
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version: "20"
 
