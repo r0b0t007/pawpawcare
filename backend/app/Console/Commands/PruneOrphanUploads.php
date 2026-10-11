@@ -31,11 +31,7 @@ class PruneOrphanUploads extends Command
         }
 
         // Public disk: avatars + post images under uploads/ (see Uploads::referencedPath).
-        $publicRefs = collect(Uploads::URL_COLUMNS)
-            ->flatMap(fn (string $column, string $model) => $model::whereNotNull($column)->pluck($column))
-            ->map(fn ($url) => Uploads::referencedPath($url))
-            ->filter()
-            ->flip();
+        $publicRefs = collect(Uploads::referencedPublicPaths());
         $deleted += $this->prune(Uploads::publicDisk(), 'uploads', $publicRefs, $cutoff, fn ($path) => Upload::where('path', $path)->delete());
 
         // Private disk: medical documents under documents/ (paths stored verbatim).

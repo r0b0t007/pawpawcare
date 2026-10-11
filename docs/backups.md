@@ -2,15 +2,16 @@
 
 Nightly encrypted backups of the production database and user uploads, sent to a private Cloudflare R2 bucket. Built on `spatie/laravel-backup`: config in `backend/config/backup.php`, the R2 disk in `backend/config/filesystems.php` (`backups`), and the schedule in `backend/routes/console.php`.
 
-> **Once uploads move to R2** ([uploads-r2.md](uploads-r2.md)), `storage/app/private` and `storage/app/public` are empty and the zip holds only the database. The R2 buckets themselves aren't backed up.
+Uploads live on R2 since 2026-10-11 ([uploads-r2.md](uploads-r2.md)). Each night, every object in `pawpawcare-media` and `pawpawcare-documents` is copied into the same archive as the database (`backend/app/Support/UploadsBackup.php`). The local `storage/app/private` and `storage/app/public` are still included, but they're empty now.
 
 ## What runs
 
 | When (server time) | Command | What it does |
 |---|---|---|
 | 03:00 | `backup:clean` | Deletes old backups (retention below). Never deletes the newest one. |
-| 03:15 | `backup:run` | Dumps the database, zips it with `storage/app/private` and `storage/app/public`, encrypts the zip (AES-256), checks the zip opens, then uploads it to R2. Two tries, a minute apart. |
+| 03:15 | `backup:run` | Dumps the database. Downloads every object from the two upload buckets into `storage/app/backup-temp`. Zips it all with `storage/app/private` and `storage/app/public`, encrypts the zip (AES-256), checks the zip opens, then uploads it to R2. Two tries, a minute apart. |
 | 09:00 | `backup:monitor` | Alerts if the newest backup is more than a day old or the bucket uses more than 8 GB. |
+| 12:00 | `backup:sweep-temp` | Deletes the unencrypted leftovers of a killed run, once they are 6 hours old. Runs even while backups are off. |
 
 - **Not in the backup:** the code (it's in git) and `.env`. Keep `.env` in your password manager, because a restore needs it.
 - **Retention:** every backup for 7 days, one a day up to day 30, one a week up to about day 86, then nothing. The privacy policy promises that deleted accounts are gone from backups within 90 days, and `BackupsTest` fails if the settings exceed that.
@@ -31,8 +32,35 @@ Nightly encrypted backups of the production database and user uploads, sent to a
 - **Destinations:** only these two disks are allowed.
   - `public` is served on the web, and `local` is itself a backup source.
   - `backups-local` (`storage/app/backups-local`) is for testing and restore drills only. Delete its contents afterwards.
+- **R2 uploads in the archive:** they sit under `r2-media/uploads/…` and `r2-documents/documents/…`, with the same names as on R2.
+  - They're read with the uploads key and the zip is uploaded with the backups key.
+    - Neither key can reach the other's bucket.
+    - Backups refuse to run if `BACKUP_R2_BUCKET` is an upload bucket, or if the backups key is the uploads key.
+  - The copy starts only after the encryption check passes.
+  - **When uploads are left out:** the database is still backed up, and the error `Backup is missing uploads` reaches Sentry. This happens when:
+    - a bucket can't be read;
+    - a file downloads short;
+    - the uploads are over the size limit, or don't fit on disk (see below).
+
+    - Each bucket goes in whole or not at all.
+    - Documents go first, so a problem with the photos never costs the medical records.
+    - A left-out bucket is retried the next night.
+    - A file a user deletes while the run is copying is just skipped; it doesn't belong in the backup.
+  - Only file names the app itself writes are copied: 40 random characters plus an image or PDF extension. Anything else is skipped with a warning.
+  - The privacy promise holds as before: a deleted file is gone from every new archive, and old archives expire within 88 days.
+- **Space and size:** every archive holds a full copy of the uploads.
+  - **Size limit:** `BACKUP_UPLOADS_MAX_MB`, 200 MB by default. About 38 archives fit under the 8 GB bucket limit, so above about 200 MB each copy would push old backups out early.
+    - This also stops one user uploading gigabytes from wiping out the backup history.
+    - When the alert comes, raise the limit together with `MaximumStorageInMegabytes` and `delete_oldest_backups_when_using_more_megabytes_than` in `config/backup.php` (R2 storage costs about $0.015 per GB-month), or switch the uploads to an incremental copy.
+  - **Free disk:** a run needs about twice the upload total, for the copies plus the zip. The run checks this before copying anything.
+    - That check sees the filesystem, not the cPanel account's disk quota. The size limit is what keeps a run inside the quota.
+    - If the quota fills anyway, the copy comes up short and that bucket is left out.
 - **Logs:** spatie's step-by-step log, with stack traces, goes to the host's `single` log file (`BACKUP_LOG_CHANNEL`). Only the short error messages above reach Sentry.
-- **During a run** the plain SQL dump sits in `storage/app/backup-temp` for a few minutes, outside the web root. It's deleted when the run ends, or at the start of the next run if a crash kills the process.
+- **During a run:** the plain SQL dump and the plain copies of the uploads sit in `storage/app/backup-temp/temp`, outside the web root.
+  - The upload copies are readable only by the hosting account.
+  - Everything there is deleted when the run ends, even after a PHP fatal error.
+  - **If the process is killed outright:** `backup:sweep-temp` deletes the leftovers at 12:00 once they're 6 hours old. It runs even while backups are switched off.
+  - The run's lock expires after 2 hours, so a killed run can't block the next night.
 
 ## One-time setup
 
@@ -97,12 +125,25 @@ Nightly encrypted backups of the production database and user uploads, sent to a
    ```sh
    7z x backup.zip
    ```
-   Inside are `db-dumps/mysql-<database>.sql`, `private/` and `public/`.
+   Inside are `db-dumps/mysql-<database>.sql`, `private/`, `public/`, and the R2 uploads under `r2-media/` and `r2-documents/`.
 3. **Load the database** into an empty database (create a new one, don't overwrite the live one until you've checked the copy):
    ```sh
    mysql -u <user> -p <database> < db-dumps/mysql-<database>.sql
    ```
-4. **Restore the files** by copying `private/` and `public/` into `backend/storage/app/`, then run `php artisan storage:link` if `public/storage` is missing.
+4. **Restore the files.**
+   - **R2 uploads:** copy `r2-media/` and `r2-documents/` to the server, outside the web root (e.g. `~/restore/`). Then, from `~/pawpawcare/backend`:
+     ```sh
+     php artisan uploads:restore ~/restore --dry-run
+     php artisan uploads:restore ~/restore
+     rm -rf ~/restore
+     ```
+     It runs with the uploads key from `.env`.
+     - **What it restores:** only files a record in the **current** database points at. Restore the database first if you're restoring both, so the photos users deleted since the backup don't become public again.
+     - **Never overwrites:** a file still on R2 is left as it is, so it's safe against the live buckets.
+     - **Symlinks** and file names the app never writes are skipped.
+     - `--include-unreferenced` also restores files nothing points at. `uploads:prune` deletes those again within about two days.
+   - **After restoring an older database,** re-apply the account deletions and purges made since that backup.
+   - **Local files from before the move:** copy `private/` and `public/` into `backend/storage/app/`, then run `php artisan storage:link` if `public/storage` is missing.
 5. **Point the app at it.** Update the `.env` database settings, then run `php artisan config:cache`.
 
 ## Monthly restore drill
@@ -117,5 +158,5 @@ A backup nobody has restored is a hope, not a backup. Once a month:
    docker exec -i drill mariadb -uroot -proot drill < db-dumps/mysql-<database>.sql
    docker exec drill mariadb -uroot -proot drill -e "select count(*) from users; select count(*) from pets;"
    ```
-3. Check that the counts look right and that a few files from `private/` open.
+3. Check that the counts look right and that a few files from `r2-documents/` and `r2-media/` open. The number of files should match the bucket's object count (`cf r2 buckets list` or the dashboard).
 4. Run `docker rm -f drill` and delete the downloaded files. They are real medical records. If you tested with `BACKUP_DISK=backups-local`, also empty `storage/app/backups-local` and set `BACKUP_DISK=backups` again.

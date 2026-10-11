@@ -253,6 +253,17 @@ class Uploads
             ? $m[1] : null;
     }
 
+    /** @return array<string, int> public-disk paths some record points at (as keys), for prune and restore. */
+    public static function referencedPublicPaths(): array
+    {
+        return collect(self::URL_COLUMNS)
+            ->flatMap(fn (string $column, string $model) => $model::whereNotNull($column)->pluck($column))
+            ->map(fn ($url) => self::referencedPath($url))
+            ->filter()
+            ->flip()
+            ->all();
+    }
+
     /**
      * Best-effort removal of a managed upload once nothing references it any
      * more. Call only after the owning write (updated/deleted hooks), so the

@@ -48,11 +48,16 @@ Schedule::command('subscriptions:reconcile --sweep')->dailyAt('04:40')->withoutO
 // if the archive password goes missing.
 Schedule::command('backup:clean')->dailyAt('03:00')->withoutOverlapping()
     ->when(fn () => Backups::destinationReady());
-Schedule::command('backup:run')->dailyAt('03:15')->withoutOverlapping()
+// The lock expires after 2 hours, so a killed run can't block the next night.
+Schedule::command('backup:run')->dailyAt('03:15')->withoutOverlapping(120)
     ->when(fn () => Backups::ready())
     ->sentryMonitor(checkInMargin: 30, maxRuntime: 60, failureIssueThreshold: 1, recoveryThreshold: 1);
 Schedule::command('backup:monitor')->dailyAt('09:00')
     ->when(fn () => Backups::ready());
+// A killed run leaves the SQL dump and the R2 uploads unencrypted in
+// backup-temp; spatie only clears it when the next run starts. Ungated, so it
+// runs even while backups are off.
+Schedule::command('backup:sweep-temp')->dailyAt('12:00');
 Schedule::call(fn () => Log::error('Backups are not configured', ['missing' => Backups::missing()]))
     ->name('backup:not-configured')->dailyAt('03:15')
     ->skip(fn () => Backups::ready());

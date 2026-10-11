@@ -74,6 +74,18 @@ return [
     ],
 
     /*
+     * The R2 upload buckets, copied whole into every archive (App\Support\
+     * UploadsBackup; spatie ignores this key). About 38 archives fit under
+     * the 8 GB caps below, so past ~200 MB of uploads each copy would push
+     * old backups out early. Above the limit, or without twice that much free
+     * disk, the uploads are skipped with an error and the database is still
+     * backed up. Raise it together with the caps below.
+     */
+    'uploads' => [
+        'max_megabytes' => (int) env('BACKUP_UPLOADS_MAX_MB', 200),
+    ],
+
+    /*
      * No mail: failures surface through the listeners in AppServiceProvider
      * (Log::error → Sentry) and the backup:run Sentry cron monitor.
      */

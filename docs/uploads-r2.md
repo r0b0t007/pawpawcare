@@ -84,10 +84,7 @@ After this, every deploy runs `uploads:check`. A failure shows as a warning and 
 
 ## Good to know
 
-- **Backups:** the nightly backup zips `storage/app/private` and `storage/app/public`, which are empty after the move. The database is still backed up every night, but **R2 objects aren't**.
-  - R2 itself stores data redundantly.
-  - What it doesn't protect against is a delete made by the app or by someone holding the uploads key.
-  - Adding the buckets to the backups is a possible follow-up.
+- **Backups:** the nightly backup copies every object in both buckets into the encrypted archive, next to the database ([backups.md](backups.md)). That covers what R2's own redundancy doesn't: a delete made by the app, or by someone holding the uploads key. `uploads:restore` puts files back.
 - **Deleted photos:** they disappear from R2 immediately. Cloudflare's edge may serve a cached copy for up to its default TTL (about 2 hours), since objects are uploaded without a `Cache-Control` header.
   - Don't add a long `immutable` cache header: a deleted avatar would then stay reachable for that long.
 - **Costs:** the free tier is 10 GB, 1M writes and 10M reads a month, and egress is free.

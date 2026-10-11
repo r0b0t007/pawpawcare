@@ -9,6 +9,7 @@ use App\Services\Extraction\OpenAiCompatibleDriver;
 use App\Support\Backups;
 use App\Support\MailDelivery;
 use App\Support\ReportOnce;
+use App\Support\UploadsBackup;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Mail\Events\MessageSending;
@@ -48,7 +49,11 @@ class AppServiceProvider extends ServiceProvider
         // spatie writes a plain zip when the password is empty or ext-zip has
         // no AES. This fires inside the backup job before zipping, so throwing
         // aborts the run (manual or scheduled) and raises BackupHasFailed.
-        Event::listen(BackupManifestWasCreated::class, fn () => Backups::assertEncryptable());
+        // Only then are the R2 upload buckets copied in (UploadsBackup).
+        Event::listen(BackupManifestWasCreated::class, function (BackupManifestWasCreated $e) {
+            Backups::assertEncryptable();
+            UploadsBackup::addToManifest($e->manifest);
+        });
 
         // Backups send no mail (config/backup.php): every failure is an error
         // log, which the sentry log channel turns into an alert.

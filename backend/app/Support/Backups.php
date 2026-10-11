@@ -40,7 +40,22 @@ class Backups
             'BACKUP_R2_SECRET_ACCESS_KEY' => config('filesystems.disks.backups.secret'),
         ];
 
-        return array_keys(array_filter($required, fn ($value) => trim((string) $value) === ''));
+        $missing = array_keys(array_filter($required, fn ($value) => trim((string) $value) === ''));
+
+        // Separate from the uploads: in the public media bucket the archives
+        // would be downloadable, and one shared key could delete both the live
+        // files and their backups.
+        $uploads = ['r2-media', 'r2-documents'];
+        $buckets = array_filter(array_map(fn ($d) => config("filesystems.disks.{$d}.bucket"), $uploads));
+        if (in_array($required['BACKUP_R2_BUCKET'], $buckets, true)) {
+            $missing[] = 'BACKUP_R2_BUCKET (must not be an upload bucket)';
+        }
+        $keys = array_filter(array_map(fn ($d) => config("filesystems.disks.{$d}.key"), $uploads));
+        if (in_array($required['BACKUP_R2_ACCESS_KEY_ID'], $keys, true)) {
+            $missing[] = 'BACKUP_R2_ACCESS_KEY_ID (must not be the uploads key)';
+        }
+
+        return $missing;
     }
 
     /** Everything that stops a backup from running, for the "not configured" error. */
