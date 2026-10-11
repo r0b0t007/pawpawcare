@@ -11,22 +11,14 @@ use Illuminate\Support\Facades\Storage;
  * One-time move of existing uploads from the local disks to the configured
  * upload disks (R2), run right after switching UPLOADS_PUBLIC_DISK /
  * UPLOADS_PRIVATE_DISK (docs/uploads-r2.md). Safe to re-run: files already on
- * R2 are copied again, and local copies are deleted only once every copy is
- * verified and every record points at the new url.
+ * R2 are copied again, and a local copy is deleted only once every copy is
+ * verified and no record still reaches it through a /storage/ url.
  */
 class MigrateUploads extends Command
 {
     protected $signature = 'uploads:migrate {--dry-run : Only list what would move}';
 
     protected $description = 'Move existing uploads from the local disks to the configured upload disks (R2) and rewrite stored image urls.';
-
-    /** Every column that can hold a public upload url, by table. */
-    private const URL_COLUMNS = [
-        'users' => 'avatar_url',
-        'pets' => 'avatar_url',
-        'posts' => 'image_url',
-        'lost_pet_reports' => 'photo_url',
-    ];
 
     public function handle(): int
     {
@@ -76,16 +68,29 @@ class MigrateUploads extends Command
 
                     return self::FAILURE;
                 }
-                $copied[] = [$from, $path];
+                $copied[] = [$from, $path, $fromName];
             }
         }
 
         // 2. Point records at the new urls.
         $rewritten = $publicTo === 'public' ? 0 : $this->rewriteUrls($dry);
 
-        // 3. Only now remove the local copies.
-        foreach ($copied as [$from, $path]) {
+        // 3. Only now remove the local copies, except any a record still
+        //    reaches through /storage/... in a form the rewrite left alone
+        //    (an absolute https://api.../storage/... url, an odd name): that
+        //    file stays served locally until someone fixes the record.
+        $stillLocal = $publicTo === 'public' ? [] : $this->pathsStillServedLocally();
+        $kept = 0;
+        foreach ($copied as [$from, $path, $fromName]) {
+            if ($fromName === 'public' && isset($stillLocal[$path])) {
+                $kept++;
+
+                continue;
+            }
             $from->delete($path);
+        }
+        if ($kept > 0) {
+            $this->warn("Kept {$kept} local file(s) that records still point at through /storage/...: update those records, then re-run.");
         }
 
         $this->info(sprintf(
@@ -97,11 +102,27 @@ class MigrateUploads extends Command
         return self::SUCCESS;
     }
 
+    /** @return array<string, true> public-disk paths some record reaches via a /storage/ url. */
+    private function pathsStillServedLocally(): array
+    {
+        $paths = [];
+        foreach (Uploads::URL_COLUMNS as $model => $column) {
+            $table = (new $model)->getTable();
+            foreach (DB::table($table)->where($column, 'like', '%/storage/%')->pluck($column) as $url) {
+                $rest = substr($url, strpos($url, '/storage/') + strlen('/storage/'));
+                $paths[strtok($rest, '?#')] = true;
+            }
+        }
+
+        return $paths;
+    }
+
     /** Rewrite /storage/uploads/... urls to MEDIA_URL/uploads/... (Uploads::canonicalUrl). */
     private function rewriteUrls(bool $dry): int
     {
         $count = 0;
-        foreach (self::URL_COLUMNS as $table => $column) {
+        foreach (Uploads::URL_COLUMNS as $model => $column) {
+            $table = (new $model)->getTable();
             // lazyById pages by id, so rows that stop matching don't shift the pages.
             DB::table($table)->select('id', $column)->where($column, 'like', '/storage/uploads/%')->lazyById(200)
                 ->each(function ($row) use ($table, $column, $dry, &$count) {

@@ -68,7 +68,7 @@ class DocumentController extends Controller
         $file = $request->file('file');
         $isPdf = $file->getMimeType() === 'application/pdf';
         // Stored on the PRIVATE disk — never web-accessible without a signed URL.
-        $path = $isPdf
+        [$path, $size] = $isPdf
             ? Uploads::storePrivatePdf($file, 'documents')
             : Uploads::storePrivateImage($file, 'documents');
 
@@ -81,7 +81,7 @@ class DocumentController extends Controller
             'file_path' => $path,
             'mime' => $isPdf ? 'application/pdf' : $file->getMimeType(),
             // Record the actual stored size (images are re-encoded, so it differs).
-            'size_bytes' => Uploads::privateDisk()->size($path),
+            'size_bytes' => $size,
         ]);
 
         return response()->json($doc->toApi(), 201);
@@ -112,20 +112,26 @@ class DocumentController extends Controller
      * authorized user and valid for minutes, is the authorization. On R2 the
      * file never passes through PHP: the browser is sent on to a 5-minute
      * presigned URL for this one object, minted fresh on every visit (so the
-     * vet share page's longer-lived links keep working).
+     * vet share page's longer-lived links keep working). Presigning is local
+     * computation, so a document open costs no R2 round-trip from PHP; a
+     * missing object is R2's own 404.
      */
     public function raw(string $documentId): Response
     {
         $doc = Document::find($documentId);
-        $disk = Uploads::privateDisk();
-        if (! $doc || ! $disk->exists($doc->file_path)) {
+        if (! $doc) {
             abort(404, 'Document not found');
         }
 
+        $disk = Uploads::privateDisk();
         $name = self::downloadName($doc->title);
         $type = $doc->mime ?: 'application/octet-stream';
 
         if (Uploads::privateDiskName() === 'local') {
+            if (! $disk->exists($doc->file_path)) {
+                abort(404, 'Document not found');
+            }
+
             return $disk->response($doc->file_path, $name, ['Content-Type' => $type]);
         }
 
@@ -136,7 +142,10 @@ class DocumentController extends Controller
             'ResponseCacheControl' => 'private, no-store',
         ]);
 
-        // no-referrer: the presigned URL must not leak to whatever the PDF links to.
+        // no-referrer only covers this hop: the request to R2 doesn't carry the
+        // signed API link as its Referer. R2 can't add a Referrer-Policy to the
+        // PDF itself; what limits a presigned URL leaking from a link inside the
+        // document is its 5-minute lifetime and single-object scope.
         return redirect()->away($url)->withHeaders(['Cache-Control' => 'no-store', 'Referrer-Policy' => 'no-referrer']);
     }
 

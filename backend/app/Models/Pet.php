@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use App\Casts\UploadUrl;
 use App\Support\Uploads;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -54,12 +54,6 @@ class Pet extends Model
         'heart_rate', 'activity_level',
     ];
 
-    /** Managed upload urls are stored in their current form (see Uploads::canonicalUrl). */
-    protected function avatarUrl(): Attribute
-    {
-        return Attribute::make(set: fn (?string $value) => Uploads::canonicalUrl($value));
-    }
-
     protected $attributes = [
         'type' => 'dog',
         'weight_unit' => 'kg',
@@ -67,6 +61,7 @@ class Pet extends Model
     ];
 
     protected $casts = [
+        'avatar_url' => UploadUrl::class,
         'age' => 'float',
         'weight' => 'float',
         'heart_rate' => 'integer',

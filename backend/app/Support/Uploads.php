@@ -25,6 +25,18 @@ class Uploads
     /** A managed upload's path: a 40-char random name in uploads/ (see pathFromUrl). */
     private const MANAGED_PATH = 'uploads/[A-Za-z0-9]{40}\.[A-Za-z0-9]{2,5}';
 
+    /**
+     * Every column that can hold a public upload url. The models cast it with
+     * App\Casts\UploadUrl; deletes, `uploads:prune` and `uploads:migrate`
+     * all read references from here, so a new image column goes here only.
+     */
+    public const URL_COLUMNS = [
+        User::class => 'avatar_url',
+        Pet::class => 'avatar_url',
+        Post::class => 'image_url',
+        LostPetReport::class => 'photo_url',
+    ];
+
     // ── Disks ────────────────────────────────────────────────────────────────
 
     public static function publicDiskName(): string
@@ -125,8 +137,8 @@ class Uploads
         }
 
         $path = self::pathFromUrl($url);
-        if ($path === null && preg_match('#^https?://#i', $url) && ! self::isMediaHost($url)) {
-            return; // an external image
+        if ($path === null && self::isExternalUrl($url)) {
+            return;
         }
 
         $owned = $path && Upload::where('path', $path)->whereIn('user_id', $uploaderIds)->exists();
@@ -138,16 +150,24 @@ class Uploads
 
     // ── Private files (medical documents) ────────────────────────────────────
 
-    /** Re-encode an image and store it on the private disk. Returns the disk path. */
-    public static function storePrivateImage(UploadedFile $file, string $dir = 'documents'): string
+    /**
+     * Re-encode an image and store it on the private disk.
+     *
+     * @return array{0: string, 1: int} [disk path, stored size in bytes]
+     */
+    public static function storePrivateImage(UploadedFile $file, string $dir = 'documents'): array
     {
         [$binary, $ext] = self::encodeImage($file);
 
         return self::putPrivate($binary, $dir, $ext);
     }
 
-    /** Store a verified PDF on the private disk. Returns the disk path. */
-    public static function storePrivatePdf(UploadedFile $file, string $dir = 'documents'): string
+    /**
+     * Store a verified PDF on the private disk.
+     *
+     * @return array{0: string, 1: int} [disk path, stored size in bytes]
+     */
+    public static function storePrivatePdf(UploadedFile $file, string $dir = 'documents'): array
     {
         return self::putPrivate(self::pdfBytes($file), $dir, 'pdf');
     }
@@ -212,15 +232,25 @@ class Uploads
     }
 
     /**
-     * The uploads/... path a stored url ends in, whatever its host — for
-     * `uploads:prune`, which must never mistake a file in use for an orphan.
-     * Matching the suffix, not MEDIA_URL, means a changed or missing
-     * MEDIA_URL can't make every image look unreferenced. Over-matching
-     * only keeps a file longer.
+     * The upload a stored url references, for `uploads:prune`: the
+     * /storage/... form, or any url on a media host (MEDIA_HOST or MEDIA_URL's)
+     * ending in /uploads/<name>. Not tied to the exact MEDIA_URL, so a
+     * changed or missing MEDIA_URL can't make every image look unreferenced;
+     * not any host either, or an external url ending in someone's file name
+     * would keep that file forever. Media-host urls can only be stored as
+     * owned uploads (assertUsableUrl never accepts them as external).
      */
     public static function referencedPath(?string $url): ?string
     {
-        return $url && preg_match('#/('.self::MANAGED_PATH.')$#', $url, $m) ? $m[1] : null;
+        if (! $url) {
+            return null;
+        }
+        if (preg_match('#^/storage/('.self::MANAGED_PATH.')$#', $url, $m)) {
+            return $m[1];
+        }
+
+        return self::isMediaHost($url) && preg_match('#^https?://[^/?\#\\\\]+(?:/[^?\#\\\\]*)?/('.self::MANAGED_PATH.')$#i', $url, $m)
+            ? $m[1] : null;
     }
 
     /**
@@ -252,14 +282,10 @@ class Uploads
             // Compared in PHP too: MySQL's case- and accent-insensitive
             // collation would let a lookalike url count as a reference.
             $urls = self::urlForms($path);
-            $references = fn (string $model, string $column) => $model::whereIn($column, $urls)
-                ->pluck($column)->contains(fn ($v) => in_array($v, $urls, true));
-            $stillReferenced = $references(User::class, 'avatar_url')
-                || $references(Pet::class, 'avatar_url')
-                || $references(Post::class, 'image_url')
-                || $references(LostPetReport::class, 'photo_url');
-            if ($stillReferenced) {
-                return;
+            foreach (self::URL_COLUMNS as $model => $column) {
+                if ($model::whereIn($column, $urls)->pluck($column)->contains(fn ($v) => in_array($v, $urls, true))) {
+                    return; // still in use
+                }
             }
 
             self::publicDisk()->delete($path);
@@ -322,12 +348,13 @@ class Uploads
         return $bytes;
     }
 
-    private static function putPrivate(string $binary, string $dir, string $ext): string
+    /** @return array{0: string, 1: int} [disk path, size]: the size is known here, so no read-back from R2. */
+    private static function putPrivate(string $binary, string $dir, string $ext): array
     {
         $path = self::randomPath($dir, $ext);
         self::privateDisk()->put($path, $binary);
 
-        return $path;
+        return [$path, strlen($binary)];
     }
 
     /** @param  list<string>  $allowed */
@@ -341,10 +368,27 @@ class Uploads
         return $name;
     }
 
+    /**
+     * An image url from another site that a record may point at as-is.
+     * Strict on purpose: browsers and the app's URL parser fold backslashes,
+     * tabs, percent-escapes and fullwidth dots into a host that PHP's
+     * parse_url reads differently, so anything that could parse two ways is
+     * refused, and so is the media host (see assertUsableUrl).
+     */
+    private static function isExternalUrl(string $url): bool
+    {
+        if (! preg_match('#^https?://#i', $url) || preg_match('#[\x00-\x20\x7f\\\\]#', $url)) {
+            return false;
+        }
+        $host = parse_url($url, PHP_URL_HOST);
+
+        return is_string($host) && preg_match('#^[A-Za-z0-9.-]+$#', $host) && ! self::isMediaHost($url);
+    }
+
     /** Whether a url is on the host our media is (or will be) served from. */
     private static function isMediaHost(string $url): bool
     {
-        $host = strtolower(rtrim((string) parse_url($url, PHP_URL_HOST), '.'));
+        $host = strtolower(rtrim((string) parse_url(str_replace('\\', '/', $url), PHP_URL_HOST), '.'));
         $hosts = array_filter([
             strtolower((string) config('filesystems.uploads.media_host')),
             strtolower((string) parse_url((string) self::mediaBase(), PHP_URL_HOST)),

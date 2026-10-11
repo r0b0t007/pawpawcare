@@ -162,6 +162,22 @@ class R2UploadsTest extends TestCase
         $this->withToken($token)->patchJson('/users/me', ['avatar_url' => 'https://media.pawpawcare.app.example.org/x.jpg'])->assertOk();
     }
 
+    public function test_urls_that_parse_two_ways_are_refused(): void
+    {
+        [, $token] = $this->user();
+        $name = str_repeat('a', 40).'.jpg';
+
+        // Browsers fold each of these into media.pawpawcare.app; parse_url doesn't.
+        foreach ([
+            "https://media.pawpawcare.app\\uploads\\{$name}",
+            "https://media.pawpaw\tcare.app/uploads/{$name}",
+            "https://media%2Epawpawcare.app/uploads/{$name}",
+            "https://media\u{3002}pawpawcare\u{3002}app/uploads/{$name}",
+        ] as $url) {
+            $this->withToken($token)->patchJson('/users/me', ['avatar_url' => $url])->assertStatus(422);
+        }
+    }
+
     // ── Documents ────────────────────────────────────────────────────────────
 
     public function test_a_document_lands_on_r2_and_opens_through_a_presigned_redirect(): void
@@ -232,6 +248,38 @@ class R2UploadsTest extends TestCase
         Storage::disk('r2-media')->assertMissing($orphan);
     }
 
+    public function test_an_external_url_ending_in_someones_file_name_does_not_keep_it(): void
+    {
+        $this->onR2();
+        [$user] = $this->user();
+        $orphan = 'uploads/'.str_repeat('o', 40).'.jpg';
+        Storage::disk('r2-media')->put($orphan, 'y');
+        Pet::create(['owner_id' => $user->id, 'name' => 'P', 'avatar_url' => 'https://a.example/'.$orphan]);
+
+        $this->artisan('uploads:prune', ['--hours' => 0])->assertSuccessful();
+
+        Storage::disk('r2-media')->assertMissing($orphan);
+    }
+
+    public function test_one_failing_file_does_not_stop_the_prune(): void
+    {
+        $this->onR2();
+        Exceptions::fake();
+        [$bad, $good] = ['uploads/'.str_repeat('b', 40).'.jpg', 'uploads/'.str_repeat('g', 40).'.jpg'];
+        $media = Mockery::mock(Filesystem::class);
+        $media->shouldReceive('files')->with('uploads')->andReturn([$bad, $good]);
+        $media->shouldReceive('lastModified')->with($bad)->andThrow(new \RuntimeException('R2 500'));
+        $media->shouldReceive('lastModified')->with($good)->andReturn(0);
+        $media->shouldReceive('delete')->with($good)->once();
+        Storage::set('r2-media', $media);
+        Storage::disk('r2-documents')->put('documents/'.str_repeat('d', 40).'.pdf', 'x');
+
+        $this->artisan('uploads:prune', ['--hours' => 0])->expectsOutputToContain('Pruned 2 orphaned file(s).')->assertSuccessful();
+
+        Exceptions::assertReported(fn (\RuntimeException $e) => $e->getMessage() === 'R2 500');
+        $this->assertSame([], Storage::disk('r2-documents')->allFiles());
+    }
+
     public function test_prune_refuses_to_run_on_r2_without_media_url(): void
     {
         $this->onR2();
@@ -273,6 +321,21 @@ class R2UploadsTest extends TestCase
         $this->assertSame('https://example.org/a.jpg', $post->fresh()->image_url);
 
         $this->artisan('uploads:migrate')->expectsOutputToContain('Moved 0 file(s) and rewrote 0')->assertSuccessful();
+    }
+
+    public function test_migrate_keeps_a_local_file_a_record_still_reaches_through_storage(): void
+    {
+        [$user] = $this->user();
+        $img = 'uploads/'.str_repeat('a', 40).'.jpg';
+        Storage::disk('public')->put($img, 'jpeg-bytes');
+        // Accepted as "external" before this change; the rewrite doesn't touch it.
+        DB::table('users')->where('id', $user->id)->update(['avatar_url' => 'https://api.pawpawcare.app/storage/'.$img]);
+        $this->onR2();
+
+        $this->artisan('uploads:migrate')->expectsOutputToContain('Kept 1 local file(s)')->assertSuccessful();
+
+        Storage::disk('r2-media')->assertExists($img);
+        Storage::disk('public')->assertExists($img);
     }
 
     public function test_migrate_does_nothing_on_local_disks_and_refuses_without_media_url(): void

@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use App\Casts\UploadUrl;
 use App\Support\Uploads;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,11 +33,7 @@ class Post extends Model
 
     protected $fillable = ['author_id', 'content', 'image_url', 'group_id'];
 
-    /** Managed upload urls are stored in their current form (see Uploads::canonicalUrl). */
-    protected function imageUrl(): Attribute
-    {
-        return Attribute::make(set: fn (?string $value) => Uploads::canonicalUrl($value));
-    }
+    protected $casts = ['image_url' => UploadUrl::class];
 
     public function author(): BelongsTo
     {
