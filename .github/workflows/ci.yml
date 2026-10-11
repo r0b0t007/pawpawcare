@@ -2,7 +2,8 @@
 # Backend: PHPUnit suite (SQLite in-memory). Frontend: Metro bundle (catches
 # import/syntax errors). Website: node:test suite for the waitlist Pages
 # Function, welcome email and asset cache-busting versions (fetch is mocked).
-# None needs external services.
+# None needs external services. Audit: known-vulnerability check of the
+# lockfiles (needs the Packagist / npm advisory APIs).
 
 name: CI
 
@@ -84,3 +85,31 @@ jobs:
 
       - name: Run tests
         run: node --test "tests/website/*.test.mjs"
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          coverage: none
+
+      # Every advisory fails, dev packages included. Abandoned packages are
+      # listed but don't fail (no known vulnerability).
+      - name: Composer audit
+        working-directory: ./backend
+        run: composer audit --locked --abandoned=report
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      # Production dependencies only. Fails on high/critical advisories that
+      # aren't in frontend/audit-allowlist.json; lower ones go to the summary.
+      - name: npm audit
+        working-directory: ./frontend
+        run: node scripts/audit-deps.js

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "GHSA-vfj7-8cjw-p6xm",
+    "package": "braces",
+    "reason": "No patched release exists (3.0.3 is the latest). Only reached via expo > @expo/cli > @expo/metro-file-map > micromatch, which matches our own Metro file patterns at build time. Never bundled into the app, and no attacker-supplied glob reaches it.",
+    "review_by": "2027-01-11"
+  },
+  {
+    "id": "GHSA-86w9-cpqp-85rv",
+    "package": "node-forge",
+    "reason": "No patched release exists (1.4.0 is the latest). Only reached via @expo/code-signing-certificates (expo-updates and @expo/cli), which signs OTA updates in CI with our own key. The flaw is in signature verification; the app verifies updates natively and never bundles node-forge.",
+    "review_by": "2027-01-11"
+  }
+]

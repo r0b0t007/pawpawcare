@@ -1,0 +1,67 @@
+# Weekly dependency update PRs. CI (incl. the dependency audit job) runs on
+# each one; nothing auto-merges.
+#
+# Merging is a release: a backend PR deploys to the cPanel host, a frontend PR
+# ships to installed apps via ota-update.yml.
+
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      backend-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Pinned in #98: laravel/framework 13 doesn't accept these yet, and an
+      # unpinned resolve jumped uri-template to 2.x.
+      - dependency-name: brick/math
+        versions: [">=0.15"]
+      - dependency-name: guzzlehttp/uri-template
+        versions: [">=2"]
+
+  # The app's runtimeVersion is a fingerprint of its native code, so bumping
+  # any package with native code (expo*, react-native*, Sentry, RevenueCat,
+  # Google sign-in, React Navigation's native-stack...) cuts every installed
+  # build off from OTA updates until a new EAS build ships. Those move only
+  # with an Expo SDK upgrade or a planned build round (`npx expo install
+  # --fix`). Dependabot gets the allowlist below: pure-JS packages only.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    allow:
+      - dependency-name: "@tanstack/*"
+      - dependency-name: posthog-react-native
+      - dependency-name: react-native-url-polyfill
+      - dependency-name: "@expo-google-fonts/*"
+      - dependency-name: "@babel/*"
+      - dependency-name: jest
+    ignore:
+      # jest-expo (versioned with the SDK) pins the jest major.
+      - dependency-name: jest
+        update-types: [version-update:semver-major]
+    groups:
+      frontend-js:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      actions:
+        patterns: ["*"]
