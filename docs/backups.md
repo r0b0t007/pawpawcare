@@ -35,8 +35,10 @@ Uploads live on R2 since 2026-10-11 ([uploads-r2.md](uploads-r2.md)). Each night
 - **R2 uploads in the archive:** they sit under `r2-media/uploads/…` and `r2-documents/documents/…`, with the same names as on R2.
   - They're read with the uploads key and the zip is uploaded with the backups key.
     - Neither key can reach the other's bucket.
-    - Backups refuse to run if `BACKUP_R2_BUCKET` is an upload bucket, or if the backups key is the uploads key.
+    - Backups refuse to run if `BACKUP_R2_BUCKET` is an upload bucket, or if the backups key is the uploads key. `backup:clean` keeps running meanwhile, so old archives still expire.
   - The copy starts only after the encryption check passes.
+  - `backup:run --only-db` copies no uploads.
+  - **Retries:** spatie's second try downloads the uploads again. That's free (R2 doesn't charge for downloads) and capped by the size limit.
   - **When uploads are left out:** the database is still backed up, and the error `Backup is missing uploads` reaches Sentry. This happens when:
     - a bucket can't be read;
     - a file downloads short;
@@ -46,15 +48,16 @@ Uploads live on R2 since 2026-10-11 ([uploads-r2.md](uploads-r2.md)). Each night
     - Documents go first, so a problem with the photos never costs the medical records.
     - A left-out bucket is retried the next night.
     - A file a user deletes while the run is copying is just skipped; it doesn't belong in the backup.
-  - Only file names the app itself writes are copied: 40 random characters plus an image or PDF extension. Anything else is skipped with a warning.
+  - Only file names the app itself writes are copied: 40 random characters plus a short extension. That includes older uploads that kept theirs, such as `.bmp`. Anything else is skipped with a warning.
   - The privacy promise holds as before: a deleted file is gone from every new archive, and old archives expire within 88 days.
 - **Space and size:** every archive holds a full copy of the uploads.
   - **Size limit:** `BACKUP_UPLOADS_MAX_MB`, 200 MB by default. About 38 archives fit under the 8 GB bucket limit, so above about 200 MB each copy would push old backups out early.
     - This also stops one user uploading gigabytes from wiping out the backup history.
     - When the alert comes, raise the limit together with `MaximumStorageInMegabytes` and `delete_oldest_backups_when_using_more_megabytes_than` in `config/backup.php` (R2 storage costs about $0.015 per GB-month), or switch the uploads to an incremental copy.
-  - **Free disk:** a run needs about twice the upload total, for the copies plus the zip. The run checks this before copying anything.
+  - **Free disk:** a run needs about twice the upload total, for the copies plus a zip of everything (uploads and SQL dump). Each bucket is checked against that before it's copied.
     - That check sees the filesystem, not the cPanel account's disk quota. The size limit is what keeps a run inside the quota.
-    - If the quota fills anyway, the copy comes up short and that bucket is left out.
+    - If the quota fills while copying, that bucket is left out.
+    - If it fills while zipping, the whole night's backup fails, database included. The failure alerts like any other.
 - **Logs:** spatie's step-by-step log, with stack traces, goes to the host's `single` log file (`BACKUP_LOG_CHANNEL`). Only the short error messages above reach Sentry.
 - **During a run:** the plain SQL dump and the plain copies of the uploads sit in `storage/app/backup-temp/temp`, outside the web root.
   - The upload copies are readable only by the hosting account.
@@ -140,7 +143,8 @@ Uploads live on R2 since 2026-10-11 ([uploads-r2.md](uploads-r2.md)). Each night
      It runs with the uploads key from `.env`.
      - **What it restores:** only files a record in the **current** database points at. Restore the database first if you're restoring both, so the photos users deleted since the backup don't become public again.
      - **Never overwrites:** a file still on R2 is left as it is, so it's safe against the live buckets.
-     - **Symlinks** and file names the app never writes are skipped.
+     - **Symlinks** and file names the app never writes are skipped. With `--include-unreferenced`, so are files a browser would run (`.html`, `.svg`, `.js`, `.xml`), since media is served publicly.
+     - **Bad copies:** a copy whose size on R2 doesn't match is deleted again and the command fails. Re-running retries it.
      - `--include-unreferenced` also restores files nothing points at. `uploads:prune` deletes those again within about two days.
    - **After restoring an older database,** re-apply the account deletions and purges made since that backup.
    - **Local files from before the move:** copy `private/` and `public/` into `backend/storage/app/`, then run `php artisan storage:link` if `public/storage` is missing.

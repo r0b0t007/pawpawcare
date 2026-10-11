@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Document;
 use App\Models\LostPetReport;
 use App\Models\Pet;
 use App\Models\Post;
@@ -251,6 +252,12 @@ class Uploads
 
         return self::isMediaHost($url) && preg_match('#^https?://[^/?\#\\\\]+(?:/[^?\#\\\\]*)?/('.self::MANAGED_PATH.')$#i', $url, $m)
             ? $m[1] : null;
+    }
+
+    /** @return array<string, int> private-disk paths some document points at (as keys), for prune and restore. */
+    public static function referencedDocumentPaths(): array
+    {
+        return Document::whereNotNull('file_path')->pluck('file_path')->flip()->all();
     }
 
     /** @return array<string, int> public-disk paths some record points at (as keys), for prune and restore. */

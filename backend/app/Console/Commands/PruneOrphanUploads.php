@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Document;
 use App\Models\Upload;
 use App\Support\Uploads;
 use Illuminate\Console\Command;
@@ -35,7 +34,7 @@ class PruneOrphanUploads extends Command
         $deleted += $this->prune(Uploads::publicDisk(), 'uploads', $publicRefs, $cutoff, fn ($path) => Upload::where('path', $path)->delete());
 
         // Private disk: medical documents under documents/ (paths stored verbatim).
-        $docRefs = Document::whereNotNull('file_path')->pluck('file_path')->flip();
+        $docRefs = collect(Uploads::referencedDocumentPaths());
         $deleted += $this->prune(Uploads::privateDisk(), 'documents', $docRefs, $cutoff);
 
         $this->info("Pruned {$deleted} orphaned file(s).");

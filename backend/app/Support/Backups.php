@@ -40,28 +40,39 @@ class Backups
             'BACKUP_R2_SECRET_ACCESS_KEY' => config('filesystems.disks.backups.secret'),
         ];
 
-        $missing = array_keys(array_filter($required, fn ($value) => trim((string) $value) === ''));
-
-        // Separate from the uploads: in the public media bucket the archives
-        // would be downloadable, and one shared key could delete both the live
-        // files and their backups.
-        $uploads = ['r2-media', 'r2-documents'];
-        $buckets = array_filter(array_map(fn ($d) => config("filesystems.disks.{$d}.bucket"), $uploads));
-        if (in_array($required['BACKUP_R2_BUCKET'], $buckets, true)) {
-            $missing[] = 'BACKUP_R2_BUCKET (must not be an upload bucket)';
-        }
-        $keys = array_filter(array_map(fn ($d) => config("filesystems.disks.{$d}.key"), $uploads));
-        if (in_array($required['BACKUP_R2_ACCESS_KEY_ID'], $keys, true)) {
-            $missing[] = 'BACKUP_R2_ACCESS_KEY_ID (must not be the uploads key)';
-        }
-
-        return $missing;
+        return array_keys(array_filter($required, fn ($value) => trim((string) $value) === ''));
     }
 
     /** Everything that stops a backup from running, for the "not configured" error. */
     public static function missing(): array
     {
-        return [...self::encryptionMissing(), ...self::destinationMissing()];
+        return [...self::encryptionMissing(), ...self::destinationMissing(), ...self::separationMissing()];
+    }
+
+    /**
+     * New archives stay apart from the uploads: in the public media bucket
+     * they'd be downloadable, and one shared key could delete both the live
+     * files and their backups. Not part of destinationMissing(), so cleanup
+     * keeps enforcing retention (the 90-day privacy promise) meanwhile.
+     */
+    private static function separationMissing(): array
+    {
+        if (self::disk() !== 'backups') {
+            return [];
+        }
+        $uploads = array_keys(UploadsBackup::DIRS);
+        $missing = [];
+
+        $buckets = array_filter(array_map(fn ($d) => config("filesystems.disks.{$d}.bucket"), $uploads));
+        if (in_array(config('filesystems.disks.backups.bucket'), $buckets, true)) {
+            $missing[] = 'BACKUP_R2_BUCKET (must not be an upload bucket)';
+        }
+        $keys = array_filter(array_map(fn ($d) => config("filesystems.disks.{$d}.key"), $uploads));
+        if (in_array(config('filesystems.disks.backups.key'), $keys, true)) {
+            $missing[] = 'BACKUP_R2_ACCESS_KEY_ID (must not be the uploads key)';
+        }
+
+        return $missing;
     }
 
     public static function ready(): bool

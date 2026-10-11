@@ -7,6 +7,7 @@ use App\Models\Pet;
 use App\Models\User;
 use App\Support\Backups;
 use App\Support\UploadsBackup;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,6 +21,9 @@ use League\Flysystem\FileAttributes;
 use League\Flysystem\UnableToReadFile;
 use Mockery;
 use Spatie\Backup\Config\Config as BackupConfig;
+use Spatie\Backup\Tasks\Backup\Manifest;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -234,10 +238,29 @@ class UploadsBackupTest extends TestCase
         $this->assertSame(['marker.txt'], array_keys($this->runBackup()));
         $this->assertCount(2, self::only($logs(), 'Backup skipped an unexpected upload key'));
 
-        foreach (['uploads/../../.env', self::PHOTO."\n", 'uploads/'.str_repeat('a', 40).'.svg', 'documents/'.str_repeat('a', 40).'.pdf'] as $key) {
+        foreach (['uploads/../../.env', self::PHOTO."\n", 'uploads/'.str_repeat('a', 39).'.jpg', 'documents/'.str_repeat('a', 40).'.pdf'] as $key) {
             $this->assertFalse(UploadsBackup::isSafeKey('r2-media', $key), json_encode($key));
         }
         $this->assertTrue(UploadsBackup::isSafeKey('r2-documents', self::DOC));
+        // Older uploads kept their original extension; they're still backed up.
+        $this->assertTrue(UploadsBackup::isSafeKey('r2-media', 'uploads/'.str_repeat('a', 40).'.bmp'));
+    }
+
+    public function test_a_database_only_run_copies_no_uploads(): void
+    {
+        $this->onR2();
+        $disk = Mockery::mock(FilesystemAdapter::class);
+        $disk->shouldNotReceive('listContents');
+        Storage::set('r2-media', $disk);
+        Storage::set('r2-documents', $disk);
+        File::ensureDirectoryExists($this->tmp);
+        $manifest = Manifest::create("{$this->tmp}/manifest.txt");
+
+        event(new CommandStarting('backup:run', new ArrayInput(['--only-db' => true]), new NullOutput));
+        UploadsBackup::addToManifest($manifest);
+        $this->assertSame(0, $manifest->count());
+
+        event(new CommandStarting('backup:run', new ArrayInput([]), new NullOutput));
     }
 
     public function test_the_backups_bucket_and_key_must_differ_from_the_uploads(): void
@@ -255,7 +278,17 @@ class UploadsBackupTest extends TestCase
         $this->assertSame([
             'BACKUP_R2_BUCKET (must not be an upload bucket)',
             'BACKUP_R2_ACCESS_KEY_ID (must not be the uploads key)',
-        ], Backups::destinationMissing());
+        ], Backups::missing());
+        // Cleanup still runs: old archives keep expiring (the 90-day promise).
+        $this->assertTrue(Backups::destinationReady());
+    }
+
+    public function test_staging_root_falls_back_like_spatie(): void
+    {
+        config(['backup.backup.temporary_directory' => null]);
+
+        $this->assertSame(storage_path('app/backup-temp').DIRECTORY_SEPARATOR.'temp', UploadsBackup::stagingRoot());
+        $this->artisan('backup:sweep-temp')->assertSuccessful();
     }
 
     public function test_sweep_deletes_only_an_abandoned_staging_folder(): void
@@ -322,11 +355,33 @@ class UploadsBackupTest extends TestCase
     {
         $this->onR2();
 
-        $this->artisan('uploads:restore', ['path' => $this->extracted(), '--include-unreferenced' => true])
-            ->expectsOutputToContain('Restored 3 file(s)')
+        $dir = $this->extracted();
+        $svg = 'uploads/'.str_repeat('s', 40).'.svg';
+        File::put("{$dir}/r2-media/{$svg}", '<svg onload="alert(1)"/>');
+
+        $this->artisan('uploads:restore', ['path' => $dir, '--include-unreferenced' => true])
+            ->expectsOutputToContain('Restored 3 file(s); 0 already on R2 and left alone; 0 no record points at; 2 skipped.')
             ->assertSuccessful();
 
         $this->assertTrue(Storage::disk('r2-media')->exists(self::DELETED_PHOTO));
+        $this->assertFalse(Storage::disk('r2-media')->exists($svg), 'active content on the public media domain');
+    }
+
+    public function test_a_bad_restore_copy_is_removed_so_a_rerun_retries_it(): void
+    {
+        $this->onR2();
+        $this->records();
+        Storage::disk('r2-documents')->put(self::DOC, 'already there');
+        $disk = Mockery::mock(FilesystemAdapter::class);
+        $disk->shouldReceive('exists')->with(self::PHOTO)->andReturn(false);
+        $disk->shouldReceive('writeStream')->once();
+        $disk->shouldReceive('size')->with(self::PHOTO)->andReturn(3);
+        $disk->shouldReceive('delete')->with(self::PHOTO)->once();
+        Storage::set('r2-media', $disk);
+
+        $this->artisan('uploads:restore', ['path' => $this->extracted()])
+            ->expectsOutputToContain('removed again; re-run to retry')
+            ->assertFailed();
     }
 
     public function test_restore_dry_run_writes_nothing(): void

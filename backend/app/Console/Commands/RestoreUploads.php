@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Document;
 use App\Support\Uploads;
 use App\Support\UploadsBackup;
 use Illuminate\Console\Command;
@@ -23,6 +22,9 @@ class RestoreUploads extends Command
         {--include-unreferenced : Also restore files no record points at (uploads:prune removes them again)}';
 
     protected $description = 'Restore missing R2 upload files from an unzipped backup, never overwriting.';
+
+    /** Extensions a browser would render or run if served from media.pawpawcare.app. */
+    private const ACTIVE_CONTENT = '#\.(?:html?|xhtml|svg|xml|js|mjs)$#i';
 
     public function handle(): int
     {
@@ -78,6 +80,14 @@ class RestoreUploads extends Command
 
                     continue;
                 }
+                // Unreferenced files bypass the record check, so nothing a
+                // browser would run may land on the public media domain.
+                if ($referenced === null && preg_match(self::ACTIVE_CONTENT, $key)) {
+                    $this->warn("Skipped {$name}/{$key}: a browser could run it.");
+                    $skipped++;
+
+                    continue;
+                }
                 if ($disk->exists($key)) {
                     $present++;
 
@@ -99,7 +109,9 @@ class RestoreUploads extends Command
                     }
                 }
                 if ($disk->size($key) !== $file->getSize()) {
-                    $this->error("{$name}:{$key}: size on R2 doesn't match the backup copy.");
+                    // Remove it, or a rerun would count the bad copy as "already on R2".
+                    $disk->delete($key);
+                    $this->error("{$name}:{$key}: size on R2 didn't match the backup copy, so it was removed again; re-run to retry.");
 
                     return self::FAILURE;
                 }
@@ -119,8 +131,6 @@ class RestoreUploads extends Command
     /** @return array<string, mixed> keys on this disk that the current database points at */
     private function referenced(string $disk): array
     {
-        return $disk === 'r2-documents'
-            ? Document::whereNotNull('file_path')->pluck('file_path')->flip()->all()
-            : Uploads::referencedPublicPaths();
+        return $disk === 'r2-documents' ? Uploads::referencedDocumentPaths() : Uploads::referencedPublicPaths();
     }
 }

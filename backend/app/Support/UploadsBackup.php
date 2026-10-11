@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Filesystem\FilesystemAdapter as Filesystem;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -28,10 +29,14 @@ class UploadsBackup
     /** Remote upload disk => the folder its objects live under (Uploads::randomPath). */
     public const DIRS = ['r2-media' => 'uploads', 'r2-documents' => 'documents'];
 
-    /** What the app writes there: 40 random characters and the extension of a re-encoded image (or a PDF). */
+    /**
+     * What the app writes there: 40 random characters and a short extension
+     * (Uploads::MANAGED_PATH; older uploads kept their original one, e.g.
+     * .bmp). Nothing can climb out of the temp or restore folder.
+     */
     private const KEY_PATTERNS = [
-        'r2-media' => '#^uploads/[A-Za-z0-9]{40}\.(?:jpe?g|png|webp|gif)$#D',
-        'r2-documents' => '#^documents/[A-Za-z0-9]{40}\.(?:jpe?g|png|webp|gif|pdf)$#D',
+        'r2-media' => '#^uploads/[A-Za-z0-9]{40}\.[A-Za-z0-9]{2,5}$#D',
+        'r2-documents' => '#^documents/[A-Za-z0-9]{40}\.[A-Za-z0-9]{2,5}$#D',
     ];
 
     /** Medical records first: when not everything fits, they matter most. */
@@ -39,6 +44,19 @@ class UploadsBackup
 
     /** Free space kept beyond the staged copies and the zip. */
     private const DISK_MARGIN_BYTES = 100 * 1048576;
+
+    /** Set from the command line: `backup:run --only-db` wants no files at all. */
+    private static bool $databaseOnly = false;
+
+    private static bool $cleanupRegistered = false;
+
+    /** CommandStarting listener (AppServiceProvider). */
+    public static function noteCommand(CommandStarting $event): void
+    {
+        if ($event->command === 'backup:run') {
+            self::$databaseOnly = $event->input->hasParameterOption('--only-db');
+        }
+    }
 
     /**
      * Copy every object on the remote upload disks next to the manifest and
@@ -50,6 +68,9 @@ class UploadsBackup
      */
     public static function addToManifest(Manifest $manifest): void
     {
+        if (self::$databaseOnly) {
+            return;
+        }
         $root = dirname($manifest->path());
         try {
             $disks = self::remoteDisks();
@@ -62,12 +83,13 @@ class UploadsBackup
 
         self::cleanUpOnFatalError($root);
         $budget = (int) config('backup.uploads.max_megabytes') * 1048576;
+        $stagedBytes = 0;
         foreach ($disks as $name) {
             try {
                 $disk = Storage::disk($name);
                 $objects = self::listObjects($disk, $name);
                 $bytes = array_sum($objects);
-                self::assertRoom($name, $bytes, $budget, $root);
+                self::assertRoom($name, $bytes, $budget, $stagedBytes, $root);
                 $staged = self::stage($disk, $name, $objects, $root);
             } catch (Throwable $e) {
                 File::deleteDirectory($root.DIRECTORY_SEPARATOR.$name);
@@ -76,6 +98,7 @@ class UploadsBackup
                 continue;
             }
             $budget -= $bytes;
+            $stagedBytes += $bytes;
             $manifest->addFiles($staged);
             backupLogger()->info('Added '.count($staged).' file(s) ('.round($bytes / 1048576, 1)." MB) from {$name}.");
         }
@@ -89,16 +112,17 @@ class UploadsBackup
         return array_values(array_filter($disks, fn (string $name) => isset(self::DIRS[$name])));
     }
 
-    /** A file name the app itself writes: nothing can climb out of the temp or restore folder, and nothing but images and PDFs reaches a bucket. */
     public static function isSafeKey(string $disk, string $key): bool
     {
         return isset(self::KEY_PATTERNS[$disk]) && preg_match(self::KEY_PATTERNS[$disk], $key) === 1;
     }
 
-    /** The staging folder of a run that was killed before spatie could delete it. */
+    /** spatie's working folder (same default as its service provider), where a killed run leaves plaintext. */
     public static function stagingRoot(): string
     {
-        return rtrim((string) config('backup.backup.temporary_directory'), '/\\').DIRECTORY_SEPARATOR.'temp';
+        $base = trim((string) config('backup.backup.temporary_directory'));
+
+        return rtrim($base !== '' ? $base : storage_path('app/backup-temp'), '/\\').DIRECTORY_SEPARATOR.'temp';
     }
 
     /** @return array<string, int> the disk's safe keys and their sizes */
@@ -121,7 +145,7 @@ class UploadsBackup
         return $objects;
     }
 
-    private static function assertRoom(string $name, int $bytes, int $budget, string $root): void
+    private static function assertRoom(string $name, int $bytes, int $budget, int $stagedBytes, string $root): void
     {
         if ($bytes > $budget) {
             throw new \RuntimeException(sprintf(
@@ -130,12 +154,20 @@ class UploadsBackup
             ));
         }
 
-        // The staged copies plus the zip of them. This sees the filesystem,
-        // not a cPanel account quota; the size limit is what bounds that.
+        // Still to be written: this bucket's copies, then a zip of everything
+        // (this bucket, the ones staged before it, the SQL dump). Running out
+        // of space while zipping would fail the whole run, database included.
+        // This sees the filesystem, not a cPanel quota; the size limit bounds that.
+        $dumps = 0;
+        foreach (File::glob($root.DIRECTORY_SEPARATOR.'db-dumps'.DIRECTORY_SEPARATOR.'*') as $dump) {
+            $dumps += (int) @filesize($dump);
+        }
+        $needed = $bytes + ($stagedBytes + $bytes + $dumps) + self::DISK_MARGIN_BYTES;
         $free = @disk_free_space($root);
-        if ($free !== false && $free < 2 * $bytes + self::DISK_MARGIN_BYTES) {
+        if ($free !== false && $free < $needed) {
             throw new \RuntimeException(sprintf(
-                'not enough free disk for %.1f MB of uploads (%.1f MB free)', $bytes / 1048576, $free / 1048576,
+                'not enough free disk for %.1f MB of %s (%.1f MB free, %.1f MB needed with the zip)',
+                $bytes / 1048576, $name, $free / 1048576, $needed / 1048576,
             ));
         }
     }
@@ -206,10 +238,14 @@ class UploadsBackup
     /**
      * A PHP fatal skips spatie's cleanup; this still removes the plaintext
      * copies and the SQL dump. Each scheduled run is its own process, and
-     * spatie deletes this same folder at the end of every run anyway.
+     * spatie deletes this same folder at the end of every run anyway. Once
+     * per process: spatie's retry fires the listener again.
      */
     private static function cleanUpOnFatalError(string $root): void
     {
-        register_shutdown_function(fn () => File::deleteDirectory($root));
+        if (! self::$cleanupRegistered) {
+            self::$cleanupRegistered = true;
+            register_shutdown_function(fn () => File::deleteDirectory($root));
+        }
     }
 }

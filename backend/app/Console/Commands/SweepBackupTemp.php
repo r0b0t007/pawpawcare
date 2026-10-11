@@ -6,6 +6,7 @@ use App\Support\UploadsBackup;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Deletes the backup staging folder a killed run left behind: the plain SQL
@@ -22,15 +23,22 @@ class SweepBackupTemp extends Command
     public function handle(): int
     {
         $root = UploadsBackup::stagingRoot();
-        if (! is_dir($root)) {
-            return self::SUCCESS;
-        }
 
         // A run in progress keeps writing into it; only a folder nothing has
-        // touched for hours is a leftover.
-        $newest = filemtime($root);
-        foreach (File::allFiles($root, true) as $file) {
-            $newest = max($newest, $file->getMTime());
+        // touched for hours is a leftover. A run that ends meanwhile deletes
+        // the folder itself, which is just as good.
+        try {
+            $newest = filemtime($root);
+            foreach (File::allFiles($root, true) as $file) {
+                $newest = max($newest, $file->getMTime());
+            }
+        } catch (Throwable) {
+            clearstatcache();
+            if (is_dir($root)) {
+                throw new \RuntimeException("Couldn't inspect {$root}.");
+            }
+
+            return self::SUCCESS;
         }
         if ($newest > now()->subHours((int) $this->option('hours'))->getTimestamp()) {
             $this->info('A backup may still be running; left alone.');

@@ -11,6 +11,7 @@ use App\Support\MailDelivery;
 use App\Support\ReportOnce;
 use App\Support\UploadsBackup;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\Request;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Event;
@@ -49,7 +50,9 @@ class AppServiceProvider extends ServiceProvider
         // spatie writes a plain zip when the password is empty or ext-zip has
         // no AES. This fires inside the backup job before zipping, so throwing
         // aborts the run (manual or scheduled) and raises BackupHasFailed.
-        // Only then are the R2 upload buckets copied in (UploadsBackup).
+        // Only then are the R2 upload buckets copied in (UploadsBackup),
+        // unless the run was started with --only-db.
+        Event::listen(CommandStarting::class, [UploadsBackup::class, 'noteCommand']);
         Event::listen(BackupManifestWasCreated::class, function (BackupManifestWasCreated $e) {
             Backups::assertEncryptable();
             UploadsBackup::addToManifest($e->manifest);
