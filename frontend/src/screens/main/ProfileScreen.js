@@ -294,6 +294,15 @@ export default function ProfileScreen({ navigation }) {
 
         <Text style={[type.sectionLabel, styles.sectionLabel]}>Support</Text>
         <Card style={styles.sectionCard}>
+          {/* Private feedback, open to everyone — never tied to the store
+              rating prompt (services/storeReview), per store policy. */}
+          <ListRow
+            icon="message-text-outline"
+            title="Send feedback"
+            subtitle="Tell us what to improve — only our team reads it"
+            chevron
+            onPress={() => navigation.navigate('Support', { category: 'feedback' })}
+          />
           <ListRow
             icon="face-agent"
             title="Help & support"

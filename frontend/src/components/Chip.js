@@ -12,6 +12,9 @@ export default function Chip({ label, active, onPress, style }) {
   const [pressed, setPressed] = useState(false);
   return (
     <AnimatedPressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: !!active }}
       onPress={onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}

@@ -10,13 +10,17 @@ class SupportMessage extends Model
 {
     use HasUuids;
 
+    /** What the person is writing about; null for older apps. */
+    public const CATEGORIES = ['feedback', 'problem', 'idea', 'question'];
+
     protected $keyType = 'string';
 
     public $incrementing = false;
 
     const UPDATED_AT = null;
 
-    protected $fillable = ['user_id', 'message'];
+    // user_id is set explicitly from the authenticated user, never filled.
+    protected $fillable = ['message', 'category', 'app_version', 'platform'];
 
     public function user(): BelongsTo
     {
@@ -29,6 +33,7 @@ class SupportMessage extends Model
         return [
             'id' => $this->id,
             'message' => $this->message,
+            'category' => $this->category,
             'created_at' => $this->created_at?->toISOString(),
         ];
     }
