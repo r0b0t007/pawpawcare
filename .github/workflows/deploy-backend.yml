@@ -108,6 +108,9 @@ jobs:
             # config/sentry.php, so it also survives a later config:clear.
             git rev-parse --short HEAD > .release
             "$PHP_BIN" artisan config:cache
+            # Mail config + SMTP login. Never fails the deploy: a failure is
+            # printed here and logged as an error (Sentry).
+            "$PHP_BIN" artisan mail:check || echo "::warning::mail:check failed: password-reset and verification emails may not be delivered (see output above)."
             "$PHP_BIN" artisan route:cache
             "$PHP_BIN" artisan queue:restart || true
 

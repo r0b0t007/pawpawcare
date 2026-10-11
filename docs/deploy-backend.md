@@ -98,6 +98,31 @@ SECRET_KEY=<fresh random string, ≥ 32 chars — do NOT reuse the dev value>
 ANTHROPIC_API_KEY=<key>    # AI document intake
 
 QUEUE_CONNECTION=sync      # start simple; see cron section to move to database
+
+# Email (password-reset and verification codes, support forwards) over SMTP
+# through a cPanel mailbox (cPanel → Email Accounts). SPF (include:spf.web-hosting.com)
+# and DKIM (default._domainkey) for pawpawcare.app already cover this server.
+# With a `log` mailer, MAIL_HOST left at 127.0.0.1 or blank, or a placeholder
+# From, the codes are silently not sent. In production that logs "Email not
+# delivered: …" as an error, at most once per 10 minutes per cause, so it is a
+# signal, not a count. It reaches Sentry only with LOG_STACK=single,sentry.
+MAIL_MAILER=smtp
+MAIL_SCHEME=smtps
+MAIL_HOST=server215.web-hosting.com
+MAIL_PORT=465
+MAIL_USERNAME=no-reply@pawpawcare.app
+MAIL_PASSWORD=<the mailbox password>
+MAIL_FROM_ADDRESS=no-reply@pawpawcare.app
+MAIL_FROM_NAME=PawPawCare
+SUPPORT_INBOX=<your inbox>  # optional: forwards in-app "Contact us" messages
+```
+
+After `config:cache`, check the config and the SMTP login (deploy-backend.yml
+runs this on every deploy), and optionally send yourself a real email:
+
+```sh
+php artisan mail:check
+php artisan mail:check --send-to=you@example.com
 ```
 
 Then:

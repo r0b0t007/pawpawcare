@@ -7,8 +7,11 @@ use App\Services\Extraction\AnthropicDriver;
 use App\Services\Extraction\ExtractionClient;
 use App\Services\Extraction\OpenAiCompatibleDriver;
 use App\Support\Backups;
+use App\Support\MailDelivery;
+use App\Support\ReportOnce;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -61,6 +64,18 @@ class AppServiceProvider extends ServiceProvider
             'disk' => $e->diskName,
             'problems' => $e->failureMessages->pluck('message')->filter()->values()->all(),
         ]));
+
+        // An email about to vanish (log mailer, SMTP at 127.0.0.1, placeholder
+        // From) becomes an error log in production, once per 10 minutes per
+        // cause, so Sentry flags it the first time a user asks for a code.
+        Event::listen(MessageSending::class, function (MessageSending $event) {
+            if (! $this->app->isProduction()) {
+                return;
+            }
+            if ($problem = MailDelivery::problem($event->data['mailer'] ?? null)) {
+                ReportOnce::log('mail-delivery:'.md5($problem), 'error', "Email not delivered: {$problem}");
+            }
+        });
 
         // Queue workers never reach app()->terminating between jobs: send any
         // analytics a job captured once it's done.
