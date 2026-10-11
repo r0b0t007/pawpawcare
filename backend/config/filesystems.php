@@ -136,13 +136,16 @@ return [
     | Where App\Support\Uploads keeps user files: 'public' + 'local' (the
     | default, also for dev and tests) or 'r2-media' + 'r2-documents'. After
     | switching, `php artisan uploads:migrate` moves the existing files over
-    | (docs/uploads-r2.md).
+    | (docs/uploads-r2.md). media_host is refused as an "external" image
+    | host even before MEDIA_URL is set, so nobody can pre-stage references
+    | to other users' photos there.
     |
     */
 
     'uploads' => [
         'public_disk' => env('UPLOADS_PUBLIC_DISK', 'public'),
         'private_disk' => env('UPLOADS_PRIVATE_DISK', 'local'),
+        'media_host' => env('MEDIA_HOST', 'media.pawpawcare.app'),
     ],
 
     /*

@@ -8,14 +8,17 @@ use App\Models\Post;
 use App\Models\Upload;
 use App\Models\User;
 use App\Services\JwtService;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Mockery;
 use Tests\TestCase;
 
 /** Uploads on the R2 disks (faked locally), the migration to them, and the deploy check. */
@@ -141,6 +144,24 @@ class R2UploadsTest extends TestCase
         $this->withToken($mine)->postJson('/pets', ['name' => 'P', 'avatar_url' => 'https://example.org/cat.jpg'])->assertCreated();
     }
 
+    public function test_the_media_host_is_never_an_external_image_host_even_before_the_move(): void
+    {
+        // Local disks, no MEDIA_URL: what production runs until the switch.
+        [, $token] = $this->user();
+        $name = str_repeat('a', 40).'.jpg';
+
+        foreach ([
+            "https://media.pawpawcare.app/uploads/{$name}",   // pre-staging someone's future R2 url
+            "https://MEDIA.pawpawcare.app/uploads/{$name}",   // case lookalike
+            "https://media.pawpawcare.app:443/uploads/{$name}?x=1",
+            'https://media.pawpawcare.app./anything.jpg',
+        ] as $url) {
+            $this->withToken($token)->patchJson('/users/me', ['avatar_url' => $url])->assertStatus(422);
+        }
+
+        $this->withToken($token)->patchJson('/users/me', ['avatar_url' => 'https://media.pawpawcare.app.example.org/x.jpg'])->assertOk();
+    }
+
     // ── Documents ────────────────────────────────────────────────────────────
 
     public function test_a_document_lands_on_r2_and_opens_through_a_presigned_redirect(): void
@@ -167,9 +188,59 @@ class R2UploadsTest extends TestCase
         $this->assertStringContainsString("filename*=utf-8''Bloodwork%201-2", $q['ResponseContentDisposition']);
         $this->assertStringContainsString('no-store', $res->headers->get('Cache-Control'));
         $this->assertSame('no-referrer', $res->headers->get('Referrer-Policy'));
+        $this->assertSame('private, no-store', $q['ResponseCacheControl']);
 
         // The signature still guards the door.
         $this->get($signed.'tampered')->assertStatus(403);
+    }
+
+    public function test_an_r2_error_deleting_a_document_file_does_not_abort_the_pet_delete(): void
+    {
+        $this->onR2();
+        Exceptions::fake();
+        [$owner, $token] = $this->user();
+        $pet = Pet::create(['owner_id' => $owner->id, 'name' => 'Luna', 'weight_unit' => 'kg']);
+        Document::create(['pet_id' => $pet->id, 'title' => 'A', 'file_path' => 'documents/a.pdf', 'mime' => 'application/pdf', 'size_bytes' => 1]);
+        Document::create(['pet_id' => $pet->id, 'title' => 'B', 'file_path' => 'documents/b.pdf', 'mime' => 'application/pdf', 'size_bytes' => 1]);
+
+        $failing = Mockery::mock(Filesystem::class);
+        $failing->shouldReceive('delete')->twice()->andThrow(new \RuntimeException('R2 timed out'));
+        Storage::set('r2-documents', $failing);
+
+        $this->withToken($token)->deleteJson("/pets/{$pet->id}")->assertSuccessful();
+
+        $this->assertNull(Pet::find($pet->id));
+        Exceptions::assertReported(fn (\RuntimeException $e) => $e->getMessage() === 'R2 timed out');
+    }
+
+    // ── uploads:prune on R2 ──────────────────────────────────────────────────
+
+    public function test_prune_keeps_images_in_use_even_if_media_url_changes(): void
+    {
+        $this->onR2();
+        [$user] = $this->user();
+        $used = 'uploads/'.str_repeat('u', 40).'.jpg';
+        $orphan = 'uploads/'.str_repeat('o', 40).'.jpg';
+        Storage::disk('r2-media')->put($used, 'x');
+        Storage::disk('r2-media')->put($orphan, 'y');
+        Pet::create(['owner_id' => $user->id, 'name' => 'P', 'avatar_url' => self::MEDIA.'/'.$used]);
+
+        config(['filesystems.disks.r2-media.url' => 'https://img.pawpawcare.app']);
+        $this->artisan('uploads:prune', ['--hours' => 0])->assertSuccessful();
+
+        Storage::disk('r2-media')->assertExists($used);
+        Storage::disk('r2-media')->assertMissing($orphan);
+    }
+
+    public function test_prune_refuses_to_run_on_r2_without_media_url(): void
+    {
+        $this->onR2();
+        config(['filesystems.disks.r2-media.url' => null]);
+        Storage::disk('r2-media')->put('uploads/'.str_repeat('o', 40).'.jpg', 'y');
+
+        $this->artisan('uploads:prune', ['--hours' => 0])->expectsOutputToContain('Not pruning: MEDIA_URL must be set')->assertFailed();
+
+        Storage::disk('r2-media')->assertExists('uploads/'.str_repeat('o', 40).'.jpg');
     }
 
     // ── uploads:migrate ──────────────────────────────────────────────────────

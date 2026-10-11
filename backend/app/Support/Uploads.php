@@ -112,6 +112,10 @@ class Uploads
      * its MEDIA_URL address), a hand-written or traversal-shaped path — is a
      * 422, so a record can never point at a file its owner may not delete.
      *
+     * The media host is never "external": a lookalike of a managed url there
+     * (other case, port, query string) or one staged before MEDIA_URL is set
+     * would otherwise keep another user's deleted photo referenced.
+     *
      * @param  list<string>  $uploaderIds
      */
     public static function assertUsableUrl(?string $url, array $uploaderIds, ?string $current, string $field): void
@@ -121,7 +125,7 @@ class Uploads
         }
 
         $path = self::pathFromUrl($url);
-        if ($path === null && preg_match('#^https?://#i', $url)) {
+        if ($path === null && preg_match('#^https?://#i', $url) && ! self::isMediaHost($url)) {
             return; // an external image
         }
 
@@ -156,7 +160,16 @@ class Uploads
     public static function deletePrivate(?string $path): void
     {
         if ($path) {
-            DB::afterCommit(fn () => self::privateDisk()->delete($path));
+            // Never throws: R2 can fail where the local disk didn't, and one
+            // failure must not abort a pet delete or skip the purge's other
+            // deletes. `uploads:prune` removes anything left behind.
+            DB::afterCommit(function () use ($path) {
+                try {
+                    self::privateDisk()->delete($path);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            });
         }
     }
 
@@ -199,6 +212,18 @@ class Uploads
     }
 
     /**
+     * The uploads/... path a stored url ends in, whatever its host — for
+     * `uploads:prune`, which must never mistake a file in use for an orphan.
+     * Matching the suffix, not MEDIA_URL, means a changed or missing
+     * MEDIA_URL can't make every image look unreferenced. Over-matching
+     * only keeps a file longer.
+     */
+    public static function referencedPath(?string $url): ?string
+    {
+        return $url && preg_match('#/('.self::MANAGED_PATH.')$#', $url, $m) ? $m[1] : null;
+    }
+
+    /**
      * Best-effort removal of a managed upload once nothing references it any
      * more. Call only after the owning write (updated/deleted hooks), so the
      * changed record no longer points at the file. Files with no ownership row
@@ -224,11 +249,15 @@ class Uploads
                 return;
             }
 
+            // Compared in PHP too: MySQL's case- and accent-insensitive
+            // collation would let a lookalike url count as a reference.
             $urls = self::urlForms($path);
-            $stillReferenced = User::whereIn('avatar_url', $urls)->exists()
-                || Pet::whereIn('avatar_url', $urls)->exists()
-                || Post::whereIn('image_url', $urls)->exists()
-                || LostPetReport::whereIn('photo_url', $urls)->exists();
+            $references = fn (string $model, string $column) => $model::whereIn($column, $urls)
+                ->pluck($column)->contains(fn ($v) => in_array($v, $urls, true));
+            $stillReferenced = $references(User::class, 'avatar_url')
+                || $references(Pet::class, 'avatar_url')
+                || $references(Post::class, 'image_url')
+                || $references(LostPetReport::class, 'photo_url');
             if ($stillReferenced) {
                 return;
             }
@@ -310,6 +339,18 @@ class Uploads
         }
 
         return $name;
+    }
+
+    /** Whether a url is on the host our media is (or will be) served from. */
+    private static function isMediaHost(string $url): bool
+    {
+        $host = strtolower(rtrim((string) parse_url($url, PHP_URL_HOST), '.'));
+        $hosts = array_filter([
+            strtolower((string) config('filesystems.uploads.media_host')),
+            strtolower((string) parse_url((string) self::mediaBase(), PHP_URL_HOST)),
+        ]);
+
+        return $host !== '' && in_array($host, $hosts, true);
     }
 
     /** MEDIA_URL without a trailing slash, or null when unset. */

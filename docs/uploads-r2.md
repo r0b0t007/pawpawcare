@@ -56,6 +56,9 @@ Steps marked **owner** need the dashboard or secrets. Everything else uses the `
 
 Run these in the cPanel terminal, one line at a time, from `~/pawpawcare/backend`.
 
+The whole switch runs in **maintenance mode**, which takes about a minute. Without it, a photo or document deleted between steps 2 and 5 would be deleted from R2, where it isn't yet. Its local copy would survive, and step 5 would copy it up again. The API answers 503 meanwhile, and the Sentry uptime alert fires after 3 minutes, so keep it short.
+
+0. `php artisan down --retry=60`
 1. Add the two switch lines to `.env`:
    ```
    UPLOADS_PUBLIC_DISK=r2-media
@@ -65,12 +68,18 @@ Run these in the cPanel terminal, one line at a time, from `~/pawpawcare/backend
 3. `php artisan uploads:check`. It writes, reads, fetches and deletes a test file on each bucket: media through `MEDIA_URL`, documents through a presigned URL. If it fails, remove the two lines, run `php artisan config:cache` again, and nothing has changed.
 4. `php artisan uploads:migrate --dry-run` lists what would move.
 5. `php artisan uploads:migrate` copies every local file to R2 and checks each size. Only then does it rewrite stored `/storage/uploads/...` URLs to `MEDIA_URL/...` and delete the local copies. It's safe to re-run.
-6. **Check in the app:** existing photos still show, a vault document opens, and a new photo upload works.
+6. `php artisan up`
+7. **Check in the app:** existing photos still show, a vault document opens, and a new photo upload works.
 
 After this, every deploy runs `uploads:check`. A failure shows as a warning and a Sentry error, and never fails the deploy.
 
-**Rollback:**
+**`MEDIA_URL` is permanent once set.** Every stored image URL contains it.
+- **If it's removed:** `uploads:prune` refuses to run and new uploads fail, so nothing is lost.
+- **If it's changed:** existing images keep their old addresses, and those stop loading if the old domain goes away. Prune still keeps them, because it matches on the `uploads/<name>` ending, not the domain.
+
+**Rollback** (still in maintenance mode):
 - **Before step 5:** remove the two lines and run `config:cache`.
+- **If anything was uploaded while on R2,** even just before step 5, those files exist only on R2. Their records hold `MEDIA_URL/...` addresses, which the local disk doesn't serve and prune doesn't scan.
 - **After step 5:** the files live only on R2, so going back means copying them down first. There's no command for that yet.
 
 ## Good to know

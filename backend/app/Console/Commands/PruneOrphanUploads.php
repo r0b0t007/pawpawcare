@@ -23,13 +23,25 @@ class PruneOrphanUploads extends Command
         $cutoff = now()->subHours((int) $this->option('hours'))->getTimestamp();
         $deleted = 0;
 
-        // Public disk: avatars + post images under uploads/.
+        // A half-configured R2 setup (no MEDIA_URL) means nothing about the
+        // stored urls can be trusted; delete nothing.
+        try {
+            Uploads::publicUrl('uploads/probe');
+            Uploads::privateDiskName();
+        } catch (\RuntimeException $e) {
+            $this->error("Not pruning: {$e->getMessage()}");
+
+            return self::FAILURE;
+        }
+
+        // Public disk: avatars + post images under uploads/. Matched on the
+        // path a url ends in (Uploads::referencedPath), not its host.
         $publicRefs = collect()
             ->merge(Pet::whereNotNull('avatar_url')->pluck('avatar_url'))
             ->merge(User::whereNotNull('avatar_url')->pluck('avatar_url'))
             ->merge(Post::whereNotNull('image_url')->pluck('image_url'))
             ->merge(LostPetReport::whereNotNull('photo_url')->pluck('photo_url'))
-            ->map(fn ($url) => Uploads::pathFromUrl($url))
+            ->map(fn ($url) => Uploads::referencedPath($url))
             ->filter()
             ->flip();
         $deleted += $this->prune(Uploads::publicDisk(), 'uploads', $publicRefs, $cutoff, fn ($path) => Upload::where('path', $path)->delete());

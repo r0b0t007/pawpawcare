@@ -132,6 +132,8 @@ class DocumentController extends Controller
         $url = $disk->temporaryUrl($doc->file_path, now()->addMinutes(5), [
             'ResponseContentType' => $type,
             'ResponseContentDisposition' => HeaderUtils::makeDisposition('inline', $name, self::asciiName($name)),
+            // Medical records: no browser or shared-cache copies.
+            'ResponseCacheControl' => 'private, no-store',
         ]);
 
         // no-referrer: the presigned URL must not leak to whatever the PDF links to.
