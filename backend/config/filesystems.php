@@ -79,6 +79,42 @@ return [
             'report' => false,
         ],
 
+        // Uploads on Cloudflare R2 (docs/uploads-r2.md). One token for two
+        // buckets: avatars and post/lost-pet photos, served publicly from
+        // MEDIA_URL, and medical documents, which have no public URL and are
+        // only reached through 5-minute presigned links. R2 has no object
+        // ACLs, so 'private' only stops Flysystem asking for a public one.
+        'r2-media' => [
+            'driver' => 's3',
+            'key' => env('UPLOADS_R2_ACCESS_KEY_ID'),
+            'secret' => env('UPLOADS_R2_SECRET_ACCESS_KEY'),
+            'region' => 'auto',
+            'bucket' => env('UPLOADS_R2_MEDIA_BUCKET'),
+            'endpoint' => env('UPLOADS_R2_ENDPOINT'),
+            'url' => env('MEDIA_URL'),
+            'use_path_style_endpoint' => true,
+            'request_checksum_calculation' => 'when_required',
+            'response_checksum_validation' => 'when_required',
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
+        'r2-documents' => [
+            'driver' => 's3',
+            'key' => env('UPLOADS_R2_ACCESS_KEY_ID'),
+            'secret' => env('UPLOADS_R2_SECRET_ACCESS_KEY'),
+            'region' => 'auto',
+            'bucket' => env('UPLOADS_R2_DOCUMENTS_BUCKET'),
+            'endpoint' => env('UPLOADS_R2_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            'request_checksum_calculation' => 'when_required',
+            'response_checksum_validation' => 'when_required',
+            'visibility' => 'private',
+            'throw' => true,
+            'report' => false,
+        ],
+
         // Local backup target for restore drills / testing only. Outside
         // storage/app/private and /public, so archives are never served and
         // never nested inside later backups. Delete its contents afterwards.
@@ -90,6 +126,26 @@ return [
             'report' => false,
         ],
 
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Upload Disks
+    |--------------------------------------------------------------------------
+    |
+    | Where App\Support\Uploads keeps user files: 'public' + 'local' (the
+    | default, also for dev and tests) or 'r2-media' + 'r2-documents'. After
+    | switching, `php artisan uploads:migrate` moves the existing files over
+    | (docs/uploads-r2.md). media_host is refused as an "external" image
+    | host even before MEDIA_URL is set, so nobody can pre-stage references
+    | to other users' photos there.
+    |
+    */
+
+    'uploads' => [
+        'public_disk' => env('UPLOADS_PUBLIC_DISK', 'public'),
+        'private_disk' => env('UPLOADS_PRIVATE_DISK', 'local'),
+        'media_host' => env('MEDIA_HOST', 'media.pawpawcare.app'),
     ],
 
     /*

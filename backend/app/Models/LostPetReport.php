@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UploadUrl;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,7 @@ class LostPetReport extends Model
     ];
 
     protected $casts = [
+        'photo_url' => UploadUrl::class,
         'last_seen_at' => 'datetime',
         'resolved_at' => 'datetime',
         'latitude' => 'float',

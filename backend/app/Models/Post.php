@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UploadUrl;
 use App\Support\Uploads;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -31,6 +32,8 @@ class Post extends Model
     }
 
     protected $fillable = ['author_id', 'content', 'image_url', 'group_id'];
+
+    protected $casts = ['image_url' => UploadUrl::class];
 
     public function author(): BelongsTo
     {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UploadUrl;
 use App\Support\Uploads;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -60,6 +61,7 @@ class Pet extends Model
     ];
 
     protected $casts = [
+        'avatar_url' => UploadUrl::class,
         'age' => 'float',
         'weight' => 'float',
         'heart_rate' => 'integer',

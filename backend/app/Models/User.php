@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\UploadUrl;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\Subscriptions\Entitlements;
 use App\Support\Uploads;
@@ -44,6 +45,7 @@ class User extends Model
     protected $hidden = ['hashed_password', 'provider', 'provider_id'];
 
     protected $casts = [
+        'avatar_url' => UploadUrl::class,
         'is_active' => 'boolean',
         // `is_admin` is intentionally NOT fillable: it can only be set via the
         // `user:make-admin` artisan command (forceFill), never over HTTP.

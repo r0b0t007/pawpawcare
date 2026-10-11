@@ -20,9 +20,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\HeaderUtils;
+use Symfony\Component\HttpFoundation\Response;
 
 class DocumentController extends Controller
 {
@@ -67,7 +68,7 @@ class DocumentController extends Controller
         $file = $request->file('file');
         $isPdf = $file->getMimeType() === 'application/pdf';
         // Stored on the PRIVATE disk — never web-accessible without a signed URL.
-        $path = $isPdf
+        [$path, $size] = $isPdf
             ? Uploads::storePrivatePdf($file, 'documents')
             : Uploads::storePrivateImage($file, 'documents');
 
@@ -80,7 +81,7 @@ class DocumentController extends Controller
             'file_path' => $path,
             'mime' => $isPdf ? 'application/pdf' : $file->getMimeType(),
             // Record the actual stored size (images are re-encoded, so it differs).
-            'size_bytes' => Storage::disk(Uploads::PRIVATE_DISK)->size($path),
+            'size_bytes' => $size,
         ]);
 
         return response()->json($doc->toApi(), 201);
@@ -106,21 +107,61 @@ class DocumentController extends Controller
     }
 
     /**
-     * Stream the file behind a valid signed URL. This route is NOT JWT-guarded
+     * Serve the file behind a valid signed URL. This route is NOT JWT-guarded
      * (a browser can't send the token) — the signature, minted only for an
-     * authorized user and valid for minutes, is the authorization.
+     * authorized user and valid for minutes, is the authorization. On R2 the
+     * file never passes through PHP: the browser is sent on to a 5-minute
+     * presigned URL for this one object, minted fresh on every visit (so the
+     * vet share page's longer-lived links keep working). Presigning is local
+     * computation, so a document open costs no R2 round-trip from PHP; a
+     * missing object is R2's own 404.
      */
-    public function raw(string $documentId): StreamedResponse
+    public function raw(string $documentId): Response
     {
         $doc = Document::find($documentId);
-        $disk = Storage::disk(Uploads::PRIVATE_DISK);
-        if (! $doc || ! $disk->exists($doc->file_path)) {
+        if (! $doc) {
             abort(404, 'Document not found');
         }
 
-        return $disk->response($doc->file_path, $doc->title, [
-            'Content-Type' => $doc->mime ?: 'application/octet-stream',
+        $disk = Uploads::privateDisk();
+        $name = self::downloadName($doc->title);
+        $type = $doc->mime ?: 'application/octet-stream';
+
+        if (Uploads::privateDiskName() === 'local') {
+            if (! $disk->exists($doc->file_path)) {
+                abort(404, 'Document not found');
+            }
+
+            return $disk->response($doc->file_path, $name, ['Content-Type' => $type]);
+        }
+
+        $url = $disk->temporaryUrl($doc->file_path, now()->addMinutes(5), [
+            'ResponseContentType' => $type,
+            'ResponseContentDisposition' => HeaderUtils::makeDisposition('inline', $name, self::asciiName($name)),
+            // Medical records: no browser or shared-cache copies.
+            'ResponseCacheControl' => 'private, no-store',
         ]);
+
+        // no-referrer only covers this hop: the request to R2 doesn't carry the
+        // signed API link as its Referer. R2 can't add a Referrer-Policy to the
+        // PDF itself; what limits a presigned URL leaking from a link inside the
+        // document is its 5-minute lifetime and single-object scope.
+        return redirect()->away($url)->withHeaders(['Cache-Control' => 'no-store', 'Referrer-Policy' => 'no-referrer']);
+    }
+
+    /** The title as a filename: path separators would make the disposition header throw. */
+    private static function downloadName(string $title): string
+    {
+        $name = trim(str_replace(['/', '\\'], '-', $title));
+
+        return $name !== '' ? $name : 'document';
+    }
+
+    private static function asciiName(string $name): string
+    {
+        $ascii = trim(str_replace('%', '', Str::ascii($name)));
+
+        return $ascii !== '' ? $ascii : 'document';
     }
 
     /**

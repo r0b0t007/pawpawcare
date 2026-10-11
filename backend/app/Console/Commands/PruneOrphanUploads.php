@@ -3,14 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\Document;
-use App\Models\LostPetReport;
-use App\Models\Pet;
-use App\Models\Post;
 use App\Models\Upload;
-use App\Models\User;
 use App\Support\Uploads;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 
 class PruneOrphanUploads extends Command
 {
@@ -24,39 +19,65 @@ class PruneOrphanUploads extends Command
         $cutoff = now()->subHours((int) $this->option('hours'))->getTimestamp();
         $deleted = 0;
 
-        // Public disk: avatars + post images under uploads/.
-        $publicRefs = collect()
-            ->merge(Pet::whereNotNull('avatar_url')->pluck('avatar_url'))
-            ->merge(User::whereNotNull('avatar_url')->pluck('avatar_url'))
-            ->merge(Post::whereNotNull('image_url')->pluck('image_url'))
-            ->merge(LostPetReport::whereNotNull('photo_url')->pluck('photo_url'))
-            ->map(fn ($url) => Uploads::pathFromUrl($url))
+        // A half-configured R2 setup (no MEDIA_URL) means nothing about the
+        // stored urls can be trusted; delete nothing.
+        try {
+            Uploads::publicUrl('uploads/probe');
+            Uploads::privateDiskName();
+        } catch (\RuntimeException $e) {
+            $this->error("Not pruning: {$e->getMessage()}");
+
+            return self::FAILURE;
+        }
+
+        // Public disk: avatars + post images under uploads/ (see Uploads::referencedPath).
+        $publicRefs = collect(Uploads::URL_COLUMNS)
+            ->flatMap(fn (string $column, string $model) => $model::whereNotNull($column)->pluck($column))
+            ->map(fn ($url) => Uploads::referencedPath($url))
             ->filter()
             ->flip();
-        $deleted += $this->prune(Storage::disk('public'), 'uploads', $publicRefs, $cutoff, fn ($path) => Upload::where('path', $path)->delete());
+        $deleted += $this->prune(Uploads::publicDisk(), 'uploads', $publicRefs, $cutoff, fn ($path) => Upload::where('path', $path)->delete());
 
         // Private disk: medical documents under documents/ (paths stored verbatim).
         $docRefs = Document::whereNotNull('file_path')->pluck('file_path')->flip();
-        $deleted += $this->prune(Storage::disk(Uploads::PRIVATE_DISK), 'documents', $docRefs, $cutoff);
+        $deleted += $this->prune(Uploads::privateDisk(), 'documents', $docRefs, $cutoff);
 
         $this->info("Pruned {$deleted} orphaned file(s).");
 
         return self::SUCCESS;
     }
 
-    /** Delete files in $dir on $disk that aren't referenced and are older than $cutoff. */
+    /**
+     * Delete files in $dir on $disk that aren't referenced and are older than
+     * $cutoff. Prune is the backstop for deletes that failed elsewhere, so one
+     * bad object (an R2 error) is reported and skipped, never fatal.
+     */
     private function prune($disk, string $dir, $referenced, int $cutoff, ?callable $afterDelete = null): int
     {
         $deleted = 0;
-        foreach ($disk->files($dir) as $path) {
-            if ($referenced->has($path) || $disk->lastModified($path) > $cutoff) {
-                continue;
+        try {
+            $paths = $disk->files($dir);
+        } catch (\Throwable $e) {
+            report($e);
+            $this->warn("Couldn't list {$dir}/: {$e->getMessage()}");
+
+            return 0;
+        }
+
+        foreach ($paths as $path) {
+            try {
+                if ($referenced->has($path) || $disk->lastModified($path) > $cutoff) {
+                    continue;
+                }
+                $disk->delete($path);
+                if ($afterDelete) {
+                    $afterDelete($path); // drop the ownership row with the file
+                }
+                $deleted++;
+            } catch (\Throwable $e) {
+                report($e);
+                $this->warn("Skipped {$path}: {$e->getMessage()}");
             }
-            $disk->delete($path);
-            if ($afterDelete) {
-                $afterDelete($path); // drop the ownership row with the file
-            }
-            $deleted++;
         }
 
         return $deleted;

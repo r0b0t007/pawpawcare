@@ -7,7 +7,6 @@ use App\Models\Pet;
 use App\Services\Extraction\ExtractionClient;
 use App\Support\Uploads;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Reads a vault document (PDF or image) with a vision LLM and returns
@@ -45,7 +44,7 @@ class DocumentExtractor
     {
         $raw = $this->client->extract(
             $doc->mime ?: 'application/pdf',
-            Storage::disk(Uploads::PRIVATE_DISK)->get($doc->file_path),
+            Uploads::privateDisk()->get($doc->file_path),
             $this->systemPrompt($pet),
             'Extract all veterinary medical information from this document.',
             $this->schema(),
