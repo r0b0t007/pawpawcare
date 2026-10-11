@@ -297,11 +297,13 @@ export function DataProvider({ children }) {
 
   // Every care completion: analytics + a gamification refetch, so streaks and
   // milestones computed by the nightly job surface without a full reload.
-  // It's also a good moment for the rating prompt (services/storeReview).
+  // It's also a good moment for the rating prompt (services/storeReview) —
+  // except an upload, which usually continues straight into the AI read and
+  // its review sheet; applying that extraction is the good moment instead.
   const trackCareAction = (actionType) => {
     track('care_action_completed', { action_type: actionType });
     queryClient.invalidateQueries({ queryKey: gamificationKeys.summary });
-    noteGoodMoment('care_action');
+    if (actionType !== 'document_uploaded') noteGoodMoment('care_action');
   };
 
   // Each domain loads and dispatches independently, so one failed request
