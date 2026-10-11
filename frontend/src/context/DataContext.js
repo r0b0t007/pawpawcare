@@ -8,6 +8,7 @@ import { get, post, patch, put, del, uploadDocument } from '../services/api';
 import { scheduleLocalReminders } from '../services/notifications';
 import { track } from '../services/analytics';
 import { getPref, setPref } from '../services/prefs';
+import { noteGoodMoment } from '../services/storeReview';
 import { addDoseDay } from '../utils/streaks';
 import { petsKeys, gamificationKeys } from '../hooks/queryKeys';
 
@@ -296,9 +297,11 @@ export function DataProvider({ children }) {
 
   // Every care completion: analytics + a gamification refetch, so streaks and
   // milestones computed by the nightly job surface without a full reload.
+  // It's also a good moment for the rating prompt (services/storeReview).
   const trackCareAction = (actionType) => {
     track('care_action_completed', { action_type: actionType });
     queryClient.invalidateQueries({ queryKey: gamificationKeys.summary });
+    noteGoodMoment('care_action');
   };
 
   // Each domain loads and dispatches independently, so one failed request
@@ -961,6 +964,7 @@ export function DataProvider({ children }) {
       weight: !!result.weight,
       expense: !!result.expense,
     });
+    noteGoodMoment('extraction_applied');
     loadData();
     return result;
   };
