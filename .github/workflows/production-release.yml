@@ -1,8 +1,12 @@
-# Triggered by pushing a version tag: git tag v1.2.3 && git push --tags
-# 1. Syncs frontend/app.json version to the tag
-# 2. Builds production AAB (Android) + IPA (iOS) via EAS
+# Triggered by pushing a version tag on the tip of main:
+#   git checkout main && git pull && git tag v1.2.3 && git push origin v1.2.3
+# 1. Syncs frontend/app.json version to the tag (commit pushed to main)
+# 2. Builds production AAB (Android) + IPA (iOS) via EAS from that commit
 # 3. Submits to Google Play (internal track) and App Store Connect (TestFlight)
 # 4. Creates a GitHub Release with release notes
+#
+# A manual run (workflow_dispatch) builds the selected branch at the version
+# already in frontend/app.json: no version commit and no GitHub Release.
 #
 # Required GitHub secrets:
 #   EXPO_TOKEN               — from expo.dev/settings/access-tokens
@@ -27,44 +31,79 @@ on:
         type: choice
         options: ["true", "false"]
 
+# The repo's default token is read-only; the version commit and the GitHub
+# Release both need write.
+permissions:
+  contents: write
+
 jobs:
   # ── 1. Sync version in frontend/app.json to the git tag ─────────────────────
   sync-version:
     name: Sync app version
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.extract.outputs.version }}
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.commit.outputs.sha }}
 
     steps:
+      # A tag build works on main (so the version commit can be pushed); a
+      # manual run works on the branch it was started from.
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.event_name == 'push' && 'main' || github.ref }}
+          fetch-depth: 0
 
-      - name: Extract version from tag
-        id: extract
+      - name: Resolve version
+        id: version
         run: |
-          TAG="${GITHUB_REF#refs/tags/v}"
-          echo "version=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Building version $TAG"
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            # Building main's tip must mean building exactly the tagged code.
+            if [ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]; then
+              echo "::error::$GITHUB_REF_NAME is not on the tip of main. Tag the latest main commit and push the tag again."
+              exit 1
+            fi
+          else
+            VERSION=$(node -p "require('./frontend/app.json').expo.version")
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Not a release version: '$VERSION'"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version $VERSION"
 
       - name: Update frontend/app.json version
+        if: github.event_name == 'push'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           node -e "
             const fs = require('fs');
             const cfg = JSON.parse(fs.readFileSync('frontend/app.json', 'utf8'));
-            cfg.expo.version = '${{ steps.extract.outputs.version }}';
+            cfg.expo.version = process.env.VERSION;
             fs.writeFileSync('frontend/app.json', JSON.stringify(cfg, null, 2) + '\n');
             console.log('frontend/app.json version set to', cfg.expo.version);
           "
 
+      # [skip ci] keeps the bump from triggering the OTA/CI workflows. A failed
+      # push fails the release here, before anything is built or submitted.
       - name: Commit version bump
+        id: commit
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add frontend/app.json
-          git diff --cached --quiet || git commit -m "chore: bump version to ${{ steps.extract.outputs.version }} [skip ci]"
-          git push origin HEAD:main || true
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add frontend/app.json
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: bump version to $VERSION [skip ci]"
+              git push origin HEAD:main
+            fi
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   # ── 2. Build production binaries ────────────────────────────────────────────
   build:
@@ -76,8 +115,11 @@ jobs:
         working-directory: ./frontend
 
     steps:
+      # The commit with the synced version, not the bare tag.
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.sync-version.outputs.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v7
@@ -106,7 +148,7 @@ jobs:
   # ── 3. Submit to stores ──────────────────────────────────────────────────────
   submit:
     name: Submit to stores
-    needs: build
+    needs: [sync-version, build]
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || github.event.inputs.submit == 'true' }}
     defaults:
@@ -116,6 +158,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.sync-version.outputs.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v7
@@ -167,9 +211,11 @@ jobs:
         run: rm -f google-service-account.json
 
   # ── 4. Create GitHub Release ─────────────────────────────────────────────────
+  # Tag builds only: a manual run has no tag to release.
   release:
     name: Create GitHub Release
     needs: build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
@@ -178,22 +224,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The previous release is the nearest version tag behind this one in
+      # history, so a hotfix tag gets its own range, not the newest tag's.
       - name: Generate changelog
         id: changelog
         run: |
-          PREV_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+          PREV_TAG=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
           if [ -z "$PREV_TAG" ]; then
-            COMMITS=$(git log --pretty=format:"- %s" | head -20)
+            COMMITS=$(git log "$GITHUB_REF_NAME" --pretty=format:"- %s" | head -20)
           else
-            COMMITS=$(git log "$PREV_TAG"..HEAD --pretty=format:"- %s")
+            COMMITS=$(git log "$PREV_TAG..$GITHUB_REF_NAME" --pretty=format:"- %s")
           fi
-          echo "commits<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$COMMITS" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          DELIM="EOF_$(openssl rand -hex 8)"
+          {
+            echo "commits<<$DELIM"
+            echo "$COMMITS"
+            echo "$DELIM"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ github.ref_name }}
           name: "PawPawCare ${{ github.ref_name }}"
           body: |
             ## What's new in ${{ github.ref_name }}
