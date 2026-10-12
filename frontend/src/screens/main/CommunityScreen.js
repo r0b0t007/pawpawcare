@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TextInput, Alert, Image,
   ActivityIndicator, Linking, Pressable,
@@ -10,6 +10,7 @@ import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { uploadImage } from '../../services/api';
 import { track } from '../../services/analytics';
+import { timeAgo } from '../../utils/dates';
 import { resolveAsset } from '../../config';
 import { ui, type, PET_COLOR_PAIRS, motion, photos } from '../../theme';
 import {
@@ -22,13 +23,6 @@ import LostPetCard from './LostPetCard';
 // serial-position slot where attention is highest — as a warm, one-tap card.
 // The composer starts collapsed; lost-pet reporting lives on the pushed
 // LostPets screen — the section here only shows the board.
-
-function timeAgo(iso) {
-  const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
 
 // Identity colors only — never UI chrome.
 const pairFor = (name) => PET_COLOR_PAIRS[name ? name.charCodeAt(0) % PET_COLOR_PAIRS.length : 0];
@@ -60,8 +54,14 @@ export default function CommunityScreen({ navigation }) {
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, destructive, action }
 
   // The feed leads with a nearby lost pet, so it needs the board too.
+  // The feed leads with a nearby lost pet, so it needs the board once per
+  // visit; the Lost pets section refreshes it every time it's opened.
+  const boardLoaded = useRef(false);
   useEffect(() => {
-    if (section === 'lost' || section === 'feed') refreshLostPets();
+    if (section === 'lost' || (section === 'feed' && !boardLoaded.current)) {
+      boardLoaded.current = true;
+      refreshLostPets();
+    }
   }, [section]);
 
   const attachImage = async () => {

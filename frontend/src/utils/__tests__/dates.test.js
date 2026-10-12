@@ -1,4 +1,4 @@
-import { fmtShort, fmtTime, dayDiff, relativeDay } from '../dates';
+import { fmtShort, fmtDay, fmtTime, dayDiff, relativeDay, timeAgo } from '../dates';
 
 // Fixed "today" for determinism (local time).
 const TODAY = new Date('2026-10-12T10:00:00');
@@ -40,12 +40,31 @@ describe('dayDiff / relativeDay', () => {
   });
 
   it('words dates relative to today', () => {
-    expect(relativeDay(plus(-3), TODAY)).toBe('today');
+    expect(relativeDay(plus(-3), TODAY)).toBe('3 days ago');
+    expect(relativeDay(plus(-1), TODAY)).toBe('yesterday');
     expect(relativeDay(plus(0), TODAY)).toBe('today');
     expect(relativeDay(plus(1), TODAY)).toBe('tomorrow');
     expect(relativeDay(plus(8), TODAY)).toBe('in 8 days');
     expect(relativeDay(plus(21), TODAY)).toBe('in 3 weeks');
     expect(relativeDay(new Date('2026-12-25T12:00:00'), TODAY)).toBe('on 25 Dec');
     expect(relativeDay(new Date('nope'), TODAY)).toBe('—');
+  });
+});
+
+describe('fmtDay', () => {
+  it('reads as a plain-language day', () => {
+    expect(fmtDay(new Date('2026-10-10T12:00:00'))).toBe('Sat 10 Oct');
+    expect(fmtDay(new Date('nope'))).toBe('—');
+  });
+});
+
+describe('timeAgo', () => {
+  const now = new Date('2026-10-12T10:00:00Z').getTime();
+  it('never says 0m ago, and steps up to hours and days', () => {
+    expect(timeAgo('2026-10-12T09:59:50Z', now)).toBe('1m ago');
+    expect(timeAgo('2026-10-12T09:45:00Z', now)).toBe('15m ago');
+    expect(timeAgo('2026-10-12T07:00:00Z', now)).toBe('3h ago');
+    expect(timeAgo('2026-10-10T10:00:00Z', now)).toBe('2d ago');
+    expect(timeAgo(null, now)).toBe('');
   });
 });

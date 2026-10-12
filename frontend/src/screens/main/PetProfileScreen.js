@@ -9,12 +9,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { resolveAsset } from '../../config';
+import { petPhoto } from '../../utils/pets';
+import { dosesOn, dosesPerDay } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
 import { fmtShort, fmtTime } from '../../utils/dates';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
+import { useToday } from '../../hooks/useToday';
 import { track } from '../../services/analytics';
 import { ui, type, radii, motion, petPair } from '../../theme';
 import {
@@ -72,7 +74,7 @@ const NO_WEIGHTS = [];
 export default function PetProfileScreen({ navigation, route }) {
   const { petId } = route.params;
   const {
-    pets, myReports, medDoseDays, addFavoriteFood, removeFavoriteFood, addActivity,
+    pets, myReports, medDoseDays, medDoseCounts, addFavoriteFood, removeFavoriteFood, addActivity,
     addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
     addWeight, deleteWeight, addExpense, deleteExpense,
     getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
@@ -132,7 +134,10 @@ export default function PetProfileScreen({ navigation, route }) {
   // render their own nested ConfirmDialog so iOS doesn't drop the modal.
   const [confirm, setConfirm] = useState(null);
   const [teamConfirm, setTeamConfirm] = useState(null);
-  // Doses in flight (see handleLogDose) — declared above the early return.
+  // "Today" rolls over at midnight / on refocus (the profile can stay open in
+  // the stack), and doses in flight (see handleLogDose) — both declared above
+  // the early return.
+  const today = useToday();
   const dosesInFlight = useRef(new Set());
   const [loggingMeds, setLoggingMeds] = useState([]);
   const askConfirm = (cfg) => setConfirm(cfg);
@@ -366,7 +371,7 @@ export default function PetProfileScreen({ navigation, route }) {
 
   const foods = pet.favoriteFoods || [];
   const pair = petPair(pet.color);
-  const photoUri = pet.avatarUrl ? resolveAsset(pet.avatarUrl) : null;
+  const photoUri = petPhoto(pet) || null;
   const heroFg = photoUri ? '#ffffff' : ui.ink;
   const speciesLabel = [pet.type ? cap(pet.type) : 'Pet', pet.breed || null].filter(Boolean).join(' · ');
   const heroMeta = [
@@ -376,10 +381,14 @@ export default function PetProfileScreen({ navigation, route }) {
   ].filter(Boolean).join(' · ');
 
   // Today: active daily meds, done = a dose logged on today's local date.
-  const todayKey = dayKey();
+  // Counted in doses, one per scheduled time: a twice-daily med is "1 of 2"
+  // after breakfast, never done.
+  const todayKey = dayKey(today);
   const dailyMeds = (pet.medications || []).filter((m) => m.active && m.frequency === 'daily');
-  const doneToday = (m) => (medDoseDays?.[m.id] || []).includes(todayKey);
-  const dailyDone = dailyMeds.filter(doneToday).length;
+  const takenToday = (m) =>
+    Math.min(dosesPerDay(m), dosesOn(m, { doseCounts: medDoseCounts, doseDays: medDoseDays }, todayKey));
+  const dosesTotal = dailyMeds.reduce((sum, m) => sum + dosesPerDay(m), 0);
+  const dailyDone = dailyMeds.reduce((sum, m) => sum + takenToday(m), 0);
   const activities = pet.activities || [];
 
   const memberCount = (share?.members || []).length;
@@ -418,12 +427,14 @@ export default function PetProfileScreen({ navigation, route }) {
         <Card padded elevated style={[styles.block, { padding: 18, gap: 12 }]}>
           <View style={styles.rowBetween}>
             <Text style={styles.cardLabel}>Today for {pet.name}</Text>
-            <Text style={styles.todayCount}>{dailyDone} of {dailyMeds.length} done</Text>
+            <Text style={styles.todayCount}>{dailyDone} of {dosesTotal} done</Text>
           </View>
-          <StepProgress done={dailyDone} total={dailyMeds.length} tone="success" />
+          <StepProgress done={dailyDone} total={dosesTotal} tone="success" />
           <View>
             {dailyMeds.map((med) => {
-              const done = doneToday(med);
+              const expected = dosesPerDay(med);
+              const taken = takenToday(med);
+              const done = taken >= expected;
               return (
                 <View key={med.id} style={styles.todayRow}>
                   <MaterialCommunityIcons
@@ -436,7 +447,10 @@ export default function PetProfileScreen({ navigation, route }) {
                       {med.name}{med.dosage ? ` · ${med.dosage}` : ''}
                     </Text>
                     {med.times?.length ? (
-                      <Text style={[type.secondary, { color: ui.sub }]}>{med.times.map((t) => fmtTime(t) || t).join(', ')}</Text>
+                      <Text style={[type.secondary, { color: ui.sub }]}>
+                        {med.times.map((t) => fmtTime(t) || t).join(', ')}
+                        {expected > 1 && !done ? ` · ${taken} of ${expected} given` : ''}
+                      </Text>
                     ) : null}
                   </View>
                   {done ? (

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { PET_COLOR_PAIRS } from '../theme';
@@ -10,6 +10,7 @@ import { track } from '../services/analytics';
 import { getPref, setPref } from '../services/prefs';
 import { noteGoodMoment } from '../services/storeReview';
 import { addDoseDay } from '../utils/streaks';
+import { addDoseCount } from '../utils/doses';
 import { petsKeys, gamificationKeys } from '../hooks/queryKeys';
 
 const DataContext = createContext(null);
@@ -254,6 +255,23 @@ function dataReducer(state, action) {
     // Device-local dose-day history per medication id ({ [medId]: ['YYYY-MM-DD'] })
     // — drives the daily-med streak until the Phase-2 server summary exists.
     case 'SET_MED_DOSE_DAYS': return { ...state, medDoseDays: action.payload };
+    // Device-local doses per medication per day ({ [medId]: { 'YYYY-MM-DD': n } })
+    // — lets a twice-daily med read "1 of 2" instead of done after one dose.
+    case 'SET_MED_DOSE_COUNTS': return { ...state, medDoseCounts: action.payload };
+    // A saved dose, applied to the CURRENT state (not a snapshot captured
+    // when the request started) so two doses logged at once both land.
+    case 'DOSE_LOGGED': {
+      const { petId, medId, at } = action.payload;
+      return {
+        ...state,
+        pets: state.pets.map((p) => (p.id !== petId ? p : {
+          ...p,
+          medications: (p.medications || []).map((m) => (m.id === medId ? { ...m, lastAdministeredAt: at } : m)),
+        })),
+        medDoseDays: { ...state.medDoseDays, [medId]: addDoseDay(state.medDoseDays[medId], at) },
+        medDoseCounts: addDoseCount(state.medDoseCounts, medId, at),
+      };
+    }
     default:           return state;
   }
 }
@@ -264,9 +282,18 @@ export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
     lostPets: [], myReports: [], invites: [], dataLoaded: false, lastSyncedAt: null,
-    medDoseDays: {},
+    medDoseDays: {}, medDoseCounts: {},
   });
   const { user, logout } = useAuth();
+
+  // Dose history is persisted from state (after DOSE_LOGGED), but only once
+  // hydrateDoseDays has loaded what's stored — never an empty pre-load map.
+  const doseHistoryReady = useRef(false);
+  useEffect(() => {
+    if (!doseHistoryReady.current) return;
+    setPref('medDoseDays', state.medDoseDays);
+    setPref('medDoseCounts', state.medDoseCounts);
+  }, [state.medDoseDays, state.medDoseCounts]);
   // Bridge to React Query while domains migrate off this store: mutations here
   // invalidate the matching query so migrated screens refetch (see queryKeys.js).
   const queryClient = useQueryClient();
@@ -286,8 +313,11 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_INVITES', payload: [] });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
       // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
-      // cleared from memory so a different account never renders it.
+      // cleared from memory so a different account never renders it — and the
+      // persist effect is paused first so the empty maps never overwrite it.
+      doseHistoryReady.current = false;
       dispatch({ type: 'SET_MED_DOSE_DAYS', payload: {} });
+      dispatch({ type: 'SET_MED_DOSE_COUNTS', payload: {} });
     }
   }, [user?.id]);
 
@@ -368,16 +398,20 @@ export function DataProvider({ children }) {
   const hydrateDoseDays = async (pets) => {
     try {
       const stored = await getPref('medDoseDays', {});
+      const storedCounts = await getPref('medDoseCounts', {});
       const map = {};
+      const counts = {};
       for (const pet of pets) {
         for (const med of pet.medications || []) {
           let days = stored[med.id] || [];
           if (med.lastAdministeredAt) days = addDoseDay(days, med.lastAdministeredAt);
           if (days.length) map[med.id] = days;
+          if (storedCounts[med.id]) counts[med.id] = storedCounts[med.id];
         }
       }
       dispatch({ type: 'SET_MED_DOSE_DAYS', payload: map });
-      setPref('medDoseDays', map);
+      dispatch({ type: 'SET_MED_DOSE_COUNTS', payload: counts });
+      doseHistoryReady.current = true;
     } catch {
       // keep whatever is in state
     }
@@ -569,8 +603,11 @@ export function DataProvider({ children }) {
       const updated = toVax(apiVax);
       applyVaxChange(petId, (vaxes) => vaxes.map((v) => (v.id === vaccinationId ? updated : v)));
       trackCareAction('vaccination_done');
+      return true;
     } catch (err) {
       handleApiError(err);
+      // Callers celebrate only a saved completion; false means nothing changed.
+      return false;
     }
   };
 
@@ -763,25 +800,14 @@ export function DataProvider({ children }) {
   const logMedicationDose = async (petId, medId) => {
     try {
       const log = await post(`/pets/${petId}/medications/${medId}/log`, {});
-      const pet = state.pets.find((p) => p.id === petId);
+      // The reducer extends the device-local streak history and today's dose
+      // count with the server's timestamp for the dose (falling back to now);
+      // the persist effect above saves both.
       dispatch({
-        type: 'UPDATE_PET',
-        payload: {
-          ...pet,
-          medications: (pet.medications || []).map((m) =>
-            m.id === medId ? { ...m, lastAdministeredAt: log?.administered_at || new Date().toISOString() } : m
-          ),
-        },
+        type: 'DOSE_LOGGED',
+        payload: { petId, medId, at: log?.administered_at || new Date().toISOString() },
       });
       trackCareAction('dose_logged');
-      // Extend this med's device-local streak history with the server's
-      // timestamp for the dose (falling back to now).
-      const doseDays = {
-        ...state.medDoseDays,
-        [medId]: addDoseDay(state.medDoseDays[medId], log?.administered_at || new Date()),
-      };
-      dispatch({ type: 'SET_MED_DOSE_DAYS', payload: doseDays });
-      setPref('medDoseDays', doseDays);
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1101,6 +1127,7 @@ export function DataProvider({ children }) {
         myReports: state.myReports,
         invites: state.invites,
         medDoseDays: state.medDoseDays,
+        medDoseCounts: state.medDoseCounts,
         addPet,
         updatePet,
         deletePet,

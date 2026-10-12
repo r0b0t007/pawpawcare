@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, Share, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveAsset } from '../../config';
+import { timeAgo } from '../../utils/dates';
 import { ui, type, petPair } from '../../theme';
 import { Card, Button, speciesIcon } from '../../components';
 
@@ -16,14 +17,6 @@ export function missingFor(iso) {
   const days = Math.floor((Date.now() - new Date(iso)) / 86400000);
   if (days < 1) return 'Missing today';
   return `Missing ${days} day${days === 1 ? '' : 's'}`;
-}
-
-function timeAgo(iso) {
-  if (!iso) return '';
-  const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 // Shares only what's already public on the board — never the contact phone.

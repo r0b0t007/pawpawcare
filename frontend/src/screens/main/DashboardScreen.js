@@ -17,6 +17,7 @@ const CARD_OUT = FadeOut.duration(150);
 import { track } from '../../services/analytics';
 import { noteGoodMoment } from '../../services/storeReview';
 import { dayKey } from '../../utils/streaks';
+import { dosesOn, dosesPerDay } from '../../utils/doses';
 import { fmtShort, fmtTime, relativeDay } from '../../utils/dates';
 import { petMeta, petPhoto } from '../../utils/pets';
 import { ui, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
@@ -42,10 +43,14 @@ function getGreeting() {
 const vaxDate = (v) => new Date(`${v.dueDate}T12:00:00`);
 
 // Status sentence for the headline: names the pets so it's recognised, not
-// read; never alarming, never shaming.
-function statusSentence(pets, overdueCount) {
+// read; never alarming, never shaming. Same buckets as petHealthStatus
+// (overdue, then due soon, then all good), so Home never calls a pet "all
+// good" that another screen shows as due.
+function statusSentence(pets, overdueCount, dueCount) {
   if (overdueCount === 1) return 'One thing needs\nyou today';
   if (overdueCount > 1) return `${overdueCount} things need\nyou today`;
+  if (dueCount === 1) return 'One thing is\ndue soon';
+  if (dueCount > 1) return `${dueCount} things are\ndue soon`;
   if (pets.length === 1) return `${pets[0].name} is\nall good`;
   if (pets.length === 2) return `${pets[0].name} and ${pets[1].name}\nare all good`;
   return `All ${pets.length} pets\nare all good`;
@@ -61,7 +66,7 @@ const TEASER_PAIR = PET_COLOR_PAIRS[3];
 export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
   const {
-    dataLoaded, pets, posts, reminders, unreadCount, medDoseDays,
+    dataLoaded, pets, posts, reminders, unreadCount, medDoseDays, medDoseCounts,
     markVaccinationComplete, logMedicationDose,
   } = useData();
 
@@ -202,13 +207,13 @@ export default function DashboardScreen({ navigation }) {
         .map((v) => ({ ...v, pet }))
     );
 
-    // Most urgent: any overdue (earliest first), else the nearest due date.
-    const next =
+    // Most urgent: any overdue (earliest first), else the nearest due-soon.
+    // A merely upcoming record is not a task yet — it stays in Coming up.
+    const earliest = (status) =>
       pending
-        .filter((v) => v.status === 'overdue')
-        .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0] ||
-      pending.sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0] ||
-      null;
+        .filter((v) => v.status === status)
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+    const next = earliest('overdue') || earliest('due_soon') || null;
 
     const weekEnd = new Date(today);
     weekEnd.setDate(weekEnd.getDate() + 7);
@@ -216,7 +221,8 @@ export default function DashboardScreen({ navigation }) {
 
     const week = [
       ...pending
-        .filter((v) => v.status !== 'overdue' && inWeek(vaxDate(v)))
+        // The Up Next item is already on screen with its status — once only.
+        .filter((v) => v.status !== 'overdue' && v.id !== next?.id && inWeek(vaxDate(v)))
         .map((v) => ({
           key: `vax-${v.pet.id}-${v.id}`,
           date: vaxDate(v),
@@ -248,9 +254,10 @@ export default function DashboardScreen({ navigation }) {
     };
   }, [pets, reminders, today]);
 
-  // Today's daily care across the household: active daily meds, done when a
-  // dose was logged today (the same local-day key the streaks use). Real data
-  // only: no progress bar when there's nothing daily to track.
+  // Today's daily care across the household: active daily meds, counted in
+  // doses (one per scheduled time), so a twice-daily med is half done after
+  // breakfast. Same local-day key as the streaks. Real data only: no progress
+  // bar when there's nothing daily to track.
   const todayKey = dayKey(today);
   const todayMeds = useMemo(
     () =>
@@ -258,25 +265,28 @@ export default function DashboardScreen({ navigation }) {
         .flatMap((pet) =>
           (pet.medications || [])
             .filter((m) => m.active && m.frequency === 'daily')
-            .map((m) => ({
-              med: m,
-              pet,
-              time: [...(m.times || [])].sort()[0] || null,
-              done: (medDoseDays?.[m.id] || []).includes(todayKey),
-            })),
+            .map((m) => {
+              const expected = dosesPerDay(m);
+              const taken = Math.min(
+                expected,
+                dosesOn(m, { doseCounts: medDoseCounts, doseDays: medDoseDays }, todayKey),
+              );
+              return { med: m, pet, times: [...(m.times || [])].sort(), expected, taken, done: taken >= expected };
+            }),
         )
-        .sort((a, b) => (a.done - b.done) || String(a.time).localeCompare(String(b.time))),
-    [pets, medDoseDays, todayKey],
+        .sort((a, b) => (a.done - b.done) || String(a.times[0]).localeCompare(String(b.times[0]))),
+    [pets, medDoseDays, medDoseCounts, todayKey],
   );
-  const medsDone = todayMeds.filter((t) => t.done).length;
+  const dosesTotal = todayMeds.reduce((n, t) => n + t.expected, 0);
+  const dosesDone = todayMeds.reduce((n, t) => n + t.taken, 0);
 
-  // Headline and subline read the same rule (petHealthStatus), so they can
-  // never contradict each other.
-  const overdueCount = pets.reduce(
-    (n, p) => n + (p.vaccinations || []).filter((v) => v.status === 'overdue').length,
-    0,
-  );
-  const overduePets = pets.filter((p) => petHealthStatus(p.vaccinations).status === 'overdue').length;
+  // Headline and subline read the same rule as every other screen
+  // (petHealthStatus: overdue, then due soon, then all good).
+  const countVax = (status) =>
+    pets.reduce((n, p) => n + (p.vaccinations || []).filter((v) => v.status === status).length, 0);
+  const overdueCount = countVax('overdue');
+  const dueCount = countVax('due_soon');
+  const okPets = pets.filter((p) => petHealthStatus(p.vaccinations).status === 'ok').length;
 
   const upNextItem = upNext
     ? {
@@ -335,12 +345,12 @@ export default function DashboardScreen({ navigation }) {
             </Text>
             {(noPets || pets.length > 0) && (
               <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">
-                {noPets ? "Let's meet your pets" : statusSentence(pets, overdueCount)}
+                {noPets ? "Let's meet your pets" : statusSentence(pets, overdueCount, dueCount)}
               </Text>
             )}
-            {overduePets > 0 && pets.length > 1 && (
+            {okPets < pets.length && pets.length > 1 && (
               <Text style={styles.subline}>
-                {pets.length - overduePets} of your {pets.length} pets are all good.
+                {okPets} of your {pets.length} pets {okPets === 1 ? 'is' : 'are'} all good.
               </Text>
             )}
           </View>
@@ -410,8 +420,12 @@ export default function DashboardScreen({ navigation }) {
                 item={upNextItem}
                 style={styles.hero}
                 onDone={async () => {
-                  await markVaccinationComplete(upNext.pet.id, upNext.id);
-                  showToast(`${upNext.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+                  const saved = await markVaccinationComplete(upNext.pet.id, upNext.id);
+                  if (saved) {
+                    showToast(`${upNext.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+                  } else {
+                    showToast(`Couldn't mark ${upNext.name} done. Try again.`);
+                  }
                 }}
                 onReschedule={() =>
                   navigation.navigate('Pets', {
@@ -427,10 +441,10 @@ export default function DashboardScreen({ navigation }) {
                 <View style={styles.rowBetween}>
                   <Text style={styles.sectionLabel}>Today</Text>
                   <Text style={styles.progressLabel}>
-                    {medsDone === todayMeds.length ? 'All done' : `${medsDone} of ${todayMeds.length} done`}
+                    {dosesDone === dosesTotal ? 'All done' : `${dosesDone} of ${dosesTotal} done`}
                   </Text>
                 </View>
-                <StepProgress done={medsDone} total={todayMeds.length} tone="success" height={8} />
+                <StepProgress done={dosesDone} total={dosesTotal} tone="success" height={8} />
                 {todayMeds.slice(0, 4).map((t) => (
                   <View key={t.med.id} style={styles.medRow}>
                     <Pressable onPress={() => goPet(t.pet)} accessibilityRole="button" accessibilityLabel={t.pet.name}>
@@ -441,7 +455,11 @@ export default function DashboardScreen({ navigation }) {
                         {t.pet.name}'s {t.med.name}
                       </Text>
                       <Text style={styles.rowSub} numberOfLines={1}>
-                        {[fmtTime(t.time) || 'Today', t.med.dosage].filter(Boolean).join(' · ')}
+                        {[
+                          t.times.map(fmtTime).filter(Boolean).join(', ') || 'Today',
+                          t.med.dosage,
+                          t.expected > 1 && !t.done ? `${t.taken} of ${t.expected} given` : null,
+                        ].filter(Boolean).join(' · ')}
                       </Text>
                     </View>
                     {t.done ? (

@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, Text, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { ui, type } from '../theme';
+import { ui, type, PET_COLOR_PAIRS } from '../theme';
 import Button from './Button';
 
+// Rose, sky and leaf from the pet identity pairs — never hard-coded copies.
 const FLOATERS = [
-  { icon: 'paw', bg: '#ffd6e7', fg: '#96375c', size: 44, pos: { top: 0, right: 0 } },
-  { icon: 'heart', bg: '#c5e7ff', fg: '#004c6a', size: 36, pos: { bottom: 14, left: 0 } },
-  { icon: 'bone', bg: '#d0f0c0', fg: '#1a6b3a', size: 32, pos: { bottom: 0, right: 12 } },
+  { icon: 'paw', ...PET_COLOR_PAIRS[3], size: 44, pos: { top: 0, right: 0 } },
+  { icon: 'heart', ...PET_COLOR_PAIRS[1], size: 36, pos: { bottom: 14, left: 0 } },
+  { icon: 'bone', ...PET_COLOR_PAIRS[2], size: 32, pos: { bottom: 0, right: 12 } },
 ];
 
 // An empty screen is the start of something, not a dead end: a warm pet

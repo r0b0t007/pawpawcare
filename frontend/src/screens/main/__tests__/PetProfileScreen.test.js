@@ -16,6 +16,7 @@ jest.mock('../../../hooks/useGamification', () => ({
   milestoneLabel: () => null,
 }));
 jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.fn() }));
+jest.mock('../../../hooks/useToday', () => ({ useToday: () => new Date('2026-10-12T10:00:00') }));
 jest.mock('../../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }));
 

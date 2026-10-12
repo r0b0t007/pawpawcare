@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { motion } from '../theme';
 import { EASE_OUT_CSS } from './motion';
 import { PET_STATUS } from './petStatus';
@@ -9,11 +10,14 @@ import { PET_STATUS } from './petStatus';
 // separated by a 3px gap. With `status` the ring is the pet's health status —
 // the ONLY place status is rendered next to an avatar. Without a status,
 // `ringColor` draws a quiet identity ring (the pet's own tint) instead.
+// `icon` (a MaterialCommunityIcons name) replaces the initial when there's no
+// photo — e.g. the species glyph.
 export default function StatusRing({
   size = 56,
   color = '#ffddb8',
   textColor = '#8a5300',
   initial,
+  icon,
   photo,
   status, // 'overdue' | 'due' | 'ok' | undefined (no status ring)
   ringColor, // identity ring when there is no status
@@ -35,6 +39,8 @@ export default function StatusRing({
     >
       {photo ? (
         <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} />
+      ) : icon ? (
+        <MaterialCommunityIcons name={icon} size={Math.round(size * 0.54)} color={textColor} />
       ) : (
         <Text
           style={{

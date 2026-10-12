@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, Pressable, Image, Platform, StyleSheet,
+  View, Text, ScrollView, TextInput, Pressable, Platform, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -8,11 +8,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { getPref } from '../../services/prefs';
-import { fmtShort, dayDiff, relativeDay } from '../../utils/dates';
-import { petPhoto } from '../../utils/pets';
-import { ui, type, radii, motion, elevation, photos, petPair } from '../../theme';
+import { fmtShort, fmtDay, dayDiff, relativeDay } from '../../utils/dates';
+import { useToday } from '../../hooks/useToday';
+import { ui, type, radii, motion, elevation, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
-  Card, Chip, Button, Sheet, PetFace, StatusPill, EmptyState, showToast, speciesIcon,
+  Card, Chip, Button, Sheet, PetFace, StatusPill, EmptyState, showToast,
 } from '../../components';
 
 // The Health hub answers "what's due, and when?" — grouped by time the way
@@ -24,19 +24,9 @@ import {
 const ROW_OUT = FadeOut.duration(150);
 const ROW_LAYOUT = LinearTransition.duration(200);
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_MS = 86400000;
 
-const VAULT = { bg: '#c5e7ff', fg: '#004c6a' }; // sky identity pair
-
-const petFg = (bg) => petPair(bg).fg;
-
-// "Fri 10 Oct" — plain-language day, never an ISO date.
-const fmtDay = (date) =>
-  Number.isNaN(date.getTime())
-    ? '—'
-    : `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`;
+const VAULT = PET_COLOR_PAIRS[1]; // sky identity pair
 
 // "Synced just now" / "Synced 5m ago" / "Synced 2h ago" — quiet trust line.
 const syncedLabel = (ts) => {
@@ -61,7 +51,6 @@ const defaultDueDate = () => {
 
 // Filter chip with the pet's face (photo, or species glyph on its tint).
 function PetFilterChip({ pet, active, onPress }) {
-  const photo = petPhoto(pet);
   return (
     <Pressable
       accessibilityRole="radio"
@@ -75,13 +64,7 @@ function PetFilterChip({ pet, active, onPress }) {
         pressed && { opacity: motion.pressOpacitySoft },
       ]}
     >
-      <View style={[styles.faceChipAvatar, { backgroundColor: pet.color || ui.accentTint }]}>
-        {photo ? (
-          <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} />
-        ) : (
-          <MaterialCommunityIcons name={speciesIcon(pet.type)} size={15} color={petFg(pet.color)} />
-        )}
-      </View>
+      <PetFace pet={pet} size={28} ring={false} glyph />
       <Text style={styles.faceChipLabel}>{pet.name}</Text>
     </Pressable>
   );
@@ -91,6 +74,8 @@ export default function HealthHubScreen({ navigation }) {
   const { pets, reminders, lastSyncedAt, addVaccination, markVaccinationComplete } = useData();
 
   const [filter, setFilter] = useState('all');
+  // The Health tab stays mounted — "today" must roll over at midnight.
+  const today = useToday();
   // Whether local reminder notifications are on (Profile → "Care reminders").
   // null while loading — no delivery pill is shown until we know the truth.
   const [remindersPrefOn, setRemindersPrefOn] = useState(null);
@@ -172,11 +157,13 @@ export default function HealthHubScreen({ navigation }) {
         : []),
     ]
       .filter((item) => !Number.isNaN(item.date.getTime()))
+      // A one-off reminder that already fired is history, not "today".
+      .filter((item) => !item.isReminder || dayDiff(item.date, today) >= 0)
       .sort((a, b) => a.date - b.date);
 
-    const today = [...overdueItems, ...upcoming.filter((i) => dayDiff(i.date) <= 0)];
-    const week = upcoming.filter((i) => dayDiff(i.date) > 0 && dayDiff(i.date) <= 7);
-    const later = upcoming.filter((i) => dayDiff(i.date) > 7);
+    const todayItems = [...overdueItems, ...upcoming.filter((i) => dayDiff(i.date, today) <= 0)];
+    const week = upcoming.filter((i) => dayDiff(i.date, today) > 0 && dayDiff(i.date, today) <= 7);
+    const later = upcoming.filter((i) => dayDiff(i.date, today) > 7);
 
     const done = vax
       .filter((v) => v.status === 'completed')
@@ -184,13 +171,13 @@ export default function HealthHubScreen({ navigation }) {
 
     return {
       sections: [
-        { label: 'Today', items: today },
+        { label: 'Today', items: todayItems },
         { label: 'This week', items: week },
         { label: 'Later', items: later },
       ].filter((sec) => sec.items.length > 0),
       history: done,
     };
-  }, [shownPets, pets, reminders, filter, navigation]);
+  }, [shownPets, pets, reminders, filter, navigation, today]);
 
   // The "Scheduled on this device" caption sits on the first section holding
   // a reminder, and stays hidden when there are none (findIndex → -1).
@@ -248,9 +235,14 @@ export default function HealthHubScreen({ navigation }) {
     }
   };
 
+  const marking = useRef(new Set());
   const markDone = async (v) => {
-    await markVaccinationComplete(v.pet.id, v.id);
-    showToast(`${v.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+    if (marking.current.has(v.id)) return;
+    marking.current.add(v.id);
+    const saved = await markVaccinationComplete(v.pet.id, v.id);
+    marking.current.delete(v.id);
+    if (saved) showToast(`${v.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+    else showToast(`Couldn't mark ${v.name} done. Try again.`);
   };
 
   const daysOverdue = (v) =>
@@ -287,7 +279,7 @@ export default function HealthHubScreen({ navigation }) {
                 style={{ marginTop: 6 }}
               />
             ) : item.dueSoon ? (
-              <StatusPill status="due" label={`Due ${relativeDay(item.date)}`} style={{ marginTop: 6 }} />
+              <StatusPill status="due" label={`Due ${relativeDay(item.date, today)}`} style={{ marginTop: 6 }} />
             ) : null}
             {item.isReminder && remindersPrefOn !== null && (
               remindersPrefOn ? (
@@ -314,7 +306,7 @@ export default function HealthHubScreen({ navigation }) {
           ) : item.dueSoon ? (
             <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} />
           ) : (
-            <Text style={styles.rowWhen}>{relativeDay(item.date)}</Text>
+            <Text style={styles.rowWhen}>{relativeDay(item.date, today)}</Text>
           )}
         </Pressable>
       </Animated.View>
@@ -479,7 +471,6 @@ export default function HealthHubScreen({ navigation }) {
           <View style={styles.chipWrap}>
             {pets.map((p) => {
               const on = recPet?.id === p.id;
-              const photo = petPhoto(p);
               return (
                 <Pressable
                   key={p.id}
@@ -488,15 +479,7 @@ export default function HealthHubScreen({ navigation }) {
                   accessibilityState={{ checked: on }}
                   style={[styles.petChip, on && styles.petChipOn]}
                 >
-                  <View style={[styles.petChipAvatar, { backgroundColor: p.color || ui.accentTint }]}>
-                    {photo ? (
-                      <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} />
-                    ) : (
-                      <Text style={[styles.petChipInitial, { color: petFg(p.color) }]}>
-                        {p.name[0]}
-                      </Text>
-                    )}
-                  </View>
+                  <PetFace pet={p} size={24} ring={false} />
                   <Text style={styles.petChipLabel}>{p.name}</Text>
                 </Pressable>
               );
@@ -574,14 +557,6 @@ const styles = StyleSheet.create({
     backgroundColor: ui.surface,
   },
   faceChipOn: { backgroundColor: '#faf1e2', borderColor: ui.accent },
-  faceChipAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   faceChipLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13.5, color: ui.ink },
   sectionLabel: { marginHorizontal: 24, marginBottom: 10, marginTop: 6 },
   sectionHeadRow: {
@@ -695,15 +670,6 @@ const styles = StyleSheet.create({
     backgroundColor: ui.surface,
   },
   petChipOn: { backgroundColor: '#faf1e2', borderColor: ui.accent },
-  petChipAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  petChipInitial: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11 },
   petChipLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.ink },
   input: {
     borderWidth: 1.5,

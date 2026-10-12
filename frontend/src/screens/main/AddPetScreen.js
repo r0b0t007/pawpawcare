@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, BackHandler,
   ScrollView, KeyboardAvoidingView, Platform, Switch, Modal, Image, ActivityIndicator,
@@ -75,6 +75,9 @@ export default function AddPetScreen({ navigation }) {
   const [step, setStep] = useState(1);
   const [created, setCreated] = useState(null); // the saved pet → success view
   const [saving, setSaving] = useState(false);
+  // Synchronous guard: two taps in one frame ("Add" + "Skip for now", or a
+  // double tap) must never create the pet twice.
+  const creating = useRef(false);
   const [showOther, setShowOther] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
 
@@ -154,10 +157,13 @@ export default function AddPetScreen({ navigation }) {
   const handleCreate = async (skipDetails) => {
     if (!requireName()) { setStep(2); return; }
     const data = buildData(skipDetails);
+    if (creating.current) return;
+    creating.current = true;
     if (data.adoptedOn) track('gotcha_day_set', {});
     setSaving(true);
     const pet = await addPet(data);
     setSaving(false);
+    creating.current = false;
     // addPet resolves undefined on failure without telling the user — say so
     // here, keeping everything they typed for the retry.
     if (pet) setCreated(pet);

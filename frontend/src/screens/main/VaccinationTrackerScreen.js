@@ -67,8 +67,9 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       message: `Mark "${vax.name}" as administered today?`,
       confirmLabel: 'Mark done',
       action: async () => {
-        await markVaccinationComplete(petId, vax.id);
-        showToast(`${vax.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+        const saved = await markVaccinationComplete(petId, vax.id);
+        if (saved) showToast(`${vax.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+        else showToast(`Couldn't mark ${vax.name} done. Try again.`);
       },
     });
 

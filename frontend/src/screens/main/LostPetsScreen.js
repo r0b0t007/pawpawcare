@@ -1,14 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, RefreshControl, Linking, Pressable, TextInput, Image,
+  View, Text, ScrollView, StyleSheet, RefreshControl, Linking, Pressable, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { resolveAsset } from '../../config';
-import { ui, type, petPair, photos } from '../../theme';
-import { Button, ConfirmDialog, EmptyState, showToast } from '../../components';
+import { ui, type, photos } from '../../theme';
+import { Button, ConfirmDialog, EmptyState, PetFace, showToast } from '../../components';
 import LostPetCard from './LostPetCard';
 
 // Redesign: this pushed screen is now the report/manage surface — the board
@@ -117,18 +116,7 @@ export default function LostPetsScreen({ navigation }) {
                         reported && { opacity: 0.45 },
                       ]}
                     >
-                      <View style={[styles.petChipAvatar, { backgroundColor: pet.color || ui.accentTint }]}>
-                        {pet.avatarUrl ? (
-                          <Image
-                            source={{ uri: resolveAsset(pet.avatarUrl) }}
-                            style={{ width: '100%', height: '100%' }}
-                          />
-                        ) : (
-                          <Text style={[styles.petChipInitial, { color: petPair(pet.color).fg }]}>
-                            {(pet.name || '?')[0]}
-                          </Text>
-                        )}
-                      </View>
+                      <PetFace pet={pet} size={28} ring={false} />
                       <Text style={styles.petChipLabel}>{pet.name}</Text>
                     </Pressable>
                   );
@@ -275,15 +263,6 @@ const styles = StyleSheet.create({
     borderColor: ui.border,
   },
   petChipSelected: { backgroundColor: ui.accentTint, borderColor: ui.accent },
-  petChipAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  petChipInitial: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11 },
   petChipLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.ink },
   input: {
     borderWidth: 1.5,
