@@ -8,7 +8,8 @@ const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 // The header of a pushed screen: a round back button, the title (a header for
 // screen readers), an optional quiet subtitle, and an optional `right` slot
 // for the screen's one secondary action; `avatar` sits between back and title
-// (e.g. the pet's face on its vault). Same place, same size on every
+// (e.g. the pet's face on its vault). Without a title it's just the back
+// button (form screens that set their own large heading). Same place, same size on every
 // screen, so "where am I and how do I get back" never needs reading.
 export default function ScreenHeader({ title, subtitle, onBack, avatar, right, style }) {
   return (
@@ -49,16 +50,20 @@ export default function ScreenHeader({ title, subtitle, onBack, avatar, right, s
         </Pressable>
       ) : null}
       {avatar}
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[type.headerTitle, { color: ui.ink }]} numberOfLines={1} accessibilityRole="header">
-          {title}
-        </Text>
-        {subtitle ? (
-          <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]} numberOfLines={1}>
-            {subtitle}
+      {title ? (
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[type.headerTitle, { color: ui.ink }]} numberOfLines={1} accessibilityRole="header">
+            {title}
           </Text>
-        ) : null}
-      </View>
+          {subtitle ? (
+            <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+      ) : (
+        <View style={{ flex: 1 }} />
+      )}
       {right}
     </View>
   );

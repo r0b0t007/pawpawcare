@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { ui, type, radii, motion, petPair, photos } from '../../theme';
-import { Card, Button, Sheet, ConfirmDialog, EmptyState, PetFace, StatusPill, showToast, ScreenHeader } from '../../components';
+import { ui, type, radii, petPair, photos } from '../../theme';
+import { Card, Button, Sheet, ConfirmDialog, EmptyState, PetFace, StatusPill, showToast, ScreenHeader, DeleteButton } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
 import { useToday } from '../../hooks/useToday';
 import { fmtFull, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
@@ -20,7 +20,6 @@ import { fmtFull, overdueLabel, parseDay, relativeDay } from '../../utils/dates'
 
 const hit = { top: 8, bottom: 8, left: 8, right: 8 };
 // 44pt target around a small icon.
-const iconHit = { top: 13, bottom: 13, left: 13, right: 13 };
 
 // 'Oct 12, 2026' (null for a missing date, so callers can fall back).
 const formatDisplay = (iso) => (iso ? fmtFull(parseDay(iso)) : null);
@@ -98,8 +97,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
         showToast("Couldn't schedule the vaccination. Try again.");
         return;
       }
-      setForm({ name: '', dueDate: '' });
-      setModal(false);
+      closeSheet();
       showToast('Vaccination scheduled');
     });
   };
@@ -151,15 +149,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
         </View>
         {!pill && <Text style={styles.rowWhen}>{relativeDay(date, today)}</Text>}
         <Button small variant="soft" icon="check" label="Done" onPress={() => confirmComplete(vax)} />
-        <Pressable
-          onPress={() => confirmDelete(vax)}
-          hitSlop={iconHit}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete ${vax.name}`}
-          style={({ pressed }) => pressed && { opacity: motion.pressOpacity }}
-        >
-          <MaterialCommunityIcons name="trash-can-outline" size={18} color={ui.faint} />
-        </Pressable>
+        <DeleteButton label={`Delete ${vax.name}`} onPress={() => confirmDelete(vax)} size={18} />
       </View>
     );
   };
@@ -171,15 +161,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       <Text style={styles.doneDate}>
         {formatDisplay(vax.administeredDate?.split('T')[0]) || 'Done'}
       </Text>
-      <Pressable
-        onPress={() => confirmDelete(vax)}
-        hitSlop={iconHit}
-        accessibilityRole="button"
-        accessibilityLabel={`Delete ${vax.name}`}
-        style={({ pressed }) => pressed && { opacity: motion.pressOpacity }}
-      >
-        <MaterialCommunityIcons name="trash-can-outline" size={16} color={ui.faint} />
-      </Pressable>
+      <DeleteButton label={`Delete ${vax.name}`} onPress={() => confirmDelete(vax)} size={16} />
     </View>
   );
 

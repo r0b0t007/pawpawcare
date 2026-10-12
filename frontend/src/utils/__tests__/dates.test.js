@@ -1,5 +1,5 @@
 import {
-  fmtShort, fmtDay, fmtTime, fmtFull, fmtMonth, dayDiff, relativeDay, timeAgo, daysOverdue, overdueLabel, parseDay,
+  fmtShort, fmtDay, fmtTime, fmtFull, fmtMonth, fmtClock, fmtDayTime, dayDiff, relativeDay, timeAgo, daysOverdue, overdueLabel, parseDay,
 } from '../dates';
 
 // Fixed "today" for determinism (local time).
@@ -92,5 +92,18 @@ describe('parseDay / fmtFull / fmtMonth', () => {
     expect(fmtFull(parseDay('2026-10-05'))).toBe('Oct 5, 2026');
     expect(fmtMonth(parseDay('2026-10-05'))).toBe('OCT');
     expect(fmtMonth(parseDay(''))).toBe('');
+  });
+});
+
+describe('fmtClock / fmtDayTime', () => {
+  const today = new Date('2026-10-12T23:30:00');
+  it('names the day so a time is never ambiguous', () => {
+    expect(fmtClock(new Date('2026-10-12T09:05:00'))).toBe('9:05 AM');
+    expect(fmtDayTime(new Date('2026-10-12T21:00:00'), today)).toBe('today 9:00 PM');
+    expect(fmtDayTime(new Date('2026-10-13T00:30:00'), today)).toBe('tomorrow 12:30 AM');
+    expect(fmtDayTime(new Date('2026-10-11T18:00:00'), today)).toBe('yesterday 6:00 PM');
+    expect(fmtDayTime(new Date('2026-10-15T09:00:00'), today)).toBe('Thu 9:00 AM');
+    expect(fmtDayTime(new Date('2026-11-02T09:00:00'), today)).toBe('Mon 2 Nov 9:00 AM');
+    expect(fmtDayTime(new Date('nope'), today)).toBe('');
   });
 });

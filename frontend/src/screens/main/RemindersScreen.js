@@ -171,7 +171,7 @@ export default function RemindersScreen({ navigation }) {
                   </Animated.View>
                 ) : (
                   <Animated.View style={[styles.rIcon, { opacity: r.enabled ? 1 : 0.4 }, styles.toggleFade]}>
-                    <MaterialCommunityIcons name={reminderIcon(r.type)} size={18} color={ui.accent} />
+                    <MaterialCommunityIcons name={reminderIcon(r.type)} size={18} color={ui.sub} />
                   </Animated.View>
                 )}
                 <View style={{ flex: 1 }}>
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: ui.accentTint,
+    backgroundColor: ui.track,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -10,11 +10,13 @@ import { useData } from '../../context/DataContext';
 import { pickRecordImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
 import { buildExtractionPayload, extractionCount } from '../../utils/extraction';
-import { fmtDay, fmtFull, relativeDay } from '../../utils/dates';
+import { fmtClock, fmtDay, fmtFull, relativeDay } from '../../utils/dates';
 import { petById } from '../../utils/pets';
 import { useInFlight } from '../../hooks/useInFlight';
 import { ui, type, radii, motion, photos, PET_COLOR_PAIRS } from '../../theme';
-import { Card, Chip, Button, Sheet, ConfirmDialog, EmptyState, PetFace, Skeleton, showToast, ScreenHeader } from '../../components';
+import {
+  Card, Chip, Button, Sheet, ConfirmDialog, DeleteButton, EmptyState, PetFace, Skeleton, showToast, ScreenHeader,
+} from '../../components';
 
 // The medical vault ("Lively & Light"): the pet's face and a one-line summary
 // up top, then one sky hero card with the single primary action (upload a
@@ -38,10 +40,11 @@ const DOC_CATEGORIES = [
 const docMeta = (id) => DOC_CATEGORIES.find((c) => c.id === id) || DOC_CATEGORIES[DOC_CATEGORIES.length - 1];
 
 const APPT_STATUS = ['scheduled', 'completed', 'cancelled'];
+// Status shown once, as icon + word (never colour alone).
 const APPT_STATUS_STYLE = {
-  scheduled: { bg: VAULT.bg, fg: VAULT.fg },
-  completed: { bg: ui.successTint, fg: ui.success },
-  cancelled: { bg: ui.track, fg: ui.sub },
+  scheduled: { bg: VAULT.bg, fg: VAULT.fg, icon: 'calendar-clock' },
+  completed: { bg: ui.successTint, fg: ui.success, icon: 'check-circle' },
+  cancelled: { bg: ui.track, fg: ui.sub, icon: 'close-circle-outline' },
 };
 const apptStyle = (s) => APPT_STATUS_STYLE[s] || APPT_STATUS_STYLE.scheduled;
 
@@ -53,7 +56,7 @@ const fmtWhen = (iso) => {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return `${fmtDay(d)} · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+  return `${fmtDay(d)} · ${fmtClock(d)}`;
 };
 const fmtStamp = (iso) => (iso ? fmtFull(new Date(iso)) : '');
 const fmtSize = (bytes) => {
@@ -74,6 +77,9 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const name = pet?.name || petName;
 
   const [records, setRecords] = useState(null);
+  // getPetRecords resolves null on failure: say so and offer a retry instead
+  // of leaving the loading placeholders up forever.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [clinicModal, setClinicModal] = useState(false);
   const [apptModal, setApptModal] = useState(false);
@@ -81,10 +87,13 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const [extractingId, setExtractingId] = useState(null);
   const [reviewDoc, setReviewDoc] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  // AI reads are paid: one at a time, and a double tap never starts two.
+  const { run: runExtract, isBusy: isExtractBusy } = useInFlight();
 
   const load = useCallback(async () => {
     const data = await getPetRecords(petId);
     if (data) setRecords(data);
+    setLoadFailed(!data);
   }, [getPetRecords, petId]);
 
   useEffect(() => { load(); }, [load]);
@@ -141,19 +150,24 @@ export default function MedicalRecordsScreen({ navigation, route }) {
 
   // AI intake: extract once (the backend caches a completed extraction),
   // then open the review sheet. Re-opening a reviewed document is free.
-  const startExtraction = async (doc) => {
-    if (doc.extractionStatus === 'done' && doc.extraction) { setReviewDoc(doc); return; }
-    if (extractingId) return;
-    setExtractingId(doc.id);
-    try {
-      const updated = await extractDocument(petId, doc.id);
-      setReviewDoc(updated);
-      load();
-    } catch (e) {
-      showToast(e.message || 'Could not read the document');
-    } finally {
-      setExtractingId(null);
+  const startExtraction = (doc) => {
+    if (doc.extractionStatus === 'done' && doc.extraction) { setReviewDoc(doc); return undefined; }
+    if (isExtractBusy('extract')) {
+      showToast('Still reading another record. Try again in a moment.');
+      return undefined;
     }
+    return runExtract('extract', async () => {
+      setExtractingId(doc.id);
+      try {
+        const updated = await extractDocument(petId, doc.id);
+        setReviewDoc(updated);
+        load();
+      } catch (e) {
+        showToast(e.message || 'Could not read the document');
+      } finally {
+        setExtractingId(null);
+      }
+    });
   };
 
   const onApplied = (result) => {
@@ -178,7 +192,20 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         style={({ pressed }) => [styles.row, !last && styles.rowDivider, pressed && { backgroundColor: ui.pressTint }]}
         onPress={() => openDocument(d)}
         accessibilityRole="button"
-        accessibilityLabel={`Open ${d.title}`}
+        accessibilityLabel={`${d.title}. ${[m.label, fmtStamp(d.createdAt)].filter(Boolean).join(', ')}`}
+        accessibilityHint="Opens the file"
+        // One element for screen readers, so the Read and Delete buttons
+        // inside can't be focused on their own — expose them as actions.
+        accessibilityActions={[
+          { name: 'activate', label: 'Open' },
+          { name: 'read', label: applied ? 'Review what was read' : 'Read with AI' },
+          { name: 'delete', label: 'Delete' },
+        ]}
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === 'activate') openDocument(d);
+          else if (nativeEvent.actionName === 'read') startExtraction(d);
+          else if (nativeEvent.actionName === 'delete') confirmDelete('document', () => deleteDocument(petId, d.id));
+        }}
       >
         <View style={styles.rowIcon}>
           <MaterialCommunityIcons name={d.mime === 'application/pdf' ? 'file-pdf-box' : m.icon} size={18} color={VAULT.fg} />
@@ -231,7 +258,8 @@ export default function MedicalRecordsScreen({ navigation, route }) {
             {fmtWhen(a.scheduledAt)}{a.clinicName ? ` · ${a.clinicName}` : ''}
           </Text>
         </View>
-        <View style={[styles.statusTag, { backgroundColor: s.bg }]}>
+        <View style={[styles.statusTag, { backgroundColor: s.bg }]} accessible accessibilityLabel={cap(a.status)}>
+          <MaterialCommunityIcons name={s.icon} size={12} color={s.fg} />
           <Text style={[styles.statusText, { color: s.fg }]}>{cap(a.status)}</Text>
         </View>
         <DeleteButton label={`Delete ${a.title}`} onPress={() => confirmDelete('appointment', () => deleteAppointment(petId, a.id))} />
@@ -269,13 +297,29 @@ export default function MedicalRecordsScreen({ navigation, route }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScreenHeader
         title={name ? `${name}'s vault` : 'Medical vault'}
-        subtitle={!records ? 'Opening the vault…' : summary || 'Vet records, lab results & documents'}
+        subtitle={!records
+          ? (loadFailed ? "Couldn't open the vault" : 'Opening the vault…')
+          : summary || 'Vet records, lab results & documents'}
         onBack={() => navigation.goBack()}
         avatar={pet ? <PetFace pet={pet} size={44} /> : null}
         style={styles.header}
       />
 
-      {!records ? (
+      {!records && loadFailed ? (
+        <ScrollView
+          contentContainerStyle={styles.emptyWrap}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
+        >
+          <EmptyState
+            photo={photos.emptyBlanket}
+            title="We couldn't open the vault"
+            body="Check your connection, then try again. Nothing in it has changed."
+            actionLabel="Try again"
+            actionIcon="refresh"
+            onAction={onRefresh}
+          />
+        </ScrollView>
+      ) : !records ? (
         // Placeholders where the cards land — no spinner-only screen.
         <View style={styles.loading} accessibilityLabel="Loading records">
           <Skeleton width="100%" height={150} radius={20} />
@@ -446,21 +490,6 @@ function QuietLink({ icon, label, onPress }) {
       <MaterialCommunityIcons name={icon} size={20} color={ui.faint} />
       <Text style={styles.quietText}>{label}</Text>
       <MaterialCommunityIcons name="plus" size={16} color={ui.accent} />
-    </Pressable>
-  );
-}
-
-// 44pt target around a small, quiet glyph — destructive, so never prominent.
-function DeleteButton({ label, onPress }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
-      style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: motion.pressOpacity }]}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-    >
-      <MaterialCommunityIcons name="close" size={16} color={ui.faint} />
     </Pressable>
   );
 }
@@ -1019,7 +1048,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteBtn: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center' },
   readPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1030,7 +1058,7 @@ const styles = StyleSheet.create({
     backgroundColor: ui.accentTint,
   },
   readPillText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: ui.accent },
-  statusTag: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
+  statusTag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 8, paddingRight: 10, paddingVertical: 3, borderRadius: 999 },
   statusText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11 },
   moreRow: {
     flexDirection: 'row',

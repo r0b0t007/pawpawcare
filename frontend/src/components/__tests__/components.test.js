@@ -28,6 +28,9 @@ describe('component kit', () => {
     'StepProgress',
     'ScreenHeader',
     'PetFaceStack',
+    'DeleteButton',
+    'PhotoBand',
+    'FormError',
     'ToastHost',
   ])('exports %s as a component', (name) => {
     expect(typeof components[name]).toBe('function');
