@@ -1,18 +1,17 @@
-import React, { useEffect } from 'react';
-import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useCallback, useEffect } from 'react';
+import { View, Text, Pressable, Image, ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
-import { ui, PET_COLOR_PAIRS, motion } from '../../theme';
+import { ui, type, motion, elevation, photos } from '../../theme';
 
-// Logged-out landing screen: warm hero + one primary path (Signup) and a text
-// link for returning users. Redesign direction 1g — flat surfaces, one accent.
-
-const PACK = [
-  { initial: 'B', ...PET_COLOR_PAIRS[0] },
-  { initial: 'M', ...PET_COLOR_PAIRS[1] },
-  { initial: 'K', ...PET_COLOR_PAIRS[2] },
-];
-
+// Logged-out landing screen ("Lively & Light"): a real cat and dog sharing a
+// moment carries the first second (aesthetic-usability), then one message and
+// one filled button in the thumb zone. Returning users get a quiet text link,
+// so there is never a 50/50 choice.
 export default function WelcomeScreen({ navigation }) {
   // TTI: entry screen for logged-out sessions — static, interactive on mount.
   const { markInteractive } = useObserve();
@@ -20,105 +19,111 @@ export default function WelcomeScreen({ navigation }) {
     markInteractive();
   }, [markInteractive]);
 
+  // Light status-bar glyphs over the photo; back to dark when leaving.
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle('light');
+      return () => setStatusBarStyle('dark');
+    }, []),
+  );
+
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <View style={styles.container}>
+    <View style={styles.root}>
+      <ScrollView bounces={false} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <Image
-            source={require('../../../assets/logo-mark.png')}
-            style={styles.logo}
-            resizeMode="contain"
+            source={photos.welcomeHero}
+            style={styles.heroImg}
+            resizeMode="cover"
+            accessibilityIgnoresInvertColors
+            accessible
+            accessibilityLabel="A kitten and a puppy looking at each other"
           />
-          <Text style={styles.headline}>Every tail,{'\n'}on track.</Text>
-          <Text style={styles.tagline}>
-            Vaccines, vet visits and daily care for all your pets — in one calm place.
-          </Text>
+          <LinearGradient
+            colors={['rgba(36, 26, 14, 0.35)', 'rgba(36, 26, 14, 0)']}
+            style={[styles.topScrim, { height: insets.top + 60 }]}
+          />
         </View>
 
-        <View style={styles.footer}>
-          <View style={styles.packRow}>
-            {PACK.map((p, i) => (
-              <View
-                key={p.initial}
-                style={[
-                  styles.packAvatar,
-                  { backgroundColor: p.bg },
-                  i > 0 && styles.packAvatarOverlap,
-                ]}
-              >
-                <Text style={[styles.packInitial, { color: p.fg }]}>{p.initial}</Text>
-              </View>
-            ))}
-            <Text style={styles.packCaption}>Built for multi-pet homes</Text>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+          <View style={styles.brandRow}>
+            <Image source={require('../../../assets/logo-mark.png')} style={styles.logo} resizeMode="contain" />
+            <View>
+              <Text style={styles.brand}>PawPawCare</Text>
+              <Text style={styles.brandSub}>Pet health, made gentle</Text>
+            </View>
           </View>
+
+          <Text style={styles.headline} accessibilityRole="header">
+            Every wag and whisker,{'\n'}cared for.
+          </Text>
+          <Text style={styles.tagline}>
+            Vaccines, meds and daily routines for all your pets, in one calm place.
+          </Text>
+
+          <View style={{ flex: 1, minHeight: 12 }} />
 
           <Pressable
             style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: motion.pressOpacitySoft }]}
             onPress={() => navigation.navigate('Signup')}
+            accessibilityRole="button"
           >
             <Text style={styles.primaryBtnText}>Get started</Text>
+            <MaterialCommunityIcons name="arrow-right" size={18} color="#ffffff" />
           </Pressable>
 
           <Pressable
             style={({ pressed }) => [styles.loginLink, pressed && { opacity: motion.pressOpacity }]}
             onPress={() => navigation.navigate('Login')}
             hitSlop={{ top: 6, bottom: 6, left: 12, right: 12 }}
+            accessibilityRole="link"
           >
             <Text style={styles.loginLinkText}>I already have an account</Text>
           </Pressable>
         </View>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: ui.background },
-  container: {
+  root: { flex: 1, backgroundColor: ui.background },
+  hero: { height: 460, backgroundColor: ui.accentTint },
+  // Explicit 100% box, not absoluteFill: react-native-web leaves an
+  // absoluteFill <Image> at its natural size instead of covering.
+  heroImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  topScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
+  sheet: {
     flex: 1,
-    justifyContent: 'space-between',
-    paddingTop: 40,
-    paddingHorizontal: 32,
-    paddingBottom: 20,
+    marginTop: -40,
+    backgroundColor: ui.background,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderCurve: 'continuous',
+    paddingTop: 26,
+    paddingHorizontal: 24,
+    gap: 14,
   },
-  hero: { gap: 22 },
-  logo: { width: 88, height: 88 },
-  headline: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 42,
-    lineHeight: 45,
-    letterSpacing: -1.2,
-    color: ui.ink,
-  },
-  tagline: {
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 16,
-    lineHeight: 25,
-    color: ui.sub,
-    maxWidth: 280,
-  },
-  footer: { gap: 14 },
-  packRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  packAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: ui.background,
-  },
-  packAvatarOverlap: { marginLeft: -26 },
-  packInitial: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 18 },
-  packCaption: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: ui.subtle },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  logo: { width: 44, height: 44, borderRadius: 12 },
+  brand: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 15, color: ui.accent },
+  brandSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, color: ui.sub },
+  headline: { ...type.display, fontSize: 30, lineHeight: 36, color: ui.ink, marginTop: 6 },
+  tagline: { ...type.body, fontSize: 15, lineHeight: 22, color: ui.sub, maxWidth: 330 },
   primaryBtn: {
+    flexDirection: 'row',
+    gap: 8,
     paddingVertical: 17,
     borderRadius: 16,
     borderCurve: 'continuous',
     backgroundColor: ui.accent,
     alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: elevation.cta,
   },
   primaryBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: '#ffffff' },
-  loginLink: { alignItems: 'center', paddingVertical: 6 },
-  loginLinkText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: ui.accent },
+  loginLink: { alignItems: 'center', paddingVertical: 8 },
+  loginLinkText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: ui.accent },
 });

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, TextInput, Pressable, Platform, StyleSheet,
+  View, Text, ScrollView, TextInput, Pressable, Image, Platform, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -8,22 +8,28 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { getPref } from '../../services/prefs';
-import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
-import { Card, Chip, Button, Sheet, showToast } from '../../components';
+import { resolveAsset } from '../../config';
+import { ui, type, radii, motion, elevation, photos, petPair } from '../../theme';
+import {
+  Card, Chip, Button, Sheet, StatusRing, StatusPill, EmptyState, showToast, speciesIcon,
+} from '../../components';
 
-// The Health hub: one place for everything time-based — overdue vaccines up
-// top ("needs attention"), the upcoming schedule grouped by month, and a done
-// history. Absorbs the old Schedule lists; the per-pet tracker and medical
-// records remain reachable from each row until phase 4 folds them in fully.
+// The Health hub answers "what's due, and when?" — grouped by time the way
+// people plan (Today / This week / Later), not by record type. Overdue items
+// sit at the top of Today with one "Overdue" pill (status once, icon + word).
+// Every row carries the pet's face, so multi-pet homes recognise before they
+// read. The one primary action ("Add record") floats in the thumb zone.
 
 const ROW_OUT = FadeOut.duration(150);
 const ROW_LAYOUT = LinearTransition.duration(200);
 
-const MONTHS = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY',
-  'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
-const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAY_MS = 86400000;
 
-const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
+const VAULT = { bg: '#c5e7ff', fg: '#004c6a' }; // sky identity pair
+
+const petFg = (bg) => petPair(bg).fg;
 
 // '—' rather than the string "Invalid Date" if a malformed date ever slips
 // through — the overdue/history rows render without a validity filter.
@@ -31,6 +37,25 @@ const fmtShort = (date) =>
   Number.isNaN(date.getTime())
     ? '—'
     : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+// "Fri 10 Oct" — plain-language day, never an ISO date.
+const fmtDay = (date) =>
+  Number.isNaN(date.getTime())
+    ? '—'
+    : `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`;
+
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const dayDiff = (date) => Math.round((startOfDay(date) - startOfDay(new Date())) / DAY_MS);
+
+// "today" / "tomorrow" / "in 8 days" / "in 3 weeks" / "on 3 Dec".
+const relative = (date) => {
+  const n = dayDiff(date);
+  if (n <= 0) return 'today';
+  if (n === 1) return 'tomorrow';
+  if (n < 14) return `in ${n} days`;
+  if (n < 56) return `in ${Math.round(n / 7)} weeks`;
+  return `on ${date.getDate()} ${MONTHS[date.getMonth()]}`;
+};
 
 // "Synced just now" / "Synced 5m ago" / "Synced 2h ago" — quiet trust line.
 const syncedLabel = (ts) => {
@@ -52,6 +77,52 @@ const defaultDueDate = () => {
   d.setDate(d.getDate() + 14);
   return d;
 };
+
+const petPhoto = (pet) => (pet?.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined);
+
+// The pet's face with its identity ring — status never lives here (rows carry
+// it as a pill), so this is pure recognition.
+function PetFace({ pet, size = 34 }) {
+  if (!pet) return null;
+  return (
+    <StatusRing
+      size={size}
+      color={pet.color || ui.accentTint}
+      textColor={petFg(pet.color)}
+      initial={pet.name[0]}
+      photo={petPhoto(pet)}
+      ringColor={pet.color || ui.accentTint}
+    />
+  );
+}
+
+// Filter chip with the pet's face (photo, or species glyph on its tint).
+function PetFilterChip({ pet, active, onPress }) {
+  const photo = petPhoto(pet);
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityLabel={pet.name}
+      accessibilityState={{ checked: !!active }}
+      onPress={onPress}
+      hitSlop={6}
+      style={({ pressed }) => [
+        styles.faceChip,
+        active && styles.faceChipOn,
+        pressed && { opacity: motion.pressOpacitySoft },
+      ]}
+    >
+      <View style={[styles.faceChipAvatar, { backgroundColor: pet.color || ui.accentTint }]}>
+        {photo ? (
+          <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} />
+        ) : (
+          <MaterialCommunityIcons name={speciesIcon(pet.type)} size={15} color={petFg(pet.color)} />
+        )}
+      </View>
+      <Text style={styles.faceChipLabel}>{pet.name}</Text>
+    </Pressable>
+  );
+}
 
 export default function HealthHubScreen({ navigation }) {
   const { pets, reminders, lastSyncedAt, addVaccination, markVaccinationComplete } = useData();
@@ -77,70 +148,97 @@ export default function HealthHubScreen({ navigation }) {
   const shownPets = filter === 'all' ? pets : pets.filter((p) => p.id === filter);
   const recPet = pets.find((p) => p.id === recPetId) || pets[0];
 
-  const { overdue, months, history } = useMemo(() => {
+  const { sections, history } = useMemo(() => {
     const vax = shownPets.flatMap((pet) =>
       (pet.vaccinations || []).map((v) => ({ ...v, pet }))
     );
-    const overdueVax = vax
+    const overdueItems = vax
       .filter((v) => v.status === 'overdue')
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+      .map((v) => {
+        const date = new Date(`${v.dueDate}T12:00:00`);
+        return {
+          key: `od-${v.pet.id}-${v.id}`,
+          date,
+          title: v.name,
+          sub: `${v.pet.name} · was due ${fmtDay(date)}`,
+          pet: v.pet,
+          overdueVax: v,
+          onPress: () => navigation.navigate('VaccinationTracker', { petId: v.pet.id }),
+        };
+      });
 
     const upcoming = [
       ...vax
         .filter((v) => v.status === 'due_soon' || v.status === 'upcoming')
-        .map((v) => ({
-          key: `vax-${v.pet.id}-${v.id}`,
-          date: new Date(`${v.dueDate}T12:00:00`),
-          title: v.name,
-          sub: v.pet.name,
-          chipLabel: v.pet.name[0],
-          chipBg: v.pet.color || ui.accentTint,
-          onPress: () => navigation.navigate('VaccinationTracker', { petId: v.pet.id }),
-        })),
+        .map((v) => {
+          const date = new Date(`${v.dueDate}T12:00:00`);
+          return {
+            key: `vax-${v.pet.id}-${v.id}`,
+            date,
+            title: v.name,
+            sub: `${v.pet.name} · ${fmtDay(date)}`,
+            pet: v.pet,
+            dueSoon: v.status === 'due_soon',
+            onPress: () => navigation.navigate('VaccinationTracker', { petId: v.pet.id }),
+          };
+        }),
       ...(filter === 'all'
         ? reminders
             .filter((r) => r.next_fire_at || r.fire_at)
-            .map((r) => ({
-              key: `rem-${r.id}`,
-              date: new Date(r.next_fire_at || r.fire_at),
-              title: r.title,
-              sub:
+            .map((r) => {
+              const pet = r.pet_id ? pets.find((p) => String(p.id) === String(r.pet_id)) : null;
+              const kind =
                 r.schedule_type === 'recurring'
                   ? `${(r.recurrence || 'daily').replace(/^\w/, (c) => c.toUpperCase())} reminder`
-                  : 'Reminder',
-              icon: 'bell-outline',
-              // Backend reminders are delivered as local notifications on this
-              // device — the row can honestly state when. Vaccination rows
-              // never get this flag (their reminders are backend-created).
-              isReminder: true,
-              onPress: () => navigation.navigate('Reminders'),
-            }))
+                  : 'Reminder';
+              return {
+                key: `rem-${r.id}`,
+                date: new Date(r.next_fire_at || r.fire_at),
+                title: r.title,
+                sub: pet ? `${pet.name} · ${kind}` : kind,
+                pet,
+                icon: 'bell-outline',
+                // Backend reminders are delivered as local notifications on
+                // this device — the row can honestly state when. Vaccination
+                // rows never get this flag (their reminders are backend-created).
+                isReminder: true,
+                onPress: () => navigation.navigate('Reminders'),
+              };
+            })
         : []),
     ]
       .filter((item) => !Number.isNaN(item.date.getTime()))
       .sort((a, b) => a.date - b.date);
 
-    const byMonth = [];
-    for (const item of upcoming) {
-      const label = MONTHS[item.date.getMonth()];
-      const bucket = byMonth[byMonth.length - 1];
-      if (bucket && bucket.label === label) bucket.items.push(item);
-      else byMonth.push({ label, items: [item] });
-    }
+    const today = [...overdueItems, ...upcoming.filter((i) => dayDiff(i.date) <= 0)];
+    const week = upcoming.filter((i) => dayDiff(i.date) > 0 && dayDiff(i.date) <= 7);
+    const later = upcoming.filter((i) => dayDiff(i.date) > 7);
 
     const done = vax
       .filter((v) => v.status === 'completed')
       .sort((a, b) => (b.administeredDate || b.dueDate || '').localeCompare(a.administeredDate || a.dueDate || ''));
 
-    return { overdue: overdueVax, months: byMonth, history: done };
-  }, [shownPets, reminders, filter, navigation]);
+    return {
+      sections: [
+        { label: 'Today', items: today },
+        { label: 'This week', items: week },
+        { label: 'Later', items: later },
+      ].filter((sec) => sec.items.length > 0),
+      history: done,
+    };
+  }, [shownPets, pets, reminders, filter, navigation]);
 
-  // Which month bucket holds the earliest reminder — the "Scheduled on this
-  // device" caption sits on that month's header (not always the first month),
-  // and stays hidden entirely when there are no reminders (findIndex → -1).
-  const firstReminderMonthIdx = months.findIndex((m) =>
-    m.items.some((it) => it.isReminder)
+  // The "Scheduled on this device" caption sits on the first section holding
+  // a reminder, and stays hidden when there are none (findIndex → -1).
+  const firstReminderSectionIdx = sections.findIndex((sec) =>
+    sec.items.some((it) => it.isReminder)
   );
+
+  // The vault opens one pet's records: the filtered pet, or the only pet.
+  const vaultPet = filter !== 'all' ? shownPets[0] : pets.length === 1 ? pets[0] : null;
+  const openVault = (pet) =>
+    navigation.navigate('MedicalRecords', { petId: pet.id, petName: pet.name });
 
   const openSheet = () => {
     if (!pets.length) {
@@ -148,7 +246,7 @@ export default function HealthHubScreen({ navigation }) {
       return;
     }
     setRecType('Vaccine');
-    setRecPetId(pets[0].id);
+    setRecPetId(filter !== 'all' ? filter : pets[0].id);
     setRecName('');
     setRecDate(defaultDueDate());
     setSheetOpen(true);
@@ -193,22 +291,84 @@ export default function HealthHubScreen({ navigation }) {
   };
 
   const daysOverdue = (v) =>
-    Math.max(1, Math.floor((Date.now() - new Date(`${v.dueDate}T12:00:00`)) / 86400000));
+    Math.max(1, Math.floor((Date.now() - new Date(`${v.dueDate}T12:00:00`)) / DAY_MS));
+
+  const renderRow = (item, i, items) => {
+    const last = i === items.length - 1;
+    const v = item.overdueVax;
+    const od = v ? daysOverdue(v) : 0;
+    return (
+      <Animated.View key={item.key} exiting={ROW_OUT} layout={ROW_LAYOUT}>
+        <Pressable
+          onPress={item.onPress}
+          style={({ pressed }) => [
+            styles.row,
+            !last && styles.rowDivider,
+            pressed && { backgroundColor: ui.pressTint },
+          ]}
+        >
+          {item.pet ? (
+            <PetFace pet={item.pet} />
+          ) : (
+            <View style={styles.iconPuck}>
+              <MaterialCommunityIcons name={item.icon || 'bell-outline'} size={18} color={ui.accent} />
+            </View>
+          )}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
+            <Text style={styles.rowSub} numberOfLines={1}>{item.sub}</Text>
+            {v ? (
+              <StatusPill
+                status="overdue"
+                label={`Overdue · ${od} day${od === 1 ? '' : 's'}`}
+                style={{ marginTop: 6 }}
+              />
+            ) : item.dueSoon ? (
+              <StatusPill status="due" label={`Due ${relative(item.date)}`} style={{ marginTop: 6 }} />
+            ) : null}
+            {item.isReminder && remindersPrefOn !== null && (
+              remindersPrefOn ? (
+                <View style={[styles.deliveryPill, { backgroundColor: ui.successTint }]}>
+                  <MaterialCommunityIcons name="bell-check-outline" size={11} color={ui.success} />
+                  <Text style={[styles.deliveryPillText, { color: ui.success }]}>
+                    Scheduled · {fmtDelivery(item.date)}
+                  </Text>
+                </View>
+              ) : (
+                // Honest state: local scheduling is off, so no notification
+                // will fire — never fake reassurance.
+                <View style={[styles.deliveryPill, { backgroundColor: ui.track }]}>
+                  <MaterialCommunityIcons name="bell-off-outline" size={11} color={ui.subtle} />
+                  <Text style={[styles.deliveryPillText, { color: ui.subtle }]}>
+                    Notifications off
+                  </Text>
+                </View>
+              )
+            )}
+          </View>
+          {v ? (
+            <Button small variant="soft" icon="check" label="Done" onPress={() => markDone(v)} />
+          ) : item.dueSoon ? (
+            <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} />
+          ) : (
+            <Text style={styles.rowWhen}>{relative(item.date)}</Text>
+          )}
+        </Pressable>
+      </Animated.View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={[type.screenTitle, { color: ui.ink }]}>Health</Text>
-            {lastSyncedAt != null && (
-              <View style={styles.syncRow}>
-                <MaterialCommunityIcons name="cloud-check" size={13} color={ui.ringOk} />
-                <Text style={styles.syncText}>{syncedLabel(lastSyncedAt)}</Text>
-              </View>
-            )}
-          </View>
-          <Button pill icon="plus" label="Add record" onPress={openSheet} />
+          <Text style={[type.screenTitle, { color: ui.ink }]}>Health</Text>
+          {lastSyncedAt != null && (
+            <View style={styles.syncRow}>
+              <MaterialCommunityIcons name="cloud-check" size={13} color={ui.ringOk} />
+              <Text style={styles.syncText}>{syncedLabel(lastSyncedAt)}</Text>
+            </View>
+          )}
         </View>
 
         {pets.length > 1 && (
@@ -217,12 +377,17 @@ export default function HealthHubScreen({ navigation }) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filters}
           >
-            <Chip accessibilityRole="radio" label="All" active={filter === 'all'} onPress={() => setFilter('all')} />
+            <Chip
+              accessibilityRole="radio"
+              label="All"
+              active={filter === 'all'}
+              onPress={() => setFilter('all')}
+              style={styles.allChip}
+            />
             {pets.map((p) => (
-              <Chip
-                accessibilityRole="radio"
+              <PetFilterChip
                 key={p.id}
-                label={p.name}
+                pet={p}
                 active={filter === p.id}
                 onPress={() => setFilter(p.id)}
               />
@@ -230,119 +395,80 @@ export default function HealthHubScreen({ navigation }) {
           </ScrollView>
         )}
 
-        {overdue.length > 0 && (
-          <>
-            <Text style={[type.sectionLabel, styles.sectionLabel, { color: ui.danger }]}>
-              Needs attention
-            </Text>
-            <Card style={styles.sectionCard}>
-              {overdue.map((v, i) => (
-                <Animated.View
-                  key={`${v.pet.id}-${v.id}`}
-                  exiting={ROW_OUT}
-                  layout={ROW_LAYOUT}
-                  style={[styles.attentionRow, i < overdue.length - 1 && styles.rowDivider]}
-                >
-                  <View style={[styles.petDot, { backgroundColor: v.pet.color || ui.accentTint }]}>
-                    <Text style={[styles.petDotText, { color: petFg(v.pet.color) }]}>
-                      {v.pet.name[0]}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.attentionTitle}>{v.name}</Text>
-                    <Text style={styles.attentionSub}>
-                      Due {fmtShort(new Date(`${v.dueDate}T12:00:00`))} · {daysOverdue(v)} days overdue
-                    </Text>
-                  </View>
-                  <Button small label="Mark done" onPress={() => markDone(v)} />
-                </Animated.View>
-              ))}
-            </Card>
-          </>
-        )}
-
-        {months.length === 0 ? (
-          <Card style={[styles.sectionCard, { marginTop: 4 }]}>
-            <Text style={styles.emptyText}>
-              {pets.length
-                ? 'Nothing scheduled for this pet.'
-                : 'Add your first pet to start tracking health.'}
-            </Text>
-          </Card>
+        {sections.length === 0 ? (
+          pets.length ? (
+            <EmptyState
+              photo={photos.emptyBlanket}
+              title="All quiet on the health front"
+              body={`Nothing scheduled${filter !== 'all' && shownPets[0] ? ` for ${shownPets[0].name}` : ''}. Add a vaccine or vet visit and we'll nudge you before it's due.`}
+              style={styles.empty}
+            />
+          ) : (
+            <EmptyState
+              photo={photos.emptyBlanket}
+              title="No pets yet"
+              body="Add your first pet and their vaccines, meds and vet visits will line up here."
+              actionLabel="Add a pet"
+              actionIcon="plus"
+              onAction={() => navigation.navigate('Pets', { screen: 'AddPet' })}
+              style={styles.empty}
+            />
+          )
         ) : (
-          months.map((month, mi) => (
-            <View key={month.label}>
-              <View style={styles.monthHeaderRow}>
-                <Text style={[type.sectionLabel, { color: ui.subtle }]}>
-                  {month.label}
-                </Text>
-                {mi === firstReminderMonthIdx &&
-                  remindersPrefOn === true && (
-                    <View style={styles.deviceCaption}>
-                      <MaterialCommunityIcons
-                        name="cellphone-check"
-                        size={12}
-                        color={ui.sub}
-                      />
-                      <Text style={styles.deviceCaptionText}>Scheduled on this device</Text>
-                    </View>
-                  )}
+          sections.map((sec, si) => (
+            <View key={sec.label}>
+              <View style={styles.sectionHeadRow}>
+                <Text style={[type.sectionLabel, { color: ui.subtle }]}>{sec.label}</Text>
+                {si === firstReminderSectionIdx && remindersPrefOn === true && (
+                  <View style={styles.deviceCaption}>
+                    <MaterialCommunityIcons name="cellphone-check" size={12} color={ui.sub} />
+                    <Text style={styles.deviceCaptionText}>Scheduled on this device</Text>
+                  </View>
+                )}
               </View>
               <Card style={styles.sectionCard}>
-                {month.items.map((item, i) => (
-                  <Pressable
-                    key={item.key}
-                    onPress={item.onPress}
-                    style={({ pressed }) => [
-                      styles.scheduleRow,
-                      i < month.items.length - 1 && styles.rowDivider,
-                      pressed && { backgroundColor: ui.pressTint },
-                    ]}
-                  >
-                    <View style={styles.dayCol}>
-                      <Text style={styles.dayLabel}>{DAYS[item.date.getDay()]}</Text>
-                      <Text style={styles.dayDate}>{item.date.getDate()}</Text>
-                    </View>
-                    {item.icon ? (
-                      <View style={[styles.typeChip, { backgroundColor: ui.track }]}>
-                        <MaterialCommunityIcons name={item.icon} size={15} color={ui.accent} />
-                      </View>
-                    ) : (
-                      <View style={[styles.typeChip, { backgroundColor: item.chipBg }]}>
-                        <Text style={[styles.typeChipText, { color: petFg(item.chipBg) }]}>
-                          {item.chipLabel}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.rowTitle}>{item.title}</Text>
-                      <Text style={styles.rowSub}>{item.sub}</Text>
-                      {item.isReminder && remindersPrefOn !== null && (
-                        remindersPrefOn ? (
-                          <View style={[styles.deliveryPill, { backgroundColor: ui.successTint }]}>
-                            <MaterialCommunityIcons name="bell-check-outline" size={11} color={ui.success} />
-                            <Text style={[styles.deliveryPillText, { color: ui.success }]}>
-                              Scheduled · {fmtDelivery(item.date)}
-                            </Text>
-                          </View>
-                        ) : (
-                          // Honest state: local scheduling is off, so no
-                          // notification will fire — never fake reassurance.
-                          <View style={[styles.deliveryPill, { backgroundColor: ui.track }]}>
-                            <MaterialCommunityIcons name="bell-off-outline" size={11} color={ui.subtle} />
-                            <Text style={[styles.deliveryPillText, { color: ui.subtle }]}>
-                              Notifications off
-                            </Text>
-                          </View>
-                        )
-                      )}
-                    </View>
-                    <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} />
-                  </Pressable>
-                ))}
+                {sec.items.map((item, i) => renderRow(item, i, sec.items))}
               </Card>
             </View>
           ))
+        )}
+
+        {pets.length > 0 && (
+          <Pressable
+            disabled={!vaultPet}
+            onPress={() => vaultPet && openVault(vaultPet)}
+            accessibilityRole={vaultPet ? 'button' : undefined}
+            style={({ pressed }) => [styles.vault, pressed && { opacity: motion.pressOpacitySoft }]}
+          >
+            <View style={styles.vaultIcon}>
+              <MaterialCommunityIcons name="shield-check" size={22} color={VAULT.fg} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.vaultTitle}>
+                {vaultPet ? `${vaultPet.name}'s medical vault` : 'Medical vault'}
+              </Text>
+              <Text style={styles.vaultSub}>
+                {vaultPet ? 'Vet records, lab results & documents' : 'Pick a pet to open their records'}
+              </Text>
+              {!vaultPet && (
+              <View style={styles.vaultFaces}>
+                {pets.slice(0, 4).map((p) => (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => openVault(p)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${p.name}'s medical vault`}
+                    hitSlop={6}
+                    style={({ pressed }) => pressed && { opacity: motion.pressOpacity }}
+                  >
+                    <PetFace pet={p} size={30} />
+                  </Pressable>
+                ))}
+              </View>
+              )}
+            </View>
+            {vaultPet && <MaterialCommunityIcons name="chevron-right" size={22} color={VAULT.fg} />}
+          </Pressable>
         )}
 
         {history.length > 0 && (
@@ -350,7 +476,7 @@ export default function HealthHubScreen({ navigation }) {
             <Text style={[type.sectionLabel, styles.sectionLabel, { color: ui.subtle }]}>
               History
             </Text>
-            <Card style={[styles.sectionCard, { marginBottom: 28 }]}>
+            <Card style={styles.sectionCard}>
               {history.slice(0, 8).map((v, i) => (
                 <View
                   key={`${v.pet.id}-${v.id}`}
@@ -370,6 +496,11 @@ export default function HealthHubScreen({ navigation }) {
         )}
       </ScrollView>
 
+      {/* The screen's one primary action floats in the thumb zone. */}
+      {pets.length > 0 && (
+        <Button pill icon="plus" label="Add record" onPress={openSheet} style={styles.fab} />
+      )}
+
       <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)} title="New record">
         <View>
           <Text style={[type.sectionLabel, styles.fieldLabel, { color: ui.subtle }]}>Type</Text>
@@ -385,16 +516,23 @@ export default function HealthHubScreen({ navigation }) {
           <View style={styles.chipWrap}>
             {pets.map((p) => {
               const on = recPet?.id === p.id;
+              const photo = petPhoto(p);
               return (
                 <Pressable
                   key={p.id}
                   onPress={() => setRecPetId(p.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: on }}
                   style={[styles.petChip, on && styles.petChipOn]}
                 >
                   <View style={[styles.petChipAvatar, { backgroundColor: p.color || ui.accentTint }]}>
-                    <Text style={[styles.petChipInitial, { color: petFg(p.color) }]}>
-                      {p.name[0]}
-                    </Text>
+                    {photo ? (
+                      <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} />
+                    ) : (
+                      <Text style={[styles.petChipInitial, { color: petFg(p.color) }]}>
+                        {p.name[0]}
+                      </Text>
+                    )}
                   </View>
                   <Text style={styles.petChipLabel}>{p.name}</Text>
                 </Pressable>
@@ -453,20 +591,37 @@ export default function HealthHubScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
-  scroll: { paddingBottom: 32 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 14,
-    paddingBottom: 16,
-  },
+  // Bottom room so the floating "Add record" never covers the last row.
+  scroll: { paddingBottom: 104 },
+  header: { paddingHorizontal: 24, paddingTop: 14, paddingBottom: 16 },
   syncRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
   syncText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, color: ui.subtle },
-  filters: { gap: 8, paddingHorizontal: 24, paddingBottom: 20 },
+  filters: { gap: 8, paddingHorizontal: 24, paddingBottom: 20, alignItems: 'center' },
+  allChip: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 16 },
+  faceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    minHeight: 40,
+    paddingLeft: 6,
+    paddingRight: 14,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
+    backgroundColor: ui.surface,
+  },
+  faceChipOn: { backgroundColor: '#faf1e2', borderColor: ui.accent },
+  faceChipAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  faceChipLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13.5, color: ui.ink },
   sectionLabel: { marginHorizontal: 24, marginBottom: 10, marginTop: 6 },
-  monthHeaderRow: {
+  sectionHeadRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -474,8 +629,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginBottom: 10,
   },
-  // Shown once (beside the first month) so each reminder row doesn't have to
-  // repeat "· this device" — the delivery pills just say "Scheduled · <when>".
+  // Shown once (beside the first section with a reminder) so each reminder
+  // row doesn't repeat "· this device" — the pills just say "Scheduled · <when>".
   deviceCaption: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // ui.sub (body-secondary) rather than ui.subtle — the smaller caption needs
   // the extra contrast to clear WCAG AA at this size.
@@ -484,50 +639,27 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: ui.sub,
   },
-  sectionCard: { marginHorizontal: 24, marginBottom: 16 },
+  sectionCard: { marginHorizontal: 24, marginBottom: 18 },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: ui.hairline },
-  attentionRow: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    minHeight: 64,
   },
-  petDot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  iconPuck: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: ui.track,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  petDotText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16 },
-  attentionTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: ui.ink },
-  attentionSub: {
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 12.5,
-    color: ui.sub,
-    marginTop: 1,
-  },
-  scheduleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 15,
-    paddingHorizontal: 18,
-  },
-  dayCol: { width: 40, alignItems: 'center' },
-  dayLabel: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, color: ui.subtle },
-  dayDate: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 17, color: ui.ink },
-  typeChip: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typeChipText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 13 },
-  rowTitle: { ...type.rowTitle, color: ui.ink },
-  rowSub: { ...type.secondary, color: ui.sub },
+  rowTitle: { ...type.rowTitle, fontSize: 15, lineHeight: 20, color: ui.ink },
+  rowSub: { ...type.secondary, color: ui.sub, marginTop: 1 },
+  rowWhen: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: ui.sub },
   deliveryPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -536,9 +668,32 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     paddingHorizontal: 7,
     borderRadius: 999,
-    marginTop: 4,
+    marginTop: 5,
   },
   deliveryPillText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10.5 },
+  vault: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 24,
+    marginBottom: 22,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: radii.card,
+    borderCurve: 'continuous',
+    backgroundColor: VAULT.bg,
+  },
+  vaultIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: ui.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vaultTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: ui.ink },
+  vaultSub: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: VAULT.fg, marginTop: 1 },
+  vaultFaces: { flexDirection: 'row', gap: 8, marginTop: 10 },
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -553,11 +708,14 @@ const styles = StyleSheet.create({
     color: ui.ink,
   },
   historyDate: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, color: ui.subtle },
-  emptyText: {
-    padding: 18,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 13,
-    color: ui.subtle,
+  empty: { marginHorizontal: 24, marginTop: 12, marginBottom: 28 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    minHeight: 52,
+    paddingHorizontal: 22,
+    boxShadow: elevation.cta,
   },
   fieldLabel: { marginBottom: 8 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -578,6 +736,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -1,32 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, RefreshControl, Linking, Pressable, TextInput,
+  View, Text, ScrollView, StyleSheet, RefreshControl, Linking, Pressable, TextInput, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { ui, type, PET_COLOR_PAIRS, motion } from '../../theme';
-import { Card, Button, ConfirmDialog, showToast } from '../../components';
+import { resolveAsset } from '../../config';
+import { ui, type, PET_COLOR_PAIRS, photos } from '../../theme';
+import { Button, ConfirmDialog, EmptyState, showToast } from '../../components';
+import LostPetCard from './LostPetCard';
 
 // Redesign: this pushed screen is now the report/manage surface — the board
 // itself lives inline in Community's "Lost pets" section. Report form on top,
 // then your active reports (mark as found), then everyone else's.
-
-function timeAgo(iso) {
-  if (!iso) return '';
-  const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-function missingFor(iso) {
-  if (!iso) return 'Missing';
-  const days = Math.floor((Date.now() - new Date(iso)) / 86400000);
-  if (days < 1) return 'Missing today';
-  return `Missing ${days} day${days === 1 ? '' : 's'}`;
-}
 
 const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
 
@@ -124,6 +111,8 @@ export default function LostPetsScreen({ navigation }) {
                     <Pressable
                       key={pet.id}
                       onPress={() => selectPet(pet)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: selected, disabled: reported }}
                       style={[
                         styles.petChip,
                         selected && styles.petChipSelected,
@@ -131,9 +120,16 @@ export default function LostPetsScreen({ navigation }) {
                       ]}
                     >
                       <View style={[styles.petChipAvatar, { backgroundColor: pet.color || ui.accentTint }]}>
-                        <Text style={[styles.petChipInitial, { color: petFg(pet.color) }]}>
-                          {(pet.name || '?')[0]}
-                        </Text>
+                        {pet.avatarUrl ? (
+                          <Image
+                            source={{ uri: resolveAsset(pet.avatarUrl) }}
+                            style={{ width: '100%', height: '100%' }}
+                          />
+                        ) : (
+                          <Text style={[styles.petChipInitial, { color: petFg(pet.color) }]}>
+                            {(pet.name || '?')[0]}
+                          </Text>
+                        )}
                       </View>
                       <Text style={styles.petChipLabel}>{pet.name}</Text>
                     </Pressable>
@@ -190,28 +186,7 @@ export default function LostPetsScreen({ navigation }) {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Your active reports</Text>
             {activeReports.map((r) => (
-              <Card key={r.id} padded style={styles.reportCard}>
-                <View style={styles.reportTitleRow}>
-                  <Text style={styles.reportTitle} numberOfLines={1}>
-                    {r.petName}
-                    {r.petType ? ` — ${r.petType}` : ''}
-                  </Text>
-                  <Text style={styles.reportMissing}>{missingFor(r.createdAt)}</Text>
-                </View>
-                {r.lastSeenLocation ? (
-                  <View style={styles.metaRow}>
-                    <MaterialCommunityIcons name="map-marker-outline" size={15} color={ui.subtle} />
-                    <Text style={styles.metaText}>Last seen near {r.lastSeenLocation}</Text>
-                  </View>
-                ) : null}
-                {r.description ? <Text style={styles.reportDesc}>{r.description}</Text> : null}
-                <Pressable
-                  onPress={() => handleMarkFound(r)}
-                  style={({ pressed }) => [styles.foundBtn, pressed && { opacity: motion.pressOpacitySoft }]}
-                >
-                  <Text style={styles.foundBtnText}>Mark as found</Text>
-                </Pressable>
-              </Card>
+              <LostPetCard key={r.id} report={r} mine onFound={() => handleMarkFound(r)} />
             ))}
           </View>
         )}
@@ -220,42 +195,26 @@ export default function LostPetsScreen({ navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Reported nearby</Text>
           {otherReports.length === 0 ? (
-            <View style={styles.empty}>
-              <MaterialCommunityIcons name="heart-outline" size={30} color={ui.faint} />
-              <Text style={styles.emptyTitle}>No pets reported lost</Text>
-              <Text style={styles.emptyText}>Good news — every pet in the community is home safe.</Text>
-            </View>
+            <EmptyState
+              compact
+              photo={photos.communityPals}
+              title="No pets reported lost"
+              body="Good news — every pet in the community is home safe."
+              style={{ paddingVertical: 12 }}
+            />
           ) : (
             otherReports.map((r) => (
-              <Card key={r.id} padded style={styles.reportCard}>
-                <View style={styles.reportTitleRow}>
-                  <Text style={styles.reportTitle} numberOfLines={1}>
-                    {r.petName}
-                    {r.petType ? ` — ${r.petType}` : ''}
-                  </Text>
-                  <Text style={styles.reportMissing}>{missingFor(r.createdAt)}</Text>
-                </View>
-                <View style={styles.metaRow}>
-                  <MaterialCommunityIcons name="account-outline" size={15} color={ui.subtle} />
-                  <Text style={styles.metaText}>
-                    Reported by {r.reporterName || 'someone'} · {timeAgo(r.createdAt)}
-                  </Text>
-                </View>
-                {r.lastSeenLocation ? (
-                  <View style={styles.metaRow}>
-                    <MaterialCommunityIcons name="map-marker-outline" size={15} color={ui.subtle} />
-                    <Text style={styles.metaText}>Last seen near {r.lastSeenLocation}</Text>
-                  </View>
-                ) : null}
-                {r.description ? <Text style={styles.reportDesc}>{r.description}</Text> : null}
-                {r.contactPhone ? (
-                  <Button
-                    icon="phone"
-                    label="Contact owner"
-                    onPress={() => Linking.openURL(`tel:${r.contactPhone}`).catch(() => {})}
-                  />
-                ) : null}
-              </Card>
+              <LostPetCard
+                key={r.id}
+                report={r}
+                showReporter
+                // Contact only when the owner shared a number — never a dead button.
+                onSeen={r.contactPhone
+                  ? () => Linking.openURL(`tel:${r.contactPhone}`).catch(() => {})
+                  : undefined}
+                seenLabel="Contact owner"
+                seenIcon="phone"
+              />
             ))
           )}
         </View>
@@ -308,6 +267,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
+    minHeight: 44,
     paddingVertical: 7,
     paddingRight: 14,
     paddingLeft: 7,
@@ -318,9 +278,10 @@ const styles = StyleSheet.create({
   },
   petChipSelected: { backgroundColor: ui.accentTint, borderColor: ui.accent },
   petChipAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -339,26 +300,4 @@ const styles = StyleSheet.create({
   inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
   section: { marginTop: 28, gap: 12 },
   sectionLabel: { ...type.sectionLabel, color: ui.subtle },
-  reportCard: { gap: 12 },
-  reportTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    gap: 10,
-  },
-  reportTitle: { flex: 1, fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, color: ui.ink },
-  reportMissing: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: ui.danger },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5, color: ui.subtle, flex: 1 },
-  reportDesc: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, lineHeight: 19, color: ui.sub },
-  foundBtn: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: ui.successTint,
-  },
-  foundBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.success },
-  empty: { alignItems: 'center', gap: 6, paddingVertical: 28 },
-  emptyTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: ui.ink, marginTop: 6 },
-  emptyText: { ...type.secondary, color: ui.sub, textAlign: 'center' },
 });

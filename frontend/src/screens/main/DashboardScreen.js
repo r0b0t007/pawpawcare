@@ -16,13 +16,19 @@ const CARD_OUT = FadeOut.duration(150);
 import { track } from '../../services/analytics';
 import { noteGoodMoment } from '../../services/storeReview';
 import { resolveAsset } from '../../config';
-import { ui, type, motion } from '../../theme';
-import { Card, CareStreakCard, RecapCard, StatusRing, UpNextCard, showToast } from '../../components';
+import { dayKey } from '../../utils/streaks';
+import { ui, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
+import {
+  Button, Card, CareStreakCard, EmptyState, PetCard, RecapCard, StatusRing, StepProgress,
+  UpNextCard, showToast,
+} from '../../components';
 
-// Home = one calm answer to "what needs my attention?": the UpNext hero,
-// the pets row (status lives on the avatar ring, nowhere else), this week's
-// schedule, and a community teaser. Stat cards, spend banner and the quick
-// actions grid are gone per the redesign's delete list.
+// Home ("Lively & Light") answers one question, "is everyone OK, and what do
+// I do next?", before any card is read: the headline is the status sentence.
+// Then the one elevated hero (Up Next), today's daily care as goal-gradient
+// progress, the pets as photo cards on their identity tints, and what's coming
+// up with each pet's face. A home with no pets is an invitation (photo empty
+// state), never a blank screen.
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -48,11 +54,40 @@ function petStatusOf(pet) {
   return 'ok';
 }
 
-const DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const photoOf = (pet) => (pet?.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined);
+
+// "in 3 days" / "tomorrow" / "today": relative first, the exact date is in
+// the row's secondary line.
+function relDay(date, today) {
+  const n = Math.round((new Date(date.toDateString()) - new Date(today.toDateString())) / 86400000);
+  if (n <= 0) return 'today';
+  if (n === 1) return 'tomorrow';
+  return `in ${n} days`;
+}
+
+// Status sentence for the headline: names the pets so it's recognised, not
+// read; never alarming, never shaming.
+function statusSentence(pets, overdueCount) {
+  if (overdueCount === 1) return 'One thing needs\nyou today';
+  if (overdueCount > 1) return `${overdueCount} things need\nyou today`;
+  if (pets.length === 1) return `${pets[0].name} is\nall good`;
+  if (pets.length === 2) return `${pets[0].name} and ${pets[1].name}\nare all good`;
+  return `All ${pets.length} pets\nare all good`;
+}
+
+const BENEFITS = [
+  { icon: 'bell-ring-outline', pair: PET_COLOR_PAIRS[0], label: 'Reminders before anything is due' },
+  { icon: 'shield-check-outline', pair: PET_COLOR_PAIRS[1], label: 'Every record in one safe place' },
+  { icon: 'account-group-outline', pair: PET_COLOR_PAIRS[2], label: 'Share care with your family' },
+];
+const TEASER_PAIR = PET_COLOR_PAIRS[3];
 
 export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
-  const { dataLoaded, pets, posts, reminders, unreadCount, markVaccinationComplete } = useData();
+  const {
+    dataLoaded, pets, posts, reminders, unreadCount, medDoseDays,
+    markVaccinationComplete, logMedicationDose,
+  } = useData();
 
   // TTI: the dashboard is the main entry screen — interactive once the initial
   // data fan-out has rendered. Safe to call repeatedly; first call wins.
@@ -182,7 +217,7 @@ export default function DashboardScreen({ navigation }) {
     .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
     .toUpperCase();
 
-  const { upNext, weekItems } = useMemo(() => {
+  const { upNext, weekItems, overdueCount } = useMemo(() => {
     const pending = pets.flatMap((pet) =>
       (pet.vaccinations || [])
         .filter((v) => v.status === 'overdue' || v.status === 'due_soon' || v.status === 'upcoming')
@@ -211,24 +246,56 @@ export default function DashboardScreen({ navigation }) {
           key: `vax-${v.pet.id}-${v.id}`,
           date: vaxDate(v),
           title: v.name,
-          sub: v.pet.name,
-          dot: v.status === 'due_soon' ? ui.warn : ui.ringOk,
+          sub: `${v.pet.name} · ${fmtShort(vaxDate(v))}`,
+          pet: v.pet,
+          dueSoon: v.status === 'due_soon',
         })),
       ...reminders
         .filter((r) => r.next_fire_at || r.fire_at)
         .map((r) => ({ r, date: new Date(r.next_fire_at || r.fire_at) }))
         .filter(({ date }) => !Number.isNaN(date.getTime()) && inWeek(date))
-        .map(({ r, date }) => ({
-          key: `rem-${r.id}`,
-          date,
-          title: r.title,
-          sub: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-          dot: ui.ringOk,
-        })),
+        .map(({ r, date }) => {
+          const pet = pets.find((p) => p.id === r.pet_id);
+          const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+          return {
+            key: `rem-${r.id}`,
+            date,
+            title: r.title,
+            sub: pet ? `${pet.name} · ${fmtShort(date)}, ${time}` : `${fmtShort(date)}, ${time}`,
+            pet,
+          };
+        }),
     ].sort((a, b) => a.date - b.date);
 
-    return { upNext: next, weekItems: week.slice(0, 5) };
+    return {
+      upNext: next,
+      weekItems: week.slice(0, 5),
+      overdueCount: pending.filter((v) => v.status === 'overdue').length,
+    };
   }, [pets, reminders, today]);
+
+  // Today's daily care across the household: active daily meds, done when a
+  // dose was logged today (the same local-day key the streaks use). Real data
+  // only: no progress bar when there's nothing daily to track.
+  const todayKey = dayKey(today);
+  const todayMeds = useMemo(
+    () =>
+      pets
+        .flatMap((pet) =>
+          (pet.medications || [])
+            .filter((m) => m.active && m.frequency === 'daily')
+            .map((m) => ({
+              med: m,
+              pet,
+              time: [...(m.times || [])].sort()[0] || null,
+              done: (medDoseDays?.[m.id] || []).includes(todayKey),
+            })),
+        )
+        .sort((a, b) => (a.done - b.done) || String(a.time).localeCompare(String(b.time))),
+    [pets, medDoseDays, todayKey],
+  );
+  const medsDone = todayMeds.filter((t) => t.done).length;
+  const overduePets = pets.filter((p) => petStatusOf(p) === 'overdue').length;
 
   const upNextItem = upNext
     ? {
@@ -237,170 +304,298 @@ export default function DashboardScreen({ navigation }) {
         status: upNext.status === 'overdue' ? 'overdue' : 'due',
         statusLabel:
           upNext.status === 'overdue'
-            ? `Overdue · ${Math.max(1, Math.floor((Date.now() - vaxDate(upNext)) / 86400000))} days`
+            ? (() => {
+                const days = Math.max(1, Math.floor((Date.now() - vaxDate(upNext)) / 86400000));
+                return `Overdue · ${days} day${days === 1 ? '' : 's'}`;
+              })()
             : `Due ${fmtShort(vaxDate(upNext))}`,
+        // No-shame framing: an invitation to act, never "you missed".
+        note:
+          upNext.status === 'overdue'
+            ? `Let's get ${upNext.pet.name}'s ${upNext.name} booked.`
+            : null,
         avatarColor: upNext.pet.color || ui.accentTint,
-        avatarTextColor: ui.accent,
+        avatarTextColor: petPair(upNext.pet.color).fg,
         initial: upNext.pet.name[0],
-        photo: upNext.pet.avatarUrl ? resolveAsset(upNext.pet.avatarUrl) : undefined,
+        photo: photoOf(upNext.pet),
       }
     : null;
+
+  const fmtTime = (hhmm) => {
+    if (!hhmm) return 'Today';
+    const [h, m] = hhmm.split(':').map(Number);
+    const d = new Date(today);
+    d.setHours(h, m || 0, 0, 0);
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+
+  const logDose = async ({ pet, med }) => {
+    await logMedicationDose(pet.id, med.id);
+    showToast(`${pet.name}'s ${med.name} logged`, { celebrate: true, actionType: 'dose_logged' });
+  };
+
+  const goPet = (pet) =>
+    navigation.navigate('Pets', { screen: 'PetProfile', params: { petId: pet.id } });
+  const addPet = () => navigation.navigate('Pets', { screen: 'AddPet' });
+  const petMeta = (pet) =>
+    [
+      pet.breed || (pet.type ? pet.type[0].toUpperCase() + pet.type.slice(1) : null),
+      pet.age ? `${pet.age} y` : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  const petAvatar = (pet, size = 36) => (
+    <StatusRing
+      size={size}
+      color={pet.color || ui.accentTint}
+      textColor={petPair(pet.color).fg}
+      initial={pet.name[0]}
+      photo={photoOf(pet)}
+      ringColor={pet.color || ui.accentTint}
+    />
+  );
+
+  const noPets = dataLoaded && pets.length === 0;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <View>
-            <Text style={[type.sectionLabel, { color: ui.subtle, marginBottom: 6 }]}>
-              {dateLabel}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.greeting}>
+              {noPets ? `Welcome to PawPawCare, ${firstName}` : `${getGreeting()}, ${firstName}`}
             </Text>
-            <Text style={[type.screenTitle, { color: ui.ink }]}>
-              {getGreeting()},{'\n'}{firstName}
-            </Text>
+            {(noPets || pets.length > 0) && (
+              <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">
+                {noPets ? "Let's meet your pets" : statusSentence(pets, overdueCount)}
+              </Text>
+            )}
+            {overduePets > 0 && pets.length > 1 && (
+              <Text style={styles.subline}>
+                {pets.length - overduePets} of your {pets.length} pets are all good.
+              </Text>
+            )}
           </View>
-          <Pressable style={styles.bell} onPress={() => navigation.navigate('Notifications')}>
-            <MaterialCommunityIcons name="bell-outline" size={24} color={ui.ink} />
+          <Pressable
+            style={({ pressed }) => [styles.bell, pressed && { opacity: motion.pressOpacity }]}
+            onPress={() => navigation.navigate('Notifications')}
+            accessibilityRole="button"
+            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+          >
+            <MaterialCommunityIcons name="bell-outline" size={22} color={ui.ink} />
             {unreadCount > 0 && <View style={styles.bellDot} />}
           </Pressable>
         </View>
 
-        {celebration && (
-          <Animated.View exiting={CARD_OUT}>
-          <Card padded style={[styles.hero, { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ui.accentTint, borderColor: ui.accentTint }]}>
-            <MaterialCommunityIcons
-              name={celebration.kind === 'birthday' ? 'cake-variant-outline' : 'heart-outline'}
-              size={22}
-              color={ui.accent}
+        {noPets ? (
+          <View style={styles.empty}>
+            <EmptyState
+              photo={photos.emptyKitten}
+              title="Add your first pet"
+              body="A cat, a dog or any companion. It takes less than a minute."
+              actionLabel="Add your first pet"
+              actionIcon="plus"
+              onAction={addPet}
             />
-            <View style={{ flex: 1 }}>
-              <Text style={[type.cardTitleSm, { color: ui.ink }]}>
-                {celebration.kind === 'birthday'
-                  ? `Happy birthday, ${celebration.pet.name}!`
-                  : `Gotcha day — ${celebration.years} year${celebration.years === 1 ? '' : 's'} with ${celebration.pet.name}`}
-              </Text>
-              {celebration.kind === 'birthday' && (
-                <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>
-                  {celebration.pet.name} turns {celebration.years} today
-                </Text>
-              )}
-            </View>
-            <Pressable onPress={dismissCelebration} hitSlop={10}>
-              <MaterialCommunityIcons name="close" size={16} color={ui.subtle} />
-            </Pressable>
-          </Card>
-          </Animated.View>
-        )}
-
-        <UpNextCard
-          item={upNextItem}
-          style={styles.hero}
-          onDone={async () => {
-            await markVaccinationComplete(upNext.pet.id, upNext.id);
-            showToast(`${upNext.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
-          }}
-          onReschedule={() =>
-            navigation.navigate('Pets', {
-              screen: 'VaccinationTracker',
-              params: { petId: upNext.pet.id },
-            })
-          }
-        />
-
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>Your pets</Text>
-          <Pressable onPress={() => navigation.navigate('Pets')}>
-            <Text style={styles.sectionLink}>All pets</Text>
-          </Pressable>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.petsRow}
-        >
-          {pets.map((pet) => (
-            <Pressable
-              key={pet.id}
-              style={styles.petItem}
-              onPress={() =>
-                navigation.navigate('Pets', { screen: 'PetProfile', params: { petId: pet.id } })
-              }
-            >
-              <StatusRing
-                size={62}
-                color={pet.color || ui.accentTint}
-                textColor={ui.accent}
-                initial={pet.name[0]}
-                photo={pet.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined}
-                status={petStatusOf(pet)}
-              />
-              <Text style={styles.petName}>{pet.name}</Text>
-            </Pressable>
-          ))}
-          <Pressable
-            style={styles.petItem}
-            onPress={() => navigation.navigate('Pets', { screen: 'AddPet' })}
-          >
-            <View style={styles.addCircle}>
-              <MaterialCommunityIcons name="plus" size={22} color={ui.accent} />
-            </View>
-            <Text style={[styles.petName, { color: ui.subtle }]}>Add</Text>
-          </Pressable>
-        </ScrollView>
-
-        <CareStreakCard streaks={careStreaks} style={styles.hero} />
-
-        {recapWindow && <RecapCard rows={recapRows} style={styles.hero} />}
-
-        <View style={styles.sectionHead}>
-          <Text style={styles.sectionTitle}>This week</Text>
-          <Pressable onPress={() => navigation.navigate('Health')}>
-            <Text style={styles.sectionLink}>Health</Text>
-          </Pressable>
-        </View>
-        <Card style={styles.weekCard}>
-          {weekItems.length === 0 ? (
-            <Text style={styles.emptyText}>Nothing scheduled this week.</Text>
-          ) : (
-            weekItems.map((item, i) => (
-              <View
-                key={item.key}
-                style={[styles.weekRow, i < weekItems.length - 1 && styles.rowDivider]}
-              >
-                <View style={styles.dayCol}>
-                  <Text style={styles.dayLabel}>{DAYS[item.date.getDay()]}</Text>
-                  <Text style={styles.dayDate}>{item.date.getDate()}</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>What you'll get</Text>
+            {BENEFITS.map((b) => (
+              <View key={b.label} style={styles.benefit}>
+                <View style={[styles.iconChip, { backgroundColor: b.pair.bg }]}>
+                  <MaterialCommunityIcons name={b.icon} size={19} color={b.pair.fg} />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowTitle}>{item.title}</Text>
-                  <Text style={styles.rowSub}>{item.sub}</Text>
-                </View>
-                <View style={[styles.weekDot, { backgroundColor: item.dot }]} />
+                <Text style={styles.benefitText}>{b.label}</Text>
               </View>
-            ))
-          )}
-        </Card>
+            ))}
+          </View>
+        ) : (
+          <>
+            {celebration && (
+              <Animated.View exiting={CARD_OUT}>
+                <Card padded style={[styles.hero, { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ui.accentTint, borderColor: ui.accentTint }]}>
+                  <MaterialCommunityIcons
+                    name={celebration.kind === 'birthday' ? 'cake-variant-outline' : 'heart-outline'}
+                    size={22}
+                    color={ui.accent}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[type.cardTitleSm, { color: ui.ink }]}>
+                      {celebration.kind === 'birthday'
+                        ? `Happy birthday, ${celebration.pet.name}!`
+                        : `Gotcha day — ${celebration.years} year${celebration.years === 1 ? '' : 's'} with ${celebration.pet.name}`}
+                    </Text>
+                    {celebration.kind === 'birthday' && (
+                      <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>
+                        {celebration.pet.name} turns {celebration.years} today
+                      </Text>
+                    )}
+                  </View>
+                  <Pressable onPress={dismissCelebration} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss">
+                    <MaterialCommunityIcons name="close" size={16} color={ui.subtle} />
+                  </Pressable>
+                </Card>
+              </Animated.View>
+            )}
 
-        <Pressable
-          onPress={() => navigation.navigate('Community')}
-          style={({ pressed }) => pressed && { opacity: motion.pressOpacitySoft }}
-        >
-          <Card style={styles.teaser}>
-            <MaterialCommunityIcons name="forum-outline" size={20} color={ui.accent} />
-            <Text style={styles.teaserText}>
-              {posts.length > 0 ? (
-                <>
-                  <Text style={styles.teaserBold}>
-                    {posts.length} recent {posts.length === 1 ? 'post' : 'posts'}
+            {/* The caught-up card only when there's no daily care to show either. */}
+            {(upNextItem || todayMeds.length === 0) && (
+              <UpNextCard
+                item={upNextItem}
+                style={styles.hero}
+                onDone={async () => {
+                  await markVaccinationComplete(upNext.pet.id, upNext.id);
+                  showToast(`${upNext.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+                }}
+                onReschedule={() =>
+                  navigation.navigate('Pets', {
+                    screen: 'VaccinationTracker',
+                    params: { petId: upNext.pet.id },
+                  })
+                }
+              />
+            )}
+
+            {todayMeds.length > 0 && (
+              <Card padded elevated={!upNextItem} style={[styles.hero, { padding: 18, gap: 12 }]}>
+                <View style={styles.rowBetween}>
+                  <Text style={styles.sectionLabel}>Today</Text>
+                  <Text style={styles.progressLabel}>
+                    {medsDone === todayMeds.length ? 'All done' : `${medsDone} of ${todayMeds.length} done`}
                   </Text>
-                  {' in the community'}
-                </>
+                </View>
+                <StepProgress done={medsDone} total={todayMeds.length} tone="success" height={8} />
+                {todayMeds.slice(0, 4).map((t) => (
+                  <View key={t.med.id} style={styles.medRow}>
+                    <Pressable onPress={() => goPet(t.pet)} accessibilityRole="button" accessibilityLabel={t.pet.name}>
+                      {petAvatar(t.pet)}
+                    </Pressable>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.rowTitle, t.done && { color: ui.sub }]} numberOfLines={1}>
+                        {t.pet.name}'s {t.med.name}
+                      </Text>
+                      <Text style={styles.rowSub} numberOfLines={1}>
+                        {[fmtTime(t.time), t.med.dosage].filter(Boolean).join(' · ')}
+                      </Text>
+                    </View>
+                    {t.done ? (
+                      <View style={styles.doneTag} accessible accessibilityLabel="Done">
+                        <MaterialCommunityIcons name="check-circle" size={18} color={ui.success} />
+                        <Text style={styles.doneTagText}>Done</Text>
+                      </View>
+                    ) : (
+                      <Button small variant="soft" label="Log" icon="check" onPress={() => logDose(t)} style={styles.logBtn} />
+                    )}
+                  </View>
+                ))}
+              </Card>
+            )}
+
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionLabel}>Your pets</Text>
+              <Pressable onPress={() => navigation.navigate('Pets')} hitSlop={8} accessibilityRole="link">
+                <Text style={styles.sectionLink}>See all</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.petsRow}
+            >
+              {pets.map((pet) => (
+                <PetCard
+                  key={pet.id}
+                  width={158}
+                  photoHeight={96}
+                  name={pet.name}
+                  meta={petMeta(pet)}
+                  color={pet.color}
+                  photo={photoOf(pet)}
+                  species={pet.type}
+                  onPress={() => goPet(pet)}
+                />
+              ))}
+              <Pressable
+                style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
+                onPress={addPet}
+                accessibilityRole="button"
+                accessibilityLabel="Add a pet"
+              >
+                <MaterialCommunityIcons name="plus" size={24} color={ui.accent} />
+                <Text style={styles.addCardText}>Add</Text>
+              </Pressable>
+            </ScrollView>
+
+            <CareStreakCard streaks={careStreaks} style={styles.hero} />
+
+            {recapWindow && <RecapCard rows={recapRows} style={styles.hero} />}
+
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionLabel}>Coming up</Text>
+              <Pressable onPress={() => navigation.navigate('Health')} hitSlop={8} accessibilityRole="link">
+                <Text style={styles.sectionLink}>Health</Text>
+              </Pressable>
+            </View>
+            <Card style={styles.weekCard}>
+              {weekItems.length === 0 ? (
+                <View style={styles.weekEmpty}>
+                  <MaterialCommunityIcons name="weather-sunny" size={18} color={ui.accent} />
+                  <Text style={styles.emptyText}>Nothing scheduled this week. Enjoy the calm.</Text>
+                </View>
               ) : (
-                'Say hi to the community'
+                weekItems.map((item, i) => (
+                  <View
+                    key={item.key}
+                    style={[styles.weekRow, i < weekItems.length - 1 && styles.rowDivider]}
+                  >
+                    {item.pet ? (
+                      petAvatar(item.pet)
+                    ) : (
+                      <View style={[styles.iconChip, { backgroundColor: ui.accentTint }]}>
+                        <MaterialCommunityIcons name="bell-outline" size={18} color={ui.accent} />
+                      </View>
+                    )}
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
+                      <Text style={styles.rowSub} numberOfLines={1}>{item.sub}</Text>
+                    </View>
+                    {item.dueSoon ? (
+                      <View style={styles.dueTag} accessible accessibilityLabel="Due soon">
+                        <MaterialCommunityIcons name="clock-outline" size={13} color={ui.warnText} />
+                        <Text style={styles.dueTagText}>Due soon</Text>
+                      </View>
+                    ) : (
+                      <Text style={styles.relDay}>{relDay(item.date, today)}</Text>
+                    )}
+                  </View>
+                ))
               )}
-            </Text>
-            <MaterialCommunityIcons name="chevron-right" size={18} color={ui.faint} />
-          </Card>
-        </Pressable>
+            </Card>
+
+            <Pressable
+              onPress={() => navigation.navigate('Community')}
+              style={({ pressed }) => pressed && { opacity: motion.pressOpacitySoft }}
+              accessibilityRole="button"
+            >
+              <Card style={styles.teaser}>
+                <View style={[styles.iconChip, { backgroundColor: TEASER_PAIR.bg }]}>
+                  <MaterialCommunityIcons name="forum-outline" size={18} color={TEASER_PAIR.fg} />
+                </View>
+                <Text style={styles.teaserText}>
+                  {posts.length > 0 ? (
+                    <>
+                      <Text style={styles.teaserBold}>
+                        {posts.length} recent {posts.length === 1 ? 'post' : 'posts'}
+                      </Text>
+                      {' in the community'}
+                    </>
+                  ) : (
+                    'Say hi to the community'
+                  )}
+                </Text>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={ui.faint} />
+              </Card>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -408,83 +603,121 @@ export default function DashboardScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
-  scroll: { paddingBottom: 28 },
+  scroll: { paddingBottom: 32 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
+    gap: 12,
     paddingHorizontal: 24,
     paddingTop: 14,
-    paddingBottom: 22,
+    paddingBottom: 20,
   },
+  greeting: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, color: ui.sub, marginBottom: 4 },
+  subline: { ...type.body, color: ui.sub, marginTop: 6 },
   bell: {
     width: 44,
     height: 44,
+    borderRadius: 22,
+    backgroundColor: ui.surface,
+    borderWidth: 1,
+    borderColor: ui.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bellDot: {
     position: 'absolute',
-    top: 8,
-    right: 9,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#b06e00',
+    top: 9,
+    right: 10,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: ui.accent,
     borderWidth: 2,
-    borderColor: ui.background,
+    borderColor: ui.surface,
   },
-  hero: { marginHorizontal: 24, marginBottom: 26 },
+  hero: { marginHorizontal: 16, marginBottom: 22 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  progressLabel: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    color: ui.sub,
+    fontVariant: ['tabular-nums'],
+  },
+  medRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
+  logBtn: { paddingVertical: 9, paddingHorizontal: 14 },
+  doneTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  doneTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: ui.success },
   sectionHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
     marginHorizontal: 24,
-    marginBottom: 14,
+    marginBottom: 12,
   },
-  sectionTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: ui.ink },
-  sectionLink: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.accent },
-  petsRow: { gap: 20, paddingHorizontal: 24, paddingTop: 6, paddingBottom: 20 },
-  petItem: { alignItems: 'center', gap: 8 },
-  petName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: ui.ink },
-  addCircle: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+  sectionLabel: { ...type.sectionLabel, color: ui.subtle },
+  sectionLink: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.accent },
+  petsRow: { gap: 12, paddingHorizontal: 16, paddingBottom: 24 },
+  addCard: {
+    width: 76,
+    borderRadius: 22,
+    borderCurve: 'continuous',
     borderWidth: 1.5,
     borderStyle: 'dashed',
     borderColor: ui.faint,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
-  weekCard: { marginHorizontal: 24, marginBottom: 24 },
+  addCardText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.accent },
+  weekCard: { marginHorizontal: 16, marginBottom: 22 },
   weekRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    paddingVertical: 15,
-    paddingHorizontal: 18,
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    minHeight: 60,
   },
   rowDivider: { borderBottomWidth: 1, borderBottomColor: ui.hairline },
-  dayCol: { width: 40, alignItems: 'center' },
-  dayLabel: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, color: ui.subtle },
-  dayDate: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 17, color: ui.ink },
-  rowTitle: { ...type.rowTitle, color: ui.ink },
-  rowSub: { ...type.secondary, color: ui.sub },
-  weekDot: { width: 8, height: 8, borderRadius: 4 },
-  emptyText: {
-    padding: 18,
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 13,
-    color: ui.subtle,
+  iconChip: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  rowTitle: { ...type.rowTitle, fontSize: 15, color: ui.ink },
+  rowSub: { ...type.secondary, color: ui.sub },
+  relDay: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: ui.sub },
+  dueTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: ui.warnTint,
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingLeft: 8,
+    paddingRight: 10,
+  },
+  dueTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11.5, color: ui.warnText },
+  weekEmpty: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 18 },
+  emptyText: {
+    flex: 1,
+    fontFamily: 'PlusJakartaSans_400Regular',
+    fontSize: 13.5,
+    color: ui.sub,
+  },
+  empty: { paddingHorizontal: 24, paddingTop: 8 },
+  benefit: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
+  benefitText: { ...type.rowTitle, fontSize: 15, color: ui.ink, flex: 1 },
   teaser: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginHorizontal: 24,
-    paddingVertical: 15,
-    paddingHorizontal: 18,
+    marginHorizontal: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   teaserText: {
     flex: 1,

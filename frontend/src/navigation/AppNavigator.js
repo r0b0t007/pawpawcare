@@ -119,20 +119,22 @@ function MainTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 80 : 66,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-          paddingTop: 10,
-          backgroundColor: '#fffdfa',
+          height: Platform.OS === 'ios' ? 84 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 22 : 10,
+          paddingTop: 6,
+          backgroundColor: ui.surface,
           borderTopWidth: 1,
-          borderTopColor: '#f0e6d7',
+          borderTopColor: ui.border,
           elevation: 0,
           shadowOpacity: 0,
         },
         tabBarActiveTintColor: ui.accent,
-        tabBarInactiveTintColor: '#a08d72',
+        // ui.sub, not a lighter beige: inactive labels must still pass AA.
+        tabBarInactiveTintColor: ui.sub,
         tabBarLabelStyle: {
-          fontFamily: 'PlusJakartaSans_600SemiBold',
-          fontSize: 10,
+          fontFamily: 'PlusJakartaSans_700Bold',
+          fontSize: 11,
+          lineHeight: 14,
           marginTop: 2,
         },
         tabBarIcon: ({ focused, color }) => {

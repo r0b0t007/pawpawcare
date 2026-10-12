@@ -1,7 +1,8 @@
-// Design tokens — Direction 1g "Warm & Focused" (see PawPawCare Handoff Spec).
-// One accent color, status encoded exactly once, 1px borders instead of
-// shadows. The legacy Material-You palette was removed once every screen
-// migrated to these tokens.
+// Design tokens — "Lively & Light" (docs/redesign-prompt.md), built on
+// Direction 1g "Warm & Focused". Still one accent for actions and status
+// encoded exactly once (icon + word); what changed: pet identity color pairs
+// tint pet surfaces, real photography, and ONE soft shadow level (`elevation`)
+// for hero and photo cards only — every other surface keeps its 1px border.
 
 export const ui = {
   background: '#fffaf6',
@@ -33,6 +34,13 @@ export const ui = {
 // Type scale from the spec: screen title 26/800 · card title 17–19/700 ·
 // body 14/400 · row secondary 12/400 · section label 11/700 caps · button 14/700.
 export const type = {
+  // Pet names over photos (profile hero) and onboarding headlines.
+  display: {
+    fontFamily: 'PlusJakartaSans_800ExtraBold',
+    fontSize: 34,
+    lineHeight: 40,
+    letterSpacing: -0.8,
+  },
   screenTitle: {
     fontFamily: 'PlusJakartaSans_800ExtraBold',
     fontSize: 26,
@@ -102,7 +110,8 @@ export const radii = {
   sheet: 28,
 };
 
-// Avatar identity colors — never for UI chrome. fg is the paired initial color.
+// Pet identity colors — tint that pet's cards, avatar ring and header, never
+// UI chrome or actions. fg is the paired text/icon color (AA on bg).
 export const PET_COLOR_PAIRS = [
   { bg: '#ffddb8', fg: '#8a5300' },
   { bg: '#c5e7ff', fg: '#004c6a' },
@@ -110,6 +119,27 @@ export const PET_COLOR_PAIRS = [
   { bg: '#ffd6e7', fg: '#96375c' },
   { bg: '#e9e2f4', fg: '#5c4a82' },
 ];
+
+// The pair for a pet's stored color (falls back to peach for legacy colors).
+export const petPair = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg) ?? PET_COLOR_PAIRS[0];
+
+// One soft, warm shadow level — hero cards and photo cards only.
+export const elevation = {
+  card: '0 6px 18px rgba(90, 58, 16, 0.09)',
+  cta: '0 4px 12px rgba(138, 83, 0, 0.22)',
+};
+
+// Decorative stock photography (Unsplash, see assets/images/CREDITS.md).
+// Never presented as the user's own pet — a user's photo always wins.
+export const photos = {
+  welcomeHero: require('../../assets/images/welcome-hero.jpg'),
+  speciesDog: require('../../assets/images/species-dog.jpg'),
+  speciesCat: require('../../assets/images/species-cat.jpg'),
+  emptyKitten: require('../../assets/images/empty-kitten.jpg'),
+  emptyBlanket: require('../../assets/images/empty-blanket.jpg'),
+  successHug: require('../../assets/images/success-hug.jpg'),
+  communityPals: require('../../assets/images/community-pals.jpg'),
+};
 
 // Motion scale — animate-expo pass. Durations in ms.
 export const motion = {

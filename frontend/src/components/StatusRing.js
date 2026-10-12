@@ -5,19 +5,21 @@ import { motion } from '../theme';
 import { EASE_OUT_CSS } from './motion';
 import { PET_STATUS } from './petStatus';
 
-// Pet avatar (photo or initial on the pet's identity color) with a 3px status
-// ring separated by a 3px gap. This is the ONLY place pet health status is
-// rendered next to an avatar — no dots-plus-badges anywhere else.
+// Pet avatar (photo or initial on the pet's identity color) with a 3px ring
+// separated by a 3px gap. With `status` the ring is the pet's health status —
+// the ONLY place status is rendered next to an avatar. Without a status,
+// `ringColor` draws a quiet identity ring (the pet's own tint) instead.
 export default function StatusRing({
   size = 56,
   color = '#ffddb8',
   textColor = '#8a5300',
   initial,
   photo,
-  status, // 'overdue' | 'due' | 'ok' | undefined (no ring)
+  status, // 'overdue' | 'due' | 'ok' | undefined (no status ring)
+  ringColor, // identity ring when there is no status
   style,
 }) {
-  const ring = status ? PET_STATUS[status]?.ring : null;
+  const ring = status ? PET_STATUS[status]?.ring : ringColor || null;
 
   const avatar = (
     <View
