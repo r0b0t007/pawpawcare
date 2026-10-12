@@ -24,7 +24,7 @@ import { dayDiff, fmtShort, fmtTime, overdueLabel, parseDay, relativeDay } from 
 import { petById, petMeta, petPhoto } from '../../utils/pets';
 import { ui, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
-  Button, Card, CareStreakCard, EmptyState, PetCard, PetFace, RecapCard, StatusPill, StepProgress,
+  Button, Card, CareStreakCard, EmptyState, PetCard, PetFace, RecapCard, Skeleton, StatusPill, StepProgress,
   UpNextCard, petHealthStatus, showToast,
 } from '../../components';
 
@@ -399,7 +399,18 @@ export default function DashboardScreen({ navigation }) {
           </Pressable>
         </View>
 
-        {noPets ? (
+        {!dataLoaded ? (
+          // Placeholders until the first load lands — never "All caught up" or
+          // "Nothing scheduled" for data that simply hasn't arrived yet.
+          <View style={styles.loading} accessibilityLabel="Loading your pets">
+            <Skeleton width="100%" height={170} radius={20} />
+            <Skeleton width={110} height={11} style={{ marginTop: 28 }} />
+            <View style={styles.loadingRow}>
+              <Skeleton width={158} height={150} radius={22} />
+              <Skeleton width={158} height={150} radius={22} />
+            </View>
+          </View>
+        ) : noPets ? (
           <View style={styles.empty}>
             <EmptyState
               photo={photos.emptyKitten}
@@ -750,6 +761,8 @@ const styles = StyleSheet.create({
     color: ui.sub,
   },
   empty: { paddingHorizontal: 24, paddingTop: 8 },
+  loading: { paddingHorizontal: 16 },
+  loadingRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
   benefitText: { ...type.rowTitle, fontSize: 15, color: ui.ink, flex: 1 },
   teaser: {

@@ -4,7 +4,10 @@ import {
   ScrollView, KeyboardAvoidingView, Platform, Switch, Modal, Image, ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
@@ -13,7 +16,7 @@ import { track } from '../../services/analytics';
 import { useInFlight } from '../../hooks/useInFlight';
 import { fmtFull, parseDay } from '../../utils/dates';
 import { resolveAsset } from '../../config';
-import { ui, radii, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
+import { ui, radii, type, motion, petPair, photos, scrim, PET_COLOR_PAIRS } from '../../theme';
 import { Button, Card, Chip, StepProgress, showToast, speciesIcon } from '../../components';
 
 // Add pet = three small questions, one per screen (species → name + photo →
@@ -79,6 +82,10 @@ export default function AddPetScreen({ navigation }) {
   // Two taps in one frame ("Add" + "Skip for now", or a double tap) must never
   // create the pet twice.
   const { run, isBusy } = useInFlight();
+  // The success view sits on a full-bleed photo: light status-bar glyphs over
+  // a top scrim while it's focused (same treatment as Welcome).
+  const insets = useSafeAreaInsets();
+  const isFocused = useIsFocused();
   const saving = isBusy('create');
   const [showOther, setShowOther] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
@@ -504,6 +511,12 @@ export default function AddPetScreen({ navigation }) {
           accessibilityIgnoresInvertColors
           importantForAccessibility="no"
         />
+        <LinearGradient
+          colors={scrim.top}
+          pointerEvents="none"
+          style={[styles.successScrim, { height: insets.top + 60 }]}
+        />
+        {isFocused && <StatusBar style="light" />}
         <View style={styles.successSheet}>
           <View style={styles.successBadge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
             <MaterialCommunityIcons name="check" size={34} color={ui.onAccent} />
@@ -856,6 +869,7 @@ const styles = StyleSheet.create({
 
   // Success
   successPhoto: { width: '100%', height: '45%' },
+  successScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
   successSheet: {
     flex: 1,
     marginTop: -28,

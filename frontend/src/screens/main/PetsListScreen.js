@@ -33,7 +33,7 @@ export default function PetsListScreen({ navigation }) {
 
   const addPet = () => navigation.navigate('AddPet');
 
-  const renderPet = ({ item: { pet, health, spacer } }) => (spacer ? <View style={{ flex: 1 }} /> : (
+  const renderPet = ({ item: { pet, health, spacer } }) => (spacer ? <View style={styles.spacer} /> : (
     <PetCard
       name={pet.name}
       meta={petMeta(pet)}
@@ -150,7 +150,12 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
   errorText: { ...type.body, color: ui.sub },
   list: { paddingHorizontal: 16, paddingBottom: 28, gap: 12 },
-  row: { gap: 12 },
+  // flexDirection for the loading skeleton's rows (FlatList's column wrapper
+  // already lays the real rows out horizontally).
+  row: { flexDirection: 'row', gap: 12 },
+  // Same horizontal padding as PetCard: Yoga floors a flex: 1 item at its
+  // padding, so an unpadded spacer would let a lone last card grow 16px wider.
+  spacer: { flex: 1, paddingHorizontal: 8 },
   headerWrap: { paddingTop: 14, paddingBottom: 6, paddingHorizontal: 8 },
   pageSubtitle: { ...type.body, color: ui.sub, marginTop: 2 },
   skeletonCard: {

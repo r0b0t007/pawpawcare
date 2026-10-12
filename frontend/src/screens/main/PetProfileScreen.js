@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, ScrollView, Pressable, StyleSheet,
+  View, Text, Pressable, StyleSheet,
   TextInput, Platform, Share, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, {
+  Extrapolation, FadeIn, FadeOut, LinearTransition, interpolate,
+  useAnimatedScrollHandler, useAnimatedStyle, useSharedValue,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
@@ -140,6 +143,16 @@ export default function PetProfileScreen({ navigation, route }) {
   // the stack), and doses in flight (see handleLogDose) — both declared above
   // the early return.
   const today = useToday();
+  // Status-bar backdrop: once the photo hero scrolls away, content would slide
+  // under the clock and icons — fade in a cream strip behind the status bar
+  // (UI-thread scroll handler, no re-render per frame).
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+  const statusBackdropStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [HERO_HEIGHT - 60, HERO_HEIGHT - 20], [0, 1], Extrapolation.CLAMP),
+  }));
   const { run, isBusy } = useInFlight();
   const askConfirm = (cfg) => setConfirm(cfg);
 
@@ -849,7 +862,13 @@ export default function PetProfileScreen({ navigation, route }) {
 
   return (
     <View style={styles.safe}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Hero — the pet's photo, or its identity tint + species glyph. */}
         <View style={[styles.hero, { height: HERO_HEIGHT + insets.top, backgroundColor: pair.bg }]}>
           {photoUri ? (
@@ -931,7 +950,11 @@ export default function PetProfileScreen({ navigation, route }) {
             {segment === 'notes' && renderNotes()}
           </Animated.View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.statusBackdrop, { height: insets.top }, statusBackdropStyle]}
+      />
 
       {/* ••• menu — rarely-used and destructive actions, off the browse path. */}
       <Sheet visible={menuSheet} onClose={() => setMenuSheet(false)} title={pet.name}>
@@ -1651,6 +1674,7 @@ const styles = StyleSheet.create({
   // absoluteFill <Image> at its natural size instead of covering.
   heroImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   safe: { flex: 1, backgroundColor: ui.background },
+  statusBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: ui.background },
   scroll: { paddingBottom: 32 },
   hero: { overflow: 'hidden' },
   scrimTop: { position: 'absolute', top: 0, left: 0, right: 0 },
