@@ -26,11 +26,14 @@ updates:
         versions: [">=2"]
 
   # The app's runtimeVersion is a fingerprint of its native code, so bumping
-  # any package with native code (expo*, react-native*, Sentry, RevenueCat,
-  # Google sign-in, React Navigation's native-stack...) cuts every installed
-  # build off from OTA updates until a new EAS build ships. Those move only
-  # with an Expo SDK upgrade or a planned build round (`npx expo install
-  # --fix`). Dependabot gets the allowlist below: pure-JS packages only.
+  # any package with native code (expo*, react-native* incl. screens and
+  # safe-area-context, Sentry, RevenueCat, Google sign-in...) cuts every
+  # installed build off from OTA updates until a new EAS build ships. Those
+  # move only with an Expo SDK upgrade or a planned build round (`npx expo
+  # install --fix`). Dependabot gets the allowlist below: pure-JS packages
+  # only. @react-navigation/* is pure JS (fingerprint unchanged in #113) but
+  # stays off the list: upgrade the whole family together by hand, check
+  # `npx expo-updates fingerprint:generate`, and test on a device first.
   - package-ecosystem: npm
     directory: /frontend
     schedule:
