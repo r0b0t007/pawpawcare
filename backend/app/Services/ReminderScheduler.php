@@ -26,6 +26,7 @@ class ReminderScheduler
             if (! $reminder->fire_at || $reminder->last_fired_at) {
                 return null; // no target, or already fired once
             }
+
             // Notify `lead_time_days` before the event. A past result is fine —
             // the job will fire it immediately as a catch-up.
             return $reminder->fire_at->copy()->subDays($reminder->lead_time_days ?? 0);
@@ -104,12 +105,17 @@ class ReminderScheduler
         $reminder->save();
     }
 
-    /** Disable the reminder(s) tied to a vaccination (e.g. once administered/deleted). */
+    /**
+     * Remove the reminder(s) tied to a vaccination once it's administered or
+     * deleted, for every recipient. Removed rather than disabled: a disabled
+     * row would linger in Reminders with a switch that could revive a reminder
+     * for a dose already given (or a record that no longer exists).
+     */
     public static function cancelVaccinationReminder(Vaccination $vax): void
     {
         Reminder::where('related_type', 'vaccination')
             ->where('related_id', $vax->id)
-            ->update(['enabled' => false, 'next_fire_at' => null]);
+            ->delete();
     }
 
     /**

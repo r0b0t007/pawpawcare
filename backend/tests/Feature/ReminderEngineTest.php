@@ -6,6 +6,7 @@ use App\Models\Pet;
 use App\Models\Reminder;
 use App\Models\ReminderDelivery;
 use App\Models\User;
+use App\Models\Vaccination;
 use App\Services\JwtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -78,9 +79,26 @@ class ReminderEngineTest extends TestCase
             'name' => 'Rabies', 'due_date' => '2099-07-01',
         ])->json('id');
 
+        $this->assertSame(1, Reminder::where('related_id', $vaxId)->count());
+
         $this->withToken($token)->patchJson("/pets/{$pet->id}/vaccinations/{$vaxId}/complete", [])->assertOk();
 
-        $this->assertFalse((bool) Reminder::where('related_id', $vaxId)->first()->enabled);
+        // Gone, not just disabled: nothing left in /reminders to switch back on.
+        $this->assertSame(0, Reminder::where('related_id', $vaxId)->count());
+        $this->assertSame([], $this->withToken($token)->getJson('/reminders')->assertOk()->json());
+    }
+
+    public function test_deleting_vaccination_removes_its_reminder(): void
+    {
+        [$user, $token] = $this->actingUser();
+        $pet = Pet::create(['owner_id' => $user->id, 'name' => 'Rex']);
+        $vaxId = $this->withToken($token)->postJson("/pets/{$pet->id}/vaccinations", [
+            'name' => 'Rabies', 'due_date' => '2099-07-01',
+        ])->json('id');
+
+        $this->withToken($token)->deleteJson("/pets/{$pet->id}/vaccinations/{$vaxId}")->assertNoContent();
+
+        $this->assertSame(0, Reminder::where('related_id', $vaxId)->count());
     }
 
     public function test_reminder_crud_is_owner_scoped(): void
@@ -166,5 +184,31 @@ class ReminderEngineTest extends TestCase
         }
 
         $this->assertSame(429, $status);
+    }
+
+    public function test_cleanup_migration_removes_only_cancelled_vaccination_reminders(): void
+    {
+        [$user] = $this->actingUser();
+        $pet = Pet::create(['owner_id' => $user->id, 'name' => 'Rex']);
+        $done = Vaccination::create(['pet_id' => $pet->id, 'name' => 'Rabies', 'due_date' => '2099-07-01', 'status' => 'completed']);
+        $open = Vaccination::create(['pet_id' => $pet->id, 'name' => 'Lepto', 'due_date' => '2099-07-01']);
+        $reminder = fn (string $relatedId, bool $enabled) => Reminder::create([
+            'user_id' => $user->id, 'pet_id' => $pet->id, 'type' => 'vaccination',
+            'related_type' => 'vaccination', 'related_id' => $relatedId, 'title' => 'Vaccination due',
+            'schedule_type' => 'one_time', 'fire_at' => '2099-07-01 09:00:00', 'enabled' => $enabled,
+        ])->id;
+
+        $cancelledDone = $reminder($done->id, false);
+        $cancelledGone = $reminder('00000000-0000-0000-0000-000000000000', false);
+        $nextDue = $reminder($done->id, true);   // document intake: completed record, next dose
+        $switchedOff = $reminder($open->id, false); // the user turned off an open one
+
+        (require database_path('migrations/2026_10_13_000001_remove_cancelled_vaccination_reminders.php'))->up();
+
+        $left = Reminder::pluck('id')->all();
+        $this->assertNotContains($cancelledDone, $left);
+        $this->assertNotContains($cancelledGone, $left);
+        $this->assertContains($nextDue, $left);
+        $this->assertContains($switchedOff, $left);
     }
 }

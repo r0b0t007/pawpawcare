@@ -661,6 +661,10 @@ export function DataProvider({ children }) {
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, vaccinations: mutate(pet.vaccinations || []) } });
     }
     queryClient.invalidateQueries({ queryKey: petsKeys.all });
+    // The server creates/removes the vaccination's due-date reminder: refetch
+    // so Health and Reminders match and this device's local notifications are
+    // rescheduled (a dose marked given must not still notify).
+    refreshReminders();
   };
 
   const addVaccination = async (petId, vaccination) => {

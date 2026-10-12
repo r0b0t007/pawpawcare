@@ -148,7 +148,9 @@ export default function HealthHubScreen({ navigation }) {
         }),
       ...(filter === 'all'
         ? reminders
-            .filter((r) => r.next_fire_at || r.fire_at)
+            // Switched-off reminders never show: a disabled one-off keeps its
+            // fire_at, which would otherwise surface it as still scheduled.
+            .filter((r) => r.enabled && (r.next_fire_at || r.fire_at))
             .map((r) => {
               const pet = petById(pets, r.pet_id) || null;
               const kind =
