@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Dimensions, Keyboard, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -23,6 +23,10 @@ import AnimatedModal from './AnimatedModal';
 // derives from the sheet position so they can never desync.
 const SPRING_IN = { duration: motion.duration.sheet, dampingRatio: 0.8 };
 const SCREEN_H = Dimensions.get('window').height;
+// iOS announces the keyboard before it moves; Android only once it's up.
+const KEYBOARD_SHOW = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+const KEYBOARD_HIDE = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+const KEYBOARD_MAX_MS = 250;
 
 export default function Sheet({ visible, onClose, title, children, style }) {
   const insets = useSafeAreaInsets();
@@ -70,6 +74,29 @@ export default function Sheet({ visible, onClose, title, children, style }) {
       }
     }
   }, [visible, reduced, translateY, fade, height]);
+
+  // The Modal window doesn't resize for the keyboard (edge-to-edge), so a
+  // form sheet would sit under it. Lift the sheet by the keyboard's height
+  // while it's up, so the field being typed in and the save button stay in
+  // view. Plain Keyboard events: useAnimatedKeyboard is deprecated and takes
+  // over the window insets.
+  const keyboardLift = useSharedValue(0);
+  useEffect(() => {
+    if (!visible) return undefined;
+    const liftTo = (to, e) =>
+      keyboardLift.set(
+        reduced ? to : withTiming(to, { duration: Math.min(e?.duration || KEYBOARD_MAX_MS, KEYBOARD_MAX_MS) })
+      );
+    const subs = [
+      Keyboard.addListener(KEYBOARD_SHOW, (e) => liftTo(e?.endCoordinates?.height || 0, e)),
+      Keyboard.addListener(KEYBOARD_HIDE, (e) => liftTo(0, e)),
+    ];
+    return () => {
+      subs.forEach((s) => s.remove());
+      keyboardLift.set(0);
+    };
+  }, [visible, reduced, keyboardLift]);
+  const liftStyle = useAnimatedStyle(() => ({ paddingBottom: keyboardLift.get() }));
 
   const onSheetLayout = (e) => {
     const h = e.nativeEvent.layout.height;
@@ -147,7 +174,7 @@ export default function Sheet({ visible, onClose, title, children, style }) {
       onRequestClose={onClose}
       exitDuration={motion.duration.sheet + 50}
     >
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+      <Animated.View style={[{ flex: 1, justifyContent: 'flex-end' }, liftStyle]}>
         <Animated.View
           pointerEvents={visible ? 'auto' : 'none'}
           style={[
@@ -192,7 +219,7 @@ export default function Sheet({ visible, onClose, title, children, style }) {
           </GestureDetector>
           {children}
         </Animated.View>
-      </View>
+      </Animated.View>
     </AnimatedModal>
   );
 }
