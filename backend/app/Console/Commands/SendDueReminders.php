@@ -8,6 +8,7 @@ use App\Models\ReminderDelivery;
 use App\Services\ExpoPushService;
 use App\Services\ReminderScheduler;
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 
 class SendDueReminders extends Command
 {
@@ -35,56 +36,63 @@ class SendDueReminders extends Command
             ->groupBy('user_id');
 
         foreach ($due as $reminder) {
-            $occurrence = $reminder->next_fire_at->copy();
+            // One reminder can vanish mid-run (its vaccination was completed or its
+            // medication changed): report it and carry on, so a missing row never
+            // aborts the deliveries still due after it.
+            try {
+                $occurrence = $reminder->next_fire_at->copy();
 
-            // Idempotent: one delivery row per (reminder, occurrence).
-            $delivery = ReminderDelivery::firstOrCreate(
-                ['reminder_id' => $reminder->id, 'occurrence_at' => $occurrence],
-                ['channel' => 'push', 'status' => 'pending'],
-            );
+                // Idempotent: one delivery row per (reminder, occurrence).
+                $delivery = ReminderDelivery::firstOrCreate(
+                    ['reminder_id' => $reminder->id, 'occurrence_at' => $occurrence],
+                    ['channel' => 'push', 'status' => 'pending'],
+                );
 
-            if ($delivery->status !== 'sent') {
-                $devices = $devicesByUser->get($reminder->user_id, collect());
+                if ($delivery->status !== 'sent') {
+                    $devices = $devicesByUser->get($reminder->user_id, collect());
 
-                // Backstop dedup: push only when overdue past the grace window, or when the
-                // user has no device that handles its own local notifications.
-                $hasLocalDevice = $devices->where('prefers_local', true)->isNotEmpty();
-                $pastGrace = $occurrence->lt($now->copy()->subMinutes(self::GRACE_MINUTES));
+                    // Backstop dedup: push only when overdue past the grace window, or when the
+                    // user has no device that handles its own local notifications.
+                    $hasLocalDevice = $devices->where('prefers_local', true)->isNotEmpty();
+                    $pastGrace = $occurrence->lt($now->copy()->subMinutes(self::GRACE_MINUTES));
 
-                if ($pastGrace || ! $hasLocalDevice) {
-                    $tokens = $devices->pluck('token');
-                    $push->send($tokens->map(fn ($t) => [
-                        'to' => $t,
-                        'title' => $reminder->title,
-                        'body' => $reminder->body ?? '',
-                        'sound' => 'default',
-                        'channelId' => 'reminders',
-                        'data' => [
-                            'reminderId' => $reminder->id,
-                            'petId' => $reminder->pet_id,
-                            'screen' => 'Notifications',
-                        ],
-                    ])->all());
-                    $delivery->channel = 'push';
-                } else {
-                    $delivery->channel = 'local';
+                    if ($pastGrace || ! $hasLocalDevice) {
+                        $tokens = $devices->pluck('token');
+                        $push->send($tokens->map(fn ($t) => [
+                            'to' => $t,
+                            'title' => $reminder->title,
+                            'body' => $reminder->body ?? '',
+                            'sound' => 'default',
+                            'channelId' => 'reminders',
+                            'data' => [
+                                'reminderId' => $reminder->id,
+                                'petId' => $reminder->pet_id,
+                                'screen' => 'Notifications',
+                            ],
+                        ])->all());
+                        $delivery->channel = 'push';
+                    } else {
+                        $delivery->channel = 'local';
+                    }
+
+                    $delivery->status = 'sent';
+                    $delivery->sent_at = $now;
+                    $delivery->save();
+                    $delivered++;
                 }
 
-                $delivery->status = 'sent';
-                $delivery->sent_at = $now;
-                $delivery->save();
-                $delivered++;
+                // Roll the schedule forward.
+                $reminder->last_fired_at = $now;
+                if ($reminder->schedule_type === 'one_time') {
+                    $reminder->enabled = false;
+                    $reminder->next_fire_at = null;
+                } else {
+                    $reminder->next_fire_at = ReminderScheduler::computeNextFireAt($reminder);
+                }
+                $reminder->save();
+            } catch (QueryException $e) {
+                report($e);
             }
-
-            // Roll the schedule forward.
-            $reminder->last_fired_at = $now;
-            if ($reminder->schedule_type === 'one_time') {
-                $reminder->enabled = false;
-                $reminder->next_fire_at = null;
-            } else {
-                $reminder->next_fire_at = ReminderScheduler::computeNextFireAt($reminder);
-            }
-            $reminder->save();
         }
 
         $this->info("Processed {$due->count()} due reminder(s); delivered {$delivered}.");

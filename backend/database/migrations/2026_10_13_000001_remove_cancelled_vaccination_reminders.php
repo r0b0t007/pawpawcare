@@ -10,8 +10,15 @@ return new class extends Migration
         // Completing or deleting a vaccination used to only disable its
         // reminders; it now deletes them (ReminderScheduler::
         // cancelVaccinationReminder). Clear out the disabled rows left behind
-        // so they stop showing in Reminders. Live reminders stay, including a
-        // completed record's reminder for its next due date (document intake).
+        // so they stop showing in Reminders.
+        //
+        // "Disabled" alone isn't "cancelled": a one-off is also disabled once it
+        // fires, and a completed record from document intake can carry a live
+        // reminder for its next dose. So, among disabled rows:
+        //   - vaccination gone        → remove (nothing left to remind about);
+        //   - vaccination completed   → remove only if it never fired, keeping
+        //     fired ones and the inbox notices that cascade with them.
+        // Enabled reminders and those for open vaccinations are never touched.
         DB::table('reminders')
             ->where('related_type', 'vaccination')
             ->where('enabled', false)
@@ -20,11 +27,14 @@ return new class extends Migration
                     $v->select(DB::raw(1))
                         ->from('vaccinations')
                         ->whereColumn('vaccinations.id', 'reminders.related_id');
-                })->orWhereExists(function ($v) {
-                    $v->select(DB::raw(1))
-                        ->from('vaccinations')
-                        ->whereColumn('vaccinations.id', 'reminders.related_id')
-                        ->where('vaccinations.status', 'completed');
+                })->orWhere(function ($q) {
+                    $q->whereNull('reminders.last_fired_at')
+                        ->whereExists(function ($v) {
+                            $v->select(DB::raw(1))
+                                ->from('vaccinations')
+                                ->whereColumn('vaccinations.id', 'reminders.related_id')
+                                ->where('vaccinations.status', 'completed');
+                        });
                 });
             })
             ->delete();

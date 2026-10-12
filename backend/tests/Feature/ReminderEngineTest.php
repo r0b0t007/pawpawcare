@@ -202,6 +202,13 @@ class ReminderEngineTest extends TestCase
         $cancelledGone = $reminder('00000000-0000-0000-0000-000000000000', false);
         $nextDue = $reminder($done->id, true);   // document intake: completed record, next dose
         $switchedOff = $reminder($open->id, false); // the user turned off an open one
+        // A next-due reminder that already fired (one-offs disable themselves),
+        // with the inbox notice that would cascade if it were deleted.
+        $firedNextDue = $reminder($done->id, false);
+        Reminder::whereKey($firedNextDue)->update(['last_fired_at' => now()]);
+        ReminderDelivery::create([
+            'reminder_id' => $firedNextDue, 'occurrence_at' => now(), 'channel' => 'push', 'status' => 'sent',
+        ]);
 
         (require database_path('migrations/2026_10_13_000001_remove_cancelled_vaccination_reminders.php'))->up();
 
@@ -210,5 +217,30 @@ class ReminderEngineTest extends TestCase
         $this->assertNotContains($cancelledGone, $left);
         $this->assertContains($nextDue, $left);
         $this->assertContains($switchedOff, $left);
+        $this->assertContains($firedNextDue, $left);
+        $this->assertSame(1, ReminderDelivery::where('reminder_id', $firedNextDue)->count());
+    }
+
+    public function test_a_reminder_deleted_mid_run_does_not_stop_the_others(): void
+    {
+        [$user] = $this->actingUser();
+        $make = fn (string $title) => Reminder::create([
+            'user_id' => $user->id, 'title' => $title, 'schedule_type' => 'one_time',
+            'fire_at' => now()->subMinute(), 'next_fire_at' => now()->subMinute(), 'enabled' => true,
+        ]);
+        $gone = $make('Vaccination due: Rabies');
+        $kept = $make('Walk');
+
+        // Simulate completeVaccination deleting a reminder after the job loaded it.
+        $this->app['events']->listen('eloquent.retrieved: '.Reminder::class, function (Reminder $r) use ($gone) {
+            if ($r->id === $gone->id) {
+                Reminder::whereKey($gone->id)->delete();
+            }
+        });
+
+        $this->artisan('reminders:send')->assertSuccessful();
+
+        $this->assertSame(1, ReminderDelivery::where('reminder_id', $kept->id)->count());
+        $this->assertSame(0, ReminderDelivery::where('reminder_id', $gone->id)->count());
     }
 }
