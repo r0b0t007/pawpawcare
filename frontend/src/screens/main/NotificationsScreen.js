@@ -50,17 +50,20 @@ export default function NotificationsScreen({ navigation }) {
     setRefreshing(false);
   }, [refreshNotifications]);
 
-  // Today / Upcoming / Earlier by calendar day, keeping the server's order
-  // inside each group. An undated item counts as earlier.
+  // Today / Upcoming / Earlier by calendar day. The server sends newest
+  // first, which suits Today and Earlier; Upcoming reads soonest first.
+  // An undated item counts as earlier.
   const sections = useMemo(() => {
+    const at = (n) => new Date(n.occurrence_at || n.created_at);
     const when = (n) => {
-      const at = new Date(n.occurrence_at || n.created_at);
-      if (Number.isNaN(at.getTime())) return -1;
-      return Math.sign(dayDiff(at, today));
+      const d = at(n);
+      if (Number.isNaN(d.getTime())) return -1;
+      return Math.sign(dayDiff(d, today));
     };
+    const upcoming = notifications.filter((n) => when(n) > 0).sort((a, b) => at(a) - at(b));
     return [
       { label: 'Today', items: notifications.filter((n) => when(n) === 0) },
-      { label: 'Upcoming', items: notifications.filter((n) => when(n) > 0) },
+      { label: 'Upcoming', items: upcoming },
       { label: 'Earlier', items: notifications.filter((n) => when(n) < 0) },
     ].filter((s) => s.items.length > 0);
   }, [notifications, today]);

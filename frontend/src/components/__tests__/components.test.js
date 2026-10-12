@@ -29,6 +29,7 @@ describe('component kit', () => {
     'ScreenHeader',
     'PetFaceStack',
     'DeleteButton',
+    'Toggle',
     'PhotoBand',
     'FormError',
     'ToastHost',

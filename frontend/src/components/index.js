@@ -20,6 +20,7 @@ export { default as StepProgress } from './StepProgress';
 export { default as TextField } from './TextField';
 export { default as ScreenHeader } from './ScreenHeader';
 export { default as DeleteButton } from './DeleteButton';
+export { default as Toggle } from './Toggle';
 export { default as PhotoBand } from './PhotoBand';
 export { default as FormError } from './FormError';
 export { REMINDER_ICON, reminderIcon } from './reminderTypes';

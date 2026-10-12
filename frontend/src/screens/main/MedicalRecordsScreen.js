@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, Pressable, StyleSheet, TextInput,
   RefreshControl, ActivityIndicator, Linking,
@@ -11,9 +11,9 @@ import { pickRecordImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
 import { buildExtractionPayload, extractionCount } from '../../utils/extraction';
 import { fmtClock, fmtDay, fmtFull, relativeDay } from '../../utils/dates';
-import { petById } from '../../utils/pets';
+import { petById, emptyPhotoFor } from '../../utils/pets';
 import { useInFlight } from '../../hooks/useInFlight';
-import { ui, type, radii, motion, photos, PET_COLOR_PAIRS } from '../../theme';
+import { ui, type, radii, motion, photos, vaultColors } from '../../theme';
 import {
   Card, Chip, Button, Sheet, ConfirmDialog, DeleteButton, EmptyState, PetFace, Skeleton, showToast, ScreenHeader,
 } from '../../components';
@@ -25,7 +25,7 @@ import {
 // first few rows with the rest one tap away (progressive disclosure). Deletes
 // stay behind ConfirmDialog and only confirm what the server actually removed.
 
-const VAULT = PET_COLOR_PAIRS[1]; // sky identity pair, as on the Health hub's vault card
+const VAULT = vaultColors; // shared with the Health hub's vault card
 const PREVIEW_ROWS = 3;
 
 const DOC_CATEGORIES = [
@@ -94,15 +94,26 @@ export default function MedicalRecordsScreen({ navigation, route }) {
     const data = await getPetRecords(petId);
     if (data) setRecords(data);
     setLoadFailed(!data);
+    return !!data;
   }, [getPetRecords, petId]);
 
   useEffect(() => { load(); }, [load]);
 
+  // One refresh at a time (pull or "Try again"). A retry from the failure
+  // view drops back to the loading placeholders so the tap visibly does
+  // something; a failed refresh over records already shown keeps them and
+  // says so instead of failing silently.
+  const refreshBusy = useRef(false);
   const onRefresh = useCallback(async () => {
+    if (refreshBusy.current) return;
+    refreshBusy.current = true;
     setRefreshing(true);
-    await load();
+    setLoadFailed(false);
+    const ok = await load();
+    if (!ok && records) showToast("Couldn't refresh the vault. Showing what was already here.");
+    refreshBusy.current = false;
     setRefreshing(false);
-  }, [load]);
+  }, [load, records]);
 
   const clinics = records?.clinics || [];
   const appointments = records?.appointments || [];
@@ -131,8 +142,9 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   };
 
   // Deletes resolve true/false (DataContext contract): only a removal the
-  // server confirmed says so; a failure keeps the row and offers a retry.
-  const confirmDelete = (label, remove) =>
+  // server confirmed says so, and only that row leaves the list (no refetch
+  // of the whole vault); a failure keeps the row and offers a retry.
+  const confirmDelete = (label, remove, key, id) =>
     setConfirm({
       title: `Delete ${label}?`,
       message: `Remove this ${label} from ${name || 'this pet'}'s vault?`,
@@ -141,7 +153,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
       action: async () => {
         if (await remove()) {
           showToast(`${cap(label)} removed`);
-          load();
+          setRecords((r) => (r ? { ...r, [key]: (r[key] || []).filter((x) => x.id !== id) } : r));
         } else {
           showToast(`Couldn't remove the ${label}. Try again.`);
         }
@@ -204,7 +216,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         onAccessibilityAction={({ nativeEvent }) => {
           if (nativeEvent.actionName === 'activate') openDocument(d);
           else if (nativeEvent.actionName === 'read') startExtraction(d);
-          else if (nativeEvent.actionName === 'delete') confirmDelete('document', () => deleteDocument(petId, d.id));
+          else if (nativeEvent.actionName === 'delete') confirmDelete('document', () => deleteDocument(petId, d.id), 'documents', d.id);
         }}
       >
         <View style={styles.rowIcon}>
@@ -240,7 +252,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
             <Text style={styles.readPillText}>Read</Text>
           </Pressable>
         )}
-        <DeleteButton label={`Delete ${d.title}`} onPress={() => confirmDelete('document', () => deleteDocument(petId, d.id))} />
+        <DeleteButton label={`Delete ${d.title}`} onPress={() => confirmDelete('document', () => deleteDocument(petId, d.id), 'documents', d.id)} />
       </Pressable>
     );
   };
@@ -262,7 +274,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
           <MaterialCommunityIcons name={s.icon} size={12} color={s.fg} />
           <Text style={[styles.statusText, { color: s.fg }]}>{cap(a.status)}</Text>
         </View>
-        <DeleteButton label={`Delete ${a.title}`} onPress={() => confirmDelete('appointment', () => deleteAppointment(petId, a.id))} />
+        <DeleteButton label={`Delete ${a.title}`} onPress={() => confirmDelete('appointment', () => deleteAppointment(petId, a.id), 'appointments', a.id)} />
       </View>
     );
   };
@@ -289,7 +301,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
           <MaterialCommunityIcons name="phone" size={17} color={ui.accent} />
         </Pressable>
       )}
-      <DeleteButton label={`Delete ${c.name}`} onPress={() => confirmDelete('clinic', () => deleteClinic(petId, c.id))} />
+      <DeleteButton label={`Delete ${c.name}`} onPress={() => confirmDelete('clinic', () => deleteClinic(petId, c.id), 'clinics', c.id)} />
     </View>
   );
 
@@ -311,7 +323,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
         >
           <EmptyState
-            photo={photos.emptyBlanket}
+            photo={emptyPhotoFor(pet, photos.emptyBlanket)}
             title="We couldn't open the vault"
             body="Check your connection, then try again. Nothing in it has changed."
             actionLabel="Try again"
@@ -333,7 +345,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
         >
           <EmptyState
-            photo={photos.emptyBlanket}
+            photo={emptyPhotoFor(pet, photos.emptyBlanket)}
             title={`Start ${name ? `${name}'s` : 'the'} vault`}
             body="Snap a vaccine certificate, a lab result or an invoice. We can read it and add the records for you."
             actionLabel="Upload a record"
@@ -747,7 +759,7 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
         accessibilityRole="button"
         accessibilityLabel={file ? `Chosen file ${file.name}, tap to change` : 'Choose a photo of the record'}
       >
-        <MaterialCommunityIcons name={file ? 'check-circle' : 'image-plus'} size={22} color={file ? ui.success : VAULT.fg} />
+        <MaterialCommunityIcons name={file ? 'check-circle' : 'image-plus'} size={22} color={file ? ui.success : ui.accent} />
         <Text style={styles.fileBtnText} numberOfLines={1}>{file ? file.name : 'Choose a photo of the record'}</Text>
       </Pressable>
       <TextInput

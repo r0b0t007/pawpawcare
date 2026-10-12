@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, Pressable, StyleSheet, TextInput, Switch,
+  View, Text, ScrollView, Pressable, StyleSheet, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -8,7 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { ui, radii, type, motion, photos } from '../../theme';
-import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, reminderIcon } from '../../components';
+import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, reminderIcon, Toggle, DeleteButton } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
 import { petById } from '../../utils/pets';
 import { EASE_OUT_CSS } from '../../components/motion';
@@ -185,20 +185,12 @@ export default function RemindersScreen({ navigation }) {
                     {pet ? `${pet.name} · ` : ''}{scheduleSummary(r)}
                   </Text>
                 </View>
-                <Switch
+                <Toggle
                   value={!!r.enabled}
                   onValueChange={(v) => updateReminder(r.id, { enabled: v })}
-                  trackColor={{ true: ui.accentTint, false: ui.track }}
-                  thumbColor={r.enabled ? ui.accent : ui.faint}
-                  activeThumbColor={ui.accent}
+                  accessibilityLabel={`${r.title} reminder`}
                 />
-                <Pressable
-                  onPress={() => setPendingDelete(r)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={({ pressed }) => [styles.delBtn, pressed && { opacity: motion.pressOpacity }]}
-                >
-                  <MaterialCommunityIcons name="trash-can-outline" size={18} color={ui.danger} />
-                </Pressable>
+                <DeleteButton label={`Delete ${r.title}`} onPress={() => setPendingDelete(r)} style={styles.delBtn} />
               </Animated.View>
               );
             })}
@@ -271,5 +263,5 @@ const styles = StyleSheet.create({
     transitionTimingFunction: EASE_OUT_CSS,
   },
   rSummary: { ...type.secondary, color: ui.sub, marginTop: 1 },
-  delBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  delBtn: { marginLeft: 4 },
 });

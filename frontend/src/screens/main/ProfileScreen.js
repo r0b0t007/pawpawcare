@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -12,7 +12,7 @@ import { usePlan } from '../../hooks/useSubscription';
 import { useInFlight } from '../../hooks/useInFlight';
 import { planStatus, planTitle } from '../../utils/subscription';
 import { ui, type, motion } from '../../theme';
-import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, PetFaceStack, showToast } from '../../components';
+import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, PetFaceStack, Toggle, showToast } from '../../components';
 
 // The Profile tab ("Lively & Light"): a friendly account card that leads
 // with who you are and who you care for (pet faces — recognition, not
@@ -21,20 +21,6 @@ import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, PetFaceStack, showTo
 // behind a confirm. One accent, used only for actions and switches.
 
 const FACES = 4; // pet faces shown on the account card; the rest are "+N"
-
-// Same switch look everywhere on this screen.
-function Toggle(props) {
-  return (
-    <Switch
-      trackColor={{ false: ui.track, true: ui.accent }}
-      thumbColor={ui.onAccent}
-      // react-native-web ignores thumbColor and paints its own teal default.
-      activeThumbColor={ui.onAccent}
-      ios_backgroundColor={ui.track}
-      {...props}
-    />
-  );
-}
 
 function SectionLabel({ children }) {
   return <Text style={[type.sectionLabel, styles.sectionLabel]}>{children}</Text>;

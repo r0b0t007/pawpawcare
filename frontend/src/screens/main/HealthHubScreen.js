@@ -13,7 +13,7 @@ import { petById } from '../../utils/pets';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
 import { useTickAt } from '../../hooks/useTickAt';
-import { ui, type, radii, motion, elevation, photos, PET_COLOR_PAIRS } from '../../theme';
+import { ui, type, radii, motion, elevation, photos, vaultColors } from '../../theme';
 import {
   Card, Chip, Button, Sheet, PetFace, StatusPill, EmptyState, showToast,
 } from '../../components';
@@ -28,7 +28,7 @@ const ROW_OUT = FadeOut.duration(150);
 const ROW_LAYOUT = LinearTransition.duration(200);
 
 
-const VAULT = PET_COLOR_PAIRS[1]; // sky identity pair
+const VAULT = vaultColors;
 
 // "Synced just now" / "Synced 5m ago" / "Synced 2h ago" — quiet trust line.
 const syncedLabel = (ts) => {

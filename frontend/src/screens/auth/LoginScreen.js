@@ -38,8 +38,10 @@ export default function LoginScreen({ navigation }) {
     if (error) clearError();
   };
 
+  // The Return key bypasses the disabled button, so check here too: no
+  // email login while one (or a Google sign-in) is already running.
   const handleLogin = () =>
-    run('login', async () => {
+    !isLoading && run('login', async () => {
       if (!email.trim() || !password) {
         setLocalError('Add your email and password to log in.');
         return;

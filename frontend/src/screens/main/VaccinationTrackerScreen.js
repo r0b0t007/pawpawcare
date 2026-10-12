@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { ui, type, radii, petPair, photos } from '../../theme';
+import { emptyPhotoFor } from '../../utils/pets';
 import { Card, Button, Sheet, ConfirmDialog, EmptyState, PetFace, StatusPill, showToast, ScreenHeader, DeleteButton } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
 import { useToday } from '../../hooks/useToday';
@@ -148,7 +149,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
           {pill}
         </View>
         {!pill && <Text style={styles.rowWhen}>{relativeDay(date, today)}</Text>}
-        <Button small variant="soft" icon="check" label="Done" onPress={() => confirmComplete(vax)} />
+        <Button small variant="soft" icon="check" label="Done" accessibilityLabel={`Mark ${vax.name} done`} onPress={() => confirmComplete(vax)} />
         <DeleteButton label={`Delete ${vax.name}`} onPress={() => confirmDelete(vax)} size={18} />
       </View>
     );
@@ -202,7 +203,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
           </>
         ) : (
           <EmptyState
-            photo={photos.emptyKitten}
+            photo={emptyPhotoFor(pet, photos.emptyKitten)}
             title="No vaccines yet"
             body={`Add ${pet.name}'s vaccines and we'll remind you before each one is due.`}
             actionLabel="Add vaccine"

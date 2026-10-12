@@ -60,8 +60,10 @@ export default function SignupScreen({ navigation }) {
     if (error) clearError();
   };
 
+  // The Return key bypasses the disabled button, so check here too: no
+  // signup while one (or a Google sign-in) is already running.
   const handleSignup = () =>
-    run('signup', async () => {
+    !isLoading && run('signup', async () => {
       if (!name.trim() || !email.trim() || !password || !confirmPwd) {
         setLocalError('Fill in each field to create your account.');
         return;
