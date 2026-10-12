@@ -8,20 +8,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { ui, radii, type, motion, photos } from '../../theme';
-import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast } from '../../components';
+import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, reminderIcon } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
 import { petById } from '../../utils/pets';
 import { EASE_OUT_CSS } from '../../components/motion';
 
 const ROW_OUT = FadeOut.duration(150);
 const ROW_LAYOUT = LinearTransition.duration(200);
-
-const TYPE_ICON = {
-  vaccination: 'needle',
-  medication: 'pill',
-  activity: 'run',
-  custom: 'bell-ring-outline',
-};
 
 function defaultWhen() {
   const d = new Date();
@@ -91,16 +84,7 @@ export default function RemindersScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.topRow}>
-        <Pressable
-          style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: ui.background }]}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-        </Pressable>
-        <Text style={styles.title} numberOfLines={1}>Reminders</Text>
-      </View>
+      <ScreenHeader title="Reminders" onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Add custom reminder */}
@@ -187,7 +171,7 @@ export default function RemindersScreen({ navigation }) {
                   </Animated.View>
                 ) : (
                   <Animated.View style={[styles.rIcon, { opacity: r.enabled ? 1 : 0.4 }, styles.toggleFade]}>
-                    <MaterialCommunityIcons name={TYPE_ICON[r.type] || 'bell-outline'} size={18} color={ui.accent} />
+                    <MaterialCommunityIcons name={reminderIcon(r.type)} size={18} color={ui.accent} />
                   </Animated.View>
                 )}
                 <View style={{ flex: 1 }}>
@@ -206,6 +190,7 @@ export default function RemindersScreen({ navigation }) {
                   onValueChange={(v) => updateReminder(r.id, { enabled: v })}
                   trackColor={{ true: ui.accentTint, false: ui.track }}
                   thumbColor={r.enabled ? ui.accent : ui.faint}
+                  activeThumbColor={ui.accent}
                 />
                 <Pressable
                   onPress={() => setPendingDelete(r)}
@@ -236,25 +221,6 @@ export default function RemindersScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: { ...type.screenTitle, flex: 1, color: ui.ink },
   scroll: { paddingHorizontal: 24, paddingBottom: 32 },
   formCard: { gap: 12 },
   formLabel: { ...type.sectionLabel, color: ui.subtle },

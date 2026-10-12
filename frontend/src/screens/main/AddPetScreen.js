@@ -405,6 +405,7 @@ export default function AddPetScreen({ navigation }) {
           onValueChange={(v) => set('microchipped', v)}
           trackColor={{ false: ui.track, true: ui.accentTint }}
           thumbColor={form.microchipped ? ui.accent : ui.faint}
+          activeThumbColor={ui.accent}
           accessibilityLabel="Microchipped"
         />
       </View>

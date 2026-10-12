@@ -205,6 +205,7 @@ export default function HealthHubScreen({ navigation }) {
 
   // The vault opens one pet's records: the filtered pet, or the only pet.
   const vaultPet = filter !== 'all' ? shownPets[0] : pets.length === 1 ? pets[0] : null;
+  const VaultCard = vaultPet ? Pressable : View;
   const openVault = (pet) =>
     navigation.navigate('MedicalRecords', { petId: pet.id, petName: pet.name });
 
@@ -272,6 +273,7 @@ export default function HealthHubScreen({ navigation }) {
       <Animated.View key={item.key} exiting={ROW_OUT} layout={ROW_LAYOUT}>
         <Pressable
           onPress={item.onPress}
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.row,
             !last && styles.rowDivider,
@@ -405,11 +407,17 @@ export default function HealthHubScreen({ navigation }) {
         )}
 
         {pets.length > 0 && (
-          <Pressable
-            disabled={!vaultPet}
-            onPress={() => vaultPet && openVault(vaultPet)}
-            accessibilityRole={vaultPet ? 'button' : undefined}
-            style={({ pressed }) => [styles.vault, pressed && { opacity: motion.pressOpacitySoft }]}
+          // One pet in view: the whole card opens its vault. Several: a plain
+          // card whose pet faces are the buttons — never a disabled button
+          // wrapping live ones (screen readers would announce them disabled).
+          <VaultCard
+            {...(vaultPet
+              ? {
+                  onPress: () => openVault(vaultPet),
+                  accessibilityRole: 'button',
+                  style: ({ pressed }) => [styles.vault, pressed && { opacity: motion.pressOpacitySoft }],
+                }
+              : { style: styles.vault })}
           >
             <View style={styles.vaultIcon}>
               <MaterialCommunityIcons name="shield-check" size={22} color={VAULT.fg} />
@@ -439,7 +447,7 @@ export default function HealthHubScreen({ navigation }) {
               )}
             </View>
             {vaultPet && <MaterialCommunityIcons name="chevron-right" size={22} color={VAULT.fg} />}
-          </Pressable>
+          </VaultCard>
         )}
 
         {history.length > 0 && (

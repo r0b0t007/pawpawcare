@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   Pressable,
+  Image,
   StyleSheet,
   ScrollView,
   KeyboardAvoidingView,
@@ -12,17 +12,26 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { ui, type, radii, motion } from '../../theme';
-import { Button } from '../../components';
+import { useInFlight } from '../../hooks/useInFlight';
+import { ui, type, radii, motion, photos } from '../../theme';
+import { Button, TextField } from '../../components';
 import SocialAuthButtons from '../../components/SocialAuthButtons';
+
+// "Lively & Light" log in: a small photo band carries the warmth of Welcome
+// (decorative only), then two labelled fields and one filled button. Return
+// moves email → password → log in, so the keyboard never has to close; the
+// error is one calm line that says what to do, never whose fault it was.
+
+const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
 export default function LoginScreen({ navigation }) {
   const { login, error, isLoading, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPwd, setShowPwd] = useState(false);
-  const [focused, setFocused] = useState('');
   const [localError, setLocalError] = useState(null);
+  const passwordRef = useRef(null);
+  // One request per tap: a double tap (or Return + tap) never logs in twice.
+  const { run, isBusy } = useInFlight();
 
   // Editing any field clears both the local validation error and the auth error.
   const onChange = (setter) => (value) => {
@@ -31,17 +40,19 @@ export default function LoginScreen({ navigation }) {
     if (error) clearError();
   };
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password) {
-      setLocalError('Please enter your email and password.');
-      return;
-    }
-    setLocalError(null);
-    await login({ email: email.trim(), password });
-    // On failure useAuth().error is set and rendered inline below.
-  };
+  const handleLogin = () =>
+    run('login', async () => {
+      if (!email.trim() || !password) {
+        setLocalError('Add your email and password to log in.');
+        return;
+      }
+      setLocalError(null);
+      await login({ email: email.trim(), password });
+      // On failure useAuth().error is set and rendered inline below.
+    });
 
   const displayError = localError || error;
+  const busy = isLoading || isBusy('login');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -57,58 +68,54 @@ export default function LoginScreen({ navigation }) {
           <Pressable
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
             onPress={() => navigation.goBack()}
+            hitSlop={HIT}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
           >
             <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
           </Pressable>
 
-          <Text style={[type.screenTitle, styles.title]}>Welcome back</Text>
+          <View style={styles.photoBand}>
+            <Image
+              source={photos.welcomeHero}
+              style={styles.photo}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+              importantForAccessibility="no"
+            />
+          </View>
+
+          <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Welcome back</Text>
           <Text style={styles.subtitle}>The pack missed you.</Text>
 
           <View style={styles.form}>
-            <View>
-              <Text style={[type.sectionLabel, styles.fieldLabel]}>Email</Text>
-              <TextInput
-                style={[styles.input, focused === 'email' && styles.inputFocused]}
-                placeholder="you@example.com"
-                placeholderTextColor={ui.faint}
-                value={email}
-                onChangeText={onChange(setEmail)}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                onFocus={() => setFocused('email')}
-                onBlur={() => setFocused('')}
-                textContentType="emailAddress"
-                autoComplete="email"
-              />
-            </View>
+            <TextField
+              label="Email"
+              placeholder="you@example.com"
+              value={email}
+              onChangeText={onChange(setEmail)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              textContentType="emailAddress"
+              autoComplete="email"
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              blurOnSubmit={false}
+            />
 
-            <View>
-              <Text style={[type.sectionLabel, styles.fieldLabel]}>Password</Text>
-              <View style={[styles.inputRow, focused === 'password' && styles.inputFocused]}>
-                <TextInput
-                  style={styles.inputInner}
-                  placeholder="Your password"
-                  placeholderTextColor={ui.faint}
-                  value={password}
-                  onChangeText={onChange(setPassword)}
-                  secureTextEntry={!showPwd}
-                  onFocus={() => setFocused('password')}
-                  onBlur={() => setFocused('')}
-                  textContentType="password"
-                  autoComplete="password"
-                />
-                <Pressable
-                  onPress={() => setShowPwd(!showPwd)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <MaterialCommunityIcons
-                    name={showPwd ? 'eye-off-outline' : 'eye-outline'}
-                    size={20}
-                    color={ui.faint}
-                  />
-                </Pressable>
-              </View>
+            <TextField
+              ref={passwordRef}
+              label="Password"
+              secure
+              placeholder="Your password"
+              value={password}
+              onChangeText={onChange(setPassword)}
+              textContentType="password"
+              autoComplete="password"
+              returnKeyType="go"
+              onSubmitEditing={handleLogin}
+            >
               <View style={styles.forgotRow}>
                 <Text style={styles.pasteHint}>
                   Paste from your password manager always works
@@ -118,20 +125,26 @@ export default function LoginScreen({ navigation }) {
                     if (error) clearError();
                     navigation.navigate('ForgotPassword');
                   }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  hitSlop={HIT}
+                  accessibilityRole="link"
                 >
                   <Text style={styles.forgotLink}>Forgot password?</Text>
                 </Pressable>
               </View>
-            </View>
+            </TextField>
           </View>
 
-          {displayError ? <Text style={styles.errorText}>{displayError}</Text> : null}
+          {displayError ? (
+            <View style={styles.errorBox} accessibilityLiveRegion="polite" accessibilityRole="alert">
+              <MaterialCommunityIcons name="information-outline" size={18} color={ui.dangerText} />
+              <Text style={styles.errorText} selectable>{displayError}</Text>
+            </View>
+          ) : null}
 
           <Button
-            label={isLoading ? 'Logging in…' : 'Log in'}
+            label={busy ? 'Logging in…' : 'Log in'}
             onPress={handleLogin}
-            disabled={isLoading}
+            disabled={busy}
             style={styles.submitBtn}
           />
 
@@ -144,6 +157,7 @@ export default function LoginScreen({ navigation }) {
               navigation.navigate('Signup');
             }}
             hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
+            accessibilityRole="link"
           >
             <Text style={styles.switchLinkText}>New here? Create an account</Text>
           </Pressable>
@@ -155,7 +169,7 @@ export default function LoginScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
-  scroll: { flexGrow: 1, paddingTop: 12, paddingHorizontal: 28, paddingBottom: 40 },
+  scroll: { flexGrow: 1, paddingTop: 12, paddingHorizontal: 24, paddingBottom: 40 },
   backBtn: {
     width: 42,
     height: 42,
@@ -166,47 +180,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { color: ui.ink, marginTop: 26, marginBottom: 6 },
-  subtitle: {
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 14,
-    color: ui.sub,
-    marginBottom: 28,
+  // Decorative, and short enough that the form stays above the keyboard.
+  photoBand: {
+    height: 120,
+    marginTop: 16,
+    borderRadius: radii.xl,
+    borderCurve: 'continuous',
+    overflow: 'hidden',
+    backgroundColor: ui.accentTint,
   },
+  // Explicit 100% box, not absoluteFill (react-native-web sizes an
+  // absoluteFill <Image> at its natural size).
+  photo: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  title: { color: ui.ink, marginTop: 22, marginBottom: 4 },
+  subtitle: { ...type.body, color: ui.sub, marginBottom: 24 },
   form: { gap: 16 },
-  fieldLabel: { color: ui.subtle, marginBottom: 8 },
-  input: {
-    borderWidth: 1.5,
-    borderColor: ui.controlBorder,
-    backgroundColor: ui.background,
-    borderRadius: radii.control,
-    borderCurve: 'continuous',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 14,
-    color: ui.ink,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: ui.controlBorder,
-    backgroundColor: ui.background,
-    borderRadius: radii.control,
-    borderCurve: 'continuous',
-    paddingRight: 14,
-  },
-  inputInner: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 14,
-    color: ui.ink,
-  },
-  inputFocused: { borderColor: ui.accent },
   forgotRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -217,27 +205,39 @@ const styles = StyleSheet.create({
   pasteHint: {
     flex: 1,
     fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 11.5,
-    lineHeight: 15,
-    color: ui.subtle,
+    fontSize: 12,
+    lineHeight: 16,
+    color: ui.sub,
   },
   forgotLink: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 12.5,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
     color: ui.accent,
   },
-  errorText: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 13,
-    lineHeight: 18,
-    color: ui.danger,
-    marginTop: 14,
+  // Status shown once, as icon + words, on its tint — calm, not alarming.
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: radii.md,
+    borderCurve: 'continuous',
+    backgroundColor: ui.dangerTint,
   },
-  submitBtn: { marginTop: 28, paddingVertical: 16 },
-  switchLink: { alignItems: 'center', paddingVertical: 14 },
-  switchLinkText: {
+  errorText: {
+    flex: 1,
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 13.5,
+    lineHeight: 19,
+    color: ui.dangerText,
+  },
+  submitBtn: { marginTop: 24, paddingVertical: 16 },
+  switchLink: { alignItems: 'center', paddingVertical: 14 },
+  switchLinkText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 14,
     color: ui.accent,
   },
 });

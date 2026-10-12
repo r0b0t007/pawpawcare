@@ -9,7 +9,7 @@ import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { resolveAsset } from '../../config';
 import { ui, radii, type, PET_COLOR_PAIRS } from '../../theme';
-import { Button, ConfirmDialog, showToast } from '../../components';
+import { Button, ConfirmDialog, showToast, ScreenHeader } from '../../components';
 
 // Edit pet: name, type, breed, identity color and photo. Deleting the pet
 // lives here — behind a danger zone + ConfirmDialog — never on the browse path.
@@ -107,16 +107,7 @@ export default function EditPetScreen({ navigation, route }) {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Header */}
-          <View style={styles.topRow}>
-            <Pressable
-              style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: ui.background }]}
-              onPress={() => navigation.goBack()}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-            </Pressable>
-            <Text style={styles.title} numberOfLines={1}>Edit {pet.name}</Text>
-          </View>
+          <ScreenHeader title={`Edit ${pet.name}`} onBack={() => navigation.goBack()} style={styles.header} />
 
           {/* Photo */}
           <View style={styles.avatarArea}>
@@ -261,24 +252,8 @@ export default function EditPetScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 32 },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20 },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    flex: 1,
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 22,
-    letterSpacing: -0.3,
-    color: ui.ink,
-  },
+  // The scroll already pads the sides and top.
+  header: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, marginBottom: 20 },
   avatarArea: { alignItems: 'center', marginBottom: 20 },
   avatarTap: { position: 'relative' },
   avatar: {

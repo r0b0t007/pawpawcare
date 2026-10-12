@@ -3,11 +3,10 @@ import {
   View, Text, ScrollView, StyleSheet, RefreshControl, Linking, Pressable, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { ui, type, photos } from '../../theme';
-import { Button, ConfirmDialog, EmptyState, PetFace, showToast } from '../../components';
+import { Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader } from '../../components';
 import LostPetCard from './LostPetCard';
 import { useInFlight } from '../../hooks/useInFlight';
 
@@ -90,16 +89,7 @@ export default function LostPetsScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { borderColor: ui.faint }]}
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Report missing pet</Text>
-        </View>
+        <ScreenHeader title="Report missing pet" onBack={() => navigation.goBack()} style={styles.header} />
         <Text style={styles.intro}>
           Your report is shared with owners nearby. Most pets are reunited within 48 hours.
         </Text>
@@ -232,23 +222,8 @@ export default function LostPetsScreen({ navigation }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 32 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 8 },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 22,
-    letterSpacing: -0.3,
-    color: ui.ink,
-  },
+  // The scroll already pads the sides and top.
+  header: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, marginBottom: 8 },
   intro: {
     fontFamily: 'PlusJakartaSans_400Regular',
     fontSize: 13,
