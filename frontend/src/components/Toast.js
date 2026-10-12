@@ -10,6 +10,7 @@ import Animated, {
 import * as Haptics from 'expo-haptics';
 import { ui, motion } from '../theme';
 import { track } from '../services/analytics';
+import { noteToast } from '../services/uiActivity';
 import { EASE_OUT } from './motion';
 
 // Ink pill toast, bottom-center, auto-dismisses after 2.2s. Mount <ToastHost/>
@@ -22,11 +23,16 @@ import { EASE_OUT } from './motion';
 // no confetti, no emoji.
 let emit = null;
 
+// How long a toast stays up, and its exit animation.
+export const TOAST_MS = 2200;
+const TOAST_EXIT_MS = 200;
+
 const TOAST_ENTER = FadeInDown.duration(motion.duration.toast).easing(EASE_OUT);
-const TOAST_EXIT = FadeOutDown.duration(200).easing(EASE_OUT);
+const TOAST_EXIT = FadeOutDown.duration(TOAST_EXIT_MS).easing(EASE_OUT);
 
 export function showToast(message, { celebrate = false, actionType } = {}) {
   if (celebrate) track('celebration_shown', { action_type: actionType || 'unknown' });
+  noteToast(TOAST_MS + TOAST_EXIT_MS);
   if (emit) emit(message, celebrate);
 }
 
@@ -46,7 +52,7 @@ export function ToastHost() {
       } else {
         scale.set(1);
       }
-      timer = setTimeout(() => setToast(null), 2200);
+      timer = setTimeout(() => setToast(null), TOAST_MS);
     };
     return () => {
       emit = null;

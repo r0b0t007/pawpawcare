@@ -14,6 +14,7 @@ import { getPref, setPref } from '../../services/prefs';
 
 const CARD_OUT = FadeOut.duration(150);
 import { track } from '../../services/analytics';
+import { noteGoodMoment } from '../../services/storeReview';
 import { resolveAsset } from '../../config';
 import { ui, type, motion } from '../../theme';
 import { Card, CareStreakCard, RecapCard, StatusRing, UpNextCard, showToast } from '../../components';
@@ -108,6 +109,7 @@ export default function DashboardScreen({ navigation }) {
           const label = milestoneLabel(fresh.key);
           showToast(pet ? `${pet.name}: ${label}` : label, { celebrate: true, actionType: 'milestone_earned' });
           track('milestone_earned', { key: fresh.key });
+          noteGoodMoment('milestone');
         }
       }
       setPref('seenMilestones', ids);

@@ -9,6 +9,7 @@ import {
 } from '../services/notifications';
 import { track } from '../services/analytics';
 import { identify, resetIdentity } from '../services/identity';
+import { cancelPendingReview } from '../services/storeReview';
 import { showToast } from '../components/Toast';
 
 const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
@@ -54,6 +55,7 @@ export function AuthProvider({ children }) {
   const endSession = () => {
     sessionRef.current += 1;
     userRef.current = null;
+    cancelPendingReview(); // no rating sheet over the landing screen
   };
 
   // Re-read the account (plan + feature switches). Resolves the fresh user,
