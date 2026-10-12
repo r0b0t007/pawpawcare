@@ -217,9 +217,10 @@ export default function HealthHubScreen({ navigation }) {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filters}
           >
-            <Chip label="All" active={filter === 'all'} onPress={() => setFilter('all')} />
+            <Chip accessibilityRole="radio" label="All" active={filter === 'all'} onPress={() => setFilter('all')} />
             {pets.map((p) => (
               <Chip
+                accessibilityRole="radio"
                 key={p.id}
                 label={p.name}
                 active={filter === p.id}
@@ -374,7 +375,7 @@ export default function HealthHubScreen({ navigation }) {
           <Text style={[type.sectionLabel, styles.fieldLabel, { color: ui.subtle }]}>Type</Text>
           <View style={styles.chipWrap}>
             {RECORD_TYPES.map((t) => (
-              <Chip key={t} label={t} active={recType === t} onPress={() => setRecType(t)} />
+              <Chip accessibilityRole="radio" key={t} label={t} active={recType === t} onPress={() => setRecType(t)} />
             ))}
           </View>
         </View>

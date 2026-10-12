@@ -720,6 +720,7 @@ export default function PetProfileScreen({ navigation, route }) {
         <View style={styles.chipWrap}>
           {['morning', 'afternoon', 'evening'].map((t) => (
             <Chip
+              accessibilityRole="radio"
               key={t}
               label={cap(t)}
               active={newActivity.timeOfDay === t}
@@ -751,6 +752,7 @@ export default function PetProfileScreen({ navigation, route }) {
           <View style={styles.chipWrap}>
             {['daily', 'weekly', 'monthly', 'as_needed'].map((f) => (
               <Chip
+                accessibilityRole="radio"
                 key={f}
                 label={f === 'as_needed' ? 'As needed' : cap(f)}
                 active={newMed.frequency === f}
@@ -827,6 +829,7 @@ export default function PetProfileScreen({ navigation, route }) {
           <View style={styles.chipWrap}>
             {EXPENSE_CATEGORIES.map((c) => (
               <Chip
+                accessibilityRole="radio"
                 key={c.id}
                 label={c.label}
                 active={newExpense.category === c.id}
@@ -1129,7 +1132,7 @@ function VetShareSheet({ visible, petName, onClose, onCreate, onRevoke }) {
             <Text style={styles.fieldLabel}>Link expires after</Text>
             <View style={styles.chipWrap}>
               {VET_EXPIRIES.map((e) => (
-                <Chip key={e.id} label={e.label} active={expiresIn === e.id} onPress={() => setExpiresIn(e.id)} />
+                <Chip accessibilityRole="radio" key={e.id} label={e.label} active={expiresIn === e.id} onPress={() => setExpiresIn(e.id)} />
               ))}
             </View>
           </View>
@@ -1307,7 +1310,7 @@ function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
               <Text style={styles.fieldLabel}>Link expires after</Text>
               <View style={styles.chipWrap}>
                 {CARE_EXPIRIES.map((e) => (
-                  <Chip key={e.id} label={e.label} active={expiresIn === e.id} onPress={() => setExpiresIn(e.id)} />
+                  <Chip accessibilityRole="radio" key={e.id} label={e.label} active={expiresIn === e.id} onPress={() => setExpiresIn(e.id)} />
                 ))}
               </View>
             </View>

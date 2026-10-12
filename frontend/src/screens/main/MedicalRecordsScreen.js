@@ -456,7 +456,7 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
           <Text style={[type.sectionLabel, styles.fieldLabel]}>Clinic (optional)</Text>
           <View style={styles.chipWrap}>
             {clinics.map((c) => (
-              <Chip key={c.id} label={c.name} active={clinicId === c.id} onPress={() => setClinicId(clinicId === c.id ? null : c.id)} />
+              <Chip accessibilityRole="radio" key={c.id} label={c.name} active={clinicId === c.id} onPress={() => setClinicId(clinicId === c.id ? null : c.id)} />
             ))}
           </View>
         </>
@@ -465,7 +465,7 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
       <Text style={[type.sectionLabel, styles.fieldLabel]}>Status</Text>
       <View style={styles.chipWrap}>
         {APPT_STATUS.map((s) => (
-          <Chip key={s} label={cap(s)} active={status === s} onPress={() => setStatus(s)} />
+          <Chip accessibilityRole="radio" key={s} label={cap(s)} active={status === s} onPress={() => setStatus(s)} />
         ))}
       </View>
 
@@ -574,7 +574,7 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
       <Text style={[type.sectionLabel, styles.fieldLabel]}>Category</Text>
       <View style={styles.chipWrap}>
         {DOC_CATEGORIES.map((c) => (
-          <Chip key={c.id} label={c.label} active={category === c.id} onPress={() => setCategory(c.id)} />
+          <Chip accessibilityRole="radio" key={c.id} label={c.label} active={category === c.id} onPress={() => setCategory(c.id)} />
         ))}
       </View>
     </FormSheet>
