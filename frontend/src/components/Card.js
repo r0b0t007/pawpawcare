@@ -1,55 +1,30 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View } from 'react-native';
 import { ui, radii, elevation } from '../theme';
-
-// Outer-box props go on the shadow wrapper of an elevated card; everything
-// else (padding, layout, colors) stays on the clipped surface.
-const OUTER = /^(margin|position|top|bottom|left|right|zIndex|alignSelf|flex$|flexGrow|flexShrink|flexBasis|width|maxWidth|minWidth)/;
 
 // Surface + radius 20 + 1px border — the border is the elevation. `elevated`
 // cards (the one hero card on a screen, photo cards) add the single soft
-// shadow level. The shadow sits on an outer view because overflow: 'hidden'
-// (needed to clip photos to the radius) would clip it.
+// shadow level instead of clipping: overflow: 'hidden' would cut the shadow,
+// so media inside an elevated card clips itself (see LostPetCard's photo).
+// One view either way, so opacity/transform/layout styles move the shadow too.
 export default function Card({ padded, elevated, style, children, ...rest }) {
-  const surface = [
-    {
-      backgroundColor: ui.surface,
-      borderRadius: radii.card,
-      borderWidth: 1,
-      borderColor: ui.border,
-      borderCurve: 'continuous',
-      overflow: 'hidden',
-    },
-    padded && { padding: 22 },
-  ];
-
-  if (!elevated) {
-    return (
-      <View style={[...surface, style]} {...rest}>
-        {children}
-      </View>
-    );
-  }
-
-  const outer = {};
-  const inner = {};
-  for (const [k, v] of Object.entries(StyleSheet.flatten(style) || {})) {
-    (OUTER.test(k) ? outer : inner)[k] = v;
-  }
   return (
     <View
       style={[
         {
-          borderRadius: inner.borderRadius ?? radii.card,
+          backgroundColor: ui.surface,
+          borderRadius: radii.card,
+          borderWidth: 1,
+          borderColor: ui.border,
           borderCurve: 'continuous',
-          boxShadow: elevation.card,
         },
-        outer,
+        elevated ? { boxShadow: elevation.card } : { overflow: 'hidden' },
+        padded && { padding: 22 },
+        style,
       ]}
+      {...rest}
     >
-      <View style={[...surface, inner, (outer.flex || outer.flexGrow) && { flex: 1 }]} {...rest}>
-        {children}
-      </View>
+      {children}
     </View>
   );
 }

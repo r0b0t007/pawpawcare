@@ -6,7 +6,7 @@ import { setStatusBarStyle } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
-import { ui, type, motion, photos } from '../../theme';
+import { ui, type, motion, photos, scrim } from '../../theme';
 
 // Logged-out landing screen ("Lively & Light"): a real cat and dog sharing a
 // moment carries the first second (aesthetic-usability), then one message and
@@ -42,7 +42,7 @@ export default function WelcomeScreen({ navigation }) {
             accessibilityLabel="A kitten and a puppy looking at each other"
           />
           <LinearGradient
-            colors={['rgba(36, 26, 14, 0.35)', 'rgba(36, 26, 14, 0)']}
+            colors={scrim.top}
             style={[styles.topScrim, { height: insets.top + 60 }]}
           />
         </View>
@@ -71,7 +71,7 @@ export default function WelcomeScreen({ navigation }) {
             accessibilityRole="button"
           >
             <Text style={styles.primaryBtnText}>Get started</Text>
-            <MaterialCommunityIcons name="arrow-right" size={18} color="#ffffff" />
+            <MaterialCommunityIcons name="arrow-right" size={18} color={ui.onAccent} />
           </Pressable>
 
           <Pressable
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: '#ffffff' },
+  primaryBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: ui.onAccent },
   loginLink: { alignItems: 'center', paddingVertical: 8 },
   loginLinkText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: ui.accent },
 });

@@ -62,7 +62,7 @@ export default function PetCard({
           borderRadius: 16,
           borderCurve: 'continuous',
           overflow: 'hidden',
-          backgroundColor: 'rgba(255, 255, 255, 0.45)',
+          backgroundColor: ui.glassSoft,
           alignItems: 'center',
           justifyContent: 'center',
         }}

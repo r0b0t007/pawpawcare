@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     paddingLeft: 9,
     paddingRight: 12,
     borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    backgroundColor: ui.glass,
   },
   pillText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: ui.ink },
   body: { paddingHorizontal: 10, paddingTop: 14, paddingBottom: 10, gap: 8 },

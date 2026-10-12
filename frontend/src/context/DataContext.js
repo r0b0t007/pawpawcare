@@ -10,7 +10,7 @@ import { track } from '../services/analytics';
 import { getPref, setPref } from '../services/prefs';
 import { noteGoodMoment } from '../services/storeReview';
 import { addDoseDay } from '../utils/streaks';
-import { addDoseCount } from '../utils/doses';
+import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { petsKeys, gamificationKeys } from '../hooks/queryKeys';
 
 const DataContext = createContext(null);
@@ -258,6 +258,16 @@ function dataReducer(state, action) {
     // Device-local doses per medication per day ({ [medId]: { 'YYYY-MM-DD': n } })
     // — lets a twice-daily med read "1 of 2" instead of done after one dose.
     case 'SET_MED_DOSE_COUNTS': return { ...state, medDoseCounts: action.payload };
+    // Stored history merged into the CURRENT in-memory maps (never replacing
+    // them): a dose logged just before a refresh may not be persisted yet.
+    case 'HYDRATE_DOSES': {
+      const { doseDays, doseCounts } = mergeDoseHistory(
+        action.payload.stored,
+        { doseDays: state.medDoseDays, doseCounts: state.medDoseCounts },
+        action.payload.medIds,
+      );
+      return { ...state, medDoseDays: doseDays, medDoseCounts: doseCounts };
+    }
     // A saved dose, applied to the CURRENT state (not a snapshot captured
     // when the request started) so two doses logged at once both land.
     case 'DOSE_LOGGED': {
@@ -399,21 +409,23 @@ export function DataProvider({ children }) {
     try {
       const stored = await getPref('medDoseDays', {});
       const storedCounts = await getPref('medDoseCounts', {});
-      const map = {};
-      const counts = {};
+      const doseDays = {};
+      const medIds = [];
       for (const pet of pets) {
         for (const med of pet.medications || []) {
+          medIds.push(med.id);
           let days = stored[med.id] || [];
           if (med.lastAdministeredAt) days = addDoseDay(days, med.lastAdministeredAt);
-          if (days.length) map[med.id] = days;
-          if (storedCounts[med.id]) counts[med.id] = storedCounts[med.id];
+          if (days.length) doseDays[med.id] = days;
         }
       }
-      dispatch({ type: 'SET_MED_DOSE_DAYS', payload: map });
-      dispatch({ type: 'SET_MED_DOSE_COUNTS', payload: counts });
-      doseHistoryReady.current = true;
+      dispatch({ type: 'HYDRATE_DOSES', payload: { stored: { doseDays, doseCounts: storedCounts }, medIds } });
     } catch {
-      // keep whatever is in state
+      // Storage unreadable: keep whatever is in state.
+    } finally {
+      // Persist from here on either way — a failed read must not silently
+      // stop every later dose from being saved for the rest of the session.
+      doseHistoryReady.current = true;
     }
   };
 

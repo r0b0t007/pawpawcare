@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TextInput, Pressable, Platform, StyleSheet,
 } from 'react-native';
@@ -8,8 +8,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { getPref } from '../../services/prefs';
-import { fmtShort, fmtDay, dayDiff, relativeDay } from '../../utils/dates';
+import { fmtShort, fmtDay, dayDiff, overdueLabel, relativeDay } from '../../utils/dates';
 import { useToday } from '../../hooks/useToday';
+import { useInFlight } from '../../hooks/useInFlight';
 import { ui, type, radii, motion, elevation, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
   Card, Chip, Button, Sheet, PetFace, StatusPill, EmptyState, showToast,
@@ -24,7 +25,6 @@ import {
 const ROW_OUT = FadeOut.duration(150);
 const ROW_LAYOUT = LinearTransition.duration(200);
 
-const DAY_MS = 86400000;
 
 const VAULT = PET_COLOR_PAIRS[1]; // sky identity pair
 
@@ -97,6 +97,7 @@ export default function HealthHubScreen({ navigation }) {
   const recPet = pets.find((p) => p.id === recPetId) || pets[0];
 
   const { sections, history } = useMemo(() => {
+    const now = new Date();
     const vax = shownPets.flatMap((pet) =>
       (pet.vaccinations || []).map((v) => ({ ...v, pet }))
     );
@@ -157,8 +158,9 @@ export default function HealthHubScreen({ navigation }) {
         : []),
     ]
       .filter((item) => !Number.isNaN(item.date.getTime()))
-      // A one-off reminder that already fired is history, not "today".
-      .filter((item) => !item.isReminder || dayDiff(item.date, today) >= 0)
+      // A reminder is a moment, not a day: one that already fired (even
+      // earlier today) is history, not "today".
+      .filter((item) => !item.isReminder || item.date >= now)
       .sort((a, b) => a.date - b.date);
 
     const todayItems = [...overdueItems, ...upcoming.filter((i) => dayDiff(i.date, today) <= 0)];
@@ -212,12 +214,18 @@ export default function HealthHubScreen({ navigation }) {
     if (!recName.trim() || !recPet || saving) return;
     setSaving(true);
     try {
-      await addVaccination(recPet.id, {
+      const saved = await addVaccination(recPet.id, {
         name: recName.trim(),
         dueDate: recDate.toISOString().split('T')[0],
         status: 'upcoming',
         administeredDate: null,
       });
+      // addVaccination resolves undefined on failure — keep the sheet (and
+      // what was typed) open for a retry instead of claiming success.
+      if (!saved) {
+        showToast("Couldn't save the record. Try again.");
+        return;
+      }
       setSheetOpen(false);
       showToast('Record saved');
     } finally {
@@ -235,23 +243,17 @@ export default function HealthHubScreen({ navigation }) {
     }
   };
 
-  const marking = useRef(new Set());
-  const markDone = async (v) => {
-    if (marking.current.has(v.id)) return;
-    marking.current.add(v.id);
-    const saved = await markVaccinationComplete(v.pet.id, v.id);
-    marking.current.delete(v.id);
-    if (saved) showToast(`${v.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
-    else showToast(`Couldn't mark ${v.name} done. Try again.`);
-  };
-
-  const daysOverdue = (v) =>
-    Math.max(1, Math.floor((Date.now() - new Date(`${v.dueDate}T12:00:00`)) / DAY_MS));
+  const { run, isBusy } = useInFlight();
+  const markDone = (v) =>
+    run(v.id, async () => {
+      const saved = await markVaccinationComplete(v.pet.id, v.id);
+      if (saved) showToast(`${v.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+      else showToast(`Couldn't mark ${v.name} done. Try again.`);
+    });
 
   const renderRow = (item, i, items) => {
     const last = i === items.length - 1;
     const v = item.overdueVax;
-    const od = v ? daysOverdue(v) : 0;
     return (
       <Animated.View key={item.key} exiting={ROW_OUT} layout={ROW_LAYOUT}>
         <Pressable
@@ -275,7 +277,7 @@ export default function HealthHubScreen({ navigation }) {
             {v ? (
               <StatusPill
                 status="overdue"
-                label={`Overdue · ${od} day${od === 1 ? '' : 's'}`}
+                label={overdueLabel(v.dueDate)}
                 style={{ marginTop: 6 }}
               />
             ) : item.dueSoon ? (
@@ -302,7 +304,7 @@ export default function HealthHubScreen({ navigation }) {
             )}
           </View>
           {v ? (
-            <Button small variant="soft" icon="check" label="Done" onPress={() => markDone(v)} />
+            <Button small variant="soft" icon="check" label="Done" disabled={isBusy(v.id)} onPress={() => markDone(v)} />
           ) : item.dueSoon ? (
             <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} />
           ) : (
@@ -556,7 +558,7 @@ const styles = StyleSheet.create({
     borderColor: ui.controlBorder,
     backgroundColor: ui.surface,
   },
-  faceChipOn: { backgroundColor: '#faf1e2', borderColor: ui.accent },
+  faceChipOn: { backgroundColor: ui.selectedTint, borderColor: ui.accent },
   faceChipLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13.5, color: ui.ink },
   sectionLabel: { marginHorizontal: 24, marginBottom: 10, marginTop: 6 },
   sectionHeadRow: {
@@ -669,7 +671,7 @@ const styles = StyleSheet.create({
     borderColor: ui.controlBorder,
     backgroundColor: ui.surface,
   },
-  petChipOn: { backgroundColor: '#faf1e2', borderColor: ui.accent },
+  petChipOn: { backgroundColor: ui.selectedTint, borderColor: ui.accent },
   petChipLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.ink },
   input: {
     borderWidth: 1.5,

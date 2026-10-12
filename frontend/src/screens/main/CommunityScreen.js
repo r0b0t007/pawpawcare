@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TextInput, Alert, Image,
   ActivityIndicator, Linking, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
@@ -53,16 +54,22 @@ export default function CommunityScreen({ navigation }) {
   const [attachFailed, setAttachFailed] = useState(null);
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, destructive, action }
 
-  // The feed leads with a nearby lost pet, so it needs the board too.
-  // The feed leads with a nearby lost pet, so it needs the board once per
-  // visit; the Lost pets section refreshes it every time it's opened.
-  const boardLoaded = useRef(false);
-  useEffect(() => {
-    if (section === 'lost' || (section === 'feed' && !boardLoaded.current)) {
-      boardLoaded.current = true;
-      refreshLostPets();
-    }
-  }, [section]);
+  // The feed leads with a lost pet, so it needs a fresh board too. This tab
+  // stays mounted: refresh whenever Community is focused or the section
+  // changes — always for Lost pets, and for the feed unless the board was
+  // fetched in the last minute (no extra GET on every Feed tap).
+  const boardFetchedAt = useRef(0);
+  useFocusEffect(
+    useCallback(() => {
+      const stale = Date.now() - boardFetchedAt.current > 60000;
+      if (section === 'lost' || (section === 'feed' && stale)) {
+        boardFetchedAt.current = Date.now();
+        refreshLostPets();
+      }
+      // refreshLostPets is recreated each render; section is the trigger.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [section]),
+  );
 
   const attachImage = async () => {
     setAttaching(true);

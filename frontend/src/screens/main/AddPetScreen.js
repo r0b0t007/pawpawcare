@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, BackHandler,
   ScrollView, KeyboardAvoidingView, Platform, Switch, Modal, Image, ActivityIndicator,
@@ -10,6 +10,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
+import { useInFlight } from '../../hooks/useInFlight';
 import { resolveAsset } from '../../config';
 import { ui, radii, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
 import { Button, Card, Chip, StepProgress, showToast, speciesIcon } from '../../components';
@@ -75,9 +76,9 @@ export default function AddPetScreen({ navigation }) {
   const [step, setStep] = useState(1);
   const [created, setCreated] = useState(null); // the saved pet → success view
   const [saving, setSaving] = useState(false);
-  // Synchronous guard: two taps in one frame ("Add" + "Skip for now", or a
-  // double tap) must never create the pet twice.
-  const creating = useRef(false);
+  // Two taps in one frame ("Add" + "Skip for now", or a double tap) must never
+  // create the pet twice.
+  const { run } = useInFlight();
   const [showOther, setShowOther] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
 
@@ -157,17 +158,16 @@ export default function AddPetScreen({ navigation }) {
   const handleCreate = async (skipDetails) => {
     if (!requireName()) { setStep(2); return; }
     const data = buildData(skipDetails);
-    if (creating.current) return;
-    creating.current = true;
-    if (data.adoptedOn) track('gotcha_day_set', {});
-    setSaving(true);
-    const pet = await addPet(data);
-    setSaving(false);
-    creating.current = false;
-    // addPet resolves undefined on failure without telling the user — say so
-    // here, keeping everything they typed for the retry.
-    if (pet) setCreated(pet);
-    else showToast(`Couldn't add ${data.name}. Check your connection and try again.`);
+    await run('create', async () => {
+      if (data.adoptedOn) track('gotcha_day_set', {});
+      setSaving(true);
+      const pet = await addPet(data);
+      setSaving(false);
+      // addPet resolves undefined on failure without telling the user — say
+      // so here, keeping everything they typed for the retry.
+      if (pet) setCreated(pet);
+      else showToast(`Couldn't add ${data.name}. Check your connection and try again.`);
+    });
   };
 
   const restart = () => {
@@ -211,7 +211,7 @@ export default function AddPetScreen({ navigation }) {
             )}
           </View>
           <View style={styles.cameraBadge}>
-            <MaterialCommunityIcons name="camera" size={18} color="#fff" />
+            <MaterialCommunityIcons name="camera" size={18} color={ui.onAccent} />
           </View>
         </Pressable>
         <Text style={styles.photoHint}>{photoUri ? 'Change photo' : 'Add a photo'}</Text>
@@ -435,7 +435,7 @@ export default function AddPetScreen({ navigation }) {
             </View>
             {on && (
               <View style={styles.checkBadge}>
-                <MaterialCommunityIcons name="check" size={20} color="#fff" />
+                <MaterialCommunityIcons name="check" size={20} color={ui.onAccent} />
               </View>
             )}
           </Pressable>
@@ -511,7 +511,7 @@ export default function AddPetScreen({ navigation }) {
         />
         <View style={styles.successSheet}>
           <View style={styles.successBadge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <MaterialCommunityIcons name="check" size={34} color="#fff" />
+            <MaterialCommunityIcons name="check" size={34} color={ui.onAccent} />
           </View>
           <ScrollView contentContainerStyle={styles.successScroll} showsVerticalScrollIndicator={false}>
             <Animated.View entering={STEP_IN} style={{ gap: 6, alignItems: 'center' }}>
@@ -892,7 +892,7 @@ const styles = StyleSheet.create({
   winSub: { ...type.secondary, color: ui.sub, marginTop: 1 },
 
   // iOS date picker
-  iosPickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(36, 26, 14, 0.4)' },
+  iosPickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: ui.overlay },
   iosPickerSheet: {
     backgroundColor: ui.surface,
     borderTopLeftRadius: radii.sheet,

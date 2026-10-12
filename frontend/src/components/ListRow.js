@@ -5,6 +5,8 @@ import { ui, type } from '../theme';
 
 // Standard tappable row inside a Card: icon · title/subtitle · value · chevron.
 // Rows draw their own hairline divider; pass `last` on the final row.
+// `danger` marks a destructive or alarming action (danger icon + title, danger
+// press tint, no chevron) so it never looks like a harmless one.
 export default function ListRow({
   icon,
   title,
@@ -14,6 +16,7 @@ export default function ListRow({
   chevron,
   onPress,
   last,
+  danger,
   style,
 }) {
   const baseStyle = {
@@ -32,20 +35,24 @@ export default function ListRow({
       onPress={onPress}
       style={
         onPress
-          ? ({ pressed }) => [baseStyle, pressed && { backgroundColor: ui.pressTint }, style]
+          ? ({ pressed }) => [
+              baseStyle,
+              pressed && { backgroundColor: danger ? ui.dangerPressTint : ui.pressTint },
+              style,
+            ]
           : [baseStyle, style]
       }
     >
-      {icon ? <MaterialCommunityIcons name={icon} size={19} color={ui.accent} /> : null}
+      {icon ? <MaterialCommunityIcons name={icon} size={19} color={danger ? ui.danger : ui.accent} /> : null}
       <View style={{ flex: 1 }}>
-        <Text style={[type.rowTitle, { color: ui.ink }]}>{title}</Text>
+        <Text style={[type.rowTitle, { color: danger ? ui.dangerText : ui.ink }]}>{title}</Text>
         {subtitle ? (
           <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>{subtitle}</Text>
         ) : null}
       </View>
       {value ? <Text style={[type.secondary, { color: ui.sub }]}>{value}</Text> : null}
       {right}
-      {chevron ? <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} /> : null}
+      {chevron && !danger ? <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} /> : null}
     </Row>
   );
 }

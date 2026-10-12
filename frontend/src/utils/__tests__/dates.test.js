@@ -1,4 +1,4 @@
-import { fmtShort, fmtDay, fmtTime, dayDiff, relativeDay, timeAgo } from '../dates';
+import { fmtShort, fmtDay, fmtTime, dayDiff, relativeDay, timeAgo, daysOverdue, overdueLabel } from '../dates';
 
 // Fixed "today" for determinism (local time).
 const TODAY = new Date('2026-10-12T10:00:00');
@@ -66,5 +66,16 @@ describe('timeAgo', () => {
     expect(timeAgo('2026-10-12T07:00:00Z', now)).toBe('3h ago');
     expect(timeAgo('2026-10-10T10:00:00Z', now)).toBe('2d ago');
     expect(timeAgo(null, now)).toBe('');
+  });
+});
+
+describe('daysOverdue / overdueLabel', () => {
+  const now = new Date('2026-10-12T10:00:00').getTime();
+  it('counts whole days past due, at least one', () => {
+    expect(daysOverdue('2026-10-10', now)).toBe(1);
+    expect(daysOverdue('2026-10-12', now)).toBe(1);
+    expect(daysOverdue('2026-10-01', now)).toBe(10);
+    expect(overdueLabel('2026-10-12', now)).toBe('Overdue · 1 day');
+    expect(overdueLabel('2026-10-01', now)).toBe('Overdue · 10 days');
   });
 });

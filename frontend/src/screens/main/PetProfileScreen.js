@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, Pressable, StyleSheet,
   TextInput, Platform, Share, ActivityIndicator, Image,
@@ -10,15 +10,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { petPhoto } from '../../utils/pets';
-import { dosesOn, dosesPerDay } from '../../utils/doses';
+import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
 import { fmtShort, fmtTime } from '../../utils/dates';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
+import { useInFlight } from '../../hooks/useInFlight';
 import { track } from '../../services/analytics';
-import { ui, type, radii, motion, petPair } from '../../theme';
+import { ui, type, radii, motion, petPair, scrim } from '../../theme';
 import {
   Card, ListRow, StatusPill, Chip, SegmentedControl, StepProgress,
   Button, Sheet, ConfirmDialog, MilestoneRow, showToast, speciesIcon, petHealthStatus,
@@ -138,8 +139,7 @@ export default function PetProfileScreen({ navigation, route }) {
   // the stack), and doses in flight (see handleLogDose) — both declared above
   // the early return.
   const today = useToday();
-  const dosesInFlight = useRef(new Set());
-  const [loggingMeds, setLoggingMeds] = useState([]);
+  const { run, isBusy } = useInFlight();
   const askConfirm = (cfg) => setConfirm(cfg);
 
   const loadShare = useCallback(async () => {
@@ -222,16 +222,12 @@ export default function PetProfileScreen({ navigation, route }) {
 
   // One tap, one dose: the button is disabled while its dose is in flight,
   // and the celebration only follows a dose the server actually saved.
-  const handleLogDose = async (med) => {
-    if (dosesInFlight.current.has(med.id)) return;
-    dosesInFlight.current.add(med.id);
-    setLoggingMeds((ids) => [...ids, med.id]);
-    const saved = await logMedicationDose(petId, med.id);
-    dosesInFlight.current.delete(med.id);
-    setLoggingMeds((ids) => ids.filter((id) => id !== med.id));
-    if (saved) showToast('Dose logged', { celebrate: true, actionType: 'dose_logged' });
-    else showToast(`Couldn't log ${med.name}. Try again.`);
-  };
+  const handleLogDose = (med) =>
+    run(med.id, async () => {
+      const saved = await logMedicationDose(petId, med.id);
+      if (saved) showToast('Dose logged', { celebrate: true, actionType: 'dose_logged' });
+      else showToast(`Couldn't log ${med.name}. Try again.`);
+    });
 
   const handleDeleteMedication = (med) => askConfirm({
     title: 'Remove medication?',
@@ -372,7 +368,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const foods = pet.favoriteFoods || [];
   const pair = petPair(pet.color);
   const photoUri = petPhoto(pet) || null;
-  const heroFg = photoUri ? '#ffffff' : ui.ink;
+  const heroFg = photoUri ? ui.onAccent : ui.ink;
   const speciesLabel = [pet.type ? cap(pet.type) : 'Pet', pet.breed || null].filter(Boolean).join(' · ');
   const heroMeta = [
     pet.age ? `${pet.age} yr${pet.age !== 1 ? 's' : ''}` : null,
@@ -385,8 +381,7 @@ export default function PetProfileScreen({ navigation, route }) {
   // after breakfast, never done.
   const todayKey = dayKey(today);
   const dailyMeds = (pet.medications || []).filter((m) => m.active && m.frequency === 'daily');
-  const takenToday = (m) =>
-    Math.min(dosesPerDay(m), dosesOn(m, { doseCounts: medDoseCounts, doseDays: medDoseDays }, todayKey));
+  const takenToday = (m) => dosesTakenOn(m, { doseCounts: medDoseCounts, doseDays: medDoseDays }, todayKey);
   const dosesTotal = dailyMeds.reduce((sum, m) => sum + dosesPerDay(m), 0);
   const dailyDone = dailyMeds.reduce((sum, m) => sum + takenToday(m), 0);
   const activities = pet.activities || [];
@@ -460,12 +455,12 @@ export default function PetProfileScreen({ navigation, route }) {
                       accessibilityRole="button"
                       accessibilityLabel={`Mark ${med.name} done`}
                       onPress={() => handleLogDose(med)}
-                      disabled={loggingMeds.includes(med.id)}
-                      accessibilityState={{ disabled: loggingMeds.includes(med.id) }}
+                      disabled={isBusy(med.id)}
+                      accessibilityState={{ disabled: isBusy(med.id) }}
                       hitSlop={8}
                       style={({ pressed }) => [
                         styles.doneBtn,
-                        (pressed || loggingMeds.includes(med.id)) && { opacity: motion.pressOpacitySoft },
+                        (pressed || isBusy(med.id)) && { opacity: motion.pressOpacitySoft },
                       ]}
                     >
                       <Text style={styles.doneBtnText}>Done</Text>
@@ -805,12 +800,12 @@ export default function PetProfileScreen({ navigation, route }) {
               />
               {/* Light top scrim keeps the dark status bar legible. */}
               <LinearGradient
-                colors={['rgba(255, 250, 246, 0.55)', 'rgba(255, 250, 246, 0)']}
+                colors={scrim.cream}
                 style={[styles.scrimTop, { height: insets.top + 90 }]}
                 pointerEvents="none"
               />
               <LinearGradient
-                colors={['rgba(36, 26, 14, 0)', 'rgba(36, 26, 14, 0.78)']}
+                colors={scrim.bottom}
                 style={styles.scrimBottom}
                 pointerEvents="none"
               />
@@ -885,7 +880,8 @@ export default function PetProfileScreen({ navigation, route }) {
               key={m.title}
               icon={m.icon}
               title={m.title}
-              chevron={!m.danger}
+              chevron
+              danger={m.danger}
               onPress={m.onPress}
               last={i === menuItems.length - 1}
             />
@@ -919,7 +915,7 @@ export default function PetProfileScreen({ navigation, route }) {
             onChangeText={setNewFood}
           />
           <Pressable style={styles.inlineAddBtn} onPress={handleAddFood}>
-            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+            <MaterialCommunityIcons name="plus" size={20} color={ui.onAccent} />
           </Pressable>
         </View>
       </Sheet>
@@ -1610,7 +1606,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: ui.glass,
     alignItems: 'center',
     justifyContent: 'center',
   },

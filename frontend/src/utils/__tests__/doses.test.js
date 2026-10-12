@@ -1,4 +1,4 @@
-import { dosesPerDay, dosesOn, addDoseCount } from '../doses';
+import { dosesPerDay, dosesOn, dosesTakenOn, addDoseCount, mergeDoseHistory } from '../doses';
 
 const TODAY = '2026-10-12';
 const BID = { id: 'm1', times: ['08:00', '20:00'] };
@@ -42,5 +42,29 @@ describe('addDoseCount', () => {
     expect(Object.keys(counts.m1)).toHaveLength(7);
     expect(counts.m1['2026-10-01']).toBeUndefined();
     expect(counts.m1['2026-10-10']).toBe(1);
+  });
+});
+
+describe('dosesTakenOn', () => {
+  it('caps at the doses a med expects', () => {
+    const once = { id: 'm5', times: ['08:00'] };
+    expect(dosesTakenOn(once, { doseCounts: { m5: { [TODAY]: 3 } } }, TODAY)).toBe(1);
+    expect(dosesTakenOn(BID, { doseCounts: { m1: { [TODAY]: 1 } } }, TODAY)).toBe(1);
+  });
+});
+
+describe('mergeDoseHistory', () => {
+  it('keeps a dose that is in memory but not yet persisted', () => {
+    const stored = { doseDays: { m1: ['2026-10-11'] }, doseCounts: { m1: { [TODAY]: 1 } } };
+    const current = { doseDays: { m1: [TODAY] }, doseCounts: { m1: { [TODAY]: 2 } } };
+    const merged = mergeDoseHistory(stored, current, ['m1']);
+    expect(merged.doseDays.m1).toEqual(['2026-10-11', TODAY]);
+    expect(merged.doseCounts.m1[TODAY]).toBe(2);
+  });
+
+  it('prunes meds that no longer exist', () => {
+    const merged = mergeDoseHistory({ doseDays: { gone: [TODAY] }, doseCounts: {} }, {}, ['m1']);
+    expect(merged.doseDays).toEqual({});
+    expect(merged.doseCounts).toEqual({});
   });
 });

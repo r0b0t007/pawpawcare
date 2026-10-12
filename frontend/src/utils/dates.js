@@ -31,6 +31,16 @@ export const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDa
 export const dayDiff = (date, today = new Date()) =>
   Math.round((startOfDay(date) - startOfDay(today)) / DAY_MS);
 
+// Whole days a 'YYYY-MM-DD' due date is past, at least 1 — for "Overdue · N days".
+export const daysOverdue = (dueDate, now = Date.now()) =>
+  Math.max(1, Math.floor((now - new Date(`${dueDate}T12:00:00`)) / DAY_MS));
+
+// "Overdue · 1 day" / "Overdue · 3 days".
+export const overdueLabel = (dueDate, now = Date.now()) => {
+  const d = daysOverdue(dueDate, now);
+  return `Overdue · ${d} day${d === 1 ? '' : 's'}`;
+};
+
 // "yesterday" / "today" / "tomorrow" / "in 8 days" / "in 3 weeks" / "on 3 Dec":
 // relative first; the exact date lives in the row's secondary line. Past
 // dates say so — never "today" for something that already happened.

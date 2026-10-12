@@ -29,6 +29,22 @@ export const ui = {
   warnText: '#7a5c00', // text on warnTint
   pressTint: '#fffdf8', // row pressed-state background
   dangerPressTint: '#fff7f6', // danger row pressed-state background
+  // "Lively & Light" additions
+  onAccent: '#ffffff', // text/icons on accent fills and over photos
+  selectedTint: '#faf1e2', // selected chip background
+  successBorder: '#d9ead9', // "All caught up" card edge
+  glass: 'rgba(255, 255, 255, 0.92)', // pills and buttons floating on photos
+  glassSoft: 'rgba(255, 255, 255, 0.45)', // quiet badge on a pet tint
+  overlay: 'rgba(36, 26, 14, 0.4)', // modal backdrop
+};
+
+// Photo scrims (LinearGradient color stops), so text stays legible over any
+// photo: ink fading down from the top, ink rising from the bottom, and the
+// cream background fading out of a photo-less hero.
+export const scrim = {
+  top: ['rgba(36, 26, 14, 0.35)', 'rgba(36, 26, 14, 0)'],
+  bottom: ['rgba(36, 26, 14, 0)', 'rgba(36, 26, 14, 0.78)'],
+  cream: ['rgba(255, 250, 246, 0.55)', 'rgba(255, 250, 246, 0)'],
 };
 
 // Type scale from the spec: screen title 26/800 · card title 17–19/700 ·

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, Pressable, StyleSheet,
 } from 'react-native';
@@ -11,14 +11,15 @@ import { useData } from '../../context/DataContext';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
+import { useInFlight } from '../../hooks/useInFlight';
 import { getPref, setPref } from '../../services/prefs';
 
 const CARD_OUT = FadeOut.duration(150);
 import { track } from '../../services/analytics';
 import { noteGoodMoment } from '../../services/storeReview';
 import { dayKey } from '../../utils/streaks';
-import { dosesOn, dosesPerDay } from '../../utils/doses';
-import { fmtShort, fmtTime, relativeDay } from '../../utils/dates';
+import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
+import { fmtShort, fmtTime, overdueLabel, relativeDay } from '../../utils/dates';
 import { petMeta, petPhoto } from '../../utils/pets';
 import { ui, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
@@ -218,6 +219,9 @@ export default function DashboardScreen({ navigation }) {
     const weekEnd = new Date(today);
     weekEnd.setDate(weekEnd.getDate() + 7);
     const inWeek = (d) => d >= new Date(today.toDateString()) && d <= weekEnd;
+    // A reminder is a moment, not a day: one that fired at 8:00 is history by
+    // 15:00 (vaccines stay day-based).
+    const now = new Date();
 
     const week = [
       ...pending
@@ -234,7 +238,7 @@ export default function DashboardScreen({ navigation }) {
       ...reminders
         .filter((r) => r.next_fire_at || r.fire_at)
         .map((r) => ({ r, date: new Date(r.next_fire_at || r.fire_at) }))
-        .filter(({ date }) => !Number.isNaN(date.getTime()) && inWeek(date))
+        .filter(({ date }) => !Number.isNaN(date.getTime()) && date >= now && inWeek(date))
         .map(({ r, date }) => {
           const pet = pets.find((p) => p.id === r.pet_id);
           const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -267,10 +271,7 @@ export default function DashboardScreen({ navigation }) {
             .filter((m) => m.active && m.frequency === 'daily')
             .map((m) => {
               const expected = dosesPerDay(m);
-              const taken = Math.min(
-                expected,
-                dosesOn(m, { doseCounts: medDoseCounts, doseDays: medDoseDays }, todayKey),
-              );
+              const taken = dosesTakenOn(m, { doseCounts: medDoseCounts, doseDays: medDoseDays }, todayKey);
               return { med: m, pet, times: [...(m.times || [])].sort(), expected, taken, done: taken >= expected };
             }),
         )
@@ -294,12 +295,7 @@ export default function DashboardScreen({ navigation }) {
         subtitle: `${upNext.pet.name} · due ${fmtShort(vaxDate(upNext))}`,
         status: upNext.status === 'overdue' ? 'overdue' : 'due',
         statusLabel:
-          upNext.status === 'overdue'
-            ? (() => {
-                const days = Math.max(1, Math.floor((Date.now() - vaxDate(upNext)) / 86400000));
-                return `Overdue · ${days} day${days === 1 ? '' : 's'}`;
-              })()
-            : `Due ${fmtShort(vaxDate(upNext))}`,
+          upNext.status === 'overdue' ? overdueLabel(upNext.dueDate) : `Due ${fmtShort(vaxDate(upNext))}`,
         // No-shame framing: an invitation to act, never "you missed".
         note:
           upNext.status === 'overdue'
@@ -312,23 +308,30 @@ export default function DashboardScreen({ navigation }) {
       }
     : null;
 
-  // One tap, one dose: a dose in flight disables its Log button, and the
-  // celebration only follows a dose the server actually saved.
-  const inFlight = useRef(new Set());
-  const [logging, setLogging] = useState([]);
-  const logDose = async ({ pet, med }) => {
-    if (inFlight.current.has(med.id)) return;
-    inFlight.current.add(med.id);
-    setLogging((ids) => [...ids, med.id]);
-    const saved = await logMedicationDose(pet.id, med.id);
-    inFlight.current.delete(med.id);
-    setLogging((ids) => ids.filter((id) => id !== med.id));
-    if (saved) {
-      showToast(`${pet.name}'s ${med.name} logged`, { celebrate: true, actionType: 'dose_logged' });
-    } else {
-      showToast(`Couldn't log ${pet.name}'s ${med.name}. Try again.`);
-    }
-  };
+  // One tap, one request: a dose or completion in flight disables its button,
+  // and the celebration only follows what the server actually saved.
+  const { run, isBusy } = useInFlight();
+  const logDose = ({ pet, med }) =>
+    run(`dose-${med.id}`, async () => {
+      const saved = await logMedicationDose(pet.id, med.id);
+      if (saved) {
+        showToast(`${pet.name}'s ${med.name} logged`, { celebrate: true, actionType: 'dose_logged' });
+      } else {
+        showToast(`Couldn't log ${pet.name}'s ${med.name}. Try again.`);
+      }
+    });
+  const markUpNextDone = () =>
+    run(`vax-${upNext.id}`, async () => {
+      const saved = await markVaccinationComplete(upNext.pet.id, upNext.id);
+      if (saved) {
+        showToast(`${upNext.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+      } else {
+        showToast(`Couldn't mark ${upNext.name} done. Try again.`);
+      }
+    });
+  // Home shows one overdue item; the rest are one tap away, never silently
+  // announced by the headline and then hidden.
+  const moreOverdue = upNext?.status === 'overdue' ? overdueCount - 1 : 0;
 
   const goPet = (pet) =>
     navigation.navigate('Pets', { screen: 'PetProfile', params: { petId: pet.id } });
@@ -419,14 +422,8 @@ export default function DashboardScreen({ navigation }) {
               <UpNextCard
                 item={upNextItem}
                 style={styles.hero}
-                onDone={async () => {
-                  const saved = await markVaccinationComplete(upNext.pet.id, upNext.id);
-                  if (saved) {
-                    showToast(`${upNext.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
-                  } else {
-                    showToast(`Couldn't mark ${upNext.name} done. Try again.`);
-                  }
-                }}
+                busy={!!upNext && isBusy(`vax-${upNext.id}`)}
+                onDone={markUpNextDone}
                 onReschedule={() =>
                   navigation.navigate('Pets', {
                     screen: 'VaccinationTracker',
@@ -434,6 +431,19 @@ export default function DashboardScreen({ navigation }) {
                   })
                 }
               />
+            )}
+            {moreOverdue > 0 && (
+              <Pressable
+                onPress={() => navigation.navigate('Health')}
+                hitSlop={8}
+                accessibilityRole="link"
+                style={({ pressed }) => [styles.moreLink, pressed && { opacity: motion.pressOpacity }]}
+              >
+                <Text style={styles.sectionLink}>
+                  {moreOverdue} more overdue · see all in Health
+                </Text>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={ui.accent} />
+              </Pressable>
             )}
 
             {todayMeds.length > 0 && (
@@ -470,7 +480,7 @@ export default function DashboardScreen({ navigation }) {
                         variant="soft"
                         label="Log"
                         icon="check"
-                        disabled={logging.includes(t.med.id)}
+                        disabled={isBusy(`dose-${t.med.id}`)}
                         onPress={() => logDose(t)}
                         style={styles.logBtn}
                       />
@@ -644,6 +654,15 @@ const styles = StyleSheet.create({
   },
   sectionLabel: { ...type.sectionLabel, color: ui.subtle },
   sectionLink: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.accent },
+  moreLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 2,
+    marginHorizontal: 24,
+    marginTop: -12,
+    marginBottom: 14,
+  },
   petsRow: { gap: 12, paddingHorizontal: 16, paddingBottom: 24 },
   addCard: {
     width: 76,

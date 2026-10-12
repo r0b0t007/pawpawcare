@@ -12,21 +12,21 @@ import StatusRing from './StatusRing';
 // elevated card on Home. Status shows once (the pill); the avatar ring is the
 // pet's identity tint, so recognition comes before reading. `note` is the
 // no-shame nudge ("Let's get Biscuit's booster booked"). Pass no item for the
-// "All caught up" state.
+// "All caught up" state. `busy` disables Mark done while it's saving.
 //
 // item: { title, subtitle, note?, status: 'overdue'|'due', statusLabel,
 //         avatarColor, avatarTextColor, initial, photo }
 const SWAP_IN = FadeIn.duration(200);
 const SWAP_OUT = FadeOut.duration(150);
 
-export default function UpNextCard({ item, onDone, onReschedule, style }) {
+export default function UpNextCard({ item, onDone, onReschedule, busy, style }) {
   if (!item) {
     return (
       <Animated.View key="caught-up" entering={SWAP_IN} exiting={SWAP_OUT}>
         <Card
           padded
           style={[
-            { borderColor: '#d9ead9', flexDirection: 'row', alignItems: 'center', gap: 14 },
+            { borderColor: ui.successBorder, flexDirection: 'row', alignItems: 'center', gap: 14 },
             style,
           ]}
         >
@@ -72,7 +72,7 @@ export default function UpNextCard({ item, onDone, onReschedule, style }) {
           </View>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Button label="Mark done" icon="check" onPress={onDone} style={{ flex: 1.3 }} />
+          <Button label="Mark done" icon="check" onPress={onDone} disabled={busy} style={{ flex: 1.3 }} />
           <Button label="Reschedule" variant="ghost" onPress={onReschedule} style={{ flex: 1 }} />
         </View>
       </Card>
