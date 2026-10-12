@@ -26,6 +26,12 @@ describe('component kit', () => {
     'PetFace',
     'EmptyState',
     'StepProgress',
+    'ScreenHeader',
+    'PetFaceStack',
+    'DeleteButton',
+    'Toggle',
+    'PhotoBand',
+    'FormError',
     'ToastHost',
   ])('exports %s as a component', (name) => {
     expect(typeof components[name]).toBe('function');
@@ -93,5 +99,21 @@ describe('motion easings', () => {
     };
     walk(path.join(__dirname, '..', '..'));
     expect(offenders).toEqual([]);
+  });
+});
+
+describe('shared form + header pieces', () => {
+  it('exports TextField as a ref-forwarding component', () => {
+    const { TextField } = require('../index');
+    expect(TextField).toBeTruthy();
+    expect(TextField.$$typeof).toBe(Symbol.for('react.forward_ref'));
+  });
+
+  it('maps reminder types to icons with a bell fallback', () => {
+    const { reminderIcon, REMINDER_ICON } = require('../index');
+    expect(reminderIcon('vaccination')).toBe(REMINDER_ICON.vaccination);
+    expect(reminderIcon('medication')).toBe('pill');
+    expect(reminderIcon('something-new')).toBe('bell-outline');
+    expect(reminderIcon(undefined)).toBe('bell-outline');
   });
 });

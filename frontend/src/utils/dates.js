@@ -28,6 +28,10 @@ export const fmtMonth = (date) =>
 export const fmtDay = (date) =>
   isValid(date) ? `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}` : '—';
 
+// '9:00 AM' — the clock time of a Date ('' if invalid).
+export const fmtClock = (date) =>
+  isValid(date) ? date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+
 // '08:00' / '18:30' -> '8:00 AM' / '6:30 PM'. Null for anything unparseable,
 // so callers decide the fallback.
 export const fmtTime = (hhmm) => {
@@ -79,4 +83,18 @@ export const timeAgo = (iso, now = Date.now()) => {
   if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+};
+
+// 'today 9:00 AM' / 'tomorrow 12:30 AM' / 'yesterday 6:00 PM' / 'Mon 9:00 AM'
+// (this week) / 'Fri 10 Oct 9:00 AM' — a moment in plain words, so a time is
+// never ambiguous about which day it means.
+export const fmtDayTime = (date, today = new Date()) => {
+  if (!isValid(date)) return '';
+  const n = dayDiff(date, today);
+  const day = n === 0 ? 'today'
+    : n === 1 ? 'tomorrow'
+      : n === -1 ? 'yesterday'
+        : n > 1 && n < 7 ? WEEKDAYS[date.getDay()]
+          : fmtDay(date);
+  return `${day} ${fmtClock(date)}`;
 };

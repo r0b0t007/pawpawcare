@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, BackHandler,
-  ScrollView, KeyboardAvoidingView, Platform, Switch, Modal, Image, ActivityIndicator,
+  ScrollView, KeyboardAvoidingView, Platform, Modal, Image, ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +17,7 @@ import { useInFlight } from '../../hooks/useInFlight';
 import { fmtFull, parseDay } from '../../utils/dates';
 import { resolveAsset } from '../../config';
 import { ui, radii, type, motion, petPair, photos, scrim, PET_COLOR_PAIRS } from '../../theme';
-import { Button, Card, Chip, StepProgress, showToast, speciesIcon } from '../../components';
+import { Button, Card, Chip, StepProgress, Toggle, showToast, speciesIcon } from '../../components';
 
 // Add pet = three small questions, one per screen (species → name + photo →
 // optional details), then a calm success moment that suggests the next step
@@ -400,11 +400,9 @@ export default function AddPetScreen({ navigation }) {
             <Text style={styles.switchSub}>Is your pet microchipped?</Text>
           </View>
         </View>
-        <Switch
+        <Toggle
           value={form.microchipped}
           onValueChange={(v) => set('microchipped', v)}
-          trackColor={{ false: ui.track, true: ui.accentTint }}
-          thumbColor={form.microchipped ? ui.accent : ui.faint}
           accessibilityLabel="Microchipped"
         />
       </View>

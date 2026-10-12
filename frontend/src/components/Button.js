@@ -37,6 +37,7 @@ export default function Button({
   pill,
   small,
   disabled,
+  accessibilityLabel,
   style,
 }) {
   const v = VARIANTS[variant] ?? VARIANTS.primary;
@@ -54,6 +55,10 @@ export default function Button({
     <AnimatedPressable
       onPress={onPress}
       disabled={disabled}
+      // Announced as a button (and as dimmed when disabled) by screen readers.
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      accessibilityLabel={accessibilityLabel ?? label}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
       hitSlop={pill ? 6 : undefined}

@@ -139,6 +139,10 @@ export const PET_COLOR_PAIRS = [
 // The pair for a pet's stored color (falls back to peach for legacy colors).
 export const petPair = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg) ?? PET_COLOR_PAIRS[0];
 
+// The medical vault's surface (Health hub card + vault screen): the sky pair,
+// so both stay in step. A surface tint only — vault actions use ui.accent.
+export const vaultColors = PET_COLOR_PAIRS[1];
+
 // One soft, warm shadow level — hero cards, photo cards and a floating
 // action (which needs to lift off the content it floats over). Nothing else.
 export const elevation = {

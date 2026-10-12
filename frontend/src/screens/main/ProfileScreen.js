@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Pressable, Switch, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { getPref, setPref } from '../../services/prefs';
@@ -10,12 +9,22 @@ import { exportRecords } from '../../services/exportRecords';
 import { captureException, isSentryEnabled } from '../../services/sentry';
 import { isAnalyticsEnabled, setAnalyticsEnabled } from '../../services/analytics';
 import { usePlan } from '../../hooks/useSubscription';
+import { useInFlight } from '../../hooks/useInFlight';
 import { planStatus, planTitle } from '../../utils/subscription';
-import { ui, type } from '../../theme';
-import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, showToast } from '../../components';
+import { ui, type, motion } from '../../theme';
+import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, PetFaceStack, Toggle, showToast } from '../../components';
 
-// The Profile tab: account card (+ Edit → AccountDetails), notification
-// toggles, sharing entry points and a guarded log out.
+// The Profile tab ("Lively & Light"): a friendly account card that leads
+// with who you are and who you care for (pet faces — recognition, not
+// reading), then short grouped lists — notifications, sharing & data,
+// privacy, support — and log out as a quiet danger row at the very end,
+// behind a confirm. One accent, used only for actions and switches.
+
+const FACES = 4; // pet faces shown on the account card; the rest are "+N"
+
+function SectionLabel({ children }) {
+  return <Text style={[type.sectionLabel, styles.sectionLabel]}>{children}</Text>;
+}
 
 export default function ProfileScreen({ navigation }) {
   const { user, isAdmin, logout, updateUser } = useAuth();
@@ -29,11 +38,13 @@ export default function ProfileScreen({ navigation }) {
   const [communityDigest, setCommunityDigest] = useState(true);
 
   // Export center — sheet state lives here; the download/share plumbing is in
-  // services/exportRecords.js.
+  // services/exportRecords.js. The export runs through useInFlight, so a
+  // double tap never starts two downloads.
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState('pdf');
   const [exportPets, setExportPets] = useState([]);
-  const [exporting, setExporting] = useState(false);
+  const { run, isBusy } = useInFlight();
+  const exporting = isBusy('export');
 
   useEffect(() => {
     let alive = true;
@@ -120,47 +131,65 @@ export default function ProfileScreen({ navigation }) {
   const toggleExportPet = (id) =>
     setExportPets((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      // All pets selected → omit the filter so new records never miss out.
-      const ids = exportPets.length === pets.length ? [] : exportPets;
-      await exportRecords(exportFormat, ids);
-      setExportOpen(false);
-    } catch (err) {
-      // Don't swallow the cause — a silent catch here is what made an Android
-      // download failure hard to diagnose. Friendly toast, but log the real one.
-      console.warn('Export failed', err);
-      showToast('Export failed — nothing was lost, try again');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const handleExport = () =>
+    run('export', async () => {
+      try {
+        // All pets selected → omit the filter so new records never miss out.
+        const ids = exportPets.length === pets.length ? [] : exportPets;
+        await exportRecords(exportFormat, ids);
+        setExportOpen(false);
+      } catch (err) {
+        // Don't swallow the cause — a silent catch here is what made an Android
+        // download failure hard to diagnose. Friendly toast, but log the real one.
+        console.warn('Export failed', err);
+        showToast('Export failed — nothing was lost, try again');
+      }
+    });
+
+  const firstName = user?.name?.split(' ')[0];
+  const careLine =
+    pets.length === 0
+      ? 'Add a pet to get started'
+      : pets.length === 1
+        ? `Caring for ${pets[0].name}`
+        : `Caring for ${pets.length} pets`;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <Text style={[type.screenTitle, styles.title]}>Profile</Text>
+        <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Profile</Text>
 
-        <Card style={styles.userCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{(user?.name || 'U')[0].toUpperCase()}</Text>
+        {/* Account card — the screen's one elevated hero. */}
+        <Card padded elevated style={styles.userCard}>
+          <View style={styles.userRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{(user?.name || 'U')[0].toUpperCase()}</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.userName} numberOfLines={1}>
+                {firstName ? `Hi, ${firstName}` : user?.name}
+              </Text>
+              <Text style={styles.userEmail} numberOfLines={1} selectable>{user?.email}</Text>
+            </View>
+            <Pressable
+              onPress={() => navigation.navigate('AccountDetails')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={({ pressed }) => [styles.editBtn, pressed && { opacity: motion.pressOpacity }]}
+              accessibilityRole="button"
+              accessibilityLabel="Edit account details"
+            >
+              <Text style={styles.editLink}>Edit</Text>
+            </Pressable>
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.userName}>{user?.name}</Text>
-            <Text style={styles.userEmail}>{user?.email}</Text>
+          <View style={styles.careRow}>
+            <PetFaceStack pets={pets} max={FACES} />
+            <Text style={styles.careLine} numberOfLines={1}>{careLine}</Text>
           </View>
-          <Pressable
-            onPress={() => navigation.navigate('AccountDetails')}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Text style={styles.editLink}>Edit</Text>
-          </Pressable>
         </Card>
 
         {(subscriptionsVisible || plan.active) && (
           <>
-            <Text style={[type.sectionLabel, styles.sectionLabel]}>Subscription</Text>
+            <SectionLabel>Subscription</SectionLabel>
             <Card style={styles.sectionCard}>
               <ListRow
                 icon="star-four-points-outline"
@@ -174,61 +203,38 @@ export default function ProfileScreen({ navigation }) {
           </>
         )}
 
-        <Text style={[type.sectionLabel, styles.sectionLabel]}>Notifications</Text>
+        <SectionLabel>Notifications</SectionLabel>
         <Card style={styles.sectionCard}>
           <ListRow
             icon="bell-outline"
             title="Care reminders"
             subtitle="Vaccines, meds, vet visits"
-            right={
-              <Switch
-                value={careReminders}
-                onValueChange={toggleCareReminders}
-                trackColor={{ false: ui.track, true: ui.accent }}
-                thumbColor="#ffffff"
-                ios_backgroundColor={ui.track}
-              />
-            }
+            right={<Toggle value={careReminders} onValueChange={toggleCareReminders} accessibilityLabel="Care reminders" />}
           />
           <ListRow
             icon="newspaper-variant-outline"
             title="Community digest"
             subtitle="Weekly highlights from your groups"
-            right={
-              <Switch
-                value={communityDigest}
-                onValueChange={toggleCommunityDigest}
-                trackColor={{ false: ui.track, true: ui.accent }}
-                thumbColor="#ffffff"
-                ios_backgroundColor={ui.track}
-              />
-            }
+            right={<Toggle value={communityDigest} onValueChange={toggleCommunityDigest} accessibilityLabel="Community digest" />}
           />
           <ListRow
             icon="cake-variant-outline"
             title="Celebrations & recaps"
             subtitle="Birthdays, gotcha days, weekly care recap"
-            right={
-              <Switch
-                value={engagementPushes}
-                onValueChange={toggleEngagementPushes}
-                trackColor={{ false: ui.track, true: ui.accent }}
-                thumbColor="#ffffff"
-                ios_backgroundColor={ui.track}
-              />
-            }
+            right={<Toggle value={engagementPushes} onValueChange={toggleEngagementPushes} accessibilityLabel="Celebrations and recaps" />}
             last
           />
         </Card>
 
-        <Text style={[type.sectionLabel, styles.sectionLabel]}>Sharing & data</Text>
+        <SectionLabel>Sharing & data</SectionLabel>
         <Card style={[styles.sectionCard, styles.dataCard]}>
           <ListRow
             icon="account-group-outline"
             title="Pet sharing & invites"
+            subtitle={invites.length > 0 ? `${invites.length} waiting for you` : 'Family, sitters and co-owners'}
             right={
               invites.length > 0 ? (
-                <View style={styles.badge}>
+                <View style={styles.badge} accessibilityLabel={`${invites.length} pending invites`}>
                   <Text style={styles.badgeText}>{invites.length}</Text>
                 </View>
               ) : null
@@ -245,24 +251,21 @@ export default function ProfileScreen({ navigation }) {
             last
           />
         </Card>
-        <Text style={styles.dataCaption}>
-          Your records belong to you — export everything free, anytime.
+        <Text style={styles.caption}>
+          Your records belong to you — export everything, anytime.
         </Text>
 
-        <Text style={[type.sectionLabel, styles.sectionLabel]}>Privacy</Text>
+        <SectionLabel>Privacy</SectionLabel>
         <Card style={styles.sectionCard}>
           <ListRow
             icon="chart-box-outline"
             title="Share usage analytics"
             subtitle="Which features you use — never pet records or health data"
             right={
-              <Switch
+              <Toggle
                 value={shareAnalytics}
                 onValueChange={toggleShareAnalytics}
                 disabled={savingAnalytics}
-                trackColor={{ false: ui.track, true: ui.accent }}
-                thumbColor="#ffffff"
-                ios_backgroundColor={ui.track}
                 accessibilityLabel="Share usage analytics"
               />
             }
@@ -272,7 +275,7 @@ export default function ProfileScreen({ navigation }) {
 
         {isAdmin && (
           <>
-            <Text style={[type.sectionLabel, styles.sectionLabel]}>Admin</Text>
+            <SectionLabel>Admin</SectionLabel>
             <Card style={styles.sectionCard}>
               <ListRow
                 icon="shield-check-outline"
@@ -292,7 +295,7 @@ export default function ProfileScreen({ navigation }) {
           </>
         )}
 
-        <Text style={[type.sectionLabel, styles.sectionLabel]}>Support</Text>
+        <SectionLabel>Support</SectionLabel>
         <Card style={styles.sectionCard}>
           {/* Private feedback, open to everyone — never tied to the store
               rating prompt (services/storeReview), per store policy. */}
@@ -313,13 +316,10 @@ export default function ProfileScreen({ navigation }) {
           />
         </Card>
 
-        <Pressable
-          style={({ pressed }) => [styles.logoutBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
-          onPress={() => setConfirmLogout(true)}
-        >
-          <MaterialCommunityIcons name="logout" size={18} color={ui.danger} />
-          <Text style={styles.logoutText}>Log out</Text>
-        </Pressable>
+        {/* Log out: a quiet danger row at the end, behind a confirm. */}
+        <Card style={styles.sectionCard}>
+          <ListRow icon="logout" title="Log out" danger onPress={() => setConfirmLogout(true)} last />
+        </Card>
       </ScrollView>
 
       <Sheet visible={exportOpen} onClose={() => setExportOpen(false)} title="Export health records">
@@ -350,6 +350,7 @@ export default function ProfileScreen({ navigation }) {
             selection already means "all pets". */}
         <Button
           label={exporting ? 'Exporting…' : exportFormat === 'pdf' ? 'Export PDF' : 'Export CSV'}
+          icon="download-outline"
           onPress={handleExport}
           disabled={exporting || pets.length === 0 || (pets.length > 1 && exportPets.length === 0)}
         />
@@ -376,42 +377,47 @@ export default function ProfileScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
-  scroll: { paddingBottom: 32 },
-  title: { color: ui.ink, paddingHorizontal: 24, paddingTop: 14, paddingBottom: 18 },
-  userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginHorizontal: 24,
-    marginBottom: 22,
-    padding: 18,
-  },
+  scroll: { paddingBottom: 36 },
+  title: { color: ui.ink, paddingHorizontal: 24, paddingTop: 14, paddingBottom: 16 },
+  userCard: { marginHorizontal: 20, marginBottom: 26, padding: 18, gap: 14 },
+  userRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: ui.accentTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 22, color: ui.accent },
-  userName: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 17, color: ui.ink },
-  userEmail: {
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 12.5,
-    color: ui.sub,
-    marginTop: 1,
+  avatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 24, color: ui.accent },
+  userName: { ...type.cardTitle, color: ui.ink },
+  userEmail: { ...type.secondary, color: ui.sub, marginTop: 1 },
+  editBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: ui.controlBorder,
   },
-  editLink: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.accent },
+  editLink: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.accent },
+  careRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: ui.hairline,
+  },
+  careLine: { ...type.secondary, color: ui.sub, flex: 1 },
   sectionLabel: { color: ui.subtle, marginHorizontal: 24, marginBottom: 8 },
-  sectionCard: { marginHorizontal: 24, marginBottom: 22 },
+  sectionCard: { marginHorizontal: 20, marginBottom: 24 },
   dataCard: { marginBottom: 8 },
-  dataCaption: {
+  caption: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 11.5,
     color: ui.subtle,
     marginHorizontal: 24,
-    marginBottom: 22,
+    marginBottom: 24,
   },
   sheetLabel: { color: ui.subtle, marginBottom: 8 },
   sheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -422,27 +428,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
     backgroundColor: ui.accentTint,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
   },
   badgeText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11, color: ui.accent },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 24,
-    marginBottom: 28,
-    paddingVertical: 15,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#f1d7d4',
-    borderCurve: 'continuous',
-  },
-  logoutText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: ui.danger },
 });

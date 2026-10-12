@@ -1,35 +1,48 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, Pressable, StyleSheet, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
-import { ui, type } from '../../theme';
-import { Card, Button } from '../../components';
+import { ui, type, motion, photos } from '../../theme';
+import { Card, EmptyState, PetFace, ScreenHeader, reminderIcon } from '../../components';
+import { useToday } from '../../hooks/useToday';
+import { dayDiff, fmtClock, fmtDayTime, timeAgo } from '../../utils/dates';
+import { petById } from '../../utils/pets';
 
-function timeAgo(iso) {
-  if (!iso) return '';
-  const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 0) return 'scheduled';
-  if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
+// "Lively & Light" notifications: a calm list grouped by when (Today /
+// Upcoming / Earlier). Each row leads with the pet's face (or the reminder
+// type's icon when it isn't about one pet), so it's recognised before it's
+// read. Unread is shown exactly once, as a word ("New") — never colour alone,
+// and never the accent, which is kept for actions. Screen readers get each
+// row as one element with its actions (mark read / snooze / dismiss) on it.
 
-// Dot encodes state exactly once: unread = danger red, snoozed-unread = amber,
-// read = faint.
-function dotColor(n) {
-  if (n.read_at) return ui.faint;
-  return n.status === 'snoozed' ? '#b06e00' : ui.danger;
+const actionHit = { top: 10, bottom: 10, left: 8, right: 8 };
+
+// '3h ago', 'Scheduled' for an occurrence that hasn't happened yet, or the
+// snooze in plain words — with the day when it isn't today ('Snoozed until
+// tomorrow 12:30 AM'), and never a past time dressed up as a future one.
+function whenLabel(n, today) {
+  if (n.status === 'snoozed') {
+    const until = n.snoozed_until ? new Date(n.snoozed_until) : null;
+    if (!until || Number.isNaN(until.getTime())) return 'Snoozed';
+    if (until.getTime() <= Date.now()) return 'Snooze ended';
+    return `Snoozed until ${dayDiff(until, today) === 0 ? fmtClock(until) : fmtDayTime(until, today)}`;
+  }
+  const at = new Date(n.occurrence_at);
+  if (!n.occurrence_at || Number.isNaN(at.getTime())) return '';
+  if (at.getTime() > Date.now()) return 'Scheduled';
+  return timeAgo(n.occurrence_at);
 }
 
 export default function NotificationsScreen({ navigation }) {
   const {
-    notifications, refreshNotifications,
+    pets, notifications, unreadCount, refreshNotifications,
     markNotificationRead, snoozeNotification, dismissNotification,
   } = useData();
   const [refreshing, setRefreshing] = useState(false);
+  const today = useToday();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -37,21 +50,110 @@ export default function NotificationsScreen({ navigation }) {
     setRefreshing(false);
   }, [refreshNotifications]);
 
+  // Today / Upcoming / Earlier by calendar day. The server sends newest
+  // first, which suits Today and Earlier; Upcoming reads soonest first.
+  // An undated item counts as earlier.
+  const sections = useMemo(() => {
+    const at = (n) => new Date(n.occurrence_at || n.created_at);
+    const when = (n) => {
+      const d = at(n);
+      if (Number.isNaN(d.getTime())) return -1;
+      return Math.sign(dayDiff(d, today));
+    };
+    const upcoming = notifications.filter((n) => when(n) > 0).sort((a, b) => at(a) - at(b));
+    return [
+      { label: 'Today', items: notifications.filter((n) => when(n) === 0) },
+      { label: 'Upcoming', items: upcoming },
+      { label: 'Earlier', items: notifications.filter((n) => when(n) < 0) },
+    ].filter((s) => s.items.length > 0);
+  }, [notifications, today]);
+
+  const renderRow = (n, i) => {
+    const unread = !n.read_at;
+    const pet = petById(pets, n.pet_id);
+    return (
+      <Pressable
+        key={n.id}
+        style={({ pressed }) => [
+          styles.row,
+          i > 0 && styles.rowDivider,
+          pressed && { backgroundColor: ui.pressTint },
+        ]}
+        onPress={() => unread && markNotificationRead(n.id)}
+        accessibilityRole="button"
+        accessibilityLabel={`${unread ? 'New. ' : ''}${n.title}${n.body ? `. ${n.body}` : ''}. ${whenLabel(n, today)}`}
+        // The row is one element for screen readers, so the inline buttons
+        // below can't be focused on their own — expose them as actions.
+        accessibilityActions={[
+          ...(unread ? [{ name: 'activate', label: 'Mark as read' }] : []),
+          { name: 'snooze', label: 'Snooze 1 hour' },
+          { name: 'dismiss', label: 'Dismiss' },
+        ]}
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === 'activate' && unread) markNotificationRead(n.id);
+          else if (nativeEvent.actionName === 'snooze') snoozeNotification(n.id, 60);
+          else if (nativeEvent.actionName === 'dismiss') dismissNotification(n.id);
+        }}
+      >
+        {pet ? (
+          <PetFace pet={pet} size={40} />
+        ) : (
+          <View style={styles.typeIcon}>
+            <MaterialCommunityIcons name={reminderIcon(n.type)} size={19} color={ui.sub} />
+          </View>
+        )}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.rowTitle}>{n.title}</Text>
+          {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
+          <View style={styles.metaRow}>
+            {unread && <Text style={styles.newTag}>New</Text>}
+            <Text style={styles.rowTime}>
+              {[pet?.name, whenLabel(n, today)].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
+          <View style={styles.rowActions}>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed && { opacity: motion.pressOpacity }]}
+              onPress={() => snoozeNotification(n.id, 60)}
+              hitSlop={actionHit}
+              accessibilityRole="button"
+              accessibilityLabel={`Snooze ${n.title} for an hour`}
+            >
+              <MaterialCommunityIcons name="alarm-snooze" size={15} color={ui.accent} />
+              <Text style={[styles.actionText, { color: ui.accent }]}>Snooze 1h</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.actionBtn, pressed && { opacity: motion.pressOpacity }]}
+              onPress={() => dismissNotification(n.id)}
+              hitSlop={actionHit}
+              accessibilityRole="button"
+              accessibilityLabel={`Dismiss ${n.title}`}
+            >
+              <MaterialCommunityIcons name="check" size={15} color={ui.sub} />
+              <Text style={[styles.actionText, { color: ui.sub }]}>Dismiss</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.topRow}>
-        <Pressable
-          style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: ui.background }]}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-        </Pressable>
-        <Text style={styles.title} numberOfLines={1}>Notifications</Text>
-        <Pressable onPress={() => navigation.navigate('Reminders')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={styles.manageLink}>Manage</Text>
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="Notifications"
+        subtitle={notifications.length > 0 ? (unreadCount === 0 ? 'All read' : `${unreadCount} new`) : null}
+        onBack={() => navigation.goBack()}
+        right={(
+          <Pressable
+            onPress={() => navigation.navigate('Reminders')}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="link"
+          >
+            <Text style={styles.manageLink}>Manage</Text>
+          </Pressable>
+        )}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -59,66 +161,22 @@ export default function NotificationsScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {notifications.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <MaterialCommunityIcons name="bell-sleep-outline" size={34} color={ui.accent} />
-            </View>
-            <Text style={styles.emptyTitle}>You're all caught up</Text>
-            <Text style={styles.emptySub}>Reminders for vaccinations and care tasks will show up here.</Text>
-            <Button
-              pill
-              label="Add a reminder"
-              icon="plus"
-              onPress={() => navigation.navigate('Reminders')}
-              style={{ marginTop: 12 }}
-            />
-          </View>
+          <EmptyState
+            photo={photos.emptyBlanket}
+            title="You're all caught up"
+            body="Reminders for vaccines, meds and care tasks will show up here."
+            actionLabel="Add a reminder"
+            actionIcon="plus"
+            onAction={() => navigation.navigate('Reminders')}
+            style={styles.empty}
+          />
         ) : (
-          <Card>
-            {notifications.map((n, i) => {
-              const unread = !n.read_at;
-              return (
-                <Pressable
-                  key={n.id}
-                  style={({ pressed }) => [
-                    styles.row,
-                    i > 0 && styles.rowDivider,
-                    pressed && { backgroundColor: ui.background },
-                  ]}
-                  onPress={() => unread && markNotificationRead(n.id)}
-                >
-                  <View style={[styles.dot, { backgroundColor: dotColor(n) }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowText}>
-                      <Text style={styles.rowLead}>{n.title}</Text>
-                      {n.body ? ` — ${n.body}` : ''}
-                    </Text>
-                    <Text style={styles.rowTime}>
-                      {n.status === 'snoozed' ? 'Snoozed' : timeAgo(n.occurrence_at)}
-                    </Text>
-                    <View style={styles.rowActions}>
-                      <Pressable
-                        style={styles.actionBtn}
-                        onPress={() => snoozeNotification(n.id, 60)}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      >
-                        <MaterialCommunityIcons name="alarm-snooze" size={15} color={ui.accent} />
-                        <Text style={[styles.actionText, { color: ui.accent }]}>Snooze 1h</Text>
-                      </Pressable>
-                      <Pressable
-                        style={styles.actionBtn}
-                        onPress={() => dismissNotification(n.id)}
-                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                      >
-                        <MaterialCommunityIcons name="check" size={15} color={ui.sub} />
-                        <Text style={[styles.actionText, { color: ui.sub }]}>Dismiss</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </Card>
+          sections.map((section) => (
+            <View key={section.label}>
+              <Text style={[type.sectionLabel, styles.sectionLabel]}>{section.label}</Text>
+              <Card style={styles.sectionCard}>{section.items.map(renderRow)}</Card>
+            </View>
+          ))
         )}
       </ScrollView>
     </SafeAreaView>
@@ -127,57 +185,50 @@ export default function NotificationsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: { ...type.screenTitle, flex: 1, color: ui.ink },
   manageLink: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: ui.accent },
-  scroll: { paddingHorizontal: 24, paddingBottom: 32 },
+  scroll: { paddingHorizontal: 16, paddingBottom: 32 },
+  sectionLabel: { marginHorizontal: 8, marginBottom: 10, marginTop: 4, color: ui.subtle },
+  sectionCard: { marginBottom: 18 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
+    gap: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  rowDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: ui.hairline },
-  dot: { width: 8, height: 8, borderRadius: 4, marginTop: 5 },
-  rowText: {
+  rowDivider: { borderTopWidth: 1, borderTopColor: ui.hairline },
+  // Identity, not an action — a neutral chip, never the accent.
+  typeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: ui.track,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  // Unread, exactly once, as a word.
+  newTag: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    color: ui.ink,
+    backgroundColor: ui.track,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
+  rowTitle: { ...type.rowTitle, color: ui.ink },
+  rowBody: {
     fontFamily: 'PlusJakartaSans_400Regular',
     fontSize: 13,
     lineHeight: 19,
     color: ui.sub,
+    marginTop: 1,
   },
-  rowLead: { fontFamily: 'PlusJakartaSans_700Bold', color: ui.ink },
-  rowTime: { ...type.secondary, color: ui.subtle, marginTop: 3 },
-  rowActions: { flexDirection: 'row', gap: 20, marginTop: 10 },
+  rowTime: { ...type.secondary, color: ui.subtle, flexShrink: 1 },
+  rowActions: { flexDirection: 'row', gap: 22, marginTop: 10 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   actionText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12.5 },
-  empty: { alignItems: 'center', paddingTop: 56, gap: 10 },
-  emptyIcon: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: ui.accentTint,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  emptyTitle: { ...type.cardTitle, color: ui.ink },
-  emptySub: { ...type.body, color: ui.sub, textAlign: 'center', paddingHorizontal: 24 },
+  empty: { paddingHorizontal: 8, paddingTop: 32 },
 });
