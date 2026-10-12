@@ -341,8 +341,8 @@ export default function ProfileScreen({ navigation }) {
         <View>
           <Text style={[type.sectionLabel, styles.sheetLabel]}>Format</Text>
           <View style={styles.sheetChips}>
-            <Chip label="PDF" active={exportFormat === 'pdf'} onPress={() => setExportFormat('pdf')} />
-            <Chip label="CSV" active={exportFormat === 'csv'} onPress={() => setExportFormat('csv')} />
+            <Chip accessibilityRole="radio" label="PDF" active={exportFormat === 'pdf'} onPress={() => setExportFormat('pdf')} />
+            <Chip accessibilityRole="radio" label="CSV" active={exportFormat === 'csv'} onPress={() => setExportFormat('csv')} />
           </View>
         </View>
         {/* Nothing to export with no pets. Pet chips only render with 2+ pets,

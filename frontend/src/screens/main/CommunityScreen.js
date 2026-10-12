@@ -146,7 +146,7 @@ export default function CommunityScreen({ navigation }) {
         {/* Section chips */}
         <View style={styles.chipRow}>
           {SECTIONS.map((s) => (
-            <Chip key={s.key} label={s.label} active={section === s.key} onPress={() => setSection(s.key)} />
+            <Chip accessibilityRole="radio" key={s.key} label={s.label} active={section === s.key} onPress={() => setSection(s.key)} />
           ))}
         </View>
 

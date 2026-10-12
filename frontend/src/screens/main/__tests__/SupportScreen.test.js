@@ -6,15 +6,13 @@ jest.mock('react-native-safe-area-context', () => {
 });
 jest.mock('expo-application', () => ({ nativeApplicationVersion: '1.4.0', nativeBuildVersion: '37' }));
 jest.mock('../../../services/api', () => ({ post: jest.fn() }));
-jest.mock('../../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../../components/Toast', () => ({ showToast: jest.fn(), ToastHost: () => null }));
 
 import React from 'react';
-import { Platform, TextInput } from 'react-native';
+import { Platform, Text, TextInput } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import SupportScreen from '../SupportScreen';
 import { post } from '../../../services/api';
-import { track } from '../../../services/analytics';
 import { showToast } from '../../../components/Toast';
 
 const navigation = { goBack: jest.fn(), navigate: jest.fn() };
@@ -29,7 +27,7 @@ async function render(params) {
 
 const chip = (tree, label) =>
   tree.root.findAll((n) => n.props.accessibilityLabel === label && n.props.accessibilityState)[0];
-const selected = (tree, label) => chip(tree, label).props.accessibilityState.selected;
+const selected = (tree, label) => chip(tree, label).props.accessibilityState.checked;
 const input = (tree) => tree.root.findAllByType(TextInput)[0];
 const sendButton = (tree) => tree.root.findAll((n) => n.props.label === 'Send message' || n.props.label === 'Sending…')[0];
 
@@ -52,6 +50,28 @@ test('opened from "Send feedback", the Feedback chip is preselected', async () =
   expect(selected(tree, 'Feedback')).toBe(true);
   expect(selected(tree, 'Problem')).toBe(false);
   expect(input(tree).props.placeholder).toMatch(/what's working/i);
+});
+
+const texts = (tree) => tree.root.findAllByType(Text).map((n) => [].concat(n.props.children).join(''));
+
+test('"Send feedback" leads with the form under its own title', async () => {
+  const all = texts(await render({ category: 'feedback' }));
+
+  expect(all).toContain('Send feedback');
+  expect(all).not.toContain('Help & support');
+  expect(all.indexOf('Send feedback or get help')).toBeLessThan(all.indexOf('Guides'));
+});
+
+test('"Help & support" keeps the guides first', async () => {
+  const all = texts(await render());
+
+  expect(all).toContain('Help & support');
+  expect(all.indexOf('Guides')).toBeLessThan(all.indexOf('Send feedback or get help'));
+});
+
+test('the chips are announced as one choice in a set', async () => {
+  const tree = await render();
+  expect(chip(tree, 'Problem').props.accessibilityRole).toBe('radio');
 });
 
 test('the category is optional: tapping the active chip clears it', async () => {
@@ -82,7 +102,6 @@ test('sends the message with its category and app context, then thanks and close
     app_version: '1.4.0 (37)',
     platform: 'android',
   });
-  expect(track).toHaveBeenCalledWith('support_message_sent', { category: 'feedback' });
   expect(showToast).toHaveBeenCalledWith('Thanks — we read every note');
   expect(navigation.goBack).toHaveBeenCalled();
 });
@@ -95,7 +114,6 @@ test('without a category it still sends, as a plain support message', async () =
   await send(tree);
 
   expect(post).toHaveBeenCalledWith('/support/messages', expect.objectContaining({ category: null }));
-  expect(track).toHaveBeenCalledWith('support_message_sent', { category: 'none' });
 });
 
 test('an empty message cannot be sent', async () => {
@@ -117,5 +135,4 @@ test('a failure keeps the message and shows why', async () => {
   expect(showToast).toHaveBeenCalledWith('Too many requests');
   expect(input(tree).props.value).toBe('It crashed');
   expect(navigation.goBack).not.toHaveBeenCalled();
-  expect(track).not.toHaveBeenCalled();
 });

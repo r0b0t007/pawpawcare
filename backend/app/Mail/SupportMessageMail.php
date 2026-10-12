@@ -11,29 +11,23 @@ use Illuminate\Support\Str;
 /** Forwards an in-app feedback or support message to the SUPPORT_INBOX address. */
 class SupportMessageMail extends Mailable
 {
-    private const LABELS = [
-        'feedback' => 'Feedback',
-        'problem' => 'Problem',
-        'idea' => 'Idea',
-        'question' => 'Question',
-    ];
-
     public function __construct(public SupportMessage $supportMessage) {}
 
     private function label(): ?string
     {
-        $category = $this->supportMessage->category;
-
-        return $category === null ? null : (self::LABELS[$category] ?? null);
+        return SupportMessage::categoryLabel($this->supportMessage->category);
     }
 
     public function envelope(): Envelope
     {
         $user = $this->supportMessage->user;
         $label = $this->label();
-        // Names allow any characters: flatten control characters and runs of
-        // whitespace so a name can't reshape the subject line.
-        $from = Str::limit(trim(preg_replace('/[\p{C}\s]+/u', ' ', $user?->name ?? '') ?? ''), 60) ?: 'a user';
+        // Names allow any characters. The mailer already encodes headers, so
+        // this is about a readable subject: collapse control characters,
+        // separators and bidi overrides (which could reorder "[Problem] from")
+        // into single spaces, but keep the zero-width joiners that emoji
+        // sequences and Indic/Persian names need.
+        $from = Str::limit(trim(preg_replace('/[\p{Cc}\p{Z}\x{200E}\x{200F}\x{202A}-\x{202E}\x{2066}-\x{2069}]+/u', ' ', $user?->name ?? '') ?? ''), 60) ?: 'a user';
 
         return new Envelope(
             subject: $label ? "[{$label}] from {$from}" : "Support message from {$from}",

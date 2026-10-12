@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\JwtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
@@ -107,23 +108,53 @@ class SupportMessageTest extends TestCase
         });
     }
 
-    public function test_category_and_context_are_validated(): void
+    public function test_unrecognised_context_is_dropped_never_blocking_the_message(): void
     {
+        $this->withoutMiddleware(ThrottleRequests::class);
         [, $token] = $this->user();
 
         foreach ([
-            ['category' => 'rant'],
-            ['platform' => 'web'],
-            ['app_version' => '<script>'],
-            ['app_version' => str_repeat('9', 33)],
-            ['app_version' => "1.4.0\nBcc: x@evil.example"],
-        ] as $bad) {
+            [['category' => 'rant'], 'category', null],
+            [['category' => ['feedback']], 'category', null],
+            [['platform' => 'web'], 'platform', null],
+            [['app_version' => '<script>'], 'app_version', 'script'],
+            [['app_version' => '1.0.0_rc1'], 'app_version', '1.0.0_rc1'],
+            [['app_version' => str_repeat('9', 40)], 'app_version', str_repeat('9', 32)],
+            [['app_version' => "1.4.0\nBcc: x@evil.example"], 'app_version', '1.4.0Bcc xevil.example'],
+            [['app_version' => '%%%'], 'app_version', null],
+        ] as [$extra, $field, $expected]) {
             $this->withToken($token)
-                ->postJson('/support/messages', ['message' => 'hi'] + $bad)
-                ->assertStatus(422);
-        }
+                ->postJson('/support/messages', ['message' => 'hi'] + $extra)
+                ->assertCreated();
 
-        $this->assertSame(0, SupportMessage::count());
+            $this->assertSame($expected, SupportMessage::sole()->{$field}, json_encode($extra));
+            SupportMessage::query()->delete();
+        }
+    }
+
+    public function test_the_subject_keeps_emoji_joiners_but_drops_bidi_overrides(): void
+    {
+        Mail::fake();
+        config(['mail.support_inbox' => 'help@pawpawcare.app']);
+        [$user, $token] = $this->user();
+        $family = "Sam \u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
+        $user->forceFill(['name' => "{$family}\u{202E}cod"])->save();
+
+        $this->withToken($token)
+            ->postJson('/support/messages', ['message' => 'hi', 'category' => 'feedback'])
+            ->assertCreated();
+
+        Mail::assertSent(SupportMessageMail::class, fn (SupportMessageMail $mail) => $mail->envelope()->subject === "[Feedback] from {$family} cod");
+    }
+
+    public function test_every_category_has_a_label(): void
+    {
+        foreach (SupportMessage::CATEGORIES as $category) {
+            $this->assertNotNull(SupportMessage::categoryLabel($category), $category);
+        }
+        $this->assertSame('Feedback', SupportMessage::categoryLabel('feedback'));
+        $this->assertNull(SupportMessage::categoryLabel('rant'));
+        $this->assertNull(SupportMessage::categoryLabel(null));
     }
 
     public function test_the_subject_flattens_control_characters_in_names(): void
@@ -188,5 +219,30 @@ class SupportMessageTest extends TestCase
         $this->withToken($token)
             ->postJson('/support/messages', ['message' => 'one too many'])
             ->assertStatus(429);
+    }
+
+    public function test_feedback_has_its_own_budget_so_a_real_problem_still_gets_through(): void
+    {
+        [, $token] = $this->user();
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->withToken($token)
+                ->postJson('/support/messages', ['message' => "note {$i}", 'category' => $i % 2 ? 'idea' : 'feedback'])
+                ->assertCreated();
+        }
+        $this->withToken($token)
+            ->postJson('/support/messages', ['message' => 'one more idea', 'category' => 'idea'])
+            ->assertStatus(429);
+
+        // The help budget is still 5, so one user's ceiling is 10 an hour.
+        for ($i = 0; $i < 5; $i++) {
+            $this->withToken($token)
+                ->postJson('/support/messages', ['message' => "help {$i}", 'category' => $i % 2 ? 'question' : 'problem'])
+                ->assertCreated();
+        }
+        $this->withToken($token)
+            ->postJson('/support/messages', ['message' => 'still stuck'])
+            ->assertStatus(429);
+        $this->assertSame(10, SupportMessage::count());
     }
 }

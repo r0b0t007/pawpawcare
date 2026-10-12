@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class SupportMessage extends Model
 {
@@ -21,6 +22,12 @@ class SupportMessage extends Model
 
     // user_id is set explicitly from the authenticated user, never filled.
     protected $fillable = ['message', 'category', 'app_version', 'platform'];
+
+    /** Display label for a category ("Feedback"), or null when unknown. */
+    public static function categoryLabel(?string $category): ?string
+    {
+        return in_array($category, self::CATEGORIES, true) ? Str::headline($category) : null;
+    }
 
     public function user(): BelongsTo
     {

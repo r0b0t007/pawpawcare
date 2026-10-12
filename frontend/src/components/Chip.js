@@ -8,13 +8,16 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // Filter/select chip: active = ink background, inactive = white + border.
 // Active flips crossfade; press gives the standard kit scale.
-export default function Chip({ label, active, onPress, style }) {
+// Pass accessibilityRole="radio" when the chips are one choice in a set, so
+// screen readers announce "checked"; the default "button" + selected suits
+// multi-select toggles.
+export default function Chip({ label, active, onPress, style, accessibilityRole = 'button' }) {
   const [pressed, setPressed] = useState(false);
   return (
     <AnimatedPressable
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
       accessibilityLabel={label}
-      accessibilityState={{ selected: !!active }}
+      accessibilityState={accessibilityRole === 'radio' ? { checked: !!active } : { selected: !!active }}
       onPress={onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}

@@ -142,9 +142,13 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(20)->by('login-ip|'.$ip);
         });
 
-        // Support inbox: 5/hour per authenticated user.
+        // Support inbox: 5/hour per authenticated user, with feedback and ideas
+        // counted separately so casual notes never use up the budget for a
+        // real problem or question.
         RateLimiter::for('support', function (Request $request) {
-            return Limit::perHour(5)->by('support|'.($request->user()?->id ?? $request->ip()));
+            $bucket = in_array($request->input('category'), ['feedback', 'idea'], true) ? 'feedback' : 'help';
+
+            return Limit::perHour(5)->by("support|{$bucket}|".($request->user()?->id ?? $request->ip()));
         });
 
         // Records export: PDF rendering is the priciest request in the app,

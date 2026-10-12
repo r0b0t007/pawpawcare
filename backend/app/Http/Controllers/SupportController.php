@@ -9,7 +9,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Validation\Rule;
 
 class SupportController extends Controller
 {
@@ -22,16 +21,18 @@ class SupportController extends Controller
     {
         $data = $request->validate([
             'message' => 'required|string|max:2000',
-            'category' => ['nullable', Rule::in(SupportMessage::CATEGORIES)],
-            'app_version' => ['nullable', 'string', 'max:32', 'regex:/^[0-9A-Za-z.\-+ ()]+$/D'],
-            'platform' => ['nullable', Rule::in(['ios', 'android'])],
         ]);
+
+        // The rest is optional triage context. A value we don't recognise is
+        // dropped rather than rejected: it must never stop someone reaching us.
+        $category = $request->input('category');
+        $platform = $request->input('platform');
 
         $message = new SupportMessage([
             'message' => $data['message'],
-            'category' => $data['category'] ?? null,
-            'app_version' => $data['app_version'] ?? null,
-            'platform' => $data['platform'] ?? null,
+            'category' => in_array($category, SupportMessage::CATEGORIES, true) ? $category : null,
+            'app_version' => self::cleanVersion($request->input('app_version')),
+            'platform' => in_array($platform, ['ios', 'android'], true) ? $platform : null,
         ]);
         $message->user_id = $request->user()->id; // never from input
         $message->save();
@@ -44,7 +45,8 @@ class SupportController extends Controller
             } catch (\Throwable $e) {
                 Log::error('Support message forward failed', [
                     'support_message_id' => $message->id,
-                    'error' => $e->getMessage(),
+                    // The class only: mailer messages can quote the address.
+                    'error' => class_basename($e),
                 ]);
             }
         }
@@ -55,5 +57,17 @@ class SupportController extends Controller
         ]);
 
         return response()->json($message->toApi(), 201);
+    }
+
+    /** "1.4.0 (37)"-style version: unexpected characters stripped, capped at the column's 32. */
+    private static function cleanVersion(mixed $version): ?string
+    {
+        if (! is_string($version)) {
+            return null;
+        }
+
+        $clean = trim(mb_substr(preg_replace('/[^0-9A-Za-z.\-+_ ()]/', '', $version) ?? '', 0, 32));
+
+        return $clean === '' ? null : $clean;
     }
 }

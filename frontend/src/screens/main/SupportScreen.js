@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { post } from '../../services/api';
-import { track } from '../../services/analytics';
 import { ui, type, radii, motion } from '../../theme';
 import { Card, ListRow, Button, Chip, showToast } from '../../components';
 
@@ -37,7 +36,7 @@ const CATEGORIES = [
   { id: 'idea', label: 'Idea', placeholder: 'What would make PawPawCare better for you and your pets?' },
   { id: 'question', label: 'Question', placeholder: 'Ask us anything about the app.' },
 ];
-const DEFAULT_PLACEHOLDER = CATEGORIES[1].placeholder;
+const DEFAULT_PLACEHOLDER = CATEGORIES.find((c) => c.id === 'problem').placeholder;
 
 // The installed app's version, for triage. Guarded like purchases.js: an
 // OTA update on a build without expo-application just sends none.
@@ -58,6 +57,8 @@ function appVersion() {
 
 export default function SupportScreen({ navigation, route }) {
   const initial = CATEGORIES.some((c) => c.id === route?.params?.category) ? route.params.category : null;
+  // Opened from Profile → Send feedback: lead with the form, titled to match.
+  const feedbackFirst = initial === 'feedback';
   const [category, setCategory] = useState(initial);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -76,7 +77,6 @@ export default function SupportScreen({ navigation, route }) {
         app_version: appVersion(),
         platform: Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : null,
       });
-      track('support_message_sent', { category: category || 'none' });
       setMessage('');
       showToast(category === 'feedback' ? 'Thanks — we read every note' : "Sent — we'll reply within 2 business days");
       navigation.goBack();
@@ -85,6 +85,64 @@ export default function SupportScreen({ navigation, route }) {
       setSending(false);
     }
   };
+
+  const guides = (
+    <>
+      <Text style={[type.sectionLabel, styles.sectionLabel]}>Guides</Text>
+      <Card style={styles.sectionCard}>
+        {GUIDES.map((guide, i) => (
+          <ListRow
+            key={guide.title}
+            icon={guide.icon}
+            title={guide.title}
+            chevron
+            onPress={() => showToast('Guide coming soon')}
+            last={i === GUIDES.length - 1}
+          />
+        ))}
+      </Card>
+    </>
+  );
+
+  const form = (
+    <>
+      <Text style={[type.sectionLabel, styles.sectionLabel]}>Send feedback or get help</Text>
+      <Card style={styles.contactCard}>
+        <View style={styles.chips}>
+          {CATEGORIES.map((c) => (
+            <Chip
+              accessibilityRole="radio"
+              key={c.id}
+              label={c.label}
+              active={category === c.id}
+              onPress={() => setCategory(category === c.id ? null : c.id)}
+            />
+          ))}
+        </View>
+        <TextInput
+          style={[styles.messageInput, focused && styles.inputFocused]}
+          placeholder={placeholder}
+          placeholderTextColor={ui.faint}
+          accessibilityLabel="Your message"
+          value={message}
+          onChangeText={setMessage}
+          multiline
+          maxLength={2000}
+          textAlignVertical="top"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
+        <Button
+          label={sending ? 'Sending…' : 'Send message'}
+          onPress={handleSend}
+          disabled={!canSend}
+        />
+        <Text style={styles.caption}>
+          Only our team reads this — it's never posted publicly. We reply within 2 business days.
+        </Text>
+      </Card>
+    </>
+  );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -106,57 +164,13 @@ export default function SupportScreen({ navigation, route }) {
             >
               <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
             </Pressable>
-            <Text style={styles.headerTitle}>Help & support</Text>
+            <Text style={styles.headerTitle} accessibilityRole="header">
+              {feedbackFirst ? 'Send feedback' : 'Help & support'}
+            </Text>
           </View>
 
-          <Text style={[type.sectionLabel, styles.sectionLabel]}>Guides</Text>
-          <Card style={styles.sectionCard}>
-            {GUIDES.map((guide, i) => (
-              <ListRow
-                key={guide.title}
-                icon={guide.icon}
-                title={guide.title}
-                chevron
-                onPress={() => showToast('Guide coming soon')}
-                last={i === GUIDES.length - 1}
-              />
-            ))}
-          </Card>
-
-          <Text style={[type.sectionLabel, styles.sectionLabel]}>Send feedback or get help</Text>
-          <Card style={styles.contactCard}>
-            <View style={styles.chips}>
-              {CATEGORIES.map((c) => (
-                <Chip
-                  key={c.id}
-                  label={c.label}
-                  active={category === c.id}
-                  onPress={() => setCategory(category === c.id ? null : c.id)}
-                />
-              ))}
-            </View>
-            <TextInput
-              style={[styles.messageInput, focused && styles.inputFocused]}
-              placeholder={placeholder}
-              placeholderTextColor={ui.faint}
-              accessibilityLabel="Your message"
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              maxLength={2000}
-              textAlignVertical="top"
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
-            />
-            <Button
-              label={sending ? 'Sending…' : 'Send message'}
-              onPress={handleSend}
-              disabled={!canSend}
-            />
-            <Text style={styles.caption}>
-              Only our team reads this — it's never posted publicly. We reply within 2 business days.
-            </Text>
-          </Card>
+          {feedbackFirst ? form : guides}
+          {feedbackFirst ? guides : form}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
