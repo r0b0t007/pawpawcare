@@ -37,8 +37,9 @@ class SendDueReminders extends Command
 
         foreach ($due as $reminder) {
             // One reminder can vanish mid-run (its vaccination was completed or its
-            // medication changed): report it and carry on, so a missing row never
-            // aborts the deliveries still due after it.
+            // medication changed): skip it so a missing row never aborts the
+            // deliveries still due after it. Any other database error still fails
+            // the run, so monitoring sees it.
             try {
                 $occurrence = $reminder->next_fire_at->copy();
 
@@ -91,7 +92,9 @@ class SendDueReminders extends Command
                 }
                 $reminder->save();
             } catch (QueryException $e) {
-                report($e);
+                if (Reminder::whereKey($reminder->id)->exists()) {
+                    throw $e;
+                }
             }
         }
 

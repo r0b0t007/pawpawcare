@@ -492,9 +492,15 @@ export function DataProvider({ children }) {
   // refresh* helpers swallow errors via handleApiError by default; loadData
   // passes { rethrow: true } to own error handling itself (allSettled counts
   // the failure and logs out at most once across all domains).
+  // Overlapping refreshes (a vaccination change right after another, or a
+  // tick/focus refetch) can resolve out of order; only the newest request may
+  // write, or a stale list could reschedule a dose that was just marked given.
+  const remindersRequest = useRef(0);
   const refreshReminders = async ({ rethrow = false } = {}) => {
+    const request = ++remindersRequest.current;
     try {
       const reminders = await get('/reminders');
+      if (request !== remindersRequest.current) return;
       dispatch({ type: 'SET_REMINDERS', payload: reminders });
       dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
       scheduleLocalReminders(reminders);

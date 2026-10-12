@@ -102,11 +102,20 @@ export default function HealthHubScreen({ navigation }) {
   );
   const recPet = pets.find((p) => p.id === recPetId) || pets[0];
 
+  // The reminders Health lists: switched-on ones, minus a vaccination's own
+  // due-date reminder (the vaccination already has its row — status shows
+  // once). A switched-off one-off keeps its fire_at, which would otherwise
+  // surface it as still scheduled.
+  const listedReminders = useMemo(
+    () => reminders.filter((r) => r.enabled && r.type !== 'vaccination'),
+    [reminders],
+  );
+
   // Re-run the grouping when the next reminder fires, so a Health tab left
   // open drops it from Today on time (this tab stays mounted).
   const reminderTimes = useMemo(
-    () => reminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
-    [reminders],
+    () => listedReminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
+    [listedReminders],
   );
   const reminderTick = useTickAt(reminderTimes);
 
@@ -147,10 +156,8 @@ export default function HealthHubScreen({ navigation }) {
           };
         }),
       ...(filter === 'all'
-        ? reminders
-            // Switched-off reminders never show: a disabled one-off keeps its
-            // fire_at, which would otherwise surface it as still scheduled.
-            .filter((r) => r.enabled && (r.next_fire_at || r.fire_at))
+        ? listedReminders
+            .filter((r) => r.next_fire_at || r.fire_at)
             .map((r) => {
               const pet = petById(pets, r.pet_id) || null;
               const kind =
@@ -197,7 +204,7 @@ export default function HealthHubScreen({ navigation }) {
       ].filter((sec) => sec.items.length > 0),
       history: done,
     };
-  }, [shownPets, pets, reminders, filter, navigation, today, reminderTick]);
+  }, [shownPets, pets, listedReminders, filter, navigation, today, reminderTick]);
 
   // The "Scheduled on this device" caption sits on the first section holding
   // a reminder, and stays hidden when there are none (findIndex → -1).

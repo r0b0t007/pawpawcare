@@ -83,9 +83,46 @@ class ReminderEngineTest extends TestCase
 
         $this->withToken($token)->patchJson("/pets/{$pet->id}/vaccinations/{$vaxId}/complete", [])->assertOk();
 
-        // Gone, not just disabled: nothing left in /reminders to switch back on.
+        // Never fired: gone, so nothing is left in /reminders to switch back on.
         $this->assertSame(0, Reminder::where('related_id', $vaxId)->count());
         $this->assertSame([], $this->withToken($token)->getJson('/reminders')->assertOk()->json());
+    }
+
+    public function test_a_fired_vaccination_reminder_keeps_its_inbox_notice_but_leaves_the_list(): void
+    {
+        [$user, $token] = $this->actingUser();
+        $pet = Pet::create(['owner_id' => $user->id, 'name' => 'Rex']);
+        $vaxId = $this->withToken($token)->postJson("/pets/{$pet->id}/vaccinations", [
+            'name' => 'Rabies', 'due_date' => '2099-07-01',
+        ])->json('id');
+
+        // It fired 7 days early, as vaccination reminders do.
+        $reminder = Reminder::where('related_id', $vaxId)->sole();
+        $reminder->forceFill(['last_fired_at' => now(), 'enabled' => false, 'next_fire_at' => null])->save();
+        ReminderDelivery::create([
+            'reminder_id' => $reminder->id, 'occurrence_at' => now(), 'channel' => 'push', 'status' => 'sent',
+        ]);
+
+        $this->withToken($token)->patchJson("/pets/{$pet->id}/vaccinations/{$vaxId}/complete", [])->assertOk();
+
+        // The notice stays in the inbox; the spent reminder isn't listed.
+        $this->assertSame(1, ReminderDelivery::where('reminder_id', $reminder->id)->count());
+        $this->assertFalse((bool) $reminder->fresh()->enabled);
+        $this->assertSame([], $this->withToken($token)->getJson('/reminders')->assertOk()->json());
+    }
+
+    public function test_the_list_keeps_reminders_the_user_switched_off_for_open_vaccinations(): void
+    {
+        [$user, $token] = $this->actingUser();
+        $pet = Pet::create(['owner_id' => $user->id, 'name' => 'Rex']);
+        $vaxId = $this->withToken($token)->postJson("/pets/{$pet->id}/vaccinations", [
+            'name' => 'Rabies', 'due_date' => '2099-07-01',
+        ])->json('id');
+        $reminderId = Reminder::where('related_id', $vaxId)->value('id');
+
+        $this->withToken($token)->patchJson("/reminders/{$reminderId}", ['enabled' => false])->assertOk();
+
+        $this->assertSame([$reminderId], array_column($this->withToken($token)->getJson('/reminders')->json(), 'id'));
     }
 
     public function test_deleting_vaccination_removes_its_reminder(): void
@@ -209,6 +246,9 @@ class ReminderEngineTest extends TestCase
         ReminderDelivery::create([
             'reminder_id' => $firedNextDue, 'occurrence_at' => now(), 'channel' => 'push', 'status' => 'sent',
         ]);
+        // Fired, then its vaccination was deleted: the notice must survive too.
+        $firedGone = $reminder('11111111-1111-1111-1111-111111111111', false);
+        Reminder::whereKey($firedGone)->update(['last_fired_at' => now()]);
 
         (require database_path('migrations/2026_10_13_000001_remove_cancelled_vaccination_reminders.php'))->up();
 
@@ -218,6 +258,7 @@ class ReminderEngineTest extends TestCase
         $this->assertContains($nextDue, $left);
         $this->assertContains($switchedOff, $left);
         $this->assertContains($firedNextDue, $left);
+        $this->assertContains($firedGone, $left);
         $this->assertSame(1, ReminderDelivery::where('reminder_id', $firedNextDue)->count());
     }
 

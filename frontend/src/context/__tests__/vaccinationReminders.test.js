@@ -109,3 +109,32 @@ test('adding and deleting a vaccination refetch reminders too', async () => {
 
   expect(reminderFetches()).toBe(before + 2);
 });
+
+test('an older reminders response arriving last never overwrites the newer one', async () => {
+  await mount();
+  let resolveOld;
+  let resolveNew;
+  get.mockImplementation((path) => {
+    if (path !== '/reminders') return Promise.resolve([]);
+    return new Promise((resolve) => {
+      if (!resolveOld) resolveOld = resolve;
+      else resolveNew = resolve;
+    });
+  });
+
+  let older;
+  let newer;
+  await act(async () => {
+    older = data.refreshReminders();
+    newer = data.refreshReminders();
+  });
+  await act(async () => {
+    resolveNew([]); // newest: the reminder is gone
+    await newer;
+    resolveOld([REMINDER]); // stale: still has it
+    await older;
+  });
+
+  expect(data.reminders).toEqual([]);
+  expect(scheduleLocalReminders).toHaveBeenLastCalledWith([]);
+});

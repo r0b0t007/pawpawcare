@@ -106,16 +106,18 @@ class ReminderScheduler
     }
 
     /**
-     * Remove the reminder(s) tied to a vaccination once it's administered or
-     * deleted, for every recipient. Removed rather than disabled: a disabled
-     * row would linger in Reminders with a switch that could revive a reminder
-     * for a dose already given (or a record that no longer exists).
+     * Retire the reminder(s) tied to a vaccination once it's administered or
+     * deleted, for every recipient. One that never fired is deleted outright.
+     * One that already fired is only switched off: its notice lives in the
+     * inbox through reminder_deliveries (which cascade on delete), and
+     * /reminders hides these spent rows so they can't be switched back on.
      */
     public static function cancelVaccinationReminder(Vaccination $vax): void
     {
-        Reminder::where('related_type', 'vaccination')
-            ->where('related_id', $vax->id)
-            ->delete();
+        $reminders = fn () => Reminder::where('related_type', 'vaccination')->where('related_id', $vax->id);
+
+        $reminders()->whereNull('last_fired_at')->delete();
+        $reminders()->update(['enabled' => false, 'next_fire_at' => null]);
     }
 
     /**
