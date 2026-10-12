@@ -782,8 +782,11 @@ export function DataProvider({ children }) {
       };
       dispatch({ type: 'SET_MED_DOSE_DAYS', payload: doseDays });
       setPref('medDoseDays', doseDays);
+      return true;
     } catch (err) {
       handleApiError(err);
+      // Callers celebrate only a saved dose; false means nothing was logged.
+      return false;
     }
   };
 

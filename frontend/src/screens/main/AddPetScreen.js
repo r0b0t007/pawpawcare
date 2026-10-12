@@ -16,7 +16,7 @@ import { Button, Card, Chip, StepProgress, showToast, speciesIcon } from '../../
 
 // Add pet = three small questions, one per screen (species → name + photo →
 // optional details), then a calm success moment that suggests the next step
-// while motivation is high. Edit keeps a single-page form. Stock photos only
+// while motivation is high. Editing lives in EditPetScreen. Stock photos only
 // ever illustrate species choices and the success moment — never the user's
 // pet (a photo-less pet shows its species glyph on its own tint).
 
@@ -51,34 +51,31 @@ const GENDERS = [
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
-const blankForm = (existing) => ({
-  name: existing?.name || '',
-  type: existing?.type || 'dog',
-  breed: existing?.breed || '',
-  birthday: existing?.birthday || '',
-  adoptedOn: existing?.adoptedOn || '',
-  age: existing?.age?.toString() || '',
-  weight: existing?.weight?.toString() || '',
-  weightUnit: existing?.weightUnit || 'kg',
-  gender: existing?.gender || 'male',
-  microchipped: existing?.microchipped || false,
-  color: existing?.color || PET_COLOR_PAIRS[0].bg,
-  avatarUrl: existing?.avatarUrl || null,
+const blankForm = () => ({
+  name: '',
+  type: 'dog',
+  breed: '',
+  birthday: '',
+  adoptedOn: '',
+  age: '',
+  weight: '',
+  weightUnit: 'kg',
+  gender: 'male',
+  microchipped: false,
+  color: PET_COLOR_PAIRS[0].bg,
+  avatarUrl: null,
 });
 
-export default function AddPetScreen({ navigation, route }) {
-  const { petId } = route.params || {};
-  const { pets, addPet, updatePet } = useData();
-  const existing = petId ? pets.find((p) => p.id === petId) : null;
-  const isEdit = !!existing;
+export default function AddPetScreen({ navigation }) {
+  const { addPet } = useData();
 
-  const [form, setForm] = useState(() => blankForm(existing));
+  const [form, setForm] = useState(blankForm);
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
   const [step, setStep] = useState(1);
   const [created, setCreated] = useState(null); // the saved pet → success view
   const [saving, setSaving] = useState(false);
-  const [showOther, setShowOther] = useState(form.type !== 'dog' && form.type !== 'cat');
+  const [showOther, setShowOther] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
 
   // Which date field the picker edits: null | 'birthday' | 'adoptedOn'.
@@ -89,7 +86,7 @@ export default function AddPetScreen({ navigation, route }) {
   const [localPreview, setLocalPreview] = useState(null);
 
   const pair = petPair(form.color);
-  const inFlow = !isEdit && !created;
+  const inFlow = !created;
 
   // Android back walks the steps backwards instead of abandoning the flow.
   useEffect(() => {
@@ -154,18 +151,6 @@ export default function AddPetScreen({ navigation, route }) {
     return false;
   };
 
-  const handleSaveEdit = async () => {
-    if (!requireName()) return;
-    const data = buildData();
-    if (data.adoptedOn && data.adoptedOn !== (existing?.adoptedOn || '')) {
-      track('gotcha_day_set', {});
-    }
-    setSaving(true);
-    await updatePet(petId, data);
-    setSaving(false);
-    navigation.goBack();
-  };
-
   const handleCreate = async (skipDetails) => {
     if (!requireName()) { setStep(2); return; }
     const data = buildData(skipDetails);
@@ -173,11 +158,14 @@ export default function AddPetScreen({ navigation, route }) {
     setSaving(true);
     const pet = await addPet(data);
     setSaving(false);
-    if (pet) setCreated(pet); // on failure the API layer already surfaced the error
+    // addPet resolves undefined on failure without telling the user — say so
+    // here, keeping everything they typed for the retry.
+    if (pet) setCreated(pet);
+    else showToast(`Couldn't add ${data.name}. Check your connection and try again.`);
   };
 
   const restart = () => {
-    setForm(blankForm(null));
+    setForm(blankForm());
     setLocalPreview(null);
     setShowOther(false);
     setCreated(null);
@@ -560,7 +548,7 @@ export default function AddPetScreen({ navigation, route }) {
     );
   }
 
-  // ── Flow / edit ──
+  // ── Flow ──
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -576,8 +564,8 @@ export default function AddPetScreen({ navigation, route }) {
             >
               <MaterialCommunityIcons name="arrow-left" size={20} color={ui.ink} />
             </Pressable>
-            <Text style={isEdit ? styles.editTitle : styles.stepLabel} numberOfLines={1}>
-              {isEdit ? `Edit ${existing.name}` : `Step ${step} of ${TOTAL_STEPS}`}
+            <Text style={styles.stepLabel} numberOfLines={1}>
+              Step {step} of {TOTAL_STEPS}
             </Text>
             <View style={{ width: 42 }} />
           </View>
@@ -589,50 +577,18 @@ export default function AddPetScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {isEdit ? (
-            <View>
-              {renderPhotoSlot(112)}
-              {renderName()}
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Type</Text>
-                <View style={styles.chipWrap}>
-                  {PET_TYPES.map((t) => (
-                    <Chip
-                      key={t.id}
-                      label={t.label}
-                      active={form.type === t.id}
-                      accessibilityRole="radio"
-                      onPress={() => set('type', t.id)}
-                    />
-                  ))}
-                </View>
-              </View>
-              {renderBreed()}
-              {renderColors()}
-              {renderDetails()}
-            </View>
-          ) : (
-            <Animated.View key={step} entering={STEP_IN}>
+          <Animated.View key={step} entering={STEP_IN}>
               <Text style={styles.stepTitle} accessibilityRole="header">{STEP_COPY[step].title}</Text>
               <Text style={styles.stepSub}>{STEP_COPY[step].sub}</Text>
               {step === 1 && renderSpeciesStep()}
               {step === 2 && renderNameStep()}
               {step === 3 && renderDetails()}
-            </Animated.View>
-          )}
+          </Animated.View>
         </ScrollView>
 
         {/* Primary action pinned in the thumb zone, same place every step. */}
         <View style={styles.footer}>
-          {isEdit ? (
-            <Button
-              label={saving ? 'Saving…' : 'Save changes'}
-              icon="content-save-outline"
-              onPress={handleSaveEdit}
-              disabled={uploading || saving}
-              style={styles.bigBtn}
-            />
-          ) : step < TOTAL_STEPS ? (
+          {step < TOTAL_STEPS ? (
             <Button label="Continue" onPress={next} disabled={uploading} style={styles.bigBtn} />
           ) : (
             <>
@@ -740,7 +696,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepLabel: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.sub, flex: 1, textAlign: 'center' },
-  editTitle: { ...type.cardTitle, color: ui.ink, flex: 1, textAlign: 'center' },
   scroll: { paddingHorizontal: 24, paddingTop: 18, paddingBottom: 24 },
   stepTitle: { ...type.screenTitle, color: ui.ink },
   stepSub: { ...type.body, color: ui.sub, marginTop: 6, marginBottom: 20 },

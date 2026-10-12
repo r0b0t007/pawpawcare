@@ -23,6 +23,7 @@ describe('component kit', () => {
     'MilestoneRow',
     'RecapCard',
     'PetCard',
+    'PetFace',
     'EmptyState',
     'StepProgress',
     'ToastHost',

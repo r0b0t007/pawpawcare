@@ -13,6 +13,7 @@ export { default as CareStreakCard } from './CareStreakCard';
 export { default as MilestoneRow } from './MilestoneRow';
 export { default as RecapCard } from './RecapCard';
 export { default as PetCard } from './PetCard';
+export { default as PetFace } from './PetFace';
 export { default as EmptyState } from './EmptyState';
 export { default as StepProgress } from './StepProgress';
 export { ToastHost, showToast } from './Toast';

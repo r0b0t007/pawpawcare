@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, Pressable, StyleSheet,
 } from 'react-native';
@@ -10,17 +10,19 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
+import { useToday } from '../../hooks/useToday';
 import { getPref, setPref } from '../../services/prefs';
 
 const CARD_OUT = FadeOut.duration(150);
 import { track } from '../../services/analytics';
 import { noteGoodMoment } from '../../services/storeReview';
-import { resolveAsset } from '../../config';
 import { dayKey } from '../../utils/streaks';
+import { fmtShort, fmtTime, relativeDay } from '../../utils/dates';
+import { petMeta, petPhoto } from '../../utils/pets';
 import { ui, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
-  Button, Card, CareStreakCard, EmptyState, PetCard, RecapCard, StatusRing, StepProgress,
-  UpNextCard, showToast,
+  Button, Card, CareStreakCard, EmptyState, PetCard, PetFace, RecapCard, StatusPill, StepProgress,
+  UpNextCard, petHealthStatus, showToast,
 } from '../../components';
 
 // Home ("Lively & Light") answers one question, "is everyone OK, and what do
@@ -37,33 +39,7 @@ function getGreeting() {
   return 'Good evening';
 }
 
-// '—' rather than the string "Invalid Date" if a malformed date ever slips
-// through (e.g. a stale bundle's locale-string dueDate) — never show garbage.
-const fmtShort = (date) =>
-  Number.isNaN(date.getTime())
-    ? '—'
-    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
 const vaxDate = (v) => new Date(`${v.dueDate}T12:00:00`);
-
-// Worst vaccination status wins the avatar ring.
-function petStatusOf(pet) {
-  const statuses = (pet.vaccinations || []).map((v) => v.status);
-  if (statuses.includes('overdue')) return 'overdue';
-  if (statuses.includes('due_soon')) return 'due';
-  return 'ok';
-}
-
-const photoOf = (pet) => (pet?.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined);
-
-// "in 3 days" / "tomorrow" / "today": relative first, the exact date is in
-// the row's secondary line.
-function relDay(date, today) {
-  const n = Math.round((new Date(date.toDateString()) - new Date(today.toDateString())) / 86400000);
-  if (n <= 0) return 'today';
-  if (n === 1) return 'tomorrow';
-  return `in ${n} days`;
-}
 
 // Status sentence for the headline: names the pets so it's recognised, not
 // read; never alarming, never shaming.
@@ -152,7 +128,9 @@ export default function DashboardScreen({ navigation }) {
   }, [gamification, pets]);
 
   const firstName = user?.name?.split(' ')[0] || 'Friend';
-  const today = useMemo(() => new Date(), []);
+  // Rolls over at midnight / on refocus — Home stays mounted, and "done
+  // today" must never key on yesterday.
+  const today = useToday();
 
   // Weekly recap — fetched only around the week boundary (Sun–Mon), matching
   // the Sunday-evening recap push so the card and notification agree.
@@ -213,11 +191,8 @@ export default function DashboardScreen({ navigation }) {
     setDismissedCelebrations(next);
     setPref('celebrationsDismissed', next);
   };
-  const dateLabel = today
-    .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-    .toUpperCase();
 
-  const { upNext, weekItems, overdueCount } = useMemo(() => {
+  const { upNext, weekItems } = useMemo(() => {
     const pending = pets.flatMap((pet) =>
       (pet.vaccinations || [])
         .filter((v) => v.status === 'overdue' || v.status === 'due_soon' || v.status === 'upcoming')
@@ -270,7 +245,6 @@ export default function DashboardScreen({ navigation }) {
     return {
       upNext: next,
       weekItems: week.slice(0, 5),
-      overdueCount: pending.filter((v) => v.status === 'overdue').length,
     };
   }, [pets, reminders, today]);
 
@@ -295,7 +269,14 @@ export default function DashboardScreen({ navigation }) {
     [pets, medDoseDays, todayKey],
   );
   const medsDone = todayMeds.filter((t) => t.done).length;
-  const overduePets = pets.filter((p) => petStatusOf(p) === 'overdue').length;
+
+  // Headline and subline read the same rule (petHealthStatus), so they can
+  // never contradict each other.
+  const overdueCount = pets.reduce(
+    (n, p) => n + (p.vaccinations || []).filter((v) => v.status === 'overdue').length,
+    0,
+  );
+  const overduePets = pets.filter((p) => petHealthStatus(p.vaccinations).status === 'overdue').length;
 
   const upNextItem = upNext
     ? {
@@ -317,44 +298,31 @@ export default function DashboardScreen({ navigation }) {
         avatarColor: upNext.pet.color || ui.accentTint,
         avatarTextColor: petPair(upNext.pet.color).fg,
         initial: upNext.pet.name[0],
-        photo: photoOf(upNext.pet),
+        photo: petPhoto(upNext.pet),
       }
     : null;
 
-  const fmtTime = (hhmm) => {
-    if (!hhmm) return 'Today';
-    const [h, m] = hhmm.split(':').map(Number);
-    const d = new Date(today);
-    d.setHours(h, m || 0, 0, 0);
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  };
-
+  // One tap, one dose: a dose in flight disables its Log button, and the
+  // celebration only follows a dose the server actually saved.
+  const inFlight = useRef(new Set());
+  const [logging, setLogging] = useState([]);
   const logDose = async ({ pet, med }) => {
-    await logMedicationDose(pet.id, med.id);
-    showToast(`${pet.name}'s ${med.name} logged`, { celebrate: true, actionType: 'dose_logged' });
+    if (inFlight.current.has(med.id)) return;
+    inFlight.current.add(med.id);
+    setLogging((ids) => [...ids, med.id]);
+    const saved = await logMedicationDose(pet.id, med.id);
+    inFlight.current.delete(med.id);
+    setLogging((ids) => ids.filter((id) => id !== med.id));
+    if (saved) {
+      showToast(`${pet.name}'s ${med.name} logged`, { celebrate: true, actionType: 'dose_logged' });
+    } else {
+      showToast(`Couldn't log ${pet.name}'s ${med.name}. Try again.`);
+    }
   };
 
   const goPet = (pet) =>
     navigation.navigate('Pets', { screen: 'PetProfile', params: { petId: pet.id } });
   const addPet = () => navigation.navigate('Pets', { screen: 'AddPet' });
-  const petMeta = (pet) =>
-    [
-      pet.breed || (pet.type ? pet.type[0].toUpperCase() + pet.type.slice(1) : null),
-      pet.age ? `${pet.age} y` : null,
-    ]
-      .filter(Boolean)
-      .join(' · ');
-  const petAvatar = (pet, size = 36) => (
-    <StatusRing
-      size={size}
-      color={pet.color || ui.accentTint}
-      textColor={petPair(pet.color).fg}
-      initial={pet.name[0]}
-      photo={photoOf(pet)}
-      ringColor={pet.color || ui.accentTint}
-    />
-  );
-
   const noPets = dataLoaded && pets.length === 0;
 
   return (
@@ -466,23 +434,28 @@ export default function DashboardScreen({ navigation }) {
                 {todayMeds.slice(0, 4).map((t) => (
                   <View key={t.med.id} style={styles.medRow}>
                     <Pressable onPress={() => goPet(t.pet)} accessibilityRole="button" accessibilityLabel={t.pet.name}>
-                      {petAvatar(t.pet)}
+                      <PetFace pet={t.pet} size={36} />
                     </Pressable>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.rowTitle, t.done && { color: ui.sub }]} numberOfLines={1}>
                         {t.pet.name}'s {t.med.name}
                       </Text>
                       <Text style={styles.rowSub} numberOfLines={1}>
-                        {[fmtTime(t.time), t.med.dosage].filter(Boolean).join(' · ')}
+                        {[fmtTime(t.time) || 'Today', t.med.dosage].filter(Boolean).join(' · ')}
                       </Text>
                     </View>
                     {t.done ? (
-                      <View style={styles.doneTag} accessible accessibilityLabel="Done">
-                        <MaterialCommunityIcons name="check-circle" size={18} color={ui.success} />
-                        <Text style={styles.doneTagText}>Done</Text>
-                      </View>
+                      <StatusPill status="ok" label="Done" style={styles.rowPill} />
                     ) : (
-                      <Button small variant="soft" label="Log" icon="check" onPress={() => logDose(t)} style={styles.logBtn} />
+                      <Button
+                        small
+                        variant="soft"
+                        label="Log"
+                        icon="check"
+                        disabled={logging.includes(t.med.id)}
+                        onPress={() => logDose(t)}
+                        style={styles.logBtn}
+                      />
                     )}
                   </View>
                 ))}
@@ -508,7 +481,7 @@ export default function DashboardScreen({ navigation }) {
                   name={pet.name}
                   meta={petMeta(pet)}
                   color={pet.color}
-                  photo={photoOf(pet)}
+                  photo={petPhoto(pet)}
                   species={pet.type}
                   onPress={() => goPet(pet)}
                 />
@@ -547,7 +520,7 @@ export default function DashboardScreen({ navigation }) {
                     style={[styles.weekRow, i < weekItems.length - 1 && styles.rowDivider]}
                   >
                     {item.pet ? (
-                      petAvatar(item.pet)
+                      <PetFace pet={item.pet} size={36} />
                     ) : (
                       <View style={[styles.iconChip, { backgroundColor: ui.accentTint }]}>
                         <MaterialCommunityIcons name="bell-outline" size={18} color={ui.accent} />
@@ -558,12 +531,9 @@ export default function DashboardScreen({ navigation }) {
                       <Text style={styles.rowSub} numberOfLines={1}>{item.sub}</Text>
                     </View>
                     {item.dueSoon ? (
-                      <View style={styles.dueTag} accessible accessibilityLabel="Due soon">
-                        <MaterialCommunityIcons name="clock-outline" size={13} color={ui.warnText} />
-                        <Text style={styles.dueTagText}>Due soon</Text>
-                      </View>
+                      <StatusPill status="due" style={styles.rowPill} />
                     ) : (
-                      <Text style={styles.relDay}>{relDay(item.date, today)}</Text>
+                      <Text style={styles.relDay}>{relativeDay(item.date, today)}</Text>
                     )}
                   </View>
                 ))
@@ -646,8 +616,7 @@ const styles = StyleSheet.create({
   },
   medRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
   logBtn: { paddingVertical: 9, paddingHorizontal: 14 },
-  doneTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  doneTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: ui.success },
+  rowPill: { alignSelf: 'center' },
   sectionHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -690,17 +659,6 @@ const styles = StyleSheet.create({
   rowTitle: { ...type.rowTitle, fontSize: 15, color: ui.ink },
   rowSub: { ...type.secondary, color: ui.sub },
   relDay: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: ui.sub },
-  dueTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: ui.warnTint,
-    borderRadius: 999,
-    paddingVertical: 4,
-    paddingLeft: 8,
-    paddingRight: 10,
-  },
-  dueTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11.5, color: ui.warnText },
   weekEmpty: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 18 },
   emptyText: {
     flex: 1,

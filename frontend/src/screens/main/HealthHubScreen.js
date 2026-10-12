@@ -8,10 +8,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { getPref } from '../../services/prefs';
-import { resolveAsset } from '../../config';
+import { fmtShort, dayDiff, relativeDay } from '../../utils/dates';
+import { petPhoto } from '../../utils/pets';
 import { ui, type, radii, motion, elevation, photos, petPair } from '../../theme';
 import {
-  Card, Chip, Button, Sheet, StatusRing, StatusPill, EmptyState, showToast, speciesIcon,
+  Card, Chip, Button, Sheet, PetFace, StatusPill, EmptyState, showToast, speciesIcon,
 } from '../../components';
 
 // The Health hub answers "what's due, and when?" — grouped by time the way
@@ -31,31 +32,11 @@ const VAULT = { bg: '#c5e7ff', fg: '#004c6a' }; // sky identity pair
 
 const petFg = (bg) => petPair(bg).fg;
 
-// '—' rather than the string "Invalid Date" if a malformed date ever slips
-// through — the overdue/history rows render without a validity filter.
-const fmtShort = (date) =>
-  Number.isNaN(date.getTime())
-    ? '—'
-    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
 // "Fri 10 Oct" — plain-language day, never an ISO date.
 const fmtDay = (date) =>
   Number.isNaN(date.getTime())
     ? '—'
     : `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${MONTHS[date.getMonth()]}`;
-
-const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const dayDiff = (date) => Math.round((startOfDay(date) - startOfDay(new Date())) / DAY_MS);
-
-// "today" / "tomorrow" / "in 8 days" / "in 3 weeks" / "on 3 Dec".
-const relative = (date) => {
-  const n = dayDiff(date);
-  if (n <= 0) return 'today';
-  if (n === 1) return 'tomorrow';
-  if (n < 14) return `in ${n} days`;
-  if (n < 56) return `in ${Math.round(n / 7)} weeks`;
-  return `on ${date.getDate()} ${MONTHS[date.getMonth()]}`;
-};
 
 // "Synced just now" / "Synced 5m ago" / "Synced 2h ago" — quiet trust line.
 const syncedLabel = (ts) => {
@@ -77,24 +58,6 @@ const defaultDueDate = () => {
   d.setDate(d.getDate() + 14);
   return d;
 };
-
-const petPhoto = (pet) => (pet?.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined);
-
-// The pet's face with its identity ring — status never lives here (rows carry
-// it as a pill), so this is pure recognition.
-function PetFace({ pet, size = 34 }) {
-  if (!pet) return null;
-  return (
-    <StatusRing
-      size={size}
-      color={pet.color || ui.accentTint}
-      textColor={petFg(pet.color)}
-      initial={pet.name[0]}
-      photo={petPhoto(pet)}
-      ringColor={pet.color || ui.accentTint}
-    />
-  );
-}
 
 // Filter chip with the pet's face (photo, or species glyph on its tint).
 function PetFilterChip({ pet, active, onPress }) {
@@ -324,7 +287,7 @@ export default function HealthHubScreen({ navigation }) {
                 style={{ marginTop: 6 }}
               />
             ) : item.dueSoon ? (
-              <StatusPill status="due" label={`Due ${relative(item.date)}`} style={{ marginTop: 6 }} />
+              <StatusPill status="due" label={`Due ${relativeDay(item.date)}`} style={{ marginTop: 6 }} />
             ) : null}
             {item.isReminder && remindersPrefOn !== null && (
               remindersPrefOn ? (
@@ -351,7 +314,7 @@ export default function HealthHubScreen({ navigation }) {
           ) : item.dueSoon ? (
             <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} />
           ) : (
-            <Text style={styles.rowWhen}>{relative(item.date)}</Text>
+            <Text style={styles.rowWhen}>{relativeDay(item.date)}</Text>
           )}
         </Pressable>
       </Animated.View>
@@ -715,7 +678,7 @@ const styles = StyleSheet.create({
     bottom: 20,
     minHeight: 52,
     paddingHorizontal: 22,
-    boxShadow: elevation.cta,
+    boxShadow: elevation.card,
   },
   fieldLabel: { marginBottom: 8 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

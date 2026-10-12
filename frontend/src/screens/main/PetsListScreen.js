@@ -1,16 +1,12 @@
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { usePetsQuery } from '../../hooks/usePets';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
-import { resolveAsset } from '../../config';
+import { petMeta, petPhoto } from '../../utils/pets';
 import { ui, type, photos } from '../../theme';
 import { Button, EmptyState, PetCard, Skeleton, petHealthStatus } from '../../components';
-
-// Reflow only — no entering on virtualized rows (recycling makes them flicker).
-const ROW_LAYOUT = LinearTransition.duration(200);
 
 // "Lively & Light": pets as a 2-column grid of photo cards on their identity
 // tints — recognised by face and color first. Status shows once per pet (icon
@@ -18,14 +14,6 @@ const ROW_LAYOUT = LinearTransition.duration(200);
 // navigates, and adding is a quiet outline tile, never a banner.
 
 const SEVERITY = { overdue: 0, due: 1, ok: 2 };
-
-const petMeta = (pet) =>
-  [
-    pet.breed || (pet.type ? pet.type.charAt(0).toUpperCase() + pet.type.slice(1) : null),
-    pet.age ? `${pet.age} y` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
 
 export default function PetsListScreen({ navigation }) {
   // Reads come from React Query; writes still go through DataContext, which
@@ -50,7 +38,7 @@ export default function PetsListScreen({ navigation }) {
       name={pet.name}
       meta={petMeta(pet)}
       color={pet.color}
-      photo={pet.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined}
+      photo={petPhoto(pet)}
       species={pet.type}
       status={health.status}
       statusLabel={health.label}
@@ -140,7 +128,9 @@ export default function PetsListScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <Animated.FlatList
+      {/* Plain FlatList: Reanimated's itemLayoutAnimation is single-column
+          only, and this grid is two. */}
+      <FlatList
         data={sorted}
         keyExtractor={({ pet, spacer }) => (spacer ? 'spacer' : pet.id)}
         renderItem={renderPet}
@@ -150,7 +140,6 @@ export default function PetsListScreen({ navigation }) {
         ListFooterComponent={ListFooter}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        itemLayoutAnimation={ROW_LAYOUT}
       />
     </SafeAreaView>
   );

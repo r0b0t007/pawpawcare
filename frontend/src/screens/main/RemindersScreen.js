@@ -7,9 +7,8 @@ import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { resolveAsset } from '../../config';
-import { ui, radii, type, motion, petPair, photos } from '../../theme';
-import { Card, Button, ConfirmDialog, EmptyState, StatusRing, showToast } from '../../components';
+import { ui, radii, type, motion, photos } from '../../theme';
+import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast } from '../../components';
 import { EASE_OUT_CSS } from '../../components/motion';
 
 const ROW_OUT = FadeOut.duration(150);
@@ -175,14 +174,7 @@ export default function RemindersScreen({ navigation }) {
               >
                 {pet ? (
                   <Animated.View style={[{ opacity: r.enabled ? 1 : 0.4 }, styles.toggleFade]}>
-                    <StatusRing
-                      size={30}
-                      color={pet.color || ui.accentTint}
-                      textColor={petPair(pet.color).fg}
-                      initial={pet.name[0]}
-                      photo={pet.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined}
-                      ringColor={pet.color || ui.accentTint}
-                    />
+                    <PetFace pet={pet} size={30} />
                   </Animated.View>
                 ) : (
                   <Animated.View style={[styles.rIcon, { opacity: r.enabled ? 1 : 0.4 }, styles.toggleFade]}>

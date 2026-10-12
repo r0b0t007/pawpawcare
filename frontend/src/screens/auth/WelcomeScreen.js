@@ -6,7 +6,7 @@ import { setStatusBarStyle } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
-import { ui, type, motion, elevation, photos } from '../../theme';
+import { ui, type, motion, photos } from '../../theme';
 
 // Logged-out landing screen ("Lively & Light"): a real cat and dog sharing a
 // moment carries the first second (aesthetic-usability), then one message and
@@ -121,7 +121,6 @@ const styles = StyleSheet.create({
     backgroundColor: ui.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: elevation.cta,
   },
   primaryBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: '#ffffff' },
   loginLink: { alignItems: 'center', paddingVertical: 8 },

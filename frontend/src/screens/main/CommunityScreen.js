@@ -127,13 +127,12 @@ export default function CommunityScreen({ navigation }) {
     action: async () => { await resolveLostPet(report.id); showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' }); },
   });
 
-  const handleSeen = (report) => {
-    if (report.contactPhone) {
-      Linking.openURL(`tel:${report.contactPhone}`).catch(() => {});
-    } else {
-      showToast('No contact number was shared');
-    }
-  };
+  // "I've seen them" only exists when the owner shared a number — never a
+  // dead primary button (LostPetCard hides it when onSeen is omitted).
+  const seenHandler = (report) =>
+    report.contactPhone
+      ? () => Linking.openURL(`tel:${report.contactPhone}`).catch(() => {})
+      : undefined;
 
   const userPair = pairFor(user?.name);
   // Someone else's active report, newest first — the feed's top card.
@@ -159,7 +158,7 @@ export default function CommunityScreen({ navigation }) {
                 <LostPetCard
                   elevated
                   report={othersLost[0]}
-                  onSeen={() => handleSeen(othersLost[0])}
+                  onSeen={seenHandler(othersLost[0])}
                 />
                 {othersLost.length > 1 && (
                   <Pressable
@@ -307,7 +306,7 @@ export default function CommunityScreen({ navigation }) {
                   key={report.id}
                   report={report}
                   mine={mine}
-                  onSeen={() => handleSeen(report)}
+                  onSeen={seenHandler(report)}
                   onFound={() => handleMarkFound(report)}
                 />
               );

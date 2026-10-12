@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, Pressable, StyleSheet,
   TextInput, Platform, Share, ActivityIndicator, Image,
@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { resolveAsset } from '../../config';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
+import { fmtShort, fmtTime } from '../../utils/dates';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { track } from '../../services/analytics';
@@ -56,13 +57,6 @@ const shortDate = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString
 const fullDate = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
 const monthLabel = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : '');
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
-
-// '08:00' -> '8:00 am' for the Today card.
-const fmtTime = (hhmm) => {
-  const [h, m] = String(hhmm).split(':').map(Number);
-  if (Number.isNaN(h)) return hhmm;
-  return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
-};
 
 const HERO_HEIGHT = 400;
 
@@ -138,6 +132,9 @@ export default function PetProfileScreen({ navigation, route }) {
   // render their own nested ConfirmDialog so iOS doesn't drop the modal.
   const [confirm, setConfirm] = useState(null);
   const [teamConfirm, setTeamConfirm] = useState(null);
+  // Doses in flight (see handleLogDose) — declared above the early return.
+  const dosesInFlight = useRef(new Set());
+  const [loggingMeds, setLoggingMeds] = useState([]);
   const askConfirm = (cfg) => setConfirm(cfg);
 
   const loadShare = useCallback(async () => {
@@ -218,9 +215,17 @@ export default function PetProfileScreen({ navigation, route }) {
     }));
   };
 
+  // One tap, one dose: the button is disabled while its dose is in flight,
+  // and the celebration only follows a dose the server actually saved.
   const handleLogDose = async (med) => {
-    await logMedicationDose(petId, med.id);
-    showToast('Dose logged', { celebrate: true, actionType: 'dose_logged' });
+    if (dosesInFlight.current.has(med.id)) return;
+    dosesInFlight.current.add(med.id);
+    setLoggingMeds((ids) => [...ids, med.id]);
+    const saved = await logMedicationDose(petId, med.id);
+    dosesInFlight.current.delete(med.id);
+    setLoggingMeds((ids) => ids.filter((id) => id !== med.id));
+    if (saved) showToast('Dose logged', { celebrate: true, actionType: 'dose_logged' });
+    else showToast(`Couldn't log ${med.name}. Try again.`);
   };
 
   const handleDeleteMedication = (med) => askConfirm({
@@ -340,6 +345,16 @@ export default function PetProfileScreen({ navigation, route }) {
   const upcoming = vaccinations.filter((v) => v.status !== 'completed');
   const completedVax = vaccinations.filter((v) => v.status === 'completed');
   const { status, label: statusLabel } = petHealthStatus(vaccinations);
+  // The Health tile names the earliest open vaccine, neutrally — the status
+  // itself is shown once, in the hero pill.
+  const nextVax = [...upcoming]
+    .filter((v) => v.dueDate)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+  const healthTileValue = nextVax
+    ? `${nextVax.name} · ${fmtShort(new Date(`${nextVax.dueDate}T12:00:00`))}`
+    : completedVax.length
+      ? `${completedVax.length} ${completedVax.length === 1 ? 'vaccine' : 'vaccines'} on record`
+      : 'Add a first vaccine';
 
   const latestWeight = normWeights[normWeights.length - 1];
 
@@ -421,7 +436,7 @@ export default function PetProfileScreen({ navigation, route }) {
                       {med.name}{med.dosage ? ` · ${med.dosage}` : ''}
                     </Text>
                     {med.times?.length ? (
-                      <Text style={[type.secondary, { color: ui.sub }]}>{med.times.map(fmtTime).join(', ')}</Text>
+                      <Text style={[type.secondary, { color: ui.sub }]}>{med.times.map((t) => fmtTime(t) || t).join(', ')}</Text>
                     ) : null}
                   </View>
                   {done ? (
@@ -431,8 +446,13 @@ export default function PetProfileScreen({ navigation, route }) {
                       accessibilityRole="button"
                       accessibilityLabel={`Mark ${med.name} done`}
                       onPress={() => handleLogDose(med)}
+                      disabled={loggingMeds.includes(med.id)}
+                      accessibilityState={{ disabled: loggingMeds.includes(med.id) }}
                       hitSlop={8}
-                      style={({ pressed }) => [styles.doneBtn, pressed && { opacity: motion.pressOpacitySoft }]}
+                      style={({ pressed }) => [
+                        styles.doneBtn,
+                        (pressed || loggingMeds.includes(med.id)) && { opacity: motion.pressOpacitySoft },
+                      ]}
                     >
                       <Text style={styles.doneBtnText}>Done</Text>
                     </Pressable>
@@ -460,8 +480,7 @@ export default function PetProfileScreen({ navigation, route }) {
         {[
           [
             {
-              icon: 'needle', title: 'Health', value: statusLabel,
-              valueColor: status === 'overdue' ? ui.dangerText : status === 'due' ? ui.warnText : ui.sub,
+              icon: 'needle', title: 'Health', value: healthTileValue,
               onPress: () => setSegment('health'),
             },
             {
@@ -498,7 +517,7 @@ export default function PetProfileScreen({ navigation, route }) {
                   <Text style={styles.tileTitle}>{t.title}</Text>
                   <Text
                     numberOfLines={2}
-                    style={[styles.tileValue, t.valueColor && { color: t.valueColor, fontFamily: 'PlusJakartaSans_600SemiBold' }]}
+                    style={styles.tileValue}
                   >
                     {t.value}
                   </Text>

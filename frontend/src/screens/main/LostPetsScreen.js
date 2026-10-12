@@ -7,15 +7,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { resolveAsset } from '../../config';
-import { ui, type, PET_COLOR_PAIRS, photos } from '../../theme';
+import { ui, type, petPair, photos } from '../../theme';
 import { Button, ConfirmDialog, EmptyState, showToast } from '../../components';
 import LostPetCard from './LostPetCard';
 
 // Redesign: this pushed screen is now the report/manage surface — the board
 // itself lives inline in Community's "Lost pets" section. Report form on top,
 // then your active reports (mark as found), then everyone else's.
-
-const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
 
 export default function LostPetsScreen({ navigation }) {
   const {
@@ -126,7 +124,7 @@ export default function LostPetsScreen({ navigation }) {
                             style={{ width: '100%', height: '100%' }}
                           />
                         ) : (
-                          <Text style={[styles.petChipInitial, { color: petFg(pet.color) }]}>
+                          <Text style={[styles.petChipInitial, { color: petPair(pet.color).fg }]}>
                             {(pet.name || '?')[0]}
                           </Text>
                         )}

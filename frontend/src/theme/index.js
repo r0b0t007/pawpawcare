@@ -123,10 +123,10 @@ export const PET_COLOR_PAIRS = [
 // The pair for a pet's stored color (falls back to peach for legacy colors).
 export const petPair = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg) ?? PET_COLOR_PAIRS[0];
 
-// One soft, warm shadow level — hero cards and photo cards only.
+// One soft, warm shadow level — hero cards, photo cards and a floating
+// action (which needs to lift off the content it floats over). Nothing else.
 export const elevation = {
   card: '0 6px 18px rgba(90, 58, 16, 0.09)',
-  cta: '0 4px 12px rgba(138, 83, 0, 0.22)',
 };
 
 // Decorative stock photography (Unsplash, see assets/images/CREDITS.md).
