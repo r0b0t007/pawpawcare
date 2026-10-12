@@ -11,6 +11,7 @@ import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
 import { useInFlight } from '../../hooks/useInFlight';
+import { fmtFull, parseDay } from '../../utils/dates';
 import { resolveAsset } from '../../config';
 import { ui, radii, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
 import { Button, Card, Chip, StepProgress, showToast, speciesIcon } from '../../components';
@@ -75,10 +76,10 @@ export default function AddPetScreen({ navigation }) {
 
   const [step, setStep] = useState(1);
   const [created, setCreated] = useState(null); // the saved pet → success view
-  const [saving, setSaving] = useState(false);
   // Two taps in one frame ("Add" + "Skip for now", or a double tap) must never
   // create the pet twice.
-  const { run } = useInFlight();
+  const { run, isBusy } = useInFlight();
+  const saving = isBusy('create');
   const [showOther, setShowOther] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
 
@@ -115,14 +116,10 @@ export default function AddPetScreen({ navigation }) {
   };
 
   const pickerValue = datePickerField && form[datePickerField]
-    ? new Date(form[datePickerField] + 'T12:00:00')
+    ? parseDay(form[datePickerField])
     : new Date();
 
-  const formatDate = (iso) => {
-    if (!iso) return null;
-    const d = new Date(iso + 'T12:00:00');
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  const formatDate = (iso) => (iso ? fmtFull(parseDay(iso)) : null);
 
   const onDateChange = (event, selectedDate) => {
     const field = datePickerField;
@@ -160,9 +157,7 @@ export default function AddPetScreen({ navigation }) {
     const data = buildData(skipDetails);
     await run('create', async () => {
       if (data.adoptedOn) track('gotcha_day_set', {});
-      setSaving(true);
       const pet = await addPet(data);
-      setSaving(false);
       // addPet resolves undefined on failure without telling the user — say
       // so here, keeping everything they typed for the retry.
       if (pet) setCreated(pet);

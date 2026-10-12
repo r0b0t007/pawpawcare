@@ -12,6 +12,7 @@ import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '..
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useTickAt } from '../../hooks/useTickAt';
 import { getPref, setPref } from '../../services/prefs';
 
 const CARD_OUT = FadeOut.duration(150);
@@ -19,8 +20,8 @@ import { track } from '../../services/analytics';
 import { noteGoodMoment } from '../../services/storeReview';
 import { dayKey } from '../../utils/streaks';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
-import { fmtShort, fmtTime, overdueLabel, relativeDay } from '../../utils/dates';
-import { petMeta, petPhoto } from '../../utils/pets';
+import { dayDiff, fmtShort, fmtTime, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
+import { petById, petMeta, petPhoto } from '../../utils/pets';
 import { ui, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
   Button, Card, CareStreakCard, EmptyState, PetCard, PetFace, RecapCard, StatusPill, StepProgress,
@@ -41,7 +42,7 @@ function getGreeting() {
   return 'Good evening';
 }
 
-const vaxDate = (v) => new Date(`${v.dueDate}T12:00:00`);
+const vaxDate = (v) => parseDay(v.dueDate);
 
 // Status sentence for the headline: names the pets so it's recognised, not
 // read; never alarming, never shaming. Same buckets as petHealthStatus
@@ -63,6 +64,7 @@ const BENEFITS = [
   { icon: 'account-group-outline', pair: PET_COLOR_PAIRS[2], label: 'Share care with your family' },
 ];
 const TEASER_PAIR = PET_COLOR_PAIRS[3];
+const MED_ROWS = 4;
 
 export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
@@ -198,6 +200,12 @@ export default function DashboardScreen({ navigation }) {
     setPref('celebrationsDismissed', next);
   };
 
+  const reminderTimes = useMemo(
+    () => reminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
+    [reminders],
+  );
+  const reminderTick = useTickAt(reminderTimes);
+
   const { upNext, weekItems } = useMemo(() => {
     const pending = pets.flatMap((pet) =>
       (pet.vaccinations || [])
@@ -216,11 +224,15 @@ export default function DashboardScreen({ navigation }) {
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
     const next = earliest('overdue') || earliest('due_soon') || null;
 
-    const weekEnd = new Date(today);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    const inWeek = (d) => d >= new Date(today.toDateString()) && d <= weekEnd;
+    // Calendar days, like Health's "This week" (today + the next 7), so an
+    // item never depends on what time Home happened to mount.
+    const inWeek = (d) => {
+      const n = dayDiff(d, today);
+      return n >= 0 && n <= 7;
+    };
     // A reminder is a moment, not a day: one that fired at 8:00 is history by
-    // 15:00 (vaccines stay day-based).
+    // 15:00 (vaccines stay day-based). `reminderTick` re-runs this when the
+    // next reminder fires, so a Home left open drops it on time.
     const now = new Date();
 
     const week = [
@@ -240,7 +252,7 @@ export default function DashboardScreen({ navigation }) {
         .map((r) => ({ r, date: new Date(r.next_fire_at || r.fire_at) }))
         .filter(({ date }) => !Number.isNaN(date.getTime()) && date >= now && inWeek(date))
         .map(({ r, date }) => {
-          const pet = pets.find((p) => p.id === r.pet_id);
+          const pet = petById(pets, r.pet_id);
           const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
           return {
             key: `rem-${r.id}`,
@@ -256,7 +268,7 @@ export default function DashboardScreen({ navigation }) {
       upNext: next,
       weekItems: week.slice(0, 5),
     };
-  }, [pets, reminders, today]);
+  }, [pets, reminders, today, reminderTick]);
 
   // Today's daily care across the household: active daily meds, counted in
   // doses (one per scheduled time), so a twice-daily med is half done after
@@ -278,6 +290,9 @@ export default function DashboardScreen({ navigation }) {
         .sort((a, b) => (a.done - b.done) || String(a.times[0]).localeCompare(String(b.times[0]))),
     [pets, medDoseDays, medDoseCounts, todayKey],
   );
+  // Four rows keep the card scannable; the rest are one tap away — every med
+  // the progress bar counts can be logged from here.
+  const [showAllMeds, setShowAllMeds] = useState(false);
   const dosesTotal = todayMeds.reduce((n, t) => n + t.expected, 0);
   const dosesDone = todayMeds.reduce((n, t) => n + t.taken, 0);
 
@@ -295,7 +310,7 @@ export default function DashboardScreen({ navigation }) {
         subtitle: `${upNext.pet.name} · due ${fmtShort(vaxDate(upNext))}`,
         status: upNext.status === 'overdue' ? 'overdue' : 'due',
         statusLabel:
-          upNext.status === 'overdue' ? overdueLabel(upNext.dueDate) : `Due ${fmtShort(vaxDate(upNext))}`,
+          upNext.status === 'overdue' ? overdueLabel(upNext.dueDate, today) : `Due ${fmtShort(vaxDate(upNext))}`,
         // No-shame framing: an invitation to act, never "you missed".
         note:
           upNext.status === 'overdue'
@@ -455,7 +470,7 @@ export default function DashboardScreen({ navigation }) {
                   </Text>
                 </View>
                 <StepProgress done={dosesDone} total={dosesTotal} tone="success" height={8} />
-                {todayMeds.slice(0, 4).map((t) => (
+                {(showAllMeds ? todayMeds : todayMeds.slice(0, MED_ROWS)).map((t) => (
                   <View key={t.med.id} style={styles.medRow}>
                     <Pressable onPress={() => goPet(t.pet)} accessibilityRole="button" accessibilityLabel={t.pet.name}>
                       <PetFace pet={t.pet} size={36} />
@@ -487,6 +502,20 @@ export default function DashboardScreen({ navigation }) {
                     )}
                   </View>
                 ))}
+                {todayMeds.length > MED_ROWS && (
+                  <Pressable
+                    onPress={() => setShowAllMeds((v) => !v)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: showAllMeds }}
+                    style={({ pressed }) => [styles.showMore, pressed && { opacity: motion.pressOpacity }]}
+                  >
+                    <Text style={styles.sectionLink}>
+                      {showAllMeds ? 'Show less' : `Show ${todayMeds.length - MED_ROWS} more`}
+                    </Text>
+                    <MaterialCommunityIcons name={showAllMeds ? 'chevron-up' : 'chevron-down'} size={18} color={ui.accent} />
+                  </Pressable>
+                )}
               </Card>
             )}
 
@@ -654,6 +683,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: { ...type.sectionLabel, color: ui.subtle },
   sectionLink: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.accent },
+  showMore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, paddingTop: 4 },
   moreLink: {
     flexDirection: 'row',
     alignItems: 'center',

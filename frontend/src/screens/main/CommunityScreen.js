@@ -12,6 +12,7 @@ import { pickAndUploadImage } from '../../services/imagePicker';
 import { uploadImage } from '../../services/api';
 import { track } from '../../services/analytics';
 import { timeAgo } from '../../utils/dates';
+import { useInFlight } from '../../hooks/useInFlight';
 import { resolveAsset } from '../../config';
 import { ui, type, PET_COLOR_PAIRS, motion, photos } from '../../theme';
 import {
@@ -105,14 +106,21 @@ export default function CommunityScreen({ navigation }) {
     }
   };
 
-  const handlePost = async () => {
-    if (!draft.trim()) return;
-    await addPost(draft.trim(), draftImage);
-    setDraft('');
-    setDraftImage(null);
-    setAttachFailed(null);
-    setComposerOpen(false);
-    showToast('Shared with the pack');
+  // One post per tap; the composer clears only once the post is saved.
+  const { run, isBusy } = useInFlight();
+  const handlePost = () => {
+    if (!draft.trim()) return undefined;
+    return run('post', async () => {
+      if (!(await addPost(draft.trim(), draftImage))) {
+        showToast("Couldn't share that. Try again.");
+        return;
+      }
+      setDraft('');
+      setDraftImage(null);
+      setAttachFailed(null);
+      setComposerOpen(false);
+      showToast('Shared with the pack');
+    });
   };
 
   const closeComposer = () => {
@@ -122,16 +130,23 @@ export default function CommunityScreen({ navigation }) {
     setComposerOpen(false);
   };
 
-  const handleToggleGroup = (group) => {
-    toggleGroupMembership(group.id);
-    showToast(group.isJoined ? `Left ${group.name}` : `Joined ${group.name}`);
-  };
+  const handleToggleGroup = (group) =>
+    run(`group-${group.id}`, async () => {
+      if (await toggleGroupMembership(group.id)) {
+        showToast(group.isJoined ? `Left ${group.name}` : `Joined ${group.name}`);
+      } else {
+        showToast(`Couldn't ${group.isJoined ? 'leave' : 'join'} ${group.name}. Try again.`);
+      }
+    });
 
   const handleMarkFound = (report) => setConfirm({
     title: 'Mark as found?',
     message: `Has ${report.petName} been found safe?`,
     confirmLabel: 'Found!',
-    action: async () => { await resolveLostPet(report.id); showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' }); },
+    action: async () => {
+      if (await resolveLostPet(report.id)) showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' });
+      else showToast("Couldn't mark them found. Try again.");
+    },
   });
 
   // "I've seen them" only exists when the owner shared a number — never a
@@ -232,7 +247,7 @@ export default function CommunityScreen({ navigation }) {
                   <Pressable onPress={closeComposer} hitSlop={8} style={styles.cancelBtn}>
                     <Text style={styles.cancelText}>Cancel</Text>
                   </Pressable>
-                  <Button pill label="Post" onPress={handlePost} disabled={!draft.trim()} />
+                  <Button pill label="Post" onPress={handlePost} disabled={!draft.trim() || isBusy('post')} />
                 </View>
               </Card>
             )}
@@ -404,7 +419,10 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
   };
 
   const removeComment = async (id) => {
-    await deleteComment(post.id, id);
+    if (!(await deleteComment(post.id, id))) {
+      showToast("Couldn't delete the comment. Try again.");
+      return;
+    }
     setComments((prev) => (prev || []).filter((c) => c.id !== id));
     showToast('Comment deleted');
   };

@@ -1,4 +1,6 @@
-import { fmtShort, fmtDay, fmtTime, dayDiff, relativeDay, timeAgo, daysOverdue, overdueLabel } from '../dates';
+import {
+  fmtShort, fmtDay, fmtTime, fmtFull, fmtMonth, dayDiff, relativeDay, timeAgo, daysOverdue, overdueLabel, parseDay,
+} from '../dates';
 
 // Fixed "today" for determinism (local time).
 const TODAY = new Date('2026-10-12T10:00:00');
@@ -70,12 +72,25 @@ describe('timeAgo', () => {
 });
 
 describe('daysOverdue / overdueLabel', () => {
-  const now = new Date('2026-10-12T10:00:00').getTime();
-  it('counts whole days past due, at least one', () => {
-    expect(daysOverdue('2026-10-10', now)).toBe(1);
-    expect(daysOverdue('2026-10-12', now)).toBe(1);
-    expect(daysOverdue('2026-10-01', now)).toBe(10);
-    expect(overdueLabel('2026-10-12', now)).toBe('Overdue · 1 day');
-    expect(overdueLabel('2026-10-01', now)).toBe('Overdue · 10 days');
+  it('counts calendar days past due, the same all day long', () => {
+    const morning = new Date('2026-10-12T09:00:00');
+    const evening = new Date('2026-10-12T21:00:00');
+    expect(daysOverdue('2026-10-10', morning)).toBe(2);
+    expect(daysOverdue('2026-10-10', evening)).toBe(2);
+    expect(daysOverdue('2026-10-11', morning)).toBe(1);
+    expect(daysOverdue('2026-10-12', morning)).toBe(1); // due today: at least one
+    expect(overdueLabel('2026-10-11', morning)).toBe('Overdue · 1 day');
+    expect(overdueLabel('2026-10-02', evening)).toBe('Overdue · 10 days');
+  });
+});
+
+describe('parseDay / fmtFull / fmtMonth', () => {
+  it('parses calendar dates (or the date part of a timestamp) at local noon', () => {
+    expect(parseDay('2026-10-05').getDate()).toBe(5);
+    expect(parseDay('2026-10-05T23:30:00Z').getDate()).toBe(5);
+    expect(Number.isNaN(parseDay(null).getTime())).toBe(true);
+    expect(fmtFull(parseDay('2026-10-05'))).toBe('Oct 5, 2026');
+    expect(fmtMonth(parseDay('2026-10-05'))).toBe('OCT');
+    expect(fmtMonth(parseDay(''))).toBe('');
   });
 });

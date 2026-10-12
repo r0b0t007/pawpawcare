@@ -8,6 +8,8 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
 import { Card, Button, Sheet, ConfirmDialog, StatusPill, showToast } from '../../components';
+import { useInFlight } from '../../hooks/useInFlight';
+import { parseDay } from '../../utils/dates';
 
 const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
 
@@ -18,7 +20,7 @@ const hit = { top: 8, bottom: 8, left: 8, right: 8 };
 
 const formatDisplay = (iso) => {
   if (!iso) return null;
-  const d = new Date(iso + 'T12:00:00');
+  const d = parseDay(iso);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
@@ -32,13 +34,15 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [confirm, setConfirm] = useState(null);
 
+  // One add per tap — declared above the early return (hook order).
+  const { run } = useInFlight();
   if (!pet) return null;
 
   const vaccinations = pet.vaccinations || [];
   const upcoming = vaccinations.filter((v) => v.status !== 'completed');
   const completed = vaccinations.filter((v) => v.status === 'completed');
 
-  const dueDateObj = form.dueDate ? new Date(form.dueDate + 'T12:00:00') : new Date();
+  const dueDateObj = form.dueDate ? parseDay(form.dueDate) : new Date();
 
   const onDateChange = (event, selectedDate) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
@@ -48,17 +52,23 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
     }
   };
 
-  const handleAdd = async () => {
-    if (!form.name.trim() || !form.dueDate) return;
-    await addVaccination(petId, {
-      name: form.name.trim(),
-      dueDate: form.dueDate,
-      status: 'upcoming',
-      administeredDate: null,
+  const handleAdd = () => {
+    if (!form.name.trim() || !form.dueDate) return undefined;
+    return run('add', async () => {
+      const saved = await addVaccination(petId, {
+        name: form.name.trim(),
+        dueDate: form.dueDate,
+        status: 'upcoming',
+        administeredDate: null,
+      });
+      if (!saved) {
+        showToast("Couldn't schedule the vaccination. Try again.");
+        return;
+      }
+      setForm({ name: '', dueDate: '' });
+      setModal(false);
+      showToast('Vaccination scheduled');
     });
-    setForm({ name: '', dueDate: '' });
-    setModal(false);
-    showToast('Vaccination scheduled');
   };
 
   const confirmComplete = (vax) =>
@@ -80,8 +90,8 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       confirmLabel: 'Delete',
       destructive: true,
       action: async () => {
-        await deleteVaccination(petId, vax.id);
-        showToast('Record deleted');
+        if (await deleteVaccination(petId, vax.id)) showToast('Record deleted');
+        else showToast("Couldn't delete the record. Try again.");
       },
     });
 

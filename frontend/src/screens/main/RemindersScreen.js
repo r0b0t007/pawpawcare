@@ -9,6 +9,8 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { ui, radii, type, motion, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast } from '../../components';
+import { useInFlight } from '../../hooks/useInFlight';
+import { petById } from '../../utils/pets';
 import { EASE_OUT_CSS } from '../../components/motion';
 
 const ROW_OUT = FadeOut.duration(150);
@@ -46,7 +48,7 @@ function scheduleSummary(r) {
 export default function RemindersScreen({ navigation }) {
   const { reminders, pets, addReminder, updateReminder, deleteReminder } = useData();
   // A reminder tied to a pet shows that pet's face — recognised before read.
-  const petOf = (r) => (r.pet_id ? (pets || []).find((p) => String(p.id) === String(r.pet_id)) : null);
+  const petOf = (r) => petById(pets, r.pet_id) || null;
 
   const [title, setTitle] = useState('');
   const [when, setWhen] = useState(defaultWhen());
@@ -57,27 +59,36 @@ export default function RemindersScreen({ navigation }) {
 
   const canSave = title.trim().length > 0 && when.getTime() > Date.now();
 
-  const onSave = async () => {
-    if (!canSave || saving) return;
-    setSaving(true);
-    await addReminder({
-      title: title.trim(),
-      schedule_type: 'one_time',
-      fire_at: when.toISOString(),
-      lead_time_days: 0,
+  // One reminder per tap (a ref guard — state alone lets two taps in one
+  // frame through); the form clears only once it's saved.
+  const { run } = useInFlight();
+  const onSave = () => {
+    if (!canSave) return undefined;
+    return run('add', async () => {
+      setSaving(true);
+      const saved = await addReminder({
+        title: title.trim(),
+        schedule_type: 'one_time',
+        fire_at: when.toISOString(),
+        lead_time_days: 0,
+      });
+      setSaving(false);
+      if (!saved) {
+        showToast("Couldn't add the reminder. Try again.");
+        return;
+      }
+      setTitle('');
+      setWhen(defaultWhen());
+      showToast('Reminder added');
     });
-    setTitle('');
-    setWhen(defaultWhen());
-    setSaving(false);
-    showToast('Reminder added');
   };
 
   const confirmDelete = () => {
     const r = pendingDelete;
     setPendingDelete(null);
     if (!r) return;
-    deleteReminder(r.id);
-    showToast('Reminder deleted');
+    deleteReminder(r.id).then((ok) =>
+      showToast(ok ? 'Reminder deleted' : "Couldn't delete the reminder. Try again."));
   };
 
   return (

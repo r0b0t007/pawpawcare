@@ -331,6 +331,12 @@ export function DataProvider({ children }) {
     }
   }, [user?.id]);
 
+  // Mutation contract: every add/update/delete/toggle below resolves a truthy
+  // value on success (the saved entity, or true) and false on failure. Errors
+  // are handled here (session expiry logs out), never thrown, so a screen
+  // confirms only what was actually saved. (The medical-vault add/update calls
+  // throw instead: their forms show the API's validation messages.)
+  //   if (await addWeight(...)) showToast('Weight logged'); else showToast("Couldn't …");
   const handleApiError = (err) => {
     if (err.message === 'SESSION_EXPIRED') logout();
   };
@@ -454,42 +460,48 @@ export function DataProvider({ children }) {
     try {
       await post('/reminders', payload);
       await refreshReminders();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const updateReminder = async (id, updates) => {
     try {
       await patch(`/reminders/${id}`, updates);
       await refreshReminders();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const deleteReminder = async (id) => {
     try {
       await del(`/reminders/${id}`);
       await refreshReminders();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const markNotificationRead = async (id) => {
     try {
       await post(`/notifications/${id}/read`);
       await refreshNotifications();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const snoozeNotification = async (id, minutes = 60) => {
     try {
       await post(`/notifications/${id}/snooze`, { minutes });
       await Promise.all([refreshNotifications(), refreshReminders()]);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const dismissNotification = async (id) => {
     try {
       await post(`/notifications/${id}/dismiss`);
       await refreshNotifications();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // ── Pet CRUD ──
@@ -519,6 +531,7 @@ export function DataProvider({ children }) {
       return newPet;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -563,8 +576,10 @@ export function DataProvider({ children }) {
         // A weight edit creates a server-side log; refetch so the tracker stays in sync.
         if (updates.weight !== undefined) refreshPetWeights(petId);
       }
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -573,8 +588,10 @@ export function DataProvider({ children }) {
       await del(`/pets/${petId}`);
       dispatch({ type: 'DELETE_PET', payload: petId });
       queryClient.invalidateQueries({ queryKey: petsKeys.all });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -606,6 +623,7 @@ export function DataProvider({ children }) {
       return newVax;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -627,8 +645,10 @@ export function DataProvider({ children }) {
     try {
       await del(`/pets/${petId}/vaccinations/${vaccinationId}`);
       applyVaxChange(petId, (vaxes) => vaxes.filter((v) => v.id !== vaccinationId));
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -640,8 +660,10 @@ export function DataProvider({ children }) {
       const newFood = toFood(apiFood);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, favoriteFoods: [...pet.favoriteFoods, newFood] } });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -650,8 +672,10 @@ export function DataProvider({ children }) {
       await del(`/pets/${petId}/foods/${foodId}`);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, favoriteFoods: pet.favoriteFoods.filter((f) => f.id !== foodId) } });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -669,8 +693,10 @@ export function DataProvider({ children }) {
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, activities: [...pet.activities, newAct] } });
       trackCareAction('activity_added');
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -712,6 +738,7 @@ export function DataProvider({ children }) {
       return newW;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -730,8 +757,10 @@ export function DataProvider({ children }) {
           weightUnit: latest ? latest.unit : pet.weightUnit,
         },
       });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -752,6 +781,7 @@ export function DataProvider({ children }) {
       return newE;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -760,8 +790,10 @@ export function DataProvider({ children }) {
       await del(`/pets/${petId}/expenses/${expenseId}`);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, expenses: (pet.expenses || []).filter((e) => e.id !== expenseId) } });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -783,6 +815,7 @@ export function DataProvider({ children }) {
       return newMed;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -793,8 +826,10 @@ export function DataProvider({ children }) {
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, medications: (pet.medications || []).map((m) => (m.id === medId ? updated : m)) } });
       refreshReminders();
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -804,8 +839,10 @@ export function DataProvider({ children }) {
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, medications: (pet.medications || []).filter((m) => m.id !== medId) } });
       refreshReminders();
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -854,14 +891,16 @@ export function DataProvider({ children }) {
       });
       // Refresh the board/reports and the feed (the broadcast post) — not all pets.
       await Promise.all([refreshLostPets(), refreshPosts()]);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const resolveLostPet = async (reportId, note) => {
     try {
       await patch(`/lost-pets/${reportId}/resolve`, { resolution_note: note || null });
       await Promise.all([refreshLostPets(), refreshPosts()]);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // ── Sharing (co-owners) ──
@@ -891,13 +930,15 @@ export function DataProvider({ children }) {
   const cancelPetInvite = async (petId, inviteId) => {
     try {
       await del(`/pets/${petId}/invites/${inviteId}`);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const removePetMember = async (petId, userId) => {
     try {
       await del(`/pets/${petId}/members/${userId}`);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // Member-side: leave a pet I was shared into → drop it from my list.
@@ -905,7 +946,8 @@ export function DataProvider({ children }) {
     try {
       await post(`/pets/${petId}/leave`);
       dispatch({ type: 'DELETE_PET', payload: petId });
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const acceptInvite = async (inviteId) => {
@@ -915,14 +957,16 @@ export function DataProvider({ children }) {
       // sub-resources) appear in the list.
       dispatch({ type: 'SET_INVITES', payload: state.invites.filter((i) => i.id !== inviteId) });
       await loadData();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const declineInvite = async (inviteId) => {
     try {
       await post(`/invites/${inviteId}/decline`);
       dispatch({ type: 'SET_INVITES', payload: state.invites.filter((i) => i.id !== inviteId) });
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // ── Medical records vault ──
@@ -956,7 +1000,7 @@ export function DataProvider({ children }) {
     return toClinic(c);
   };
   const deleteClinic = async (petId, id) => {
-    try { await del(`/pets/${petId}/clinics/${id}`); } catch (err) { handleApiError(err); }
+    try { await del(`/pets/${petId}/clinics/${id}`); return true; } catch (err) { handleApiError(err); return false; }
   };
 
   const addAppointment = async (petId, data) => {
@@ -968,7 +1012,7 @@ export function DataProvider({ children }) {
     return toAppointment(a);
   };
   const deleteAppointment = async (petId, id) => {
-    try { await del(`/pets/${petId}/appointments/${id}`); } catch (err) { handleApiError(err); }
+    try { await del(`/pets/${petId}/appointments/${id}`); return true; } catch (err) { handleApiError(err); return false; }
   };
 
   // file = { uri, name }; fields = { title, category, appointment_id?, clinic_id? }
@@ -978,7 +1022,7 @@ export function DataProvider({ children }) {
     return toDocument(d);
   };
   const deleteDocument = async (petId, id) => {
-    try { await del(`/pets/${petId}/documents/${id}`); } catch (err) { handleApiError(err); }
+    try { await del(`/pets/${petId}/documents/${id}`); return true; } catch (err) { handleApiError(err); return false; }
   };
   // Mint a short-lived signed URL to view a document (files aren't public).
   const getDocumentUrl = async (petId, id) => {
@@ -1045,8 +1089,10 @@ export function DataProvider({ children }) {
     try {
       const apiPost = await post('/community/posts', { content, image_url: imageUrl || null });
       dispatch({ type: 'ADD_POST', payload: toPost(apiPost) });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -1054,8 +1100,10 @@ export function DataProvider({ children }) {
     try {
       const apiGroup = await post(`/community/groups/${groupId}/join`);
       dispatch({ type: 'UPDATE_GROUP', payload: toGroup(apiGroup) });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -1063,8 +1111,10 @@ export function DataProvider({ children }) {
     try {
       const apiPost = await post(`/community/posts/${postId}/paw`);
       dispatch({ type: 'UPDATE_POST', payload: toPost(apiPost) });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -1111,6 +1161,7 @@ export function DataProvider({ children }) {
       return apiComment;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -1119,8 +1170,10 @@ export function DataProvider({ children }) {
       await del(`/community/posts/${postId}/comments/${commentId}`);
       const p = state.posts.find((x) => x.id === postId);
       if (p) dispatch({ type: 'UPDATE_POST', payload: { ...p, comments: Math.max(0, (p.comments || 0) - 1) } });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 

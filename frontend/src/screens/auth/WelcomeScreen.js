@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Pressable, Image, ScrollView, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import { setStatusBarStyle } from 'expo-status-bar';
+import { useIsFocused } from '@react-navigation/native';
+import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
@@ -19,18 +19,17 @@ export default function WelcomeScreen({ navigation }) {
     markInteractive();
   }, [markInteractive]);
 
-  // Light status-bar glyphs over the photo; back to dark when leaving.
-  useFocusEffect(
-    useCallback(() => {
-      setStatusBarStyle('light');
-      return () => setStatusBarStyle('dark');
-    }, []),
-  );
+  // Light status-bar glyphs over the photo while this screen is focused. A
+  // declarative <StatusBar> (not setStatusBarStyle): mounted StatusBars stack,
+  // the latest wins, so App's always-rendered dark one can't override it on a
+  // re-render — and unmounting it (on blur) hands control straight back.
+  const isFocused = useIsFocused();
 
   const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.root}>
+      {isFocused && <StatusBar style="light" />}
       <ScrollView bounces={false} contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <Image

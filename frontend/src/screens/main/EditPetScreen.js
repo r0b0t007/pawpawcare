@@ -74,13 +74,17 @@ export default function EditPetScreen({ navigation, route }) {
     }
     setSaving(true);
     try {
-      await updatePet(petId, {
+      const saved = await updatePet(petId, {
         name: form.name.trim(),
         type: form.type,
         breed: form.breed.trim(),
         color: form.color,
         avatarUrl: form.avatarUrl,
       });
+      if (!saved) {
+        showToast("Couldn't save the changes. Try again.");
+        return;
+      }
       showToast('Saved');
       navigation.goBack();
     } finally {
@@ -93,8 +97,9 @@ export default function EditPetScreen({ navigation, route }) {
     // Navigate away first so the pet vanishing from state can't flash a
     // "Pet not found" frame; the delete then completes in the background.
     navigation.popToTop();
-    deletePet(petId);
-    showToast(`${pet.name} removed`);
+    const name = pet.name;
+    deletePet(petId).then((ok) =>
+      showToast(ok ? `${name} removed` : `Couldn't remove ${name}. Try again.`));
   };
 
   return (

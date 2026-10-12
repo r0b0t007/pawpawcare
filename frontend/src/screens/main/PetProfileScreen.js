@@ -13,7 +13,7 @@ import { petPhoto } from '../../utils/pets';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
-import { fmtShort, fmtTime } from '../../utils/dates';
+import { fmtFull, fmtMonth, fmtShort, fmtTime, parseDay } from '../../utils/dates';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
@@ -56,9 +56,10 @@ const SEGMENTS = [
   { value: 'notes', label: 'Notes' },
 ];
 
-const shortDate = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
-const fullDate = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
-const monthLabel = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : '');
+// '' for a missing date (callers supply their own fallback text).
+const shortDate = (iso) => (iso ? fmtShort(parseDay(iso)) : '');
+const fullDate = (iso) => (iso ? fmtFull(parseDay(iso)) : '');
+const monthLabel = (iso) => (iso ? fmtMonth(parseDay(iso)) : '');
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
 const HERO_HEIGHT = 400;
@@ -171,46 +172,71 @@ export default function PetProfileScreen({ navigation, route }) {
     );
   }
 
-  // ── Handlers (logic unchanged from the previous screen) ──
+  // ── Handlers ──
 
-  const handleAddFood = async () => {
-    if (!newFood.trim()) return;
-    await addFavoriteFood(petId, newFood.trim());
-    setNewFood('');
-    showToast('Food added');
+  // Every save goes through here: one request per tap (useInFlight — a
+  // double tap never saves twice), and the success copy (plus clearing the
+  // form / closing the sheet) only for what the server actually saved. On a
+  // failure the form stays as typed and the user gets a retry message.
+  const save = (key, request, { ok, okOptions, fail, then }) =>
+    run(key, async () => {
+      if (await request()) {
+        then?.();
+        if (ok) showToast(ok, okOptions);
+      } else {
+        showToast(fail);
+      }
+    });
+
+  const handleAddFood = () => {
+    if (!newFood.trim()) return undefined;
+    return save('food', () => addFavoriteFood(petId, newFood.trim()), {
+      ok: 'Food added',
+      fail: "Couldn't add that food. Try again.",
+      then: () => setNewFood(''),
+    });
   };
 
-  const handleRemoveFood = async (food) => {
-    await removeFavoriteFood(petId, food.id);
-    showToast('Food removed');
-  };
+  const handleRemoveFood = (food) =>
+    save(`food-${food.id}`, () => removeFavoriteFood(petId, food.id), {
+      ok: 'Food removed',
+      fail: "Couldn't remove that food. Try again.",
+    });
 
-  const handleAddActivity = async () => {
-    if (!newActivity.name.trim()) return;
-    await addActivity(petId, {
+  const handleAddActivity = () => {
+    if (!newActivity.name.trim()) return undefined;
+    return save('activity', () => addActivity(petId, {
       name: newActivity.name.trim(),
       duration: parseInt(newActivity.duration) || 30,
       timeOfDay: newActivity.timeOfDay,
       icon: newActivity.icon,
+    }), {
+      ok: 'Activity added',
+      fail: "Couldn't add the activity. Try again.",
+      then: () => {
+        setNewActivity({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
+        setActivitySheet(false);
+      },
     });
-    setNewActivity({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
-    setActivitySheet(false);
-    showToast('Activity added');
   };
 
-  const handleAddMedication = async () => {
-    if (!newMed.name.trim()) return;
+  const handleAddMedication = () => {
+    if (!newMed.name.trim()) return undefined;
     const asNeeded = newMed.frequency === 'as_needed';
-    await addMedication(petId, {
+    return save('medication', () => addMedication(petId, {
       name: newMed.name.trim(),
       dosage: newMed.dosage.trim() || null,
       frequency: newMed.frequency,
       times: asNeeded ? [] : (newMed.times.length ? [...newMed.times].sort() : ['08:00']),
       notes: newMed.notes.trim() || null,
+    }), {
+      ok: 'Medication added',
+      fail: "Couldn't add the medication. Try again.",
+      then: () => {
+        setNewMed({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
+        setMedSheet(false);
+      },
     });
-    setNewMed({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
-    setMedSheet(false);
-    showToast('Medication added');
   };
 
   const toggleMedTime = (t) => {
@@ -234,15 +260,22 @@ export default function PetProfileScreen({ navigation, route }) {
     message: `${med.name} will no longer appear on ${pet.name}'s schedule.`,
     confirmLabel: 'Remove',
     destructive: true,
-    action: async () => { await deleteMedication(petId, med.id); showToast('Medication removed'); },
+    action: () => save(`med-del-${med.id}`, () => deleteMedication(petId, med.id), {
+      ok: 'Medication removed',
+      fail: "Couldn't remove the medication. Try again.",
+    }),
   });
 
-  const handleReportLost = async () => {
-    await reportPetLost(petId, lostForm);
-    setLostForm({ lastSeenLocation: '', description: '', contactPhone: '' });
-    setLostSheet(false);
-    showToast(`${pet.name} reported to the community board`);
-  };
+  // A double tap here would post two public reports — the guard matters most.
+  const handleReportLost = () =>
+    save('report-lost', () => reportPetLost(petId, lostForm), {
+      ok: `${pet.name} reported to the community board`,
+      fail: `Couldn't report ${pet.name}. Check your connection and try again.`,
+      then: () => {
+        setLostForm({ lastSeenLocation: '', description: '', contactPhone: '' });
+        setLostSheet(false);
+      },
+    });
 
   const handleMarkFound = () => {
     if (!activeReport) return;
@@ -250,17 +283,27 @@ export default function PetProfileScreen({ navigation, route }) {
       title: 'Mark as found?',
       message: `Has ${pet.name} been found safe?`,
       confirmLabel: 'Found!',
-      action: async () => { await resolveLostPet(activeReport.id); showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' }); },
+      action: () => save('found', () => resolveLostPet(activeReport.id), {
+        ok: 'Welcome home!',
+        okOptions: { celebrate: true, actionType: 'lost_pet_found' },
+        fail: "Couldn't mark them found. Try again.",
+      }),
     });
   };
 
-  const handleAddWeight = async () => {
+  const handleAddWeight = () => {
     const v = parseFloat(newWeight.value);
-    if (!v || v <= 0) return;
-    await addWeight(petId, { weight: v }); // unit is locked to the pet's unit server-side
-    setNewWeight({ value: '' });
-    setWeightSheet(false);
-    showToast('Weight logged', { celebrate: true, actionType: 'weight_logged' });
+    if (!v || v <= 0) return undefined;
+    // Unit is locked to the pet's unit server-side.
+    return save('weight', () => addWeight(petId, { weight: v }), {
+      ok: 'Weight logged',
+      okOptions: { celebrate: true, actionType: 'weight_logged' },
+      fail: "Couldn't log the weight. Try again.",
+      then: () => {
+        setNewWeight({ value: '' });
+        setWeightSheet(false);
+      },
+    });
   };
 
   const handleDeleteWeight = (w) => askConfirm({
@@ -268,16 +311,23 @@ export default function PetProfileScreen({ navigation, route }) {
     message: `Remove the ${w.value.toFixed(1)} ${wUnit} entry?`,
     confirmLabel: 'Delete',
     destructive: true,
-    action: async () => { await deleteWeight(petId, w.id); showToast('Entry deleted'); },
+    action: () => save(`weight-del-${w.id}`, () => deleteWeight(petId, w.id), {
+      ok: 'Entry deleted',
+      fail: "Couldn't delete the entry. Try again.",
+    }),
   });
 
-  const handleAddExpense = async () => {
+  const handleAddExpense = () => {
     const amt = parseFloat(newExpense.amount);
-    if (!amt || amt <= 0) return;
-    await addExpense(petId, { category: newExpense.category, amount: amt, notes: newExpense.notes.trim() || null });
-    setNewExpense({ category: 'vet', amount: '', notes: '' });
-    setExpenseSheet(false);
-    showToast('Expense added');
+    if (!amt || amt <= 0) return undefined;
+    return save('expense', () => addExpense(petId, { category: newExpense.category, amount: amt, notes: newExpense.notes.trim() || null }), {
+      ok: 'Expense added',
+      fail: "Couldn't add the expense. Try again.",
+      then: () => {
+        setNewExpense({ category: 'vet', amount: '', notes: '' });
+        setExpenseSheet(false);
+      },
+    });
   };
 
   const handleDeleteExpense = (e) => askConfirm({
@@ -285,7 +335,10 @@ export default function PetProfileScreen({ navigation, route }) {
     message: `Remove this ${catMeta(e.category).label.toLowerCase()} expense?`,
     confirmLabel: 'Delete',
     destructive: true,
-    action: async () => { await deleteExpense(petId, e.id); showToast('Expense deleted'); },
+    action: () => save(`expense-del-${e.id}`, () => deleteExpense(petId, e.id), {
+      ok: 'Expense deleted',
+      fail: "Couldn't delete the expense. Try again.",
+    }),
   });
 
   const handleInvite = async () => {
@@ -311,7 +364,11 @@ export default function PetProfileScreen({ navigation, route }) {
     message: `Remove ${member.name} from ${pet.name}?`,
     confirmLabel: 'Remove',
     destructive: true,
-    action: async () => { await removePetMember(petId, member.id); await loadShare(); showToast('Co-owner removed'); },
+    action: () => save(`member-${member.id}`, () => removePetMember(petId, member.id), {
+      ok: 'Co-owner removed',
+      fail: `Couldn't remove ${member.name}. Try again.`,
+      then: loadShare,
+    }),
   });
 
   const handleCancelInvite = (invite) => setTeamConfirm({
@@ -319,7 +376,11 @@ export default function PetProfileScreen({ navigation, route }) {
     message: `Withdraw the invite to ${invite.email}?`,
     confirmLabel: 'Withdraw',
     destructive: true,
-    action: async () => { await cancelPetInvite(petId, invite.id); await loadShare(); showToast('Invite withdrawn'); },
+    action: () => save(`invite-${invite.id}`, () => cancelPetInvite(petId, invite.id), {
+      ok: 'Invite withdrawn',
+      fail: "Couldn't withdraw the invite. Try again.",
+      then: loadShare,
+    }),
   });
 
   const leaveConfig = () => ({
@@ -352,7 +413,7 @@ export default function PetProfileScreen({ navigation, route }) {
     .filter((v) => v.dueDate)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
   const healthTileValue = nextVax
-    ? `${nextVax.name} · ${fmtShort(new Date(`${nextVax.dueDate}T12:00:00`))}`
+    ? `${nextVax.name} · ${fmtShort(parseDay(nextVax.dueDate))}`
     : completedVax.length
       ? `${completedVax.length} ${completedVax.length === 1 ? 'vaccine' : 'vaccines'} on record`
       : 'Add a first vaccine';
@@ -914,7 +975,7 @@ export default function PetProfileScreen({ navigation, route }) {
             value={newFood}
             onChangeText={setNewFood}
           />
-          <Pressable style={styles.inlineAddBtn} onPress={handleAddFood}>
+          <Pressable style={styles.inlineAddBtn} onPress={handleAddFood} disabled={isBusy('food')}>
             <MaterialCommunityIcons name="plus" size={20} color={ui.onAccent} />
           </Pressable>
         </View>
@@ -948,7 +1009,7 @@ export default function PetProfileScreen({ navigation, route }) {
             />
           ))}
         </View>
-        <Button label="Add activity" onPress={handleAddActivity} disabled={!newActivity.name.trim()} />
+        <Button label="Add activity" onPress={handleAddActivity} disabled={!newActivity.name.trim() || isBusy('activity')} />
       </Sheet>
 
       {/* Add medication */}
@@ -991,7 +1052,7 @@ export default function PetProfileScreen({ navigation, route }) {
             </View>
           </View>
         )}
-        <Button label="Add medication" onPress={handleAddMedication} disabled={!newMed.name.trim()} />
+        <Button label="Add medication" onPress={handleAddMedication} disabled={!newMed.name.trim() || isBusy('medication')} />
       </Sheet>
 
       {/* Report lost */}
@@ -1020,7 +1081,7 @@ export default function PetProfileScreen({ navigation, route }) {
           onChangeText={(v) => setLostForm({ ...lostForm, contactPhone: v })}
           keyboardType="phone-pad"
         />
-        <Button variant="danger" label="Report lost" onPress={handleReportLost} />
+        <Button variant="danger" label="Report lost" onPress={handleReportLost} disabled={isBusy('report-lost')} />
       </Sheet>
 
       {/* Log weight */}
@@ -1039,7 +1100,7 @@ export default function PetProfileScreen({ navigation, route }) {
           </View>
         </View>
         <Text style={styles.sheetHint}>Logged in {wUnit} — change the unit in Edit Pet.</Text>
-        <Button label="Log weight" onPress={handleAddWeight} disabled={!parseFloat(newWeight.value)} />
+        <Button label="Log weight" onPress={handleAddWeight} disabled={!parseFloat(newWeight.value) || isBusy('weight')} />
       </Sheet>
 
       {/* Add expense */}
@@ -1073,7 +1134,7 @@ export default function PetProfileScreen({ navigation, route }) {
           value={newExpense.notes}
           onChangeText={(v) => setNewExpense({ ...newExpense, notes: v })}
         />
-        <Button label="Add expense" onPress={handleAddExpense} disabled={!parseFloat(newExpense.amount)} />
+        <Button label="Add expense" onPress={handleAddExpense} disabled={!parseFloat(newExpense.amount) || isBusy('expense')} />
       </Sheet>
 
       {/* Care team (owner list + invite / leave) */}

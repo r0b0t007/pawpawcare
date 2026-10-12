@@ -8,9 +8,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { getPref } from '../../services/prefs';
-import { fmtShort, fmtDay, dayDiff, overdueLabel, relativeDay } from '../../utils/dates';
+import { fmtShort, fmtDay, dayDiff, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
+import { petById } from '../../utils/pets';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useTickAt } from '../../hooks/useTickAt';
 import { ui, type, radii, motion, elevation, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
   Card, Chip, Button, Sheet, PetFace, StatusPill, EmptyState, showToast,
@@ -91,10 +93,17 @@ export default function HealthHubScreen({ navigation }) {
   const [recName, setRecName] = useState('');
   const [recDate, setRecDate] = useState(defaultDueDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   const shownPets = filter === 'all' ? pets : pets.filter((p) => p.id === filter);
   const recPet = pets.find((p) => p.id === recPetId) || pets[0];
+
+  // Re-run the grouping when the next reminder fires, so a Health tab left
+  // open drops it from Today on time (this tab stays mounted).
+  const reminderTimes = useMemo(
+    () => reminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
+    [reminders],
+  );
+  const reminderTick = useTickAt(reminderTimes);
 
   const { sections, history } = useMemo(() => {
     const now = new Date();
@@ -105,7 +114,7 @@ export default function HealthHubScreen({ navigation }) {
       .filter((v) => v.status === 'overdue')
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
       .map((v) => {
-        const date = new Date(`${v.dueDate}T12:00:00`);
+        const date = parseDay(v.dueDate);
         return {
           key: `od-${v.pet.id}-${v.id}`,
           date,
@@ -121,7 +130,7 @@ export default function HealthHubScreen({ navigation }) {
       ...vax
         .filter((v) => v.status === 'due_soon' || v.status === 'upcoming')
         .map((v) => {
-          const date = new Date(`${v.dueDate}T12:00:00`);
+          const date = parseDay(v.dueDate);
           return {
             key: `vax-${v.pet.id}-${v.id}`,
             date,
@@ -136,7 +145,7 @@ export default function HealthHubScreen({ navigation }) {
         ? reminders
             .filter((r) => r.next_fire_at || r.fire_at)
             .map((r) => {
-              const pet = r.pet_id ? pets.find((p) => String(p.id) === String(r.pet_id)) : null;
+              const pet = petById(pets, r.pet_id) || null;
               const kind =
                 r.schedule_type === 'recurring'
                   ? `${(r.recurrence || 'daily').replace(/^\w/, (c) => c.toUpperCase())} reminder`
@@ -179,7 +188,7 @@ export default function HealthHubScreen({ navigation }) {
       ].filter((sec) => sec.items.length > 0),
       history: done,
     };
-  }, [shownPets, pets, reminders, filter, navigation, today]);
+  }, [shownPets, pets, reminders, filter, navigation, today, reminderTick]);
 
   // The "Scheduled on this device" caption sits on the first section holding
   // a reminder, and stays hidden when there are none (findIndex → -1).
@@ -210,27 +219,25 @@ export default function HealthHubScreen({ navigation }) {
     if (selectedDate) setRecDate(selectedDate);
   };
 
-  const saveVaccine = async () => {
-    if (!recName.trim() || !recPet || saving) return;
-    setSaving(true);
-    try {
+  // One record per tap: the in-flight guard is a ref, so two taps in one
+  // frame can't both save. A failed save keeps the sheet (and what was
+  // typed) open for a retry instead of claiming success.
+  const saveVaccine = () => {
+    if (!recName.trim() || !recPet) return undefined;
+    return run('record', async () => {
       const saved = await addVaccination(recPet.id, {
         name: recName.trim(),
         dueDate: recDate.toISOString().split('T')[0],
         status: 'upcoming',
         administeredDate: null,
       });
-      // addVaccination resolves undefined on failure — keep the sheet (and
-      // what was typed) open for a retry instead of claiming success.
       if (!saved) {
         showToast("Couldn't save the record. Try again.");
         return;
       }
       setSheetOpen(false);
       showToast('Record saved');
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const continueElsewhere = () => {
@@ -277,7 +284,7 @@ export default function HealthHubScreen({ navigation }) {
             {v ? (
               <StatusPill
                 status="overdue"
-                label={overdueLabel(v.dueDate)}
+                label={overdueLabel(v.dueDate, today)}
                 style={{ marginTop: 6 }}
               />
             ) : item.dueSoon ? (
@@ -444,7 +451,7 @@ export default function HealthHubScreen({ navigation }) {
                     {v.name} — {v.pet.name}
                   </Text>
                   <Text style={styles.historyDate}>
-                    {fmtShort(new Date(`${v.administeredDate || v.dueDate}T12:00:00`))}
+                    {fmtShort(parseDay(v.administeredDate || v.dueDate))}
                   </Text>
                 </View>
               ))}
@@ -519,7 +526,7 @@ export default function HealthHubScreen({ navigation }) {
             <Button
               label={`Save · ${fmtShort(recDate)}`}
               onPress={saveVaccine}
-              disabled={!recName.trim() || saving}
+              disabled={!recName.trim() || isBusy('record')}
             />
           </>
         ) : (

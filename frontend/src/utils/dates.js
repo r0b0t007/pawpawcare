@@ -7,9 +7,22 @@ const DAY_MS = 86400000;
 
 const isValid = (date) => date instanceof Date && !Number.isNaN(date.getTime());
 
+// A calendar date ('YYYY-MM-DD', or the date part of a timestamp) as a local
+// Date at noon — noon so no timezone offset can tip it into the day before or
+// after. The one parser for due dates, birthdays and log dates.
+export const parseDay = (iso) => (iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`) : new Date(NaN));
+
 // 'Oct 14' — '—' rather than "Invalid Date" if a malformed date slips through.
 export const fmtShort = (date) =>
   isValid(date) ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
+
+// 'Oct 14, 2026' — when the year matters (birthdays, logs).
+export const fmtFull = (date) =>
+  isValid(date) ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+// 'OCT' — chart axis labels.
+export const fmtMonth = (date) =>
+  isValid(date) ? date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : '';
 
 // 'Fri 10 Oct' — plain-language day, never an ISO date.
 export const fmtDay = (date) =>
@@ -31,13 +44,14 @@ export const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDa
 export const dayDiff = (date, today = new Date()) =>
   Math.round((startOfDay(date) - startOfDay(today)) / DAY_MS);
 
-// Whole days a 'YYYY-MM-DD' due date is past, at least 1 — for "Overdue · N days".
-export const daysOverdue = (dueDate, now = Date.now()) =>
-  Math.max(1, Math.floor((now - new Date(`${dueDate}T12:00:00`)) / DAY_MS));
+// Calendar days a 'YYYY-MM-DD' due date is past, at least 1 — for "Overdue ·
+// N days". Calendar days, not elapsed hours: due Oct 10 reads "2 days" all of
+// Oct 12, morning and evening alike.
+export const daysOverdue = (dueDate, today = new Date()) => Math.max(1, -dayDiff(parseDay(dueDate), today));
 
 // "Overdue · 1 day" / "Overdue · 3 days".
-export const overdueLabel = (dueDate, now = Date.now()) => {
-  const d = daysOverdue(dueDate, now);
+export const overdueLabel = (dueDate, today = new Date()) => {
+  const d = daysOverdue(dueDate, today);
   return `Overdue · ${d} day${d === 1 ? '' : 's'}`;
 };
 

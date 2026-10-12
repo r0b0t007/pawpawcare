@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ui, type, photos } from '../../theme';
 import { Button, ConfirmDialog, EmptyState, PetFace, showToast } from '../../components';
 import LostPetCard from './LostPetCard';
+import { useInFlight } from '../../hooks/useInFlight';
 
 // Redesign: this pushed screen is now the report/manage surface — the board
 // itself lives inline in Community's "Lost pets" section. Report form on top,
@@ -47,28 +48,40 @@ export default function LostPetsScreen({ navigation }) {
     setSelectedPetId((prev) => (prev === pet.id ? null : pet.id));
   };
 
-  const handleSubmit = async () => {
-    if (!selectedPetId || submitting) return;
+  // A double tap would post two public reports: one request per tap, and the
+  // form clears only once the report is actually on the board.
+  const { run } = useInFlight();
+  const handleSubmit = () => {
+    if (!selectedPetId) return undefined;
     const pet = pets.find((p) => p.id === selectedPetId);
-    setSubmitting(true);
-    await reportPetLost(selectedPetId, {
-      lastSeenLocation: lastSeen.trim(),
-      description: note.trim(),
-      contactPhone: phone.trim(),
+    return run('report', async () => {
+      setSubmitting(true);
+      const saved = await reportPetLost(selectedPetId, {
+        lastSeenLocation: lastSeen.trim(),
+        description: note.trim(),
+        contactPhone: phone.trim(),
+      });
+      setSubmitting(false);
+      if (!saved) {
+        showToast(`Couldn't post ${pet?.name || 'your pet'}. Check your connection and try again.`);
+        return;
+      }
+      setSelectedPetId(null);
+      setLastSeen('');
+      setNote('');
+      setPhone('');
+      showToast(`${pet?.name || 'Your pet'} posted to the board`);
     });
-    setSubmitting(false);
-    setSelectedPetId(null);
-    setLastSeen('');
-    setNote('');
-    setPhone('');
-    showToast(`${pet?.name || 'Your pet'} posted to the board`);
   };
 
   const handleMarkFound = (report) => setConfirm({
     title: 'Mark as found?',
     message: `Has ${report.petName} been found safe?`,
     confirmLabel: 'Found!',
-    action: async () => { await resolveLostPet(report.id); showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' }); },
+    action: async () => {
+      if (await resolveLostPet(report.id)) showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' });
+      else showToast("Couldn't mark them found. Try again.");
+    },
   });
 
   return (
