@@ -15,7 +15,7 @@ import { petById, emptyPhotoFor } from '../../utils/pets';
 import { useInFlight } from '../../hooks/useInFlight';
 import { ui, type, radii, motion, photos, vaultColors } from '../../theme';
 import {
-  Card, Chip, Button, Sheet, ConfirmDialog, DeleteButton, EmptyState, PetFace, Skeleton, showToast, ScreenHeader,
+  Card, Chip, Button, Sheet, ConfirmDialog, DeleteButton, EmptyState, PetFace, Skeleton, showToast, ScreenHeader, TextField,
 } from '../../components';
 
 // The medical vault ("Lively & Light"): the pet's face and a one-line summary
@@ -559,11 +559,10 @@ function ClinicModal({ visible, onClose, onSave, onDone }) {
     });
   };
 
-  const field = (key, placeholder, opts = {}) => (
-    <TextInput
-      style={[styles.input, { marginTop: 12 }]}
-      placeholder={placeholder}
-      placeholderTextColor={ui.subtle}
+  const field = (key, label, opts = {}) => (
+    <TextField
+      label={label}
+      style={{ marginTop: 12 }}
       value={form[key]}
       onChangeText={(v) => { setForm({ ...form, [key]: v }); setError(null); }}
       {...opts}
@@ -572,14 +571,12 @@ function ClinicModal({ visible, onClose, onSave, onDone }) {
 
   return (
     <FormSheet visible={visible} title="Add vet clinic" onClose={close} onSave={save} busy={busy} saveLabel="Add clinic" error={error} saveDisabled={!form.name.trim()}>
-      <TextInput
-        style={styles.input}
-        placeholder="Clinic name"
-        placeholderTextColor={ui.subtle}
+      <TextField
+        label="Clinic name"
+        placeholder="e.g. Riverside Vet"
         value={form.name}
         onChangeText={(v) => { setForm({ ...form, name: v }); setError(null); }}
         autoFocus
-        accessibilityLabel="Clinic name"
       />
       {field('vet_name', 'Vet name (optional)')}
       {field('phone', 'Phone', { keyboardType: 'phone-pad' })}
@@ -624,10 +621,9 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
 
   return (
     <FormSheet visible={visible} title="Log a vet visit" onClose={close} onSave={save} busy={busy} saveLabel="Save" error={error} saveDisabled={!title.trim()}>
-      <TextInput
-        style={styles.input}
-        placeholder="Reason (e.g. Annual checkup)"
-        placeholderTextColor={ui.subtle}
+      <TextField
+        label="Reason"
+        placeholder="e.g. Annual checkup"
         value={title}
         onChangeText={(v) => { setTitle(v); setError(null); }}
         autoFocus
@@ -762,10 +758,10 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
         <MaterialCommunityIcons name={file ? 'check-circle' : 'image-plus'} size={22} color={file ? ui.success : ui.accent} />
         <Text style={styles.fileBtnText} numberOfLines={1}>{file ? file.name : 'Choose a photo of the record'}</Text>
       </Pressable>
-      <TextInput
-        style={[styles.input, { marginTop: 12 }]}
-        placeholder="Title (e.g. Rabies certificate)"
-        placeholderTextColor={ui.subtle}
+      <TextField
+        label="Title"
+        style={{ marginTop: 12 }}
+        placeholder="e.g. Rabies certificate"
         value={title}
         onChangeText={(v) => { setTitle(v); setError(null); }}
         accessibilityLabel="Document title"
@@ -1093,18 +1089,6 @@ const styles = StyleSheet.create({
   quietText: { ...type.body, fontSize: 13.5, color: ui.sub, flex: 1 },
   error: { ...type.secondary, color: ui.dangerText, marginTop: 12 },
   sheetActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  input: {
-    borderWidth: 1.5,
-    borderColor: ui.controlBorder,
-    backgroundColor: ui.background,
-    borderRadius: radii.control,
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 14,
-    color: ui.ink,
-    minHeight: 48,
-  },
   pickerBtn: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform,
+  View, Text, ScrollView, Pressable, StyleSheet, Modal, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,7 +8,7 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { ui, type, radii, petPair, photos } from '../../theme';
 import { emptyPhotoFor } from '../../utils/pets';
-import { Card, Button, Sheet, ConfirmDialog, EmptyState, PetFace, StatusPill, showToast, ScreenHeader, DeleteButton } from '../../components';
+import { Card, Button, Sheet, ConfirmDialog, EmptyState, PetFace, StatusPill, showToast, ScreenHeader, DeleteButton, TextField } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
 import { useToday } from '../../hooks/useToday';
 import { fmtFull, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
@@ -218,10 +218,8 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       <Sheet visible={modal} onClose={closeSheet} title="New vaccine">
         <View>
           <Text style={[type.sectionLabel, styles.fieldLabel]}>Vaccine name</Text>
-          <TextInput
-            style={styles.input}
+          <TextField
             placeholder="e.g. Rabies booster"
-            placeholderTextColor={ui.subtle}
             value={form.name}
             onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
             autoFocus
@@ -348,17 +346,6 @@ const styles = StyleSheet.create({
   addBtn: { marginHorizontal: 16, marginTop: 4 },
   empty: { paddingHorizontal: 24, paddingTop: 12 },
   fieldLabel: { color: ui.subtle, marginBottom: 8 },
-  input: {
-    borderWidth: 1.5,
-    borderColor: ui.controlBorder,
-    backgroundColor: ui.background,
-    borderRadius: radii.control,
-    paddingVertical: 13,
-    paddingHorizontal: 14,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 14,
-    color: ui.ink,
-  },
   dateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
