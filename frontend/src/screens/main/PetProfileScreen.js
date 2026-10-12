@@ -1,29 +1,40 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, ScrollView, Pressable, StyleSheet,
-  TextInput, Platform, Share, ActivityIndicator,
+  View, Text, Pressable, StyleSheet,
+  TextInput, Platform, Share, ActivityIndicator, Image,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  Extrapolation, FadeIn, FadeOut, LinearTransition, interpolate,
+  useAnimatedScrollHandler, useAnimatedStyle, useSharedValue,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { resolveAsset } from '../../config';
+import { petPhoto } from '../../utils/pets';
+import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
-import { medicationStreak, medicationStreakLabel } from '../../utils/streaks';
+import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
+import { fmtFull, fmtMonth, fmtShort, fmtTime, parseDay } from '../../utils/dates';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
+import { useToday } from '../../hooks/useToday';
+import { useInFlight } from '../../hooks/useInFlight';
 import { track } from '../../services/analytics';
-import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
+import { ui, type, radii, motion, petPair, scrim } from '../../theme';
 import {
-  Card, ListRow, StatusRing, StatusPill, Chip, SegmentedControl,
-  Button, Sheet, ConfirmDialog, MilestoneRow, showToast,
+  Card, ListRow, StatusPill, Chip, SegmentedControl, StepProgress,
+  Button, Sheet, ConfirmDialog, MilestoneRow, showToast, speciesIcon, petHealthStatus,
 } from '../../components';
 
-// Redesign: segmented Overview / Health / Notes layout. Every data action from
-// the old screen is preserved — weight add/delete, medications, foods,
-// activities, expenses, sharing (co-owners, vet links, caretaker handoff),
-// lost-pet reporting — just reorganized into the three segments.
+// "Lively & Light" profile: a full-bleed photo hero (or the pet's identity
+// tint + species glyph when there's no photo — never stock imagery), then a
+// cream sheet with Today's care first and four summary tiles that open the
+// detail (progressive disclosure). Destructive and rarely-used actions live
+// in the ••• menu. Every data action from the old screen is preserved —
+// weight add/delete, medications, foods, activities, expenses, sharing
+// (co-owners, vet links, caretaker handoff), lost-pet reporting.
 
 // Motion builders live at module scope — rebuilt-in-render builders cost
 // every re-render.
@@ -48,20 +59,13 @@ const SEGMENTS = [
   { value: 'notes', label: 'Notes' },
 ];
 
-const shortDate = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
-const fullDate = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
-const monthLabel = (iso) => (iso ? new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' }).toUpperCase() : '');
+// '' for a missing date (callers supply their own fallback text).
+const shortDate = (iso) => (iso ? fmtShort(parseDay(iso)) : '');
+const fullDate = (iso) => (iso ? fmtFull(parseDay(iso)) : '');
+const monthLabel = (iso) => (iso ? fmtMonth(parseDay(iso)) : '');
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
-const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
-
-// Worst vaccination status wins — same logic as the pets list.
-function petStatus(vax = []) {
-  const overdueCount = vax.filter((v) => v.status === 'overdue').length;
-  if (overdueCount > 0) return { status: 'overdue', label: `${overdueCount} overdue` };
-  if (vax.some((v) => v.status === 'due_soon')) return { status: 'due', label: 'Due soon' };
-  return { status: 'ok', label: 'All good' };
-}
+const HERO_HEIGHT = 400;
 
 const vaxPill = (v) => (v.status === 'overdue'
   ? { status: 'overdue', label: 'Overdue' }
@@ -75,7 +79,7 @@ const NO_WEIGHTS = [];
 export default function PetProfileScreen({ navigation, route }) {
   const { petId } = route.params;
   const {
-    pets, myReports, medDoseDays, addFavoriteFood, removeFavoriteFood, addActivity,
+    pets, myReports, medDoseDays, medDoseCounts, addFavoriteFood, removeFavoriteFood, addActivity,
     addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
     addWeight, deleteWeight, addExpense, deleteExpense,
     getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
@@ -88,6 +92,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const isOwner = !!pet && pet.ownerId === user?.id;
 
   const [segment, setSegment] = useState('overview');
+  const insets = useSafeAreaInsets();
 
   // This pet's weekly care streak + earned milestones (nightly-computed).
   const { data: gamification, refetch: refetchGamification, isStale: gamificationStale } = useGamificationSummary();
@@ -117,6 +122,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const [expenseSheet, setExpenseSheet] = useState(false);
   const [teamSheet, setTeamSheet] = useState(false);
   const [vetSheet, setVetSheet] = useState(false);
+  const [menuSheet, setMenuSheet] = useState(false);
 
   const [newFood, setNewFood] = useState('');
   const [newActivity, setNewActivity] = useState({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
@@ -133,6 +139,21 @@ export default function PetProfileScreen({ navigation, route }) {
   // render their own nested ConfirmDialog so iOS doesn't drop the modal.
   const [confirm, setConfirm] = useState(null);
   const [teamConfirm, setTeamConfirm] = useState(null);
+  // "Today" rolls over at midnight / on refocus (the profile can stay open in
+  // the stack), and doses in flight (see handleLogDose) — both declared above
+  // the early return.
+  const today = useToday();
+  // Status-bar backdrop: once the photo hero scrolls away, content would slide
+  // under the clock and icons — fade in a cream strip behind the status bar
+  // (UI-thread scroll handler, no re-render per frame).
+  const scrollY = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+  const statusBackdropStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [HERO_HEIGHT - 60, HERO_HEIGHT - 20], [0, 1], Extrapolation.CLAMP),
+  }));
+  const { run, isBusy } = useInFlight();
   const askConfirm = (cfg) => setConfirm(cfg);
 
   const loadShare = useCallback(async () => {
@@ -164,46 +185,71 @@ export default function PetProfileScreen({ navigation, route }) {
     );
   }
 
-  // ── Handlers (logic unchanged from the previous screen) ──
+  // ── Handlers ──
 
-  const handleAddFood = async () => {
-    if (!newFood.trim()) return;
-    await addFavoriteFood(petId, newFood.trim());
-    setNewFood('');
-    showToast('Food added');
+  // Every save goes through here: one request per tap (useInFlight — a
+  // double tap never saves twice), and the success copy (plus clearing the
+  // form / closing the sheet) only for what the server actually saved. On a
+  // failure the form stays as typed and the user gets a retry message.
+  const save = (key, request, { ok, okOptions, fail, then }) =>
+    run(key, async () => {
+      if (await request()) {
+        then?.();
+        if (ok) showToast(ok, okOptions);
+      } else {
+        showToast(fail);
+      }
+    });
+
+  const handleAddFood = () => {
+    if (!newFood.trim()) return undefined;
+    return save('food', () => addFavoriteFood(petId, newFood.trim()), {
+      ok: 'Food added',
+      fail: "Couldn't add that food. Try again.",
+      then: () => setNewFood(''),
+    });
   };
 
-  const handleRemoveFood = async (food) => {
-    await removeFavoriteFood(petId, food.id);
-    showToast('Food removed');
-  };
+  const handleRemoveFood = (food) =>
+    save(`food-${food.id}`, () => removeFavoriteFood(petId, food.id), {
+      ok: 'Food removed',
+      fail: "Couldn't remove that food. Try again.",
+    });
 
-  const handleAddActivity = async () => {
-    if (!newActivity.name.trim()) return;
-    await addActivity(petId, {
+  const handleAddActivity = () => {
+    if (!newActivity.name.trim()) return undefined;
+    return save('activity', () => addActivity(petId, {
       name: newActivity.name.trim(),
       duration: parseInt(newActivity.duration) || 30,
       timeOfDay: newActivity.timeOfDay,
       icon: newActivity.icon,
+    }), {
+      ok: 'Activity added',
+      fail: "Couldn't add the activity. Try again.",
+      then: () => {
+        setNewActivity({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
+        setActivitySheet(false);
+      },
     });
-    setNewActivity({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
-    setActivitySheet(false);
-    showToast('Activity added');
   };
 
-  const handleAddMedication = async () => {
-    if (!newMed.name.trim()) return;
+  const handleAddMedication = () => {
+    if (!newMed.name.trim()) return undefined;
     const asNeeded = newMed.frequency === 'as_needed';
-    await addMedication(petId, {
+    return save('medication', () => addMedication(petId, {
       name: newMed.name.trim(),
       dosage: newMed.dosage.trim() || null,
       frequency: newMed.frequency,
       times: asNeeded ? [] : (newMed.times.length ? [...newMed.times].sort() : ['08:00']),
       notes: newMed.notes.trim() || null,
+    }), {
+      ok: 'Medication added',
+      fail: "Couldn't add the medication. Try again.",
+      then: () => {
+        setNewMed({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
+        setMedSheet(false);
+      },
     });
-    setNewMed({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
-    setMedSheet(false);
-    showToast('Medication added');
   };
 
   const toggleMedTime = (t) => {
@@ -213,25 +259,36 @@ export default function PetProfileScreen({ navigation, route }) {
     }));
   };
 
-  const handleLogDose = async (med) => {
-    await logMedicationDose(petId, med.id);
-    showToast('Dose logged', { celebrate: true, actionType: 'dose_logged' });
-  };
+  // One tap, one dose: the button is disabled while its dose is in flight,
+  // and the celebration only follows a dose the server actually saved.
+  const handleLogDose = (med) =>
+    run(med.id, async () => {
+      const saved = await logMedicationDose(petId, med.id);
+      if (saved) showToast('Dose logged', { celebrate: true, actionType: 'dose_logged' });
+      else showToast(`Couldn't log ${med.name}. Try again.`);
+    });
 
   const handleDeleteMedication = (med) => askConfirm({
     title: 'Remove medication?',
     message: `${med.name} will no longer appear on ${pet.name}'s schedule.`,
     confirmLabel: 'Remove',
     destructive: true,
-    action: async () => { await deleteMedication(petId, med.id); showToast('Medication removed'); },
+    action: () => save(`med-del-${med.id}`, () => deleteMedication(petId, med.id), {
+      ok: 'Medication removed',
+      fail: "Couldn't remove the medication. Try again.",
+    }),
   });
 
-  const handleReportLost = async () => {
-    await reportPetLost(petId, lostForm);
-    setLostForm({ lastSeenLocation: '', description: '', contactPhone: '' });
-    setLostSheet(false);
-    showToast(`${pet.name} reported to the community board`);
-  };
+  // A double tap here would post two public reports — the guard matters most.
+  const handleReportLost = () =>
+    save('report-lost', () => reportPetLost(petId, lostForm), {
+      ok: `${pet.name} reported to the community board`,
+      fail: `Couldn't report ${pet.name}. Check your connection and try again.`,
+      then: () => {
+        setLostForm({ lastSeenLocation: '', description: '', contactPhone: '' });
+        setLostSheet(false);
+      },
+    });
 
   const handleMarkFound = () => {
     if (!activeReport) return;
@@ -239,17 +296,27 @@ export default function PetProfileScreen({ navigation, route }) {
       title: 'Mark as found?',
       message: `Has ${pet.name} been found safe?`,
       confirmLabel: 'Found!',
-      action: async () => { await resolveLostPet(activeReport.id); showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' }); },
+      action: () => save('found', () => resolveLostPet(activeReport.id), {
+        ok: 'Welcome home!',
+        okOptions: { celebrate: true, actionType: 'lost_pet_found' },
+        fail: "Couldn't mark them found. Try again.",
+      }),
     });
   };
 
-  const handleAddWeight = async () => {
+  const handleAddWeight = () => {
     const v = parseFloat(newWeight.value);
-    if (!v || v <= 0) return;
-    await addWeight(petId, { weight: v }); // unit is locked to the pet's unit server-side
-    setNewWeight({ value: '' });
-    setWeightSheet(false);
-    showToast('Weight logged', { celebrate: true, actionType: 'weight_logged' });
+    if (!v || v <= 0) return undefined;
+    // Unit is locked to the pet's unit server-side.
+    return save('weight', () => addWeight(petId, { weight: v }), {
+      ok: 'Weight logged',
+      okOptions: { celebrate: true, actionType: 'weight_logged' },
+      fail: "Couldn't log the weight. Try again.",
+      then: () => {
+        setNewWeight({ value: '' });
+        setWeightSheet(false);
+      },
+    });
   };
 
   const handleDeleteWeight = (w) => askConfirm({
@@ -257,16 +324,23 @@ export default function PetProfileScreen({ navigation, route }) {
     message: `Remove the ${w.value.toFixed(1)} ${wUnit} entry?`,
     confirmLabel: 'Delete',
     destructive: true,
-    action: async () => { await deleteWeight(petId, w.id); showToast('Entry deleted'); },
+    action: () => save(`weight-del-${w.id}`, () => deleteWeight(petId, w.id), {
+      ok: 'Entry deleted',
+      fail: "Couldn't delete the entry. Try again.",
+    }),
   });
 
-  const handleAddExpense = async () => {
+  const handleAddExpense = () => {
     const amt = parseFloat(newExpense.amount);
-    if (!amt || amt <= 0) return;
-    await addExpense(petId, { category: newExpense.category, amount: amt, notes: newExpense.notes.trim() || null });
-    setNewExpense({ category: 'vet', amount: '', notes: '' });
-    setExpenseSheet(false);
-    showToast('Expense added');
+    if (!amt || amt <= 0) return undefined;
+    return save('expense', () => addExpense(petId, { category: newExpense.category, amount: amt, notes: newExpense.notes.trim() || null }), {
+      ok: 'Expense added',
+      fail: "Couldn't add the expense. Try again.",
+      then: () => {
+        setNewExpense({ category: 'vet', amount: '', notes: '' });
+        setExpenseSheet(false);
+      },
+    });
   };
 
   const handleDeleteExpense = (e) => askConfirm({
@@ -274,7 +348,10 @@ export default function PetProfileScreen({ navigation, route }) {
     message: `Remove this ${catMeta(e.category).label.toLowerCase()} expense?`,
     confirmLabel: 'Delete',
     destructive: true,
-    action: async () => { await deleteExpense(petId, e.id); showToast('Expense deleted'); },
+    action: () => save(`expense-del-${e.id}`, () => deleteExpense(petId, e.id), {
+      ok: 'Expense deleted',
+      fail: "Couldn't delete the expense. Try again.",
+    }),
   });
 
   const handleInvite = async () => {
@@ -300,7 +377,11 @@ export default function PetProfileScreen({ navigation, route }) {
     message: `Remove ${member.name} from ${pet.name}?`,
     confirmLabel: 'Remove',
     destructive: true,
-    action: async () => { await removePetMember(petId, member.id); await loadShare(); showToast('Co-owner removed'); },
+    action: () => save(`member-${member.id}`, () => removePetMember(petId, member.id), {
+      ok: 'Co-owner removed',
+      fail: `Couldn't remove ${member.name}. Try again.`,
+      then: loadShare,
+    }),
   });
 
   const handleCancelInvite = (invite) => setTeamConfirm({
@@ -308,10 +389,14 @@ export default function PetProfileScreen({ navigation, route }) {
     message: `Withdraw the invite to ${invite.email}?`,
     confirmLabel: 'Withdraw',
     destructive: true,
-    action: async () => { await cancelPetInvite(petId, invite.id); await loadShare(); showToast('Invite withdrawn'); },
+    action: () => save(`invite-${invite.id}`, () => cancelPetInvite(petId, invite.id), {
+      ok: 'Invite withdrawn',
+      fail: "Couldn't withdraw the invite. Try again.",
+      then: loadShare,
+    }),
   });
 
-  const handleLeave = () => setTeamConfirm({
+  const leaveConfig = () => ({
     title: 'Leave pet?',
     message: `Stop co-owning ${pet.name}? You'll lose access to its records.`,
     confirmLabel: 'Leave',
@@ -320,13 +405,31 @@ export default function PetProfileScreen({ navigation, route }) {
     // "Pet not found" frame; the detach then completes in the background.
     action: () => { setTeamSheet(false); navigation.goBack(); leavePet(petId); },
   });
+  const handleLeave = () => setTeamConfirm(leaveConfig());
+
+  // Close the ••• menu before presenting the next modal — iOS drops a modal
+  // presented while another is still dismissing (Sheet exits in ≤300ms).
+  const fromMenu = (fn) => {
+    setMenuSheet(false);
+    setTimeout(fn, 320);
+  };
 
   // ── Derived data ──
 
   const vaccinations = pet.vaccinations || [];
   const upcoming = vaccinations.filter((v) => v.status !== 'completed');
   const completedVax = vaccinations.filter((v) => v.status === 'completed');
-  const { status, label: statusLabel } = petStatus(vaccinations);
+  const { status, label: statusLabel } = petHealthStatus(vaccinations);
+  // The Health tile names the earliest open vaccine, neutrally — the status
+  // itself is shown once, in the hero pill.
+  const nextVax = [...upcoming]
+    .filter((v) => v.dueDate)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+  const healthTileValue = nextVax
+    ? `${nextVax.name} · ${fmtShort(parseDay(nextVax.dueDate))}`
+    : completedVax.length
+      ? `${completedVax.length} ${completedVax.length === 1 ? 'vaccine' : 'vaccines'} on record`
+      : 'Add a first vaccine';
 
   const latestWeight = normWeights[normWeights.length - 1];
 
@@ -337,12 +440,25 @@ export default function PetProfileScreen({ navigation, route }) {
     .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
   const foods = pet.favoriteFoods || [];
-  const meta = [
-    pet.type ? cap(pet.type) : null,
-    pet.breed || null,
+  const pair = petPair(pet.color);
+  const photoUri = petPhoto(pet) || null;
+  const heroFg = photoUri ? ui.onAccent : ui.ink;
+  const speciesLabel = [pet.type ? cap(pet.type) : 'Pet', pet.breed || null].filter(Boolean).join(' · ');
+  const heroMeta = [
     pet.age ? `${pet.age} yr${pet.age !== 1 ? 's' : ''}` : null,
     pet.gender ? cap(pet.gender) : null,
+    pet.microchipped ? 'Microchipped' : null,
   ].filter(Boolean).join(' · ');
+
+  // Today: active daily meds, done = a dose logged on today's local date.
+  // Counted in doses, one per scheduled time: a twice-daily med is "1 of 2"
+  // after breakfast, never done.
+  const todayKey = dayKey(today);
+  const dailyMeds = (pet.medications || []).filter((m) => m.active && m.frequency === 'daily');
+  const takenToday = (m) => dosesTakenOn(m, { doseCounts: medDoseCounts, doseDays: medDoseDays }, todayKey);
+  const dosesTotal = dailyMeds.reduce((sum, m) => sum + dosesPerDay(m), 0);
+  const dailyDone = dailyMeds.reduce((sum, m) => sum + takenToday(m), 0);
+  const activities = pet.activities || [];
 
   const memberCount = (share?.members || []).length;
   const teamSummary = !share
@@ -374,6 +490,126 @@ export default function PetProfileScreen({ navigation, route }) {
           <MaterialCommunityIcons name="check-circle-outline" size={20} color={ui.success} />
         </Pressable>
       )}
+
+      {/* Today — the most frequent task first; the one elevated card here. */}
+      {dailyMeds.length > 0 ? (
+        <Card padded elevated style={[styles.block, { padding: 18, gap: 12 }]}>
+          <View style={styles.rowBetween}>
+            <Text style={styles.cardLabel}>Today for {pet.name}</Text>
+            <Text style={styles.todayCount}>{dailyDone} of {dosesTotal} done</Text>
+          </View>
+          <StepProgress done={dailyDone} total={dosesTotal} tone="success" />
+          <View>
+            {dailyMeds.map((med) => {
+              const expected = dosesPerDay(med);
+              const taken = takenToday(med);
+              const done = taken >= expected;
+              return (
+                <View key={med.id} style={styles.todayRow}>
+                  <MaterialCommunityIcons
+                    name={done ? 'check-circle' : 'checkbox-blank-circle-outline'}
+                    size={24}
+                    color={done ? ui.success : ui.faint}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[type.rowTitle, { color: done ? ui.sub : ui.ink }]} numberOfLines={1}>
+                      {med.name}{med.dosage ? ` · ${med.dosage}` : ''}
+                    </Text>
+                    {med.times?.length ? (
+                      <Text style={[type.secondary, { color: ui.sub }]}>
+                        {med.times.map((t) => fmtTime(t) || t).join(', ')}
+                        {expected > 1 && !done ? ` · ${taken} of ${expected} given` : ''}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {done ? (
+                    <Text style={[type.secondary, { color: ui.success, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>Given</Text>
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Mark ${med.name} done`}
+                      onPress={() => handleLogDose(med)}
+                      disabled={isBusy(med.id)}
+                      accessibilityState={{ disabled: isBusy(med.id) }}
+                      hitSlop={8}
+                      style={({ pressed }) => [
+                        styles.doneBtn,
+                        (pressed || isBusy(med.id)) && { opacity: motion.pressOpacitySoft },
+                      ]}
+                    >
+                      <Text style={styles.doneBtnText}>Done</Text>
+                    </Pressable>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </Card>
+      ) : (
+        <Card padded elevated style={[styles.block, styles.todayEmpty]}>
+          <View style={[styles.tileChip, { backgroundColor: pair.bg }]}>
+            <MaterialCommunityIcons name="pill" size={20} color={pair.fg} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[type.rowTitle, { color: ui.ink }]}>Nothing to give today</Text>
+            <Text style={[type.secondary, { color: ui.sub }]}>Add a daily med and we'll nudge you on time.</Text>
+          </View>
+          <Button pill small label="Add" icon="plus" variant="soft" onPress={() => setMedSheet(true)} />
+        </Card>
+      )}
+
+      {/* Four summaries, one number deep — the detail is one tap away. */}
+      <View style={styles.tileGrid}>
+        {[
+          [
+            {
+              icon: 'needle', title: 'Health', value: healthTileValue,
+              onPress: () => setSegment('health'),
+            },
+            {
+              icon: 'run', title: 'Routine',
+              value: activities.length ? `${activities.length} daily ${activities.length === 1 ? 'activity' : 'activities'}` : 'Not set up yet',
+              onPress: () => setSegment('notes'),
+            },
+          ],
+          [
+            {
+              icon: 'scale-bathroom', title: 'Weight',
+              value: latestWeight ? `${latestWeight.value.toFixed(1)} ${wUnit}${trendText ? ` · ${trendText.toLowerCase()}` : ''}` : 'Log a first weight',
+              onPress: () => setWeightSheet(true),
+            },
+            {
+              icon: 'note-text-outline', title: 'Notes', value: 'Sitter notes & handoff',
+              onPress: () => setSegment('notes'),
+            },
+          ],
+        ].map((row, ri) => (
+          <View key={ri} style={styles.tileRow}>
+            {row.map((t) => (
+              <Pressable
+                key={t.title}
+                accessibilityRole="button"
+                accessibilityLabel={`${t.title}: ${t.value}`}
+                onPress={t.onPress}
+                style={({ pressed }) => [styles.tile, pressed && { backgroundColor: ui.pressTint }]}
+              >
+                <View style={[styles.tileChip, { backgroundColor: pair.bg }]}>
+                  <MaterialCommunityIcons name={t.icon} size={20} color={pair.fg} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.tileTitle}>{t.title}</Text>
+                  <Text
+                    numberOfLines={2}
+                    style={styles.tileValue}
+                  >
+                    {t.value}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        ))}
+      </View>
 
       {/* Weight */}
       <Card padded style={[styles.block, { padding: 18, gap: 13 }]}>
@@ -470,7 +706,7 @@ export default function PetProfileScreen({ navigation, route }) {
           const m = catMeta(e.category);
           return (
             <View key={e.id} style={styles.itemRow}>
-              <MaterialCommunityIcons name={m.icon} size={19} color={ui.accent} />
+              <IconChip icon={m.icon} pair={pair} />
               <View style={{ flex: 1 }}>
                 <Text style={[type.rowTitle, { color: ui.ink }]}>
                   {m.label}{e.notes ? <Text style={[type.secondary, { color: ui.sub }]}>  ·  {e.notes}</Text> : null}
@@ -486,16 +722,7 @@ export default function PetProfileScreen({ navigation, route }) {
         })}
         <AddRow label="Add expense" onPress={() => setExpenseSheet(true)} />
       </Card>
-
-      {!activeReport && (
-        <Pressable
-          style={({ pressed }) => [styles.reportLostBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
-          onPress={() => setLostSheet(true)}
-        >
-          <MaterialCommunityIcons name="map-marker-alert-outline" size={17} color={ui.danger} />
-          <Text style={styles.reportLostText}>Report {pet.name} as lost</Text>
-        </Pressable>
-      )}
+      {/* Report lost moved to the ••• menu — out of the browse path. */}
     </View>
   );
 
@@ -538,6 +765,7 @@ export default function PetProfileScreen({ navigation, route }) {
           <Animated.View key={med.id} exiting={ROW_OUT} layout={ROW_LAYOUT}>
             <MedicationRow
               med={med}
+              pair={pair}
               streakLabel={medicationStreakLabel(medicationStreak(medDoseDays?.[med.id], med))}
               onLog={() => handleLogDose(med)}
               onDelete={() => handleDeleteMedication(med)}
@@ -606,7 +834,7 @@ export default function PetProfileScreen({ navigation, route }) {
           <Text style={styles.emptyRowText}>No daily activities yet.</Text>
         )}
         {(pet.activities || []).map((act) => (
-          <ActivityRow key={act.id} activity={act} />
+          <ActivityRow key={act.id} activity={act} pair={pair} />
         ))}
         <AddRow label="Add activity" onPress={() => setActivitySheet(true)} />
       </Card>
@@ -622,52 +850,128 @@ export default function PetProfileScreen({ navigation, route }) {
     </View>
   );
 
+  const menuItems = [
+    { icon: 'pencil-outline', title: 'Edit details', onPress: () => { setMenuSheet(false); navigation.navigate('EditPet', { petId }); } },
+    { icon: 'share-variant-outline', title: 'Share with vet', onPress: () => fromMenu(() => setVetSheet(true)) },
+    { icon: 'account-group-outline', title: 'Care team', onPress: () => fromMenu(() => { setInviteError(null); setTeamSheet(true); }) },
+    activeReport
+      ? { icon: 'home-heart', title: `Mark ${pet.name} as found`, onPress: () => fromMenu(handleMarkFound) }
+      : { icon: 'map-marker-alert-outline', title: `Report ${pet.name} as lost`, danger: true, onPress: () => fromMenu(() => setLostSheet(true)) },
+    !isOwner && { icon: 'exit-to-app', title: 'Leave this pet', danger: true, onPress: () => fromMenu(() => askConfirm(leaveConfig())) },
+  ].filter(Boolean);
+
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        {/* Header */}
-        <View style={styles.topRow}>
-          <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: ui.background }]}
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-          </Pressable>
-          <Pressable onPress={() => navigation.navigate('EditPet', { petId })} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Text style={styles.editLink}>Edit</Text>
-          </Pressable>
+    <View style={styles.safe}>
+      <Animated.ScrollView
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Hero — the pet's photo, or its identity tint + species glyph. */}
+        <View style={[styles.hero, { height: HERO_HEIGHT + insets.top, backgroundColor: pair.bg }]}>
+          {photoUri ? (
+            <>
+              <Image
+                source={{ uri: photoUri }}
+                style={styles.heroImg}
+                accessibilityLabel={`Photo of ${pet.name}`}
+              />
+              {/* Light top scrim keeps the dark status bar legible. */}
+              <LinearGradient
+                colors={scrim.cream}
+                style={[styles.scrimTop, { height: insets.top + 90 }]}
+                pointerEvents="none"
+              />
+              <LinearGradient
+                colors={scrim.bottom}
+                style={styles.scrimBottom}
+                pointerEvents="none"
+              />
+            </>
+          ) : (
+            <MaterialCommunityIcons
+              name={speciesIcon(pet.type)}
+              size={190}
+              color={pair.fg}
+              style={styles.heroGlyph}
+            />
+          )}
+
+          <View style={[styles.heroBar, { top: insets.top + 8 }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              style={({ pressed }) => [styles.heroBtn, pressed && { opacity: motion.pressOpacity }]}
+              onPress={() => navigation.goBack()}
+              hitSlop={4}
+            >
+              <MaterialCommunityIcons name="arrow-left" size={21} color={ui.ink} />
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`More actions for ${pet.name}`}
+              style={({ pressed }) => [styles.heroBtn, pressed && { opacity: motion.pressOpacity }]}
+              onPress={() => setMenuSheet(true)}
+              hitSlop={4}
+            >
+              <MaterialCommunityIcons name="dots-horizontal" size={22} color={ui.ink} />
+            </Pressable>
+          </View>
+
+          <View style={styles.heroText}>
+            <View style={styles.heroPills}>
+              <View style={[styles.speciesPill, { backgroundColor: photoUri ? pair.bg : ui.surface }]}>
+                <MaterialCommunityIcons name={speciesIcon(pet.type)} size={14} color={pair.fg} />
+                <Text style={[styles.speciesPillText, { color: pair.fg }]} numberOfLines={1}>{speciesLabel}</Text>
+              </View>
+              {/* Status shown exactly once on this screen. */}
+              <StatusPill status={status} label={statusLabel} style={{ alignSelf: 'auto' }} />
+            </View>
+            <Text style={[type.display, { color: heroFg }]} numberOfLines={1}>{pet.name}</Text>
+            {heroMeta ? <Text style={[styles.heroMeta, { color: heroFg }]}>{heroMeta}</Text> : null}
+          </View>
         </View>
 
-        {/* Identity */}
-        <View style={styles.identity}>
-          <StatusRing
-            size={84}
-            color={pet.color || ui.accentTint}
-            textColor={petFg(pet.color)}
-            initial={pet.name[0]}
-            photo={pet.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined}
-            status={status}
+        {/* Cream sheet sliding up over the hero. */}
+        <View style={styles.sheet}>
+          <SegmentedControl
+            segments={SEGMENTS}
+            value={segment}
+            onChange={setSegment}
+            style={styles.segmented}
           />
-          <Text style={styles.petName}>{pet.name}</Text>
-          {meta ? <Text style={styles.petMeta}>{meta}</Text> : null}
-          <StatusPill status={status} label={statusLabel} />
+
+          {/* Fade only on segment switch — tabs are peers, no slide. */}
+          <Animated.View key={segment} entering={SEGMENT_IN}>
+            {segment === 'overview' && renderOverview()}
+            {segment === 'health' && renderHealth()}
+            {segment === 'notes' && renderNotes()}
+          </Animated.View>
         </View>
+      </Animated.ScrollView>
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.statusBackdrop, { height: insets.top }, statusBackdropStyle]}
+      />
 
-        <SegmentedControl
-          segments={SEGMENTS}
-          value={segment}
-          onChange={setSegment}
-          style={styles.segmented}
-        />
-
-        {/* Fade only on segment switch — tabs are peers, no slide. */}
-        <Animated.View key={segment} entering={SEGMENT_IN}>
-          {segment === 'overview' && renderOverview()}
-          {segment === 'health' && renderHealth()}
-          {segment === 'notes' && renderNotes()}
-        </Animated.View>
-      </ScrollView>
+      {/* ••• menu — rarely-used and destructive actions, off the browse path. */}
+      <Sheet visible={menuSheet} onClose={() => setMenuSheet(false)} title={pet.name}>
+        <Card>
+          {menuItems.map((m, i) => (
+            <ListRow
+              key={m.title}
+              icon={m.icon}
+              title={m.title}
+              chevron
+              danger={m.danger}
+              onPress={m.onPress}
+              last={i === menuItems.length - 1}
+            />
+          ))}
+        </Card>
+      </Sheet>
 
       {/* ── Sheets ── */}
 
@@ -694,8 +998,8 @@ export default function PetProfileScreen({ navigation, route }) {
             value={newFood}
             onChangeText={setNewFood}
           />
-          <Pressable style={styles.inlineAddBtn} onPress={handleAddFood}>
-            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+          <Pressable style={styles.inlineAddBtn} onPress={handleAddFood} disabled={isBusy('food')}>
+            <MaterialCommunityIcons name="plus" size={20} color={ui.onAccent} />
           </Pressable>
         </View>
       </Sheet>
@@ -728,7 +1032,7 @@ export default function PetProfileScreen({ navigation, route }) {
             />
           ))}
         </View>
-        <Button label="Add activity" onPress={handleAddActivity} disabled={!newActivity.name.trim()} />
+        <Button label="Add activity" onPress={handleAddActivity} disabled={!newActivity.name.trim() || isBusy('activity')} />
       </Sheet>
 
       {/* Add medication */}
@@ -771,7 +1075,7 @@ export default function PetProfileScreen({ navigation, route }) {
             </View>
           </View>
         )}
-        <Button label="Add medication" onPress={handleAddMedication} disabled={!newMed.name.trim()} />
+        <Button label="Add medication" onPress={handleAddMedication} disabled={!newMed.name.trim() || isBusy('medication')} />
       </Sheet>
 
       {/* Report lost */}
@@ -800,7 +1104,7 @@ export default function PetProfileScreen({ navigation, route }) {
           onChangeText={(v) => setLostForm({ ...lostForm, contactPhone: v })}
           keyboardType="phone-pad"
         />
-        <Button variant="danger" label="Report lost" onPress={handleReportLost} />
+        <Button variant="danger" label="Report lost" onPress={handleReportLost} disabled={isBusy('report-lost')} />
       </Sheet>
 
       {/* Log weight */}
@@ -819,7 +1123,7 @@ export default function PetProfileScreen({ navigation, route }) {
           </View>
         </View>
         <Text style={styles.sheetHint}>Logged in {wUnit} — change the unit in Edit Pet.</Text>
-        <Button label="Log weight" onPress={handleAddWeight} disabled={!parseFloat(newWeight.value)} />
+        <Button label="Log weight" onPress={handleAddWeight} disabled={!parseFloat(newWeight.value) || isBusy('weight')} />
       </Sheet>
 
       {/* Add expense */}
@@ -853,7 +1157,7 @@ export default function PetProfileScreen({ navigation, route }) {
           value={newExpense.notes}
           onChangeText={(v) => setNewExpense({ ...newExpense, notes: v })}
         />
-        <Button label="Add expense" onPress={handleAddExpense} disabled={!parseFloat(newExpense.amount)} />
+        <Button label="Add expense" onPress={handleAddExpense} disabled={!parseFloat(newExpense.amount) || isBusy('expense')} />
       </Sheet>
 
       {/* Care team (owner list + invite / leave) */}
@@ -975,7 +1279,7 @@ export default function PetProfileScreen({ navigation, route }) {
         onCancel={() => setConfirm(null)}
         onConfirm={() => { const a = confirm?.action; setConfirm(null); a?.(); }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -1011,7 +1315,7 @@ function WeightSparkline({ weights }) {
   );
 }
 
-function MedicationRow({ med, streakLabel, onLog, onDelete }) {
+function MedicationRow({ med, pair, streakLabel, onLog, onDelete }) {
   const freqLabel = med.frequency === 'as_needed'
     ? 'As needed'
     : `${cap(med.frequency)}${med.times?.length ? ` · ${med.times.join(', ')}` : ''}`;
@@ -1021,7 +1325,7 @@ function MedicationRow({ med, streakLabel, onLog, onDelete }) {
 
   return (
     <View style={[styles.itemRow, !med.active && { opacity: 0.55 }]}>
-      <MaterialCommunityIcons name="pill" size={19} color={ui.accent} />
+      <IconChip icon="pill" pair={pair} />
       <View style={{ flex: 1 }}>
         <Text style={[type.rowTitle, { color: ui.ink }]}>
           {med.name}{med.dosage ? <Text style={[type.secondary, { color: ui.sub }]}>  ·  {med.dosage}</Text> : null}
@@ -1044,17 +1348,27 @@ function MedicationRow({ med, streakLabel, onLog, onDelete }) {
   );
 }
 
-function ActivityRow({ activity }) {
+function ActivityRow({ activity, pair }) {
   const timeIcons = { morning: 'weather-sunny', afternoon: 'weather-partly-cloudy', evening: 'weather-night' };
   return (
     <View style={styles.itemRow}>
-      <MaterialCommunityIcons name={timeIcons[activity.timeOfDay] || 'run'} size={19} color={ui.accent} />
+      <IconChip icon={timeIcons[activity.timeOfDay] || 'run'} pair={pair} />
       <View style={{ flex: 1 }}>
         <Text style={[type.rowTitle, { color: ui.ink }]}>{activity.name}</Text>
         <Text style={[type.secondary, { color: ui.sub, marginTop: 1, textTransform: 'capitalize' }]}>
           {activity.duration} min · {activity.timeOfDay}
         </Text>
       </View>
+    </View>
+  );
+}
+
+// Row icon on the pet's identity tint — the pet's color threads through its
+// own records (decoration only; actions stay brown).
+function IconChip({ icon, pair }) {
+  return (
+    <View style={[styles.rowChip, { backgroundColor: pair?.bg ?? ui.accentTint }]}>
+      <MaterialCommunityIcons name={icon} size={17} color={pair?.fg ?? ui.accent} />
     </View>
   );
 }
@@ -1356,41 +1670,85 @@ function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
 }
 
 const styles = StyleSheet.create({
+  // Explicit 100% box, not absoluteFill: react-native-web leaves an
+  // absoluteFill <Image> at its natural size instead of covering.
+  heroImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   safe: { flex: 1, backgroundColor: ui.background },
+  statusBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: ui.background },
   scroll: { paddingBottom: 32 },
-  topRow: {
+  hero: { overflow: 'hidden' },
+  scrimTop: { position: 'absolute', top: 0, left: 0, right: 0 },
+  scrimBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 230 },
+  heroGlyph: { position: 'absolute', right: -18, bottom: 96, opacity: 0.22 },
+  heroBar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 12,
   },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
+  heroBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: ui.glass,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editLink: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.accent },
-  identity: {
+  heroText: { position: 'absolute', left: 24, right: 24, bottom: 52, gap: 6 },
+  heroPills: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 4 },
+  speciesPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 11,
+    borderRadius: 999,
+    maxWidth: 240,
+  },
+  speciesPillText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12 },
+  heroMeta: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, lineHeight: 19, opacity: 0.92 },
+  sheet: {
+    marginTop: -28,
+    paddingTop: 20,
+    backgroundColor: ui.background,
+    borderTopLeftRadius: radii.sheet,
+    borderTopRightRadius: radii.sheet,
+    borderCurve: 'continuous',
+  },
+  segmented: { marginHorizontal: 24, marginBottom: 20 },
+  todayCount: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: ui.sub },
+  todayRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingVertical: 4 },
+  todayEmpty: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
+  doneBtn: {
+    minHeight: 34,
+    paddingHorizontal: 14,
+    borderRadius: 11,
+    borderCurve: 'continuous',
+    backgroundColor: ui.accentTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.accent },
+  tileGrid: { marginHorizontal: 24, marginBottom: 18, gap: 10 },
+  tileRow: { flexDirection: 'row', gap: 10 },
+  tile: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 20,
+    minHeight: 72,
+    padding: 12,
+    backgroundColor: ui.surface,
+    borderWidth: 1,
+    borderColor: ui.border,
+    borderRadius: 18,
+    borderCurve: 'continuous',
   },
-  petName: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 25,
-    letterSpacing: -0.4,
-    color: ui.ink,
-  },
-  petMeta: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: ui.sub },
-  segmented: { marginHorizontal: 24, marginBottom: 20 },
+  tileChip: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  rowChip: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  tileTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: ui.ink },
+  tileValue: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, lineHeight: 16, color: ui.sub, marginTop: 1 },
 
   block: { marginHorizontal: 24, marginBottom: 18 },
   sectionLabel: {
@@ -1498,20 +1856,6 @@ const styles = StyleSheet.create({
   },
   lostTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: ui.ink },
   lostSub: { ...type.secondary, color: ui.sub, marginTop: 1 },
-  reportLostBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    marginHorizontal: 24,
-    marginBottom: 28,
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#f1d7d4',
-    borderCurve: 'continuous',
-  },
-  reportLostText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: ui.danger },
   dangerOutlineBtn: {
     flexDirection: 'row',
     alignItems: 'center',

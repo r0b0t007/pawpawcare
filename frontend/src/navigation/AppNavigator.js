@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, ActivityIndicator, Platform } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
 import { ui } from '../theme';
@@ -114,25 +115,32 @@ const TAB_ICONS = {
 };
 
 function MainTabs() {
+  // The bar grows by the device's bottom inset (home indicator, Android's
+  // gesture or 3-button bar) so labels never sit under system UI; a fixed
+  // height would override React Navigation's own inset handling.
+  const insets = useSafeAreaInsets();
+  const bottomPad = Math.max(insets.bottom, 10);
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 80 : 66,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-          paddingTop: 10,
-          backgroundColor: '#fffdfa',
+          height: 60 + bottomPad,
+          paddingBottom: bottomPad,
+          paddingTop: 6,
+          backgroundColor: ui.surface,
           borderTopWidth: 1,
-          borderTopColor: '#f0e6d7',
+          borderTopColor: ui.border,
           elevation: 0,
           shadowOpacity: 0,
         },
         tabBarActiveTintColor: ui.accent,
-        tabBarInactiveTintColor: '#a08d72',
+        // ui.sub, not a lighter beige: inactive labels must still pass AA.
+        tabBarInactiveTintColor: ui.sub,
         tabBarLabelStyle: {
-          fontFamily: 'PlusJakartaSans_600SemiBold',
-          fontSize: 10,
+          fontFamily: 'PlusJakartaSans_700Bold',
+          fontSize: 11,
+          lineHeight: 14,
           marginTop: 2,
         },
         tabBarIcon: ({ focused, color }) => {

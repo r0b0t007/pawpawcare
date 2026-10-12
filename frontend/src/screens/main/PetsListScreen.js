@@ -1,41 +1,19 @@
-import React from 'react';
-import {
-  View, Text, Pressable, StyleSheet,
-} from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, Pressable, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { usePetsQuery } from '../../hooks/usePets';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
-import { resolveAsset } from '../../config';
-import { ui, type, PET_COLOR_PAIRS } from '../../theme';
-import { StatusRing, StatusPill, Button, Skeleton } from '../../components';
+import { petMeta, petPhoto } from '../../utils/pets';
+import { ui, type, photos } from '../../theme';
+import { Button, EmptyState, PetCard, Skeleton, petHealthStatus } from '../../components';
 
-// Reflow only — no entering on virtualized rows (recycling makes them flicker).
-const ROW_LAYOUT = LinearTransition.duration(200);
+// "Lively & Light": pets as a 2-column grid of photo cards on their identity
+// tints — recognised by face and color first. Status shows once per pet (icon
+// + word on the card); pets that need attention sort first. The whole card
+// navigates, and adding is a quiet outline tile, never a banner.
 
-// Redesign: the whole card navigates (no "View Profile" button), status lives
-// on the ring + one pill, and delete moved off the browse path into EditPet.
-
-function petStatus(vax = []) {
-  const overdueCount = vax.filter((v) => v.status === 'overdue').length;
-  if (overdueCount > 0) {
-    return { status: 'overdue', label: `${overdueCount} overdue` };
-  }
-  if (vax.some((v) => v.status === 'due_soon')) return { status: 'due', label: 'Due soon' };
-  return { status: 'ok', label: 'All good' };
-}
-
-const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
-
-const petMeta = (pet) =>
-  [
-    pet.type ? pet.type.charAt(0).toUpperCase() + pet.type.slice(1) : null,
-    pet.breed || null,
-    pet.age ? `${pet.age} yr${pet.age !== 1 ? 's' : ''}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+const SEVERITY = { overdue: 0, due: 1, ok: 2 };
 
 export default function PetsListScreen({ navigation }) {
   // Reads come from React Query; writes still go through DataContext, which
@@ -43,80 +21,70 @@ export default function PetsListScreen({ navigation }) {
   const { data: pets = [], isLoading, isError, refetch } = usePetsQuery();
   useRefetchOnFocus(refetch);
 
-  const renderPet = ({ item: pet }) => {
-    const { status, label } = petStatus(pet.vaccinations);
-    return (
-      <Pressable
-        style={({ pressed }) => [styles.card, pressed && { borderColor: '#d9c6a8' }]}
-        onPress={() => navigation.navigate('PetProfile', { petId: pet.id })}
-      >
-        <StatusRing
-          size={56}
-          color={pet.color || ui.accentTint}
-          textColor={petFg(pet.color)}
-          initial={pet.name[0]}
-          photo={pet.avatarUrl ? resolveAsset(pet.avatarUrl) : undefined}
-          status={status}
-        />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={styles.petName}>{pet.name}</Text>
-          {petMeta(pet) ? (
-            <Text style={styles.petMeta} numberOfLines={1}>
-              {petMeta(pet)}
-            </Text>
-          ) : null}
-          <StatusPill status={status} label={label} style={{ marginTop: 8 }} />
-        </View>
-        <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} />
-      </Pressable>
-    );
-  };
+  const sorted = useMemo(
+    () =>
+      pets
+        .map((pet, i) => ({ pet, i, health: petHealthStatus(pet.vaccinations) }))
+        .sort((a, b) => SEVERITY[a.health.status] - SEVERITY[b.health.status] || a.i - b.i)
+        // An odd count gets a spacer so the last card keeps its column width.
+        .concat(pets.length % 2 ? [{ spacer: true }] : []),
+    [pets],
+  );
 
-  const ListHeader = () => (
+  const addPet = () => navigation.navigate('AddPet');
+
+  const renderPet = ({ item: { pet, health, spacer } }) => (spacer ? <View style={styles.spacer} /> : (
+    <PetCard
+      name={pet.name}
+      meta={petMeta(pet)}
+      color={pet.color}
+      photo={petPhoto(pet)}
+      species={pet.type}
+      status={health.status}
+      statusLabel={health.label}
+      onPress={() => navigation.navigate('PetProfile', { petId: pet.id })}
+    />
+  ));
+
+  const ListHeader = (
     <View style={styles.headerWrap}>
-      <View>
-        <Text style={[type.screenTitle, { color: ui.ink }]}>Your pets</Text>
-        <Text style={styles.pageSubtitle}>
-          {pets.length === 0
-            ? 'Add your first pet below'
-            : `${pets.length} in your care`}
-        </Text>
-      </View>
-      <Button pill icon="plus" label="Add pet" onPress={() => navigation.navigate('AddPet')} />
+      <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">Your pets</Text>
+      <Text style={styles.pageSubtitle}>
+        {pets.length === 1 ? "1 pet · tap to see today's care" : `${pets.length} pets · tap one to see today's care`}
+      </Text>
     </View>
   );
 
-  const ListFooter = () => (
+  const ListFooter = (
     <Pressable
       style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
-      onPress={() => navigation.navigate('AddPet')}
+      onPress={addPet}
+      accessibilityRole="button"
     >
       <MaterialCommunityIcons name="plus" size={20} color={ui.accent} />
-      <Text style={styles.addCardText}>Add a pet</Text>
+      <Text style={styles.addCardText}>Add another pet</Text>
     </Pressable>
   );
 
   if (isLoading) {
     // Real header, skeleton cards where the data goes — no layout jump when
-    // the list lands.
+    // the grid lands.
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.list}>
           <View style={styles.headerWrap}>
-            <View>
-              <Text style={[type.screenTitle, { color: ui.ink }]}>Your pets</Text>
-              <Skeleton width={110} height={12} style={{ marginTop: 8 }} />
-            </View>
-            <Button pill icon="plus" label="Add pet" onPress={() => navigation.navigate('AddPet')} />
+            <Text style={[type.screenTitle, { color: ui.ink }]}>Your pets</Text>
+            <Skeleton width={150} height={12} style={{ marginTop: 8 }} />
           </View>
-          {[0, 1, 2].map((i) => (
-            <View key={i} style={styles.card}>
-              <Skeleton width={56} height={56} radius={28} />
-              <View style={{ flex: 1, gap: 9 }}>
-                <Skeleton width="55%" height={16} />
-                <Skeleton width="40%" height={11} />
-                <Skeleton width={82} height={22} radius={11} style={{ marginTop: 2 }} />
-              </View>
+          {[0, 1].map((r) => (
+            <View key={r} style={styles.row}>
+              {[0, 1].map((c) => (
+                <View key={c} style={styles.skeletonCard}>
+                  <Skeleton width="100%" height={128} radius={16} />
+                  <Skeleton width="60%" height={16} />
+                  <Skeleton width="45%" height={11} />
+                </View>
+              ))}
             </View>
           ))}
         </View>
@@ -135,17 +103,43 @@ export default function PetsListScreen({ navigation }) {
     );
   }
 
+  if (pets.length === 0) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <View style={[styles.list, { flex: 1 }]}>
+          <View style={styles.headerWrap}>
+            <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">Your pets</Text>
+          </View>
+          <View style={styles.centered}>
+            <EmptyState
+              photo={photos.emptyKitten}
+              title="No pets yet"
+              body="Add a cat, a dog or any companion. It takes less than a minute."
+              actionLabel="Add your first pet"
+              actionIcon="plus"
+              onAction={addPet}
+              style={{ alignSelf: 'stretch' }}
+            />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <Animated.FlatList
-        data={pets}
-        keyExtractor={(p) => p.id}
+      {/* Plain FlatList: Reanimated's itemLayoutAnimation is single-column
+          only, and this grid is two. */}
+      <FlatList
+        data={sorted}
+        keyExtractor={({ pet, spacer }) => (spacer ? 'spacer' : pet.id)}
         renderItem={renderPet}
+        numColumns={2}
+        columnWrapperStyle={styles.row}
         ListHeaderComponent={ListHeader}
         ListFooterComponent={ListFooter}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        itemLayoutAnimation={ROW_LAYOUT}
       />
     </SafeAreaView>
   );
@@ -155,33 +149,21 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16 },
   errorText: { ...type.body, color: ui.sub },
-  list: { paddingHorizontal: 24, paddingBottom: 28, gap: 14 },
-  headerWrap: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 14,
-    paddingBottom: 6,
-  },
+  list: { paddingHorizontal: 16, paddingBottom: 28, gap: 12 },
+  // flexDirection for the loading skeleton's rows (FlatList's column wrapper
+  // already lays the real rows out horizontally).
+  row: { flexDirection: 'row', gap: 12 },
+  // Same horizontal padding as PetCard: Yoga floors a flex: 1 item at its
+  // padding, so an unpadded spacer would let a lone last card grow 16px wider.
+  spacer: { flex: 1, paddingHorizontal: 8 },
+  headerWrap: { paddingTop: 14, paddingBottom: 6, paddingHorizontal: 8 },
   pageSubtitle: { ...type.body, color: ui.sub, marginTop: 2 },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    borderRadius: 20,
-    borderCurve: 'continuous',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-  },
-  petName: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 17, color: ui.ink },
-  petMeta: {
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 12.5,
-    color: ui.sub,
-    marginTop: 2,
+  skeletonCard: {
+    flex: 1,
+    gap: 10,
+    padding: 8,
+    borderRadius: 22,
+    backgroundColor: ui.track,
   },
   addCard: {
     flexDirection: 'row',
@@ -192,7 +174,9 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderColor: ui.faint,
     borderRadius: 20,
-    padding: 18,
+    borderCurve: 'continuous',
+    minHeight: 56,
+    marginTop: 4,
   },
-  addCardText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: ui.accent },
+  addCardText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: ui.accent },
 });

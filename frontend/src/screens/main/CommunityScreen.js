@@ -1,36 +1,30 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TextInput, Alert, Image,
   ActivityIndicator, Linking, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { uploadImage } from '../../services/api';
 import { track } from '../../services/analytics';
+import { timeAgo } from '../../utils/dates';
+import { useInFlight } from '../../hooks/useInFlight';
 import { resolveAsset } from '../../config';
-import { ui, type, PET_COLOR_PAIRS, motion } from '../../theme';
-import { Card, Chip, Button, ConfirmDialog, showToast } from '../../components';
+import { ui, type, PET_COLOR_PAIRS, motion, photos } from '../../theme';
+import {
+  Card, Button, ConfirmDialog, EmptyState, SegmentedControl, showToast,
+} from '../../components';
+import LostPetCard from './LostPetCard';
 
-// Redesign: one screen, three chip-switched sections (Feed / Groups / Lost
-// pets). The composer starts collapsed; lost-pet reporting lives on the
-// pushed LostPets screen — the section here only shows the board.
-
-function timeAgo(iso) {
-  const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
-function missingFor(iso) {
-  if (!iso) return 'Missing';
-  const days = Math.floor((Date.now() - new Date(iso)) / 86400000);
-  if (days < 1) return 'Missing today';
-  return `Missing ${days} day${days === 1 ? '' : 's'}`;
-}
+// One screen, three peer sections (Feed / Lost pets / Groups) on a segmented
+// control. A lost pet from someone else always tops the feed — the
+// serial-position slot where attention is highest — as a warm, one-tap card.
+// The composer starts collapsed; lost-pet reporting lives on the pushed
+// LostPets screen — the section here only shows the board.
 
 // Identity colors only — never UI chrome.
 const pairFor = (name) => PET_COLOR_PAIRS[name ? name.charCodeAt(0) % PET_COLOR_PAIRS.length : 0];
@@ -38,9 +32,9 @@ const pairFor = (name) => PET_COLOR_PAIRS[name ? name.charCodeAt(0) % PET_COLOR_
 const GROUP_ICONS = ['dog', 'cat', 'bird', 'rabbit', 'paw'];
 
 const SECTIONS = [
-  { key: 'feed', label: 'Feed' },
-  { key: 'groups', label: 'Groups' },
-  { key: 'lost', label: 'Lost pets' },
+  { value: 'feed', label: 'Feed' },
+  { value: 'lost', label: 'Lost pets' },
+  { value: 'groups', label: 'Groups' },
 ];
 
 export default function CommunityScreen({ navigation }) {
@@ -61,9 +55,22 @@ export default function CommunityScreen({ navigation }) {
   const [attachFailed, setAttachFailed] = useState(null);
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, destructive, action }
 
-  useEffect(() => {
-    if (section === 'lost') refreshLostPets();
-  }, [section]);
+  // The feed leads with a lost pet, so it needs a fresh board too. This tab
+  // stays mounted: refresh whenever Community is focused or the section
+  // changes — always for Lost pets, and for the feed unless the board was
+  // fetched in the last minute (no extra GET on every Feed tap).
+  const boardFetchedAt = useRef(0);
+  useFocusEffect(
+    useCallback(() => {
+      const stale = Date.now() - boardFetchedAt.current > 60000;
+      if (section === 'lost' || (section === 'feed' && stale)) {
+        boardFetchedAt.current = Date.now();
+        refreshLostPets();
+      }
+      // refreshLostPets is recreated each render; section is the trigger.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [section]),
+  );
 
   const attachImage = async () => {
     setAttaching(true);
@@ -99,14 +106,21 @@ export default function CommunityScreen({ navigation }) {
     }
   };
 
-  const handlePost = async () => {
-    if (!draft.trim()) return;
-    await addPost(draft.trim(), draftImage);
-    setDraft('');
-    setDraftImage(null);
-    setAttachFailed(null);
-    setComposerOpen(false);
-    showToast('Shared with the pack');
+  // One post per tap; the composer clears only once the post is saved.
+  const { run, isBusy } = useInFlight();
+  const handlePost = () => {
+    if (!draft.trim()) return undefined;
+    return run('post', async () => {
+      if (!(await addPost(draft.trim(), draftImage))) {
+        showToast("Couldn't share that. Try again.");
+        return;
+      }
+      setDraft('');
+      setDraftImage(null);
+      setAttachFailed(null);
+      setComposerOpen(false);
+      showToast('Shared with the pack');
+    });
   };
 
   const closeComposer = () => {
@@ -116,43 +130,73 @@ export default function CommunityScreen({ navigation }) {
     setComposerOpen(false);
   };
 
-  const handleToggleGroup = (group) => {
-    toggleGroupMembership(group.id);
-    showToast(group.isJoined ? `Left ${group.name}` : `Joined ${group.name}`);
-  };
+  const handleToggleGroup = (group) =>
+    run(`group-${group.id}`, async () => {
+      if (await toggleGroupMembership(group.id)) {
+        showToast(group.isJoined ? `Left ${group.name}` : `Joined ${group.name}`);
+      } else {
+        showToast(`Couldn't ${group.isJoined ? 'leave' : 'join'} ${group.name}. Try again.`);
+      }
+    });
 
   const handleMarkFound = (report) => setConfirm({
     title: 'Mark as found?',
     message: `Has ${report.petName} been found safe?`,
     confirmLabel: 'Found!',
-    action: async () => { await resolveLostPet(report.id); showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' }); },
+    action: async () => {
+      if (await resolveLostPet(report.id)) showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' });
+      else showToast("Couldn't mark them found. Try again.");
+    },
   });
 
-  const handleSeen = (report) => {
-    if (report.contactPhone) {
-      Linking.openURL(`tel:${report.contactPhone}`).catch(() => {});
-    } else {
-      showToast('No contact number was shared');
-    }
-  };
+  // "I've seen them" only exists when the owner shared a number — never a
+  // dead primary button (LostPetCard hides it when onSeen is omitted).
+  const seenHandler = (report) =>
+    report.contactPhone
+      ? () => Linking.openURL(`tel:${report.contactPhone}`).catch(() => {})
+      : undefined;
 
   const userPair = pairFor(user?.name);
+  // Someone else's active report, newest first — the feed's top card.
+  const othersLost = lostPets.filter((r) => r.reportedBy !== user?.id && r.status !== 'resolved');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Community</Text>
 
-        {/* Section chips */}
-        <View style={styles.chipRow}>
-          {SECTIONS.map((s) => (
-            <Chip accessibilityRole="radio" key={s.key} label={s.label} active={section === s.key} onPress={() => setSection(s.key)} />
-          ))}
-        </View>
+        <SegmentedControl
+          segments={SECTIONS}
+          value={section}
+          onChange={setSection}
+          style={styles.segmented}
+        />
 
         {/* ── Feed ── */}
         {section === 'feed' && (
           <View>
+            {othersLost.length > 0 && (
+              <View style={styles.feedLost}>
+                <LostPetCard
+                  elevated
+                  report={othersLost[0]}
+                  onSeen={seenHandler(othersLost[0])}
+                />
+                {othersLost.length > 1 && (
+                  <Pressable
+                    onPress={() => setSection('lost')}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.moreLost, pressed && { opacity: motion.pressOpacity }]}
+                  >
+                    <Text style={styles.moreLostText}>
+                      See all {othersLost.length} lost pets
+                    </Text>
+                    <MaterialCommunityIcons name="chevron-right" size={18} color={ui.accent} />
+                  </Pressable>
+                )}
+              </View>
+            )}
+
             {!composerOpen ? (
               <Pressable
                 style={({ pressed }) => [styles.composerCollapsed, pressed && { borderColor: ui.faint }]}
@@ -203,7 +247,7 @@ export default function CommunityScreen({ navigation }) {
                   <Pressable onPress={closeComposer} hitSlop={8} style={styles.cancelBtn}>
                     <Text style={styles.cancelText}>Cancel</Text>
                   </Pressable>
-                  <Button pill label="Post" onPress={handlePost} disabled={!draft.trim()} />
+                  <Button pill label="Post" onPress={handlePost} disabled={!draft.trim() || isBusy('post')} />
                 </View>
               </Card>
             )}
@@ -223,11 +267,12 @@ export default function CommunityScreen({ navigation }) {
                 />
               ))}
               {posts.length === 0 && (
-                <View style={styles.empty}>
-                  <MaterialCommunityIcons name="forum-outline" size={32} color={ui.faint} />
-                  <Text style={styles.emptyTitle}>No posts yet</Text>
-                  <Text style={styles.emptyText}>Be the first to share a moment with your pet!</Text>
-                </View>
+                <EmptyState
+                  photo={photos.communityPals}
+                  title="No posts yet"
+                  body="Be the first to share a moment with your pet!"
+                  style={styles.emptyState}
+                />
               )}
             </View>
           </View>
@@ -279,45 +324,23 @@ export default function CommunityScreen({ navigation }) {
             {lostPets.map((report) => {
               const mine = report.reportedBy === user?.id;
               return (
-                <Card key={report.id}>
-                  {report.photoUrl ? (
-                    <Image source={{ uri: resolveAsset(report.photoUrl) }} style={styles.lostPhoto} resizeMode="cover" />
-                  ) : null}
-                  <View style={styles.lostBody}>
-                    <View style={styles.lostTitleRow}>
-                      <Text style={styles.lostTitle} numberOfLines={1}>
-                        {report.petName}
-                        {report.petType ? ` — ${report.petType}` : ''}
-                      </Text>
-                      <Text style={styles.lostMissing}>{missingFor(report.createdAt)}</Text>
-                    </View>
-                    {report.description ? <Text style={styles.lostDesc}>{report.description}</Text> : null}
-                    {report.lastSeenLocation ? (
-                      <View style={styles.lostLocation}>
-                        <MaterialCommunityIcons name="map-marker-outline" size={15} color={ui.subtle} />
-                        <Text style={styles.lostLocationText}>Last seen near {report.lastSeenLocation}</Text>
-                      </View>
-                    ) : null}
-                    {mine ? (
-                      <Pressable
-                        onPress={() => handleMarkFound(report)}
-                        style={({ pressed }) => [styles.foundBtn, pressed && { opacity: motion.pressOpacitySoft }]}
-                      >
-                        <Text style={styles.foundBtnText}>Mark as found</Text>
-                      </Pressable>
-                    ) : (
-                      <Button label="I've seen them" onPress={() => handleSeen(report)} />
-                    )}
-                  </View>
-                </Card>
+                <LostPetCard
+                  key={report.id}
+                  report={report}
+                  mine={mine}
+                  onSeen={seenHandler(report)}
+                  onFound={() => handleMarkFound(report)}
+                />
               );
             })}
             {lostPets.length === 0 && (
-              <View style={styles.empty}>
-                <MaterialCommunityIcons name="heart-outline" size={32} color={ui.faint} />
-                <Text style={styles.emptyTitle}>No pets reported lost</Text>
-                <Text style={styles.emptyText}>Good news — every pet in the community is home safe.</Text>
-              </View>
+              <EmptyState
+                compact
+                photo={photos.communityPals}
+                title="No pets reported lost"
+                body="Good news — every pet in the community is home safe."
+                style={styles.emptyState}
+              />
             )}
             <Pressable
               style={({ pressed }) => [styles.reportBtn, pressed && { backgroundColor: ui.pressTint }]}
@@ -396,7 +419,10 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
   };
 
   const removeComment = async (id) => {
-    await deleteComment(post.id, id);
+    if (!(await deleteComment(post.id, id))) {
+      showToast("Couldn't delete the comment. Try again.");
+      return;
+    }
     setComments((prev) => (prev || []).filter((c) => c.id !== id));
     showToast('Comment deleted');
   };
@@ -525,7 +551,17 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 16,
   },
-  chipRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 24, paddingBottom: 20 },
+  segmented: { marginHorizontal: 24, marginBottom: 18 },
+  feedLost: { marginHorizontal: 24, marginBottom: 18, gap: 10 },
+  moreLost: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    minHeight: 44,
+  },
+  moreLostText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: ui.accent },
+  emptyState: { paddingVertical: 20 },
 
   // Composer
   composerCollapsed: {
@@ -585,7 +621,7 @@ const styles = StyleSheet.create({
 
   // Feed
   feedList: { marginHorizontal: 24, gap: 14 },
-  postCard: { padding: 18 },
+  postCard: { padding: 16 },
   postHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 10 },
   postAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   postAvatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16 },
@@ -598,7 +634,14 @@ const styles = StyleSheet.create({
     color: ui.ink,
     marginBottom: 14,
   },
-  postImage: { width: '100%', height: 200, borderRadius: 14, marginBottom: 14, backgroundColor: ui.track },
+  postImage: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    borderRadius: 16,
+    borderCurve: 'continuous',
+    marginBottom: 14,
+    backgroundColor: ui.track,
+  },
   postActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -607,7 +650,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: ui.hairline,
   },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, minWidth: 44 },
   actionText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.sub },
 
   // Reported → hidden collapsed state
@@ -704,26 +747,6 @@ const styles = StyleSheet.create({
 
   // Lost pets
   lostList: { marginHorizontal: 24, gap: 14 },
-  lostPhoto: { width: '100%', height: 130, backgroundColor: ui.track },
-  lostBody: { padding: 18, gap: 12 },
-  lostTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    gap: 10,
-  },
-  lostTitle: { flex: 1, fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16, color: ui.ink },
-  lostMissing: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, color: ui.danger },
-  lostDesc: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, lineHeight: 19, color: ui.sub },
-  lostLocation: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  lostLocationText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5, color: ui.subtle },
-  foundBtn: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: ui.successTint,
-  },
-  foundBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.success },
   reportBtn: {
     flexDirection: 'row',
     alignItems: 'center',

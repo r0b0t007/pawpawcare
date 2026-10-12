@@ -7,8 +7,10 @@ import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { ui, radii, type, motion } from '../../theme';
-import { Card, Button, ConfirmDialog, showToast } from '../../components';
+import { ui, radii, type, motion, photos } from '../../theme';
+import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast } from '../../components';
+import { useInFlight } from '../../hooks/useInFlight';
+import { petById } from '../../utils/pets';
 import { EASE_OUT_CSS } from '../../components/motion';
 
 const ROW_OUT = FadeOut.duration(150);
@@ -44,38 +46,47 @@ function scheduleSummary(r) {
 }
 
 export default function RemindersScreen({ navigation }) {
-  const { reminders, addReminder, updateReminder, deleteReminder } = useData();
+  const { reminders, pets, addReminder, updateReminder, deleteReminder } = useData();
+  // A reminder tied to a pet shows that pet's face — recognised before read.
+  const petOf = (r) => petById(pets, r.pet_id) || null;
 
   const [title, setTitle] = useState('');
   const [when, setWhen] = useState(defaultWhen());
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
 
   const canSave = title.trim().length > 0 && when.getTime() > Date.now();
 
-  const onSave = async () => {
-    if (!canSave || saving) return;
-    setSaving(true);
-    await addReminder({
-      title: title.trim(),
-      schedule_type: 'one_time',
-      fire_at: when.toISOString(),
-      lead_time_days: 0,
+  // One reminder per tap (a ref guard — state alone lets two taps in one
+  // frame through); the form clears only once it's saved.
+  const { run, isBusy } = useInFlight();
+  const saving = isBusy('add');
+  const onSave = () => {
+    if (!canSave) return undefined;
+    return run('add', async () => {
+      const saved = await addReminder({
+        title: title.trim(),
+        schedule_type: 'one_time',
+        fire_at: when.toISOString(),
+        lead_time_days: 0,
+      });
+      if (!saved) {
+        showToast("Couldn't add the reminder. Try again.");
+        return;
+      }
+      setTitle('');
+      setWhen(defaultWhen());
+      showToast('Reminder added');
     });
-    setTitle('');
-    setWhen(defaultWhen());
-    setSaving(false);
-    showToast('Reminder added');
   };
 
   const confirmDelete = () => {
     const r = pendingDelete;
     setPendingDelete(null);
     if (!r) return;
-    deleteReminder(r.id);
-    showToast('Reminder deleted');
+    deleteReminder(r.id).then((ok) =>
+      showToast(ok ? 'Reminder deleted' : "Couldn't delete the reminder. Try again."));
   };
 
   return (
@@ -152,19 +163,33 @@ export default function RemindersScreen({ navigation }) {
         {/* Existing reminders */}
         <Text style={styles.sectionLabel}>Your reminders</Text>
         {reminders.length === 0 ? (
-          <Text style={styles.emptyText}>No reminders yet. Vaccination reminders are added automatically.</Text>
+          <EmptyState
+            compact
+            photo={photos.emptyKitten}
+            title="No reminders yet"
+            body="Vaccination reminders are added automatically. Add your own above for anything else."
+            style={{ marginTop: 8 }}
+          />
         ) : (
           <Card>
-            {reminders.map((r, i) => (
+            {reminders.map((r, i) => {
+              const pet = petOf(r);
+              return (
               <Animated.View
                 key={r.id}
                 exiting={ROW_OUT}
                 layout={ROW_LAYOUT}
                 style={[styles.reminderRow, i > 0 && styles.rowDivider]}
               >
-                <Animated.View style={[styles.rIcon, { opacity: r.enabled ? 1 : 0.4 }, styles.toggleFade]}>
-                  <MaterialCommunityIcons name={TYPE_ICON[r.type] || 'bell-outline'} size={18} color={ui.accent} />
-                </Animated.View>
+                {pet ? (
+                  <Animated.View style={[{ opacity: r.enabled ? 1 : 0.4 }, styles.toggleFade]}>
+                    <PetFace pet={pet} size={30} />
+                  </Animated.View>
+                ) : (
+                  <Animated.View style={[styles.rIcon, { opacity: r.enabled ? 1 : 0.4 }, styles.toggleFade]}>
+                    <MaterialCommunityIcons name={TYPE_ICON[r.type] || 'bell-outline'} size={18} color={ui.accent} />
+                  </Animated.View>
+                )}
                 <View style={{ flex: 1 }}>
                   <Animated.Text
                     style={[styles.rTitle, !r.enabled && styles.rTitleOff, styles.toggleFade]}
@@ -172,7 +197,9 @@ export default function RemindersScreen({ navigation }) {
                   >
                     {r.title}
                   </Animated.Text>
-                  <Text style={styles.rSummary}>{scheduleSummary(r)}</Text>
+                  <Text style={styles.rSummary}>
+                    {pet ? `${pet.name} · ` : ''}{scheduleSummary(r)}
+                  </Text>
                 </View>
                 <Switch
                   value={!!r.enabled}
@@ -188,7 +215,8 @@ export default function RemindersScreen({ navigation }) {
                   <MaterialCommunityIcons name="trash-can-outline" size={18} color={ui.danger} />
                 </Pressable>
               </Animated.View>
-            ))}
+              );
+            })}
           </Card>
         )}
       </ScrollView>
@@ -252,7 +280,6 @@ const styles = StyleSheet.create({
   },
   whenText: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13.5, color: ui.ink },
   sectionLabel: { ...type.sectionLabel, color: ui.subtle, marginTop: 24, marginBottom: 10 },
-  emptyText: { ...type.body, color: ui.sub },
   reminderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -278,5 +305,5 @@ const styles = StyleSheet.create({
     transitionTimingFunction: EASE_OUT_CSS,
   },
   rSummary: { ...type.secondary, color: ui.sub, marginTop: 1 },
-  delBtn: { padding: 4 },
+  delBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 });

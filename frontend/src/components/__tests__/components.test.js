@@ -22,6 +22,10 @@ describe('component kit', () => {
     'CareStreakCard',
     'MilestoneRow',
     'RecapCard',
+    'PetCard',
+    'PetFace',
+    'EmptyState',
+    'StepProgress',
     'ToastHost',
   ])('exports %s as a component', (name) => {
     expect(typeof components[name]).toBe('function');

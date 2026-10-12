@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useMemo, useRef } from 'react';
+import { AppState } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { PET_COLOR_PAIRS } from '../theme';
@@ -9,7 +10,10 @@ import { scheduleLocalReminders } from '../services/notifications';
 import { track } from '../services/analytics';
 import { getPref, setPref } from '../services/prefs';
 import { noteGoodMoment } from '../services/storeReview';
-import { addDoseDay } from '../utils/streaks';
+import { addDoseDay, dayKey } from '../utils/streaks';
+import { addDoseCount, mergeDoseHistory } from '../utils/doses';
+import { vaxStatusOn } from '../utils/vaccines';
+import { useTickAt } from '../hooks/useTickAt';
 import { petsKeys, gamificationKeys } from '../hooks/queryKeys';
 
 const DataContext = createContext(null);
@@ -30,20 +34,9 @@ const parseToISO = (str) => {
 // ── API → frontend shape mappers ──────────────────────────────────────────────
 
 const toVax = (v) => {
-  let status = v.status;
-  if (status === 'upcoming' && v.due_date) {
-    // Integer day diff, noon-to-noon: due *today* is 0 (due_soon), and only
-    // dates strictly before today flip to overdue — mirroring the server's
-    // list-time flip (`due_date < today`) so a freshly added past-dated
-    // record lands in "Needs attention" immediately, without going
-    // "overdue" at 12:01 PM on the due day itself.
-    const due = new Date(`${v.due_date}T12:00:00`);
-    const today = new Date();
-    today.setHours(12, 0, 0, 0);
-    const daysUntil = Math.round((due - today) / 86400000);
-    if (daysUntil < 0) status = 'overdue';
-    else if (daysUntil <= 30) status = 'due_soon';
-  }
+  // Same rule as the midnight rollover (ROLL_VAX_STATUS): a freshly added
+  // past-dated record lands in "Needs attention" immediately.
+  const status = vaxStatusOn(v.status, v.due_date);
   return {
     id: v.id,
     name: v.name,
@@ -229,6 +222,10 @@ const toDocument = (d) => ({
   extractedAt: d.extracted_at || null,
 });
 
+// A minute and a half after a reminder fires: time for the server's scheduler
+// (every minute) to advance a recurring reminder's next_fire_at.
+const REMINDER_REFETCH_DELAY = 90000;
+
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
 function dataReducer(state, action) {
@@ -254,6 +251,53 @@ function dataReducer(state, action) {
     // Device-local dose-day history per medication id ({ [medId]: ['YYYY-MM-DD'] })
     // — drives the daily-med streak until the Phase-2 server summary exists.
     case 'SET_MED_DOSE_DAYS': return { ...state, medDoseDays: action.payload };
+    // Device-local doses per medication per day ({ [medId]: { 'YYYY-MM-DD': n } })
+    // — lets a twice-daily med read "1 of 2" instead of done after one dose.
+    case 'SET_MED_DOSE_COUNTS': return { ...state, medDoseCounts: action.payload };
+    // The day rolled over while the app stayed open: re-derive every open
+    // vaccination's status for the new day, so "due soon" yesterday reads
+    // "overdue" today on every screen without a reload.
+    case 'ROLL_VAX_STATUS': {
+      const today = action.payload;
+      let changed = false;
+      const pets = state.pets.map((p) => {
+        let petChanged = false;
+        const vaccinations = (p.vaccinations || []).map((v) => {
+          const status = vaxStatusOn(v.status, v.dueDate, today);
+          if (status === v.status) return v;
+          petChanged = true;
+          return { ...v, status };
+        });
+        if (!petChanged) return p;
+        changed = true;
+        return { ...p, vaccinations };
+      });
+      return changed ? { ...state, pets } : state;
+    }
+    // Stored history merged into the CURRENT in-memory maps (never replacing
+    // them): a dose logged just before a refresh may not be persisted yet.
+    case 'HYDRATE_DOSES': {
+      const { doseDays, doseCounts } = mergeDoseHistory(
+        action.payload.stored,
+        { doseDays: state.medDoseDays, doseCounts: state.medDoseCounts },
+        action.payload.medIds,
+      );
+      return { ...state, medDoseDays: doseDays, medDoseCounts: doseCounts };
+    }
+    // A saved dose, applied to the CURRENT state (not a snapshot captured
+    // when the request started) so two doses logged at once both land.
+    case 'DOSE_LOGGED': {
+      const { petId, medId, at } = action.payload;
+      return {
+        ...state,
+        pets: state.pets.map((p) => (p.id !== petId ? p : {
+          ...p,
+          medications: (p.medications || []).map((m) => (m.id === medId ? { ...m, lastAdministeredAt: at } : m)),
+        })),
+        medDoseDays: { ...state.medDoseDays, [medId]: addDoseDay(state.medDoseDays[medId], at) },
+        medDoseCounts: addDoseCount(state.medDoseCounts, medId, at),
+      };
+    }
     default:           return state;
   }
 }
@@ -264,9 +308,54 @@ export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
     lostPets: [], myReports: [], invites: [], dataLoaded: false, lastSyncedAt: null,
-    medDoseDays: {},
+    medDoseDays: {}, medDoseCounts: {},
   });
   const { user, logout } = useAuth();
+
+  // Midnight rollover: statuses were derived for the day the data loaded.
+  // Re-derive them when the local day changes — on a timer while the app is
+  // open, and when it comes back to the foreground.
+  const statusDay = useRef(dayKey());
+  useEffect(() => {
+    const roll = () => {
+      const key = dayKey();
+      if (key === statusDay.current) return;
+      statusDay.current = key;
+      dispatch({ type: 'ROLL_VAX_STATUS', payload: new Date() });
+    };
+    let timer;
+    const arm = () => {
+      const midnight = new Date();
+      midnight.setHours(24, 0, 1, 0);
+      timer = setTimeout(() => { roll(); arm(); }, midnight - Date.now());
+    };
+    arm();
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') roll(); });
+    return () => { clearTimeout(timer); sub.remove(); };
+  }, []);
+
+  // When a reminder fires, the server moves a recurring one's next_fire_at
+  // forward — refetch shortly after so the lists show the next occurrence
+  // instead of dropping it (only one-off reminders leave once fired).
+  const reminderTimes = useMemo(
+    () => state.reminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
+    [state.reminders],
+  );
+  const reminderTick = useTickAt(reminderTimes, REMINDER_REFETCH_DELAY);
+  useEffect(() => {
+    if (reminderTick > 0 && user) refreshReminders();
+    // refreshReminders is recreated each render; the tick is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminderTick]);
+
+  // Dose history is persisted from state (after DOSE_LOGGED), but only once
+  // hydrateDoseDays has loaded what's stored — never an empty pre-load map.
+  const doseHistoryReady = useRef(false);
+  useEffect(() => {
+    if (!doseHistoryReady.current) return;
+    setPref('medDoseDays', state.medDoseDays);
+    setPref('medDoseCounts', state.medDoseCounts);
+  }, [state.medDoseDays, state.medDoseCounts]);
   // Bridge to React Query while domains migrate off this store: mutations here
   // invalidate the matching query so migrated screens refetch (see queryKeys.js).
   const queryClient = useQueryClient();
@@ -286,11 +375,20 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_INVITES', payload: [] });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
       // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
-      // cleared from memory so a different account never renders it.
+      // cleared from memory so a different account never renders it — and the
+      // persist effect is paused first so the empty maps never overwrite it.
+      doseHistoryReady.current = false;
       dispatch({ type: 'SET_MED_DOSE_DAYS', payload: {} });
+      dispatch({ type: 'SET_MED_DOSE_COUNTS', payload: {} });
     }
   }, [user?.id]);
 
+  // Mutation contract: every add/update/delete/toggle below resolves a truthy
+  // value on success (the saved entity, or true) and false on failure. Errors
+  // are handled here (session expiry logs out), never thrown, so a screen
+  // confirms only what was actually saved. (The medical-vault add/update calls
+  // throw instead: their forms show the API's validation messages.)
+  //   if (await addWeight(...)) showToast('Weight logged'); else showToast("Couldn't …");
   const handleApiError = (err) => {
     if (err.message === 'SESSION_EXPIRED') logout();
   };
@@ -368,18 +466,24 @@ export function DataProvider({ children }) {
   const hydrateDoseDays = async (pets) => {
     try {
       const stored = await getPref('medDoseDays', {});
-      const map = {};
+      const storedCounts = await getPref('medDoseCounts', {});
+      const doseDays = {};
+      const medIds = [];
       for (const pet of pets) {
         for (const med of pet.medications || []) {
+          medIds.push(med.id);
           let days = stored[med.id] || [];
           if (med.lastAdministeredAt) days = addDoseDay(days, med.lastAdministeredAt);
-          if (days.length) map[med.id] = days;
+          if (days.length) doseDays[med.id] = days;
         }
       }
-      dispatch({ type: 'SET_MED_DOSE_DAYS', payload: map });
-      setPref('medDoseDays', map);
+      dispatch({ type: 'HYDRATE_DOSES', payload: { stored: { doseDays, doseCounts: storedCounts }, medIds } });
     } catch {
-      // keep whatever is in state
+      // Storage unreadable: keep whatever is in state.
+    } finally {
+      // Persist from here on either way — a failed read must not silently
+      // stop every later dose from being saved for the rest of the session.
+      doseHistoryReady.current = true;
     }
   };
 
@@ -408,42 +512,48 @@ export function DataProvider({ children }) {
     try {
       await post('/reminders', payload);
       await refreshReminders();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const updateReminder = async (id, updates) => {
     try {
       await patch(`/reminders/${id}`, updates);
       await refreshReminders();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const deleteReminder = async (id) => {
     try {
       await del(`/reminders/${id}`);
       await refreshReminders();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const markNotificationRead = async (id) => {
     try {
       await post(`/notifications/${id}/read`);
       await refreshNotifications();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const snoozeNotification = async (id, minutes = 60) => {
     try {
       await post(`/notifications/${id}/snooze`, { minutes });
       await Promise.all([refreshNotifications(), refreshReminders()]);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const dismissNotification = async (id) => {
     try {
       await post(`/notifications/${id}/dismiss`);
       await refreshNotifications();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // ── Pet CRUD ──
@@ -473,6 +583,7 @@ export function DataProvider({ children }) {
       return newPet;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -517,8 +628,10 @@ export function DataProvider({ children }) {
         // A weight edit creates a server-side log; refetch so the tracker stays in sync.
         if (updates.weight !== undefined) refreshPetWeights(petId);
       }
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -527,8 +640,10 @@ export function DataProvider({ children }) {
       await del(`/pets/${petId}`);
       dispatch({ type: 'DELETE_PET', payload: petId });
       queryClient.invalidateQueries({ queryKey: petsKeys.all });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -560,6 +675,7 @@ export function DataProvider({ children }) {
       return newVax;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -569,8 +685,11 @@ export function DataProvider({ children }) {
       const updated = toVax(apiVax);
       applyVaxChange(petId, (vaxes) => vaxes.map((v) => (v.id === vaccinationId ? updated : v)));
       trackCareAction('vaccination_done');
+      return true;
     } catch (err) {
       handleApiError(err);
+      // Callers celebrate only a saved completion; false means nothing changed.
+      return false;
     }
   };
 
@@ -578,8 +697,10 @@ export function DataProvider({ children }) {
     try {
       await del(`/pets/${petId}/vaccinations/${vaccinationId}`);
       applyVaxChange(petId, (vaxes) => vaxes.filter((v) => v.id !== vaccinationId));
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -591,8 +712,10 @@ export function DataProvider({ children }) {
       const newFood = toFood(apiFood);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, favoriteFoods: [...pet.favoriteFoods, newFood] } });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -601,8 +724,10 @@ export function DataProvider({ children }) {
       await del(`/pets/${petId}/foods/${foodId}`);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, favoriteFoods: pet.favoriteFoods.filter((f) => f.id !== foodId) } });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -620,8 +745,10 @@ export function DataProvider({ children }) {
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, activities: [...pet.activities, newAct] } });
       trackCareAction('activity_added');
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -663,6 +790,7 @@ export function DataProvider({ children }) {
       return newW;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -681,8 +809,10 @@ export function DataProvider({ children }) {
           weightUnit: latest ? latest.unit : pet.weightUnit,
         },
       });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -703,6 +833,7 @@ export function DataProvider({ children }) {
       return newE;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -711,8 +842,10 @@ export function DataProvider({ children }) {
       await del(`/pets/${petId}/expenses/${expenseId}`);
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, expenses: (pet.expenses || []).filter((e) => e.id !== expenseId) } });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -734,6 +867,7 @@ export function DataProvider({ children }) {
       return newMed;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -744,8 +878,10 @@ export function DataProvider({ children }) {
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, medications: (pet.medications || []).map((m) => (m.id === medId ? updated : m)) } });
       refreshReminders();
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -755,35 +891,29 @@ export function DataProvider({ children }) {
       const pet = state.pets.find((p) => p.id === petId);
       dispatch({ type: 'UPDATE_PET', payload: { ...pet, medications: (pet.medications || []).filter((m) => m.id !== medId) } });
       refreshReminders();
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
   const logMedicationDose = async (petId, medId) => {
     try {
       const log = await post(`/pets/${petId}/medications/${medId}/log`, {});
-      const pet = state.pets.find((p) => p.id === petId);
+      // The reducer extends the device-local streak history and today's dose
+      // count with the server's timestamp for the dose (falling back to now);
+      // the persist effect above saves both.
       dispatch({
-        type: 'UPDATE_PET',
-        payload: {
-          ...pet,
-          medications: (pet.medications || []).map((m) =>
-            m.id === medId ? { ...m, lastAdministeredAt: log?.administered_at || new Date().toISOString() } : m
-          ),
-        },
+        type: 'DOSE_LOGGED',
+        payload: { petId, medId, at: log?.administered_at || new Date().toISOString() },
       });
       trackCareAction('dose_logged');
-      // Extend this med's device-local streak history with the server's
-      // timestamp for the dose (falling back to now).
-      const doseDays = {
-        ...state.medDoseDays,
-        [medId]: addDoseDay(state.medDoseDays[medId], log?.administered_at || new Date()),
-      };
-      dispatch({ type: 'SET_MED_DOSE_DAYS', payload: doseDays });
-      setPref('medDoseDays', doseDays);
+      return true;
     } catch (err) {
       handleApiError(err);
+      // Callers celebrate only a saved dose; false means nothing was logged.
+      return false;
     }
   };
 
@@ -813,14 +943,16 @@ export function DataProvider({ children }) {
       });
       // Refresh the board/reports and the feed (the broadcast post) — not all pets.
       await Promise.all([refreshLostPets(), refreshPosts()]);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const resolveLostPet = async (reportId, note) => {
     try {
       await patch(`/lost-pets/${reportId}/resolve`, { resolution_note: note || null });
       await Promise.all([refreshLostPets(), refreshPosts()]);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // ── Sharing (co-owners) ──
@@ -850,13 +982,15 @@ export function DataProvider({ children }) {
   const cancelPetInvite = async (petId, inviteId) => {
     try {
       await del(`/pets/${petId}/invites/${inviteId}`);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const removePetMember = async (petId, userId) => {
     try {
       await del(`/pets/${petId}/members/${userId}`);
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // Member-side: leave a pet I was shared into → drop it from my list.
@@ -864,7 +998,8 @@ export function DataProvider({ children }) {
     try {
       await post(`/pets/${petId}/leave`);
       dispatch({ type: 'DELETE_PET', payload: petId });
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const acceptInvite = async (inviteId) => {
@@ -874,14 +1009,16 @@ export function DataProvider({ children }) {
       // sub-resources) appear in the list.
       dispatch({ type: 'SET_INVITES', payload: state.invites.filter((i) => i.id !== inviteId) });
       await loadData();
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const declineInvite = async (inviteId) => {
     try {
       await post(`/invites/${inviteId}/decline`);
       dispatch({ type: 'SET_INVITES', payload: state.invites.filter((i) => i.id !== inviteId) });
-    } catch (err) { handleApiError(err); }
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // ── Medical records vault ──
@@ -915,7 +1052,7 @@ export function DataProvider({ children }) {
     return toClinic(c);
   };
   const deleteClinic = async (petId, id) => {
-    try { await del(`/pets/${petId}/clinics/${id}`); } catch (err) { handleApiError(err); }
+    try { await del(`/pets/${petId}/clinics/${id}`); return true; } catch (err) { handleApiError(err); return false; }
   };
 
   const addAppointment = async (petId, data) => {
@@ -927,7 +1064,7 @@ export function DataProvider({ children }) {
     return toAppointment(a);
   };
   const deleteAppointment = async (petId, id) => {
-    try { await del(`/pets/${petId}/appointments/${id}`); } catch (err) { handleApiError(err); }
+    try { await del(`/pets/${petId}/appointments/${id}`); return true; } catch (err) { handleApiError(err); return false; }
   };
 
   // file = { uri, name }; fields = { title, category, appointment_id?, clinic_id? }
@@ -937,7 +1074,7 @@ export function DataProvider({ children }) {
     return toDocument(d);
   };
   const deleteDocument = async (petId, id) => {
-    try { await del(`/pets/${petId}/documents/${id}`); } catch (err) { handleApiError(err); }
+    try { await del(`/pets/${petId}/documents/${id}`); return true; } catch (err) { handleApiError(err); return false; }
   };
   // Mint a short-lived signed URL to view a document (files aren't public).
   const getDocumentUrl = async (petId, id) => {
@@ -1004,8 +1141,10 @@ export function DataProvider({ children }) {
     try {
       const apiPost = await post('/community/posts', { content, image_url: imageUrl || null });
       dispatch({ type: 'ADD_POST', payload: toPost(apiPost) });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -1013,8 +1152,10 @@ export function DataProvider({ children }) {
     try {
       const apiGroup = await post(`/community/groups/${groupId}/join`);
       dispatch({ type: 'UPDATE_GROUP', payload: toGroup(apiGroup) });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -1022,8 +1163,10 @@ export function DataProvider({ children }) {
     try {
       const apiPost = await post(`/community/posts/${postId}/paw`);
       dispatch({ type: 'UPDATE_POST', payload: toPost(apiPost) });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -1070,6 +1213,7 @@ export function DataProvider({ children }) {
       return apiComment;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -1078,8 +1222,10 @@ export function DataProvider({ children }) {
       await del(`/community/posts/${postId}/comments/${commentId}`);
       const p = state.posts.find((x) => x.id === postId);
       if (p) dispatch({ type: 'UPDATE_POST', payload: { ...p, comments: Math.max(0, (p.comments || 0) - 1) } });
+      return true;
     } catch (err) {
       handleApiError(err);
+      return false;
     }
   };
 
@@ -1098,6 +1244,7 @@ export function DataProvider({ children }) {
         myReports: state.myReports,
         invites: state.invites,
         medDoseDays: state.medDoseDays,
+        medDoseCounts: state.medDoseCounts,
         addPet,
         updatePet,
         deletePet,
