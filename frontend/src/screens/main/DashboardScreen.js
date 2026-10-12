@@ -206,7 +206,7 @@ export default function DashboardScreen({ navigation }) {
   );
   const reminderTick = useTickAt(reminderTimes);
 
-  const { upNext, weekItems } = useMemo(() => {
+  const { upNext, weekItems, hiddenOverdue, hiddenDue } = useMemo(() => {
     const pending = pets.flatMap((pet) =>
       (pet.vaccinations || [])
         .filter((v) => v.status === 'overdue' || v.status === 'due_soon' || v.status === 'upcoming')
@@ -245,12 +245,15 @@ export default function DashboardScreen({ navigation }) {
           title: v.name,
           sub: `${v.pet.name} · ${fmtShort(vaxDate(v))}`,
           pet: v.pet,
+          vaxId: v.id,
           dueSoon: v.status === 'due_soon',
         })),
       ...reminders
         .filter((r) => r.next_fire_at || r.fire_at)
         .map((r) => ({ r, date: new Date(r.next_fire_at || r.fire_at) }))
-        .filter(({ date }) => !Number.isNaN(date.getTime()) && date >= now && inWeek(date))
+        .filter(({ r, date }) => (
+          !Number.isNaN(date.getTime()) && (r.schedule_type === 'recurring' || date >= now) && inWeek(date)
+        ))
         .map(({ r, date }) => {
           const pet = petById(pets, r.pet_id);
           const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -263,10 +266,20 @@ export default function DashboardScreen({ navigation }) {
           };
         }),
     ].sort((a, b) => a.date - b.date);
+    const weekItems = week.slice(0, 5);
+
+    // Everything the headline counts but Home doesn't show (overdue never
+    // sits in Coming up; due-soon spans 30 days, Coming up only 7) — named by
+    // the "N more" link, never announced and then hidden.
+    const shownVax = new Set(weekItems.map((i) => i.vaxId).filter(Boolean));
+    const hidden = (status) =>
+      pending.filter((v) => v.status === status && v.id !== next?.id && !shownVax.has(v.id)).length;
 
     return {
       upNext: next,
-      weekItems: week.slice(0, 5),
+      weekItems,
+      hiddenOverdue: hidden('overdue'),
+      hiddenDue: hidden('due_soon'),
     };
   }, [pets, reminders, today, reminderTick]);
 
@@ -344,9 +357,12 @@ export default function DashboardScreen({ navigation }) {
         showToast(`Couldn't mark ${upNext.name} done. Try again.`);
       }
     });
-  // Home shows one overdue item; the rest are one tap away, never silently
-  // announced by the headline and then hidden.
-  const moreOverdue = upNext?.status === 'overdue' ? overdueCount - 1 : 0;
+  // "2 more overdue · 1 due soon" — whatever the headline counted that isn't
+  // on Home is one tap away in Health.
+  const moreLabel = [
+    hiddenOverdue > 0 && `${hiddenOverdue} more overdue`,
+    hiddenDue > 0 && `${hiddenDue} ${hiddenOverdue > 0 ? '' : 'more '}due soon`,
+  ].filter(Boolean).join(', ');
 
   const goPet = (pet) =>
     navigation.navigate('Pets', { screen: 'PetProfile', params: { petId: pet.id } });
@@ -447,7 +463,7 @@ export default function DashboardScreen({ navigation }) {
                 }
               />
             )}
-            {moreOverdue > 0 && (
+            {!!moreLabel && (
               <Pressable
                 onPress={() => navigation.navigate('Health')}
                 hitSlop={8}
@@ -455,7 +471,7 @@ export default function DashboardScreen({ navigation }) {
                 style={({ pressed }) => [styles.moreLink, pressed && { opacity: motion.pressOpacity }]}
               >
                 <Text style={styles.sectionLink}>
-                  {moreOverdue} more overdue · see all in Health
+                  {moreLabel} · see all in Health
                 </Text>
                 <MaterialCommunityIcons name="chevron-right" size={18} color={ui.accent} />
               </Pressable>

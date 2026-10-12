@@ -94,7 +94,12 @@ export default function HealthHubScreen({ navigation }) {
   const [recDate, setRecDate] = useState(defaultDueDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const shownPets = filter === 'all' ? pets : pets.filter((p) => p.id === filter);
+  // Memoised: a fresh filtered array every render would rerun the grouping
+  // below on every keystroke and busy toggle.
+  const shownPets = useMemo(
+    () => (filter === 'all' ? pets : pets.filter((p) => p.id === filter)),
+    [pets, filter],
+  );
   const recPet = pets.find((p) => p.id === recPetId) || pets[0];
 
   // Re-run the grouping when the next reminder fires, so a Health tab left
@@ -161,15 +166,17 @@ export default function HealthHubScreen({ navigation }) {
                 // this device — the row can honestly state when. Vaccination
                 // rows never get this flag (their reminders are backend-created).
                 isReminder: true,
+                recurring: r.schedule_type === 'recurring',
                 onPress: () => navigation.navigate('Reminders'),
               };
             })
         : []),
     ]
       .filter((item) => !Number.isNaN(item.date.getTime()))
-      // A reminder is a moment, not a day: one that already fired (even
-      // earlier today) is history, not "today".
-      .filter((item) => !item.isReminder || item.date >= now)
+      // A one-off reminder is a moment: once it has fired (even earlier
+      // today) it's history. A recurring one stays — DataContext refetches
+      // its next occurrence shortly after it fires.
+      .filter((item) => !item.isReminder || item.recurring || item.date >= now)
       .sort((a, b) => a.date - b.date);
 
     const todayItems = [...overdueItems, ...upcoming.filter((i) => dayDiff(i.date, today) <= 0)];
@@ -416,7 +423,7 @@ export default function HealthHubScreen({ navigation }) {
               </Text>
               {!vaultPet && (
               <View style={styles.vaultFaces}>
-                {pets.slice(0, 4).map((p) => (
+                {pets.map((p) => (
                   <Pressable
                     key={p.id}
                     onPress={() => openVault(p)}
@@ -640,7 +647,7 @@ const styles = StyleSheet.create({
   },
   vaultTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, color: ui.ink },
   vaultSub: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, color: VAULT.fg, marginTop: 1 },
-  vaultFaces: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  vaultFaces: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',

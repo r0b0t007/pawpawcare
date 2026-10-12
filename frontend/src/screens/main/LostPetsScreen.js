@@ -25,7 +25,6 @@ export default function LostPetsScreen({ navigation }) {
   const [lastSeen, setLastSeen] = useState('');
   const [note, setNote] = useState('');
   const [phone, setPhone] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, action }
 
   useEffect(() => { refreshLostPets(); }, []);
@@ -50,18 +49,17 @@ export default function LostPetsScreen({ navigation }) {
 
   // A double tap would post two public reports: one request per tap, and the
   // form clears only once the report is actually on the board.
-  const { run } = useInFlight();
+  const { run, isBusy } = useInFlight();
+  const submitting = isBusy('report');
   const handleSubmit = () => {
     if (!selectedPetId) return undefined;
     const pet = pets.find((p) => p.id === selectedPetId);
     return run('report', async () => {
-      setSubmitting(true);
       const saved = await reportPetLost(selectedPetId, {
         lastSeenLocation: lastSeen.trim(),
         description: note.trim(),
         contactPhone: phone.trim(),
       });
-      setSubmitting(false);
       if (!saved) {
         showToast(`Couldn't post ${pet?.name || 'your pet'}. Check your connection and try again.`);
         return;

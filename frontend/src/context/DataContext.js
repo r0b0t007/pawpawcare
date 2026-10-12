@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useMemo, useRef } from 'react';
+import { AppState } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { PET_COLOR_PAIRS } from '../theme';
@@ -9,8 +10,10 @@ import { scheduleLocalReminders } from '../services/notifications';
 import { track } from '../services/analytics';
 import { getPref, setPref } from '../services/prefs';
 import { noteGoodMoment } from '../services/storeReview';
-import { addDoseDay } from '../utils/streaks';
+import { addDoseDay, dayKey } from '../utils/streaks';
 import { addDoseCount, mergeDoseHistory } from '../utils/doses';
+import { vaxStatusOn } from '../utils/vaccines';
+import { useTickAt } from '../hooks/useTickAt';
 import { petsKeys, gamificationKeys } from '../hooks/queryKeys';
 
 const DataContext = createContext(null);
@@ -31,20 +34,9 @@ const parseToISO = (str) => {
 // ── API → frontend shape mappers ──────────────────────────────────────────────
 
 const toVax = (v) => {
-  let status = v.status;
-  if (status === 'upcoming' && v.due_date) {
-    // Integer day diff, noon-to-noon: due *today* is 0 (due_soon), and only
-    // dates strictly before today flip to overdue — mirroring the server's
-    // list-time flip (`due_date < today`) so a freshly added past-dated
-    // record lands in "Needs attention" immediately, without going
-    // "overdue" at 12:01 PM on the due day itself.
-    const due = new Date(`${v.due_date}T12:00:00`);
-    const today = new Date();
-    today.setHours(12, 0, 0, 0);
-    const daysUntil = Math.round((due - today) / 86400000);
-    if (daysUntil < 0) status = 'overdue';
-    else if (daysUntil <= 30) status = 'due_soon';
-  }
+  // Same rule as the midnight rollover (ROLL_VAX_STATUS): a freshly added
+  // past-dated record lands in "Needs attention" immediately.
+  const status = vaxStatusOn(v.status, v.due_date);
   return {
     id: v.id,
     name: v.name,
@@ -230,6 +222,10 @@ const toDocument = (d) => ({
   extractedAt: d.extracted_at || null,
 });
 
+// A minute and a half after a reminder fires: time for the server's scheduler
+// (every minute) to advance a recurring reminder's next_fire_at.
+const REMINDER_REFETCH_DELAY = 90000;
+
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
 function dataReducer(state, action) {
@@ -258,6 +254,26 @@ function dataReducer(state, action) {
     // Device-local doses per medication per day ({ [medId]: { 'YYYY-MM-DD': n } })
     // — lets a twice-daily med read "1 of 2" instead of done after one dose.
     case 'SET_MED_DOSE_COUNTS': return { ...state, medDoseCounts: action.payload };
+    // The day rolled over while the app stayed open: re-derive every open
+    // vaccination's status for the new day, so "due soon" yesterday reads
+    // "overdue" today on every screen without a reload.
+    case 'ROLL_VAX_STATUS': {
+      const today = action.payload;
+      let changed = false;
+      const pets = state.pets.map((p) => {
+        let petChanged = false;
+        const vaccinations = (p.vaccinations || []).map((v) => {
+          const status = vaxStatusOn(v.status, v.dueDate, today);
+          if (status === v.status) return v;
+          petChanged = true;
+          return { ...v, status };
+        });
+        if (!petChanged) return p;
+        changed = true;
+        return { ...p, vaccinations };
+      });
+      return changed ? { ...state, pets } : state;
+    }
     // Stored history merged into the CURRENT in-memory maps (never replacing
     // them): a dose logged just before a refresh may not be persisted yet.
     case 'HYDRATE_DOSES': {
@@ -295,6 +311,42 @@ export function DataProvider({ children }) {
     medDoseDays: {}, medDoseCounts: {},
   });
   const { user, logout } = useAuth();
+
+  // Midnight rollover: statuses were derived for the day the data loaded.
+  // Re-derive them when the local day changes — on a timer while the app is
+  // open, and when it comes back to the foreground.
+  const statusDay = useRef(dayKey());
+  useEffect(() => {
+    const roll = () => {
+      const key = dayKey();
+      if (key === statusDay.current) return;
+      statusDay.current = key;
+      dispatch({ type: 'ROLL_VAX_STATUS', payload: new Date() });
+    };
+    let timer;
+    const arm = () => {
+      const midnight = new Date();
+      midnight.setHours(24, 0, 1, 0);
+      timer = setTimeout(() => { roll(); arm(); }, midnight - Date.now());
+    };
+    arm();
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') roll(); });
+    return () => { clearTimeout(timer); sub.remove(); };
+  }, []);
+
+  // When a reminder fires, the server moves a recurring one's next_fire_at
+  // forward — refetch shortly after so the lists show the next occurrence
+  // instead of dropping it (only one-off reminders leave once fired).
+  const reminderTimes = useMemo(
+    () => state.reminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
+    [state.reminders],
+  );
+  const reminderTick = useTickAt(reminderTimes, REMINDER_REFETCH_DELAY);
+  useEffect(() => {
+    if (reminderTick > 0 && user) refreshReminders();
+    // refreshReminders is recreated each render; the tick is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reminderTick]);
 
   // Dose history is persisted from state (after DOSE_LOGGED), but only once
   // hydrateDoseDays has loaded what's stored — never an empty pre-load map.

@@ -54,25 +54,23 @@ export default function RemindersScreen({ navigation }) {
   const [when, setWhen] = useState(defaultWhen());
   const [showDate, setShowDate] = useState(false);
   const [showTime, setShowTime] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
 
   const canSave = title.trim().length > 0 && when.getTime() > Date.now();
 
   // One reminder per tap (a ref guard — state alone lets two taps in one
   // frame through); the form clears only once it's saved.
-  const { run } = useInFlight();
+  const { run, isBusy } = useInFlight();
+  const saving = isBusy('add');
   const onSave = () => {
     if (!canSave) return undefined;
     return run('add', async () => {
-      setSaving(true);
       const saved = await addReminder({
         title: title.trim(),
         schedule_type: 'one_time',
         fire_at: when.toISOString(),
         lead_time_days: 0,
       });
-      setSaving(false);
       if (!saved) {
         showToast("Couldn't add the reminder. Try again.");
         return;

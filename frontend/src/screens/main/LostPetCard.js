@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Image, Share, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveAsset } from '../../config';
-import { timeAgo } from '../../utils/dates';
+import { dayDiff, timeAgo } from '../../utils/dates';
 import { ui, type, petPair } from '../../theme';
 import { Card, Button, speciesIcon } from '../../components';
 
@@ -12,9 +12,13 @@ import { Card, Button, speciesIcon } from '../../components';
 // and the action is one tap. No proximity or "neighbours looking" claims —
 // the board has no such data, so the card never invents it.
 
-export function missingFor(iso) {
-  if (!iso) return 'Missing';
-  const days = Math.floor((Date.now() - new Date(iso)) / 86400000);
+// How long the pet has been missing: from when it was last seen (falling back
+// to when it was reported), in calendar days — a report filed at 23:00 reads
+// "1 day" the next morning, like every other day count in the app.
+export function missingFor(lastSeenAt, reportedAt, today = new Date()) {
+  const since = new Date(lastSeenAt || reportedAt || NaN);
+  if (Number.isNaN(since.getTime())) return 'Missing';
+  const days = Math.max(0, -dayDiff(since, today));
   if (days < 1) return 'Missing today';
   return `Missing ${days} day${days === 1 ? '' : 's'}`;
 }
@@ -59,7 +63,7 @@ export default function LostPetCard({
         )}
         <View style={styles.pill}>
           <MaterialCommunityIcons name="map-marker-radius-outline" size={14} color={ui.accent} />
-          <Text style={styles.pillText}>{missingFor(report.createdAt)}</Text>
+          <Text style={styles.pillText}>{missingFor(report.lastSeenAt, report.createdAt)}</Text>
         </View>
       </View>
 

@@ -6,23 +6,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { ui, type, radii, PET_COLOR_PAIRS } from '../../theme';
+import { ui, type, radii, petPair } from '../../theme';
 import { Card, Button, Sheet, ConfirmDialog, StatusPill, showToast } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
-import { parseDay } from '../../utils/dates';
-
-const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
+import { fmtFull, parseDay } from '../../utils/dates';
 
 // Health statuses render through StatusPill; 'upcoming' stays a neutral date row.
 const PILL_STATUS = { overdue: 'overdue', due_soon: 'due' };
 
 const hit = { top: 8, bottom: 8, left: 8, right: 8 };
 
-const formatDisplay = (iso) => {
-  if (!iso) return null;
-  const d = parseDay(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
+// 'Oct 12, 2026' (null for a missing date, so callers can fall back).
+const formatDisplay = (iso) => (iso ? fmtFull(parseDay(iso)) : null);
 
 export default function VaccinationTrackerScreen({ navigation, route }) {
   const { petId } = route.params;
@@ -114,7 +109,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
             <Text style={styles.pageSubtitle}>{pet.name}'s health records</Text>
           </View>
           <View style={[styles.petBadge, { backgroundColor: petBg }]}>
-            <Text style={[styles.petBadgeText, { color: petFg(pet.color) }]}>{pet.name[0]}</Text>
+            <Text style={[styles.petBadgeText, { color: petPair(pet.color).fg }]}>{pet.name[0]}</Text>
           </View>
         </View>
 
