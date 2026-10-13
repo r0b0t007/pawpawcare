@@ -12,6 +12,7 @@ import WelcomeScreen from '../screens/auth/WelcomeScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SignupScreen from '../screens/auth/SignupScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import ReconnectScreen from '../screens/auth/ReconnectScreen';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import PetsListScreen from '../screens/main/PetsListScreen';
 import PetProfileScreen from '../screens/main/PetProfileScreen';
@@ -159,7 +160,7 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, restoreFailed } = useAuth();
 
   if (isLoading) {
     return (
@@ -168,6 +169,10 @@ export default function AppNavigator() {
       </View>
     );
   }
+
+  // Saved session, server unreachable at launch: offer a retry rather than
+  // the Welcome screen.
+  if (restoreFailed && !user) return <ReconnectScreen />;
 
   return (
     // Login/logout swaps the whole tree — crossfade instead of a hard cut.

@@ -311,6 +311,10 @@ export function DataProvider({ children }) {
     medDoseDays: {}, medDoseCounts: {},
   });
   const { user, logout } = useAuth();
+  // The pets loader reads the current list to keep a pet's last good data
+  // when one of its requests fails (see loadData).
+  const petsRef = useRef(state.pets);
+  petsRef.current = state.pets;
 
   // Midnight rollover: statuses were derived for the day the data loaded.
   // Re-derive them when the local day changes — on a timer while the app is
@@ -414,23 +418,67 @@ export function DataProvider({ children }) {
         // report-lost / mark-found actions from BOTH, and a half-loaded pair
         // renders the wrong action (e.g. "report as lost" for a lost pet).
         const [apiPets, apiMyReports] = await Promise.all([get('/pets'), get('/lost-pets/mine')]);
-        // Load each pet's sub-resources in parallel
+
+        // Each pet has six sub-resources, so a load is 1 + 6N requests. One
+        // failure among them used to reject the whole domain: no pets for the
+        // rest of the session (Home said "Welcome to PawPawCare", every
+        // profile said "Pet not found") while the Pets tab, on React Query,
+        // still listed them. Now a failed request keeps that pet's last good
+        // copy of the field (or empty on first load), and the domain still
+        // counts as failed below (logged as a partial load).
+        const previous = new Map(petsRef.current.map((p) => [p.id, p]));
+        const failures = [];
+        const fetchList = (petId, resource) =>
+          get(`/pets/${petId}/${resource}`).catch((err) => {
+            failures.push(err);
+            return null;
+          });
+        // API resource → field on the mapped pet (toPet's option names
+        // match the resources except foods → favoriteFoods).
+        const FIELDS = {
+          vaccinations: 'vaccinations', activities: 'activities', foods: 'favoriteFoods',
+          medications: 'medications', weights: 'weights', expenses: 'expenses',
+        };
+        const buildPet = (apiPet, i, lists) => {
+          const loaded = Object.fromEntries(Object.entries(lists).filter(([, list]) => list));
+          const pet = toPet(apiPet, { ...loaded, index: i });
+          const old = previous.get(apiPet.id);
+          if (old) {
+            for (const [resource, field] of Object.entries(FIELDS)) {
+              if (!loaded[resource]) pet[field] = old[field];
+            }
+          }
+          return pet;
+        };
+
+        // Paint the pets as soon as they can be drawn correctly: the cards
+        // render name + avatar + status ring, and the ring needs vaccinations
+        // (the same minimum usePets.js fetches for its list cards).
+        const vaccinationsByPet = await Promise.all(apiPets.map((p) => fetchList(p.id, 'vaccinations')));
+        dispatch({
+          type: 'SET_PETS',
+          payload: apiPets.map((apiPet, i) => buildPet(apiPet, i, { vaccinations: vaccinationsByPet[i] })),
+        });
+        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
+
+        // Then enrich with what only the profile and health screens read.
         const petsWithData = await Promise.all(
           apiPets.map(async (apiPet, i) => {
-            const [vax, acts, foods, meds, weights, expenses] = await Promise.all([
-              get(`/pets/${apiPet.id}/vaccinations`),
-              get(`/pets/${apiPet.id}/activities`),
-              get(`/pets/${apiPet.id}/foods`),
-              get(`/pets/${apiPet.id}/medications`),
-              get(`/pets/${apiPet.id}/weights`),
-              get(`/pets/${apiPet.id}/expenses`),
-            ]);
-            return toPet(apiPet, { vaccinations: vax, activities: acts, foods, medications: meds, weights, expenses, index: i });
+            const [activities, foods, medications, weights, expenses] = await Promise.all(
+              ['activities', 'foods', 'medications', 'weights', 'expenses'].map((r) => fetchList(apiPet.id, r))
+            );
+            return buildPet(apiPet, i, {
+              vaccinations: vaccinationsByPet[i], activities, foods, medications, weights, expenses,
+            });
           })
         );
         dispatch({ type: 'SET_PETS', payload: petsWithData });
-        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
         hydrateDoseDays(petsWithData);
+
+        if (failures.length) {
+          throw failures.find((e) => e?.message === 'SESSION_EXPIRED')
+            ?? new Error(`${failures.length} pet request(s) failed`);
+        }
       },
       () => refreshPosts({ rethrow: true }),
       async () => {

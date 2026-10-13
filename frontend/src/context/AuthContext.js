@@ -19,20 +19,29 @@ const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
 // this often.
 const FOREGROUND_REFRESH_MS = 5 * 60 * 1000;
 
+// Restoring a saved session at launch: waits before each retry when the server
+// can't be reached, before offering "Try again".
+const RESTORE_RETRY_MS = [1000, 3000];
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const AuthContext = createContext(null);
 
 function authReducer(state, action) {
   switch (action.type) {
-    case 'SET_USER':    return { ...state, user: action.payload, isLoading: false, error: null };
-    case 'SET_LOADING': return { ...state, isLoading: action.payload };
-    case 'SET_ERROR':   return { ...state, error: action.payload, isLoading: false };
-    case 'LOGOUT':      return { user: null, isLoading: false, error: null };
-    default:            return state;
+    case 'SET_USER':       return { ...state, user: action.payload, isLoading: false, error: null, restoreFailed: false };
+    case 'SET_LOADING':    return { ...state, isLoading: action.payload };
+    case 'SET_ERROR':      return { ...state, error: action.payload, isLoading: false };
+    case 'RESTORE_FAILED': return { ...state, isLoading: false, restoreFailed: true };
+    case 'RESTORE_RETRY':  return { ...state, isLoading: true, restoreFailed: false };
+    case 'LOGOUT':         return { user: null, isLoading: false, error: null, restoreFailed: false };
+    default:               return state;
   }
 }
 
 export function AuthProvider({ children }) {
-  const [state, dispatch] = useReducer(authReducer, { user: null, isLoading: true, error: null });
+  const [state, dispatch] = useReducer(authReducer, {
+    user: null, isLoading: true, error: null, restoreFailed: false,
+  });
 
   useEffect(() => { loadUser(); }, []);
 
@@ -128,16 +137,48 @@ export function AuthProvider({ children }) {
     await cancelAllLocalReminders();
   };
 
+  // Launch: restore the saved session. Only a rejected session signs out.
+  // Offline, a timeout or a server error leaves the tokens valid, and falling
+  // through to the Welcome screen read as being signed out — so retry
+  // briefly, then show "Try again" (restoreFailed) instead.
   const loadUser = async () => {
-    try {
-      const user = await get('/users/me');
-      applyUser(user); // tie analytics to the restored session
-      syncDevice();
-    } catch (err) {
-      if (err.message === 'SESSION_EXPIRED') await clearTokens();
-      dispatch({ type: 'SET_LOADING', payload: false });
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const user = await get('/users/me');
+        applyUser(user); // tie analytics to the restored session
+        syncDevice();
+        return;
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') {
+          await clearTokens();
+          break;
+        }
+        // Never signed in (no saved session): the Welcome screen is right.
+        const { refresh } = await getTokens().catch(() => ({ refresh: null }));
+        if (!refresh) break;
+        if (attempt >= RESTORE_RETRY_MS.length) {
+          dispatch({ type: 'RESTORE_FAILED' });
+          return;
+        }
+        await wait(RESTORE_RETRY_MS[attempt]);
+      }
     }
+    dispatch({ type: 'SET_LOADING', payload: false });
   };
+
+  const retryRestore = () => {
+    dispatch({ type: 'RESTORE_RETRY' });
+    loadUser();
+  };
+
+  // Coming back to the app (e.g. after turning wifi on) retries on its own.
+  useEffect(() => {
+    if (!state.restoreFailed) return undefined;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') retryRestore();
+    });
+    return () => sub.remove();
+  }, [state.restoreFailed]);
 
   const signup = async ({ name, email, password }) => {
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -297,6 +338,10 @@ export function AuthProvider({ children }) {
         // stable boolean so screens can gate admin-only UI without null checks.
         isAdmin: !!state.user?.is_admin,
         isLoading: state.isLoading,
+        // A saved session couldn't be checked (offline / server down):
+        // AppNavigator shows ReconnectScreen instead of the Welcome screen.
+        restoreFailed: state.restoreFailed,
+        retryRestore,
         error: state.error,
         signup,
         login,
