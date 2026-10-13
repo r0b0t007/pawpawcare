@@ -82,3 +82,21 @@ test('renders through pet missing -> loaded -> removed without a hooks-order cra
   act(() => tree.update(<PetProfileScreen {...props} />));
   expect(texts(tree)).toContain('Pet not found.');
 });
+
+// Vaccinations that didn't load are unknown, not "none due": no "All good"
+// pill, and no "Add a first vaccine" invitation for records that exist.
+test("doesn't call a pet all good when its vaccinations didn't load", () => {
+  let tree;
+  mockPets = [LUNA];
+  act(() => {
+    tree = TestRenderer.create(<PetProfileScreen {...props} />);
+  });
+  expect(texts(tree)).toContain('All good');
+
+  mockPets = [{ ...LUNA, missing: ['vaccinations'] }];
+  act(() => tree.update(<PetProfileScreen {...props} />));
+  expect(texts(tree)).not.toContain('All good');
+  expect(texts(tree)).not.toContain('Add a first vaccine');
+  expect(texts(tree)).toContain("Couldn't load vaccines");
+  act(() => tree.unmount());
+});

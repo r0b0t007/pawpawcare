@@ -83,3 +83,25 @@ export async function getTokens() {
   }
   return loadPromise;
 }
+
+// A sign-out the server never heard about (made offline): the refresh token
+// to revoke and the push token to unregister, kept in the same secure store
+// until a later launch or sign-in can send them.
+const PENDING_LOGOUT_KEY = 'pawpawcare.pending_logout';
+
+export async function storePendingLogout(pending) {
+  await setItem(PENDING_LOGOUT_KEY, JSON.stringify(pending));
+}
+
+export async function getPendingLogout() {
+  const raw = await getItem(PENDING_LOGOUT_KEY);
+  try {
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+export async function clearPendingLogout() {
+  await deleteItem(PENDING_LOGOUT_KEY);
+}

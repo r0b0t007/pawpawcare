@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\PasswordResetCodeMail;
+use App\Models\DeviceToken;
 use App\Models\PasswordResetCode;
 use App\Models\RefreshToken;
 use App\Models\User;
@@ -222,11 +223,24 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'refresh_token' => 'required|string',
+            'refresh_token' => 'required|string|max:512',
+            'device_token' => 'sometimes|nullable|string|max:255',
         ]);
 
-        RefreshToken::where('token', $data['refresh_token'])
-            ->update(['revoked' => true]);
+        $refresh = RefreshToken::where('token', $data['refresh_token'])->first();
+        if ($refresh) {
+            $refresh->update(['revoked' => true]);
+
+            // Signing out also stops push to that phone. Done here as well as
+            // DELETE /devices because the app retries a sign-out made offline
+            // later, when it no longer holds an access token. Scoped to the
+            // refresh token's owner: one account can't unregister another's.
+            if (! empty($data['device_token'])) {
+                DeviceToken::where('token', $data['device_token'])
+                    ->where('user_id', $refresh->user_id)
+                    ->delete();
+            }
+        }
 
         return response()->json(null, 204);
     }

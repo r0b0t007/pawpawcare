@@ -311,6 +311,10 @@ export function DataProvider({ children }) {
     medDoseDays: {}, medDoseCounts: {},
   });
   const { user, logout } = useAuth();
+  // The pets loader reads the current list to keep a pet's last good data
+  // when one of its requests fails (see loadData).
+  const petsRef = useRef(state.pets);
+  petsRef.current = state.pets;
 
   // Midnight rollover: statuses were derived for the day the data loaded.
   // Re-derive them when the local day changes — on a timer while the app is
@@ -414,23 +418,60 @@ export function DataProvider({ children }) {
         // report-lost / mark-found actions from BOTH, and a half-loaded pair
         // renders the wrong action (e.g. "report as lost" for a lost pet).
         const [apiPets, apiMyReports] = await Promise.all([get('/pets'), get('/lost-pets/mine')]);
-        // Load each pet's sub-resources in parallel
-        const petsWithData = await Promise.all(
-          apiPets.map(async (apiPet, i) => {
-            const [vax, acts, foods, meds, weights, expenses] = await Promise.all([
-              get(`/pets/${apiPet.id}/vaccinations`),
-              get(`/pets/${apiPet.id}/activities`),
-              get(`/pets/${apiPet.id}/foods`),
-              get(`/pets/${apiPet.id}/medications`),
-              get(`/pets/${apiPet.id}/weights`),
-              get(`/pets/${apiPet.id}/expenses`),
-            ]);
-            return toPet(apiPet, { vaccinations: vax, activities: acts, foods, medications: meds, weights, expenses, index: i });
-          })
+
+        // Each pet has six sub-resources, so a load is 1 + 6N requests. One
+        // failure among them used to reject the whole domain: no pets for the
+        // rest of the session (Home said "Welcome to PawPawCare", every
+        // profile said "Pet not found") while the Pets tab, on React Query,
+        // still listed them. Now a failed request keeps that pet's last good
+        // copy of the field; with none, the field is listed in pet.missing so
+        // screens don't read the empty list as "nothing on record". The domain
+        // still counts as failed below (logged as a partial load).
+        const previous = new Map(petsRef.current.map((p) => [p.id, p]));
+        const failures = [];
+        const fetchList = (petId, resource) =>
+          get(`/pets/${petId}/${resource}`).catch((err) => {
+            // An expired session ends the load (and signs out below) at once,
+            // instead of after every other request has failed the same way.
+            if (err?.message === 'SESSION_EXPIRED') throw err;
+            failures.push(err);
+            return null;
+          });
+        // API resource → field on the mapped pet (toPet's option names
+        // match the resources except foods → favoriteFoods).
+        const FIELDS = {
+          vaccinations: 'vaccinations', activities: 'activities', foods: 'favoriteFoods',
+          medications: 'medications', weights: 'weights', expenses: 'expenses',
+        };
+        const RESOURCES = Object.keys(FIELDS);
+        const buildPet = (apiPet, i, lists) => {
+          const loaded = Object.fromEntries(Object.entries(lists).filter(([, list]) => list));
+          const pet = toPet(apiPet, { ...loaded, index: i });
+          const old = previous.get(apiPet.id);
+          const missing = [];
+          for (const [resource, field] of Object.entries(FIELDS)) {
+            if (loaded[resource]) continue;
+            if (old) pet[field] = old[field];
+            if (!old || old.missing?.includes(field)) missing.push(field);
+          }
+          if (missing.length) pet.missing = missing;
+          return pet;
+        };
+
+        const listsByPet = await Promise.all(
+          apiPets.map((p) => Promise.all(RESOURCES.map((r) => fetchList(p.id, r))))
+        );
+        const petsWithData = apiPets.map((apiPet, i) =>
+          buildPet(apiPet, i, Object.fromEntries(RESOURCES.map((r, j) => [r, listsByPet[i][j]])))
         );
         dispatch({ type: 'SET_PETS', payload: petsWithData });
         dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
-        hydrateDoseDays(petsWithData);
+        // Hydrating prunes the stored dose history of every med it isn't
+        // given, so a pet whose medications never loaded would lose its
+        // history for good. Skip it; the next full load hydrates.
+        if (!petsWithData.some((p) => p.missing?.includes('medications'))) hydrateDoseDays(petsWithData);
+
+        if (failures.length) throw new Error(`${failures.length} pet request(s) failed`);
       },
       () => refreshPosts({ rethrow: true }),
       async () => {

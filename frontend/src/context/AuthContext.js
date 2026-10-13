@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react';
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { get, post, patch, request, getTokens, storeTokens, clearTokens } from '../services/api';
+import {
+  get, post, patch, request, getTokens, storeTokens, clearTokens,
+  storePendingLogout, getPendingLogout, clearPendingLogout,
+} from '../services/api';
 import {
   registerForPushNotificationsAsync,
   deviceTimezone,
@@ -19,20 +22,31 @@ const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
 // this often.
 const FOREGROUND_REFRESH_MS = 5 * 60 * 1000;
 
+// Restoring a saved session at launch: waits before each retry when the server
+// can't be reached, before offering "Try again". One retry: on Android a
+// hanging server costs ~10s per attempt (OkHttp's connect timeout), measured
+// on the emulator at ~30s of spinner with two.
+const RESTORE_RETRY_MS = [2000];
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const AuthContext = createContext(null);
 
 function authReducer(state, action) {
   switch (action.type) {
-    case 'SET_USER':    return { ...state, user: action.payload, isLoading: false, error: null };
-    case 'SET_LOADING': return { ...state, isLoading: action.payload };
-    case 'SET_ERROR':   return { ...state, error: action.payload, isLoading: false };
-    case 'LOGOUT':      return { user: null, isLoading: false, error: null };
-    default:            return state;
+    case 'SET_USER':       return { ...state, user: action.payload, isLoading: false, error: null, restoreFailed: false };
+    case 'SET_LOADING':    return { ...state, isLoading: action.payload };
+    case 'SET_ERROR':      return { ...state, error: action.payload, isLoading: false };
+    case 'RESTORE_FAILED': return { ...state, isLoading: false, restoreFailed: true, restoreOffline: action.payload };
+    case 'RESTORE_RETRY':  return { ...state, isLoading: true, restoreFailed: false };
+    case 'LOGOUT':         return { user: null, isLoading: false, error: null, restoreFailed: false };
+    default:               return state;
   }
 }
 
 export function AuthProvider({ children }) {
-  const [state, dispatch] = useReducer(authReducer, { user: null, isLoading: true, error: null });
+  const [state, dispatch] = useReducer(authReducer, {
+    user: null, isLoading: true, error: null, restoreFailed: false, restoreOffline: false,
+  });
 
   useEffect(() => { loadUser(); }, []);
 
@@ -102,9 +116,42 @@ export function AuthProvider({ children }) {
     return () => sub.remove();
   }, [refreshUser]);
 
+  // Tell the server about a sign-out: revoke the refresh token and unregister
+  // this phone's push token (POST /auth/logout needs no access token). Kept
+  // until the server has it — a sign-out made offline is resent on the next
+  // launch or sign-in, or the server keeps pushing that account's reminders
+  // to this phone. Never throws.
+  const sendLogout = async (pending) => {
+    try {
+      await storePendingLogout(pending);
+      await post('/auth/logout', pending, { skipAuth: true });
+      await clearPendingLogout();
+    } catch (err) {
+      // A 4xx other than rate limiting won't succeed on a resend.
+      if (err?.status >= 400 && err.status < 500 && err.status !== 429) {
+        await clearPendingLogout().catch(() => {});
+      }
+    }
+  };
+
+  // Single-flight: launch and a quick sign-in can both resend it.
+  const pendingLogoutRef = useRef(null);
+  const flushPendingLogout = () => {
+    if (!pendingLogoutRef.current) {
+      pendingLogoutRef.current = getPendingLogout()
+        .catch(() => null)
+        .then((pending) => pending && sendLogout(pending))
+        .finally(() => { pendingLogoutRef.current = null; });
+    }
+    return pendingLogoutRef.current;
+  };
+
   // Register this device's push token + timezone with the backend so reminders
   // fire at the right local time. Safe to call repeatedly (idempotent upsert).
   const syncDevice = async () => {
+    // An earlier sign-out still unregisters this phone first, so it can't
+    // remove the registration made below.
+    await flushPendingLogout();
     const tz = deviceTimezone();
     // Always tell the server the timezone — needed even when push is unavailable.
     patch('/users/me', { timezone: tz }).catch(() => {});
@@ -113,6 +160,12 @@ export function AuthProvider({ children }) {
       if (reg?.token) {
         await post('/devices', { token: reg.token, platform: reg.platform, timezone: tz }).catch(() => {});
         await AsyncStorage.setItem(PUSH_TOKEN_KEY, reg.token);
+        // A sign-out still waiting to be sent (its resend failed above) must
+        // not unregister the phone this sign-in has just registered.
+        const pending = await getPendingLogout().catch(() => null);
+        if (pending?.device_token === reg.token) {
+          await storePendingLogout({ ...pending, device_token: null });
+        }
       }
     } catch (_) {}
   };
@@ -128,16 +181,55 @@ export function AuthProvider({ children }) {
     await cancelAllLocalReminders();
   };
 
+  // Launch: restore the saved session. Only a rejected session signs out.
+  // Offline, a timeout or a server error leaves the tokens valid, and falling
+  // through to the Welcome screen read as being signed out — so retry
+  // briefly, then show "Try again" (restoreFailed) instead.
   const loadUser = async () => {
-    try {
-      const user = await get('/users/me');
-      applyUser(user); // tie analytics to the restored session
-      syncDevice();
-    } catch (err) {
-      if (err.message === 'SESSION_EXPIRED') await clearTokens();
+    flushPendingLogout();
+    // Never signed in (no saved session): the Welcome screen is right, and
+    // without a request an offline first launch doesn't wait on a timeout.
+    const { refresh } = await getTokens().catch(() => ({ refresh: null }));
+    if (!refresh) {
       dispatch({ type: 'SET_LOADING', payload: false });
+      return;
     }
+
+    let user;
+    for (let attempt = 0; !user; attempt += 1) {
+      try {
+        user = await get('/users/me');
+      } catch (err) {
+        if (err.message === 'SESSION_EXPIRED') {
+          await clearTokens();
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+        if (attempt >= RESTORE_RETRY_MS.length) {
+          dispatch({ type: 'RESTORE_FAILED', payload: !!err.isNetworkError });
+          return;
+        }
+        await wait(RESTORE_RETRY_MS[attempt]);
+      }
+    }
+    // Outside the retry: only the request can fail for want of a connection.
+    applyUser(user); // tie analytics to the restored session
+    syncDevice();
   };
+
+  const retryRestore = () => {
+    dispatch({ type: 'RESTORE_RETRY' });
+    loadUser();
+  };
+
+  // Coming back to the app (e.g. after turning wifi on) retries on its own.
+  useEffect(() => {
+    if (!state.restoreFailed) return undefined;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') retryRestore();
+    });
+    return () => sub.remove();
+  }, [state.restoreFailed]);
 
   const signup = async ({ name, email, password }) => {
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -203,15 +295,28 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const loggingOut = useRef(false);
   const logout = async () => {
+    if (loggingOut.current) return; // a double tap signs out once
+    loggingOut.current = true;
+    try {
+      await signOut();
+    } finally {
+      loggingOut.current = false;
+    }
+  };
+
+  const signOut = async () => {
     endSession();
-    // Grab the refresh token before we wipe local state (needed to revoke it).
+    // Grab the refresh and push tokens before we wipe local state (needed to
+    // revoke the session and unregister this phone).
     const { refresh } = await getTokens().catch(() => ({ refresh: null }));
+    const pushToken = await AsyncStorage.getItem(PUSH_TOKEN_KEY).catch(() => null);
 
     // Best-effort server / device / provider cleanup — all fire-and-forget so a
     // slow or failing network call can neither delay the redirect to the landing
     // screen nor trap the user in a logged-in state if it throws.
-    if (refresh) post('/auth/logout', { refresh_token: refresh }).catch(() => {});
+    if (refresh) sendLogout({ refresh_token: refresh, device_token: pushToken });
     deregisterDevice().catch(() => {});
     resetIdentity(); // clear identity so the next user starts fresh
     try {
@@ -297,6 +402,11 @@ export function AuthProvider({ children }) {
         // stable boolean so screens can gate admin-only UI without null checks.
         isAdmin: !!state.user?.is_admin,
         isLoading: state.isLoading,
+        // A saved session couldn't be checked (offline / server down):
+        // AppNavigator shows ReconnectScreen instead of the Welcome screen.
+        restoreFailed: state.restoreFailed,
+        restoreOffline: state.restoreOffline,
+        retryRestore,
         error: state.error,
         signup,
         login,

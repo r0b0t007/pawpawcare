@@ -47,12 +47,13 @@ const vaxDate = (v) => parseDay(v.dueDate);
 // Status sentence for the headline: names the pets so it's recognised, not
 // read; never alarming, never shaming. Same buckets as petHealthStatus
 // (overdue, then due soon, then all good), so Home never calls a pet "all
-// good" that another screen shows as due.
-function statusSentence(pets, overdueCount, dueCount) {
+// good" that another screen shows as due — nor one whose vaccines didn't load.
+function statusSentence(pets, overdueCount, dueCount, unknownCount) {
   if (overdueCount === 1) return 'One thing needs\nyou today';
   if (overdueCount > 1) return `${overdueCount} things need\nyou today`;
   if (dueCount === 1) return 'One thing is\ndue soon';
   if (dueCount > 1) return `${dueCount} things are\ndue soon`;
+  if (unknownCount > 0) return "Some records\ndidn't load";
   if (pets.length === 1) return `${pets[0].name} is\nall good`;
   if (pets.length === 2) return `${pets[0].name} and ${pets[1].name}\nare all good`;
   return `All ${pets.length} pets\nare all good`;
@@ -315,7 +316,12 @@ export default function DashboardScreen({ navigation }) {
     pets.reduce((n, p) => n + (p.vaccinations || []).filter((v) => v.status === status).length, 0);
   const overdueCount = countVax('overdue');
   const dueCount = countVax('due_soon');
-  const okPets = pets.filter((p) => petHealthStatus(p.vaccinations).status === 'ok').length;
+  // A pet whose vaccinations didn't load (DataContext lists the field in
+  // pet.missing) has no known status — never counted as all good.
+  const unknownPets = pets.filter((p) => p.missing?.includes('vaccinations'));
+  const okPets = pets.filter(
+    (p) => !unknownPets.includes(p) && petHealthStatus(p.vaccinations).status === 'ok'
+  ).length;
 
   const upNextItem = upNext
     ? {
@@ -379,13 +385,20 @@ export default function DashboardScreen({ navigation }) {
             </Text>
             {(noPets || pets.length > 0) && (
               <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">
-                {noPets ? "Let's meet your pets" : statusSentence(pets, overdueCount, dueCount)}
+                {noPets ? "Let's meet your pets" : statusSentence(pets, overdueCount, dueCount, unknownPets.length)}
               </Text>
             )}
-            {okPets < pets.length && pets.length > 1 && (
+            {unknownPets.length > 0 ? (
               <Text style={styles.subline}>
-                {okPets} of your {pets.length} pets {okPets === 1 ? 'is' : 'are'} all good.
+                {unknownPets.length === 1 ? `${unknownPets[0].name}'s vaccines` : 'Some vaccines'} couldn't be
+                loaded. Check your connection.
               </Text>
+            ) : (
+              okPets < pets.length && pets.length > 1 && (
+                <Text style={styles.subline}>
+                  {okPets} of your {pets.length} pets {okPets === 1 ? 'is' : 'are'} all good.
+                </Text>
+              )
             )}
           </View>
           <Pressable

@@ -1,10 +1,12 @@
 import { Platform } from 'react-native';
 import { File as FileSystemFile } from 'expo-file-system';
 import { API_URL } from '../config';
-import { getTokens, storeTokens, clearTokens } from './tokenStorage';
+import {
+  getTokens, storeTokens, clearTokens, storePendingLogout, getPendingLogout, clearPendingLogout,
+} from './tokenStorage';
 
 // Re-exported so callers keep one import surface for auth plumbing.
-export { getTokens, storeTokens, clearTokens };
+export { getTokens, storeTokens, clearTokens, storePendingLogout, getPendingLogout, clearPendingLogout };
 
 // ── Transport ────────────────────────────────────────────────────────────────
 
