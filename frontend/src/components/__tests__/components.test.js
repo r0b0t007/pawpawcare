@@ -18,6 +18,7 @@ describe('component kit', () => {
     'Button',
     'Sheet',
     'ConfirmDialog',
+    'FormScrollView',
     'UpNextCard',
     'CareStreakCard',
     'MilestoneRow',

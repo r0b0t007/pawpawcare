@@ -5,15 +5,12 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { post } from '../../services/api';
 import { ui, type, radii, motion } from '../../theme';
-import { Button, showToast } from '../../components';
+import { Button, showToast, FormScrollView } from '../../components';
 
 // Code-based password reset. Step 1 asks for the email; step 2 confirms a
 // 6-digit code was sent and collects code + new password. The backend always
@@ -99,160 +96,151 @@ export default function ForgotPasswordScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+      <FormScrollView contentContainerStyle={styles.scroll}>
+        <Pressable
+          style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
+          onPress={handleBack}
         >
-          <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
-            onPress={handleBack}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-          </Pressable>
+          <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
+        </Pressable>
 
-          {step === 'email' ? (
-            <>
-              <Text style={[type.screenTitle, styles.title]}>Reset your password</Text>
-              <Text style={styles.subtitle}>
-                Enter your account email and we'll send you a 6-digit code.
-              </Text>
+        {step === 'email' ? (
+          <>
+            <Text style={[type.screenTitle, styles.title]}>Reset your password</Text>
+            <Text style={styles.subtitle}>
+              Enter your account email and we'll send you a 6-digit code.
+            </Text>
 
-              <View style={styles.form}>
-                <View>
-                  <Text style={[type.sectionLabel, styles.fieldLabel]}>Email</Text>
-                  <TextInput
-                    style={[styles.input, focused === 'email' && styles.inputFocused]}
-                    placeholder="you@example.com"
-                    placeholderTextColor={ui.faint}
-                    value={email}
-                    onChangeText={onChange(setEmail)}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onFocus={() => setFocused('email')}
-                    onBlur={() => setFocused('')}
-                    textContentType="emailAddress"
-                    autoComplete="email"
-                  />
-                </View>
+            <View style={styles.form}>
+              <View>
+                <Text style={[type.sectionLabel, styles.fieldLabel]}>Email</Text>
+                <TextInput
+                  style={[styles.input, focused === 'email' && styles.inputFocused]}
+                  placeholder="you@example.com"
+                  placeholderTextColor={ui.faint}
+                  value={email}
+                  onChangeText={onChange(setEmail)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onFocus={() => setFocused('email')}
+                  onBlur={() => setFocused('')}
+                  textContentType="emailAddress"
+                  autoComplete="email"
+                />
+              </View>
+            </View>
+
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            <Button
+              label={sending ? 'Sending…' : 'Send code'}
+              onPress={() => sendCode()}
+              disabled={sending}
+              style={styles.submitBtn}
+            />
+          </>
+        ) : (
+          <>
+            <View style={styles.iconWrap}>
+              <MaterialCommunityIcons name="email-check-outline" size={30} color={ui.accent} />
+            </View>
+            <Text style={[type.screenTitle, styles.title, { marginTop: 18 }]}>
+              Check your inbox
+            </Text>
+            <Text style={styles.subtitle}>
+              We sent a 6-digit code to {email.trim()}. It's valid for 30 minutes.
+            </Text>
+
+            <View style={styles.form}>
+              <View>
+                <Text style={[type.sectionLabel, styles.fieldLabel]}>6-digit code</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.codeInput,
+                    focused === 'code' && styles.inputFocused,
+                  ]}
+                  placeholder="123456"
+                  placeholderTextColor={ui.faint}
+                  value={code}
+                  onChangeText={onChange(setCode)}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  onFocus={() => setFocused('code')}
+                  onBlur={() => setFocused('')}
+                  textContentType="oneTimeCode"
+                  autoComplete="one-time-code"
+                />
               </View>
 
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-              <Button
-                label={sending ? 'Sending…' : 'Send code'}
-                onPress={() => sendCode()}
-                disabled={sending}
-                style={styles.submitBtn}
-              />
-            </>
-          ) : (
-            <>
-              <View style={styles.iconWrap}>
-                <MaterialCommunityIcons name="email-check-outline" size={30} color={ui.accent} />
-              </View>
-              <Text style={[type.screenTitle, styles.title, { marginTop: 18 }]}>
-                Check your inbox
-              </Text>
-              <Text style={styles.subtitle}>
-                We sent a 6-digit code to {email.trim()}. It's valid for 30 minutes.
-              </Text>
-
-              <View style={styles.form}>
-                <View>
-                  <Text style={[type.sectionLabel, styles.fieldLabel]}>6-digit code</Text>
+              <View>
+                <Text style={[type.sectionLabel, styles.fieldLabel]}>New password</Text>
+                <View style={[styles.inputRow, focused === 'password' && styles.inputFocused]}>
                   <TextInput
-                    style={[
-                      styles.input,
-                      styles.codeInput,
-                      focused === 'code' && styles.inputFocused,
-                    ]}
-                    placeholder="123456"
+                    style={styles.inputInner}
+                    placeholder="At least 8 characters"
                     placeholderTextColor={ui.faint}
-                    value={code}
-                    onChangeText={onChange(setCode)}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    onFocus={() => setFocused('code')}
-                    onBlur={() => setFocused('')}
-                    textContentType="oneTimeCode"
-                    autoComplete="one-time-code"
-                  />
-                </View>
-
-                <View>
-                  <Text style={[type.sectionLabel, styles.fieldLabel]}>New password</Text>
-                  <View style={[styles.inputRow, focused === 'password' && styles.inputFocused]}>
-                    <TextInput
-                      style={styles.inputInner}
-                      placeholder="At least 8 characters"
-                      placeholderTextColor={ui.faint}
-                      value={password}
-                      onChangeText={onChange(setPassword)}
-                      secureTextEntry={!showPwd}
-                      onFocus={() => setFocused('password')}
-                      onBlur={() => setFocused('')}
-                      textContentType="newPassword"
-                      autoComplete="new-password"
-                    />
-                    <Pressable
-                      onPress={() => setShowPwd(!showPwd)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    >
-                      <MaterialCommunityIcons
-                        name={showPwd ? 'eye-off-outline' : 'eye-outline'}
-                        size={20}
-                        color={ui.faint}
-                      />
-                    </Pressable>
-                  </View>
-                </View>
-
-                <View>
-                  <Text style={[type.sectionLabel, styles.fieldLabel]}>Confirm password</Text>
-                  <TextInput
-                    style={[styles.input, focused === 'confirm' && styles.inputFocused]}
-                    placeholder="Same password again"
-                    placeholderTextColor={ui.faint}
-                    value={confirm}
-                    onChangeText={onChange(setConfirm)}
+                    value={password}
+                    onChangeText={onChange(setPassword)}
                     secureTextEntry={!showPwd}
-                    onFocus={() => setFocused('confirm')}
+                    onFocus={() => setFocused('password')}
                     onBlur={() => setFocused('')}
                     textContentType="newPassword"
                     autoComplete="new-password"
                   />
+                  <Pressable
+                    onPress={() => setShowPwd(!showPwd)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <MaterialCommunityIcons
+                      name={showPwd ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color={ui.faint}
+                    />
+                  </Pressable>
                 </View>
               </View>
 
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              <View>
+                <Text style={[type.sectionLabel, styles.fieldLabel]}>Confirm password</Text>
+                <TextInput
+                  style={[styles.input, focused === 'confirm' && styles.inputFocused]}
+                  placeholder="Same password again"
+                  placeholderTextColor={ui.faint}
+                  value={confirm}
+                  onChangeText={onChange(setConfirm)}
+                  secureTextEntry={!showPwd}
+                  onFocus={() => setFocused('confirm')}
+                  onBlur={() => setFocused('')}
+                  textContentType="newPassword"
+                  autoComplete="new-password"
+                />
+              </View>
+            </View>
 
-              <Button
-                label={resetting ? 'Updating…' : 'Reset password'}
-                onPress={handleReset}
-                disabled={resetting}
-                style={styles.submitBtn}
-              />
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-              <Pressable
-                style={({ pressed }) => [styles.resendLink, pressed && { opacity: motion.pressOpacity }]}
-                onPress={() => sendCode({ again: true })}
-                disabled={sending}
-                hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
-              >
-                <Text style={[styles.resendLinkText, sending && { opacity: 0.5 }]}>
-                  {sending ? 'Sending…' : "Didn't get it? Send again"}
-                </Text>
-              </Pressable>
-            </>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <Button
+              label={resetting ? 'Updating…' : 'Reset password'}
+              onPress={handleReset}
+              disabled={resetting}
+              style={styles.submitBtn}
+            />
+
+            <Pressable
+              style={({ pressed }) => [styles.resendLink, pressed && { opacity: motion.pressOpacity }]}
+              onPress={() => sendCode({ again: true })}
+              disabled={sending}
+              hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
+            >
+              <Text style={[styles.resendLinkText, sending && { opacity: 0.5 }]}>
+                {sending ? 'Sending…' : "Didn't get it? Send again"}
+              </Text>
+            </Pressable>
+          </>
+        )}
+      </FormScrollView>
     </SafeAreaView>
   );
 }

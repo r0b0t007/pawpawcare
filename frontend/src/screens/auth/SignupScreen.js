@@ -4,16 +4,13 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useInFlight } from '../../hooks/useInFlight';
 import { ui, type, motion, photos } from '../../theme';
-import { Button, TextField, ScreenHeader, PhotoBand, FormError } from '../../components';
+import { Button, TextField, ScreenHeader, PhotoBand, FormError, FormScrollView } from '../../components';
 import SocialAuthButtons from '../../components/SocialAuthButtons';
 
 // "Lively & Light" sign up: the same calm shape as log in — a small photo
@@ -88,115 +85,106 @@ export default function SignupScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ScreenHeader onBack={() => navigation.goBack()} style={styles.header} />
+      <FormScrollView contentContainerStyle={styles.scroll}>
+        <ScreenHeader onBack={() => navigation.goBack()} style={styles.header} />
 
-          <PhotoBand source={photos.communityPals} height={104} />
+        <PhotoBand source={photos.communityPals} height={104} />
 
-          <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Create your account</Text>
-          <Text style={styles.subtitle}>Your pack's records, safe in one place.</Text>
+        <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Create your account</Text>
+        <Text style={styles.subtitle}>Your pack's records, safe in one place.</Text>
 
-          <View style={styles.form}>
-            <TextField
-              label="Your name"
-              placeholder="e.g. Ahmed"
-              value={name}
-              onChangeText={onChange(setName)}
-              autoCapitalize="words"
-              autoCorrect={false}
-              textContentType="name"
-              autoComplete="name"
-              returnKeyType="next"
-              onSubmitEditing={() => emailRef.current?.focus()}
-              blurOnSubmit={false}
-            />
-
-            <TextField
-              ref={emailRef}
-              label="Email"
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={onChange(setEmail)}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="emailAddress"
-              autoComplete="email"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              blurOnSubmit={false}
-            />
-
-            {/* One toggle reveals both password fields. */}
-            <TextField
-              ref={passwordRef}
-              label="Password"
-              secure
-              revealed={showPwd}
-              onToggleReveal={() => setShowPwd((v) => !v)}
-              toggleLabel="passwords"
-              placeholder={`${MIN_PASSWORD}+ characters`}
-              value={password}
-              onChangeText={onChange(setPassword)}
-              textContentType="newPassword"
-              autoComplete="new-password"
-              returnKeyType="next"
-              onSubmitEditing={() => confirmRef.current?.focus()}
-              blurOnSubmit={false}
-            />
-
-            <TextField
-              ref={confirmRef}
-              label="Confirm password"
-              secure
-              revealed={showPwd}
-              showToggle={false}
-              placeholder="Repeat password"
-              value={confirmPwd}
-              onChangeText={onChange(setConfirmPwd)}
-              textContentType="newPassword"
-              returnKeyType="go"
-              onSubmitEditing={handleSignup}
-            >
-              <View style={styles.rules}>
-                <Rule met={longEnough} label={`${MIN_PASSWORD}+ characters`} />
-                <Rule met={matches} label="Passwords match" />
-              </View>
-            </TextField>
-          </View>
-
-          <FormError message={displayError} style={styles.formError} />
-
-          <Button
-            label={busy ? 'Creating account…' : 'Create account'}
-            onPress={handleSignup}
-            disabled={busy}
-            style={styles.submitBtn}
+        <View style={styles.form}>
+          <TextField
+            label="Your name"
+            placeholder="e.g. Ahmed"
+            value={name}
+            onChangeText={onChange(setName)}
+            autoCapitalize="words"
+            autoCorrect={false}
+            textContentType="name"
+            autoComplete="name"
+            returnKeyType="next"
+            onSubmitEditing={() => emailRef.current?.focus()}
+            blurOnSubmit={false}
           />
 
-          <SocialAuthButtons />
+          <TextField
+            ref={emailRef}
+            label="Email"
+            placeholder="you@example.com"
+            value={email}
+            onChangeText={onChange(setEmail)}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="emailAddress"
+            autoComplete="email"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            blurOnSubmit={false}
+          />
 
-          <Pressable
-            style={({ pressed }) => [styles.switchLink, pressed && { opacity: motion.pressOpacity }]}
-            onPress={() => {
-              if (error) clearError();
-              navigation.navigate('Login');
-            }}
-            hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
-            accessibilityRole="link"
+          {/* One toggle reveals both password fields. */}
+          <TextField
+            ref={passwordRef}
+            label="Password"
+            secure
+            revealed={showPwd}
+            onToggleReveal={() => setShowPwd((v) => !v)}
+            toggleLabel="passwords"
+            placeholder={`${MIN_PASSWORD}+ characters`}
+            value={password}
+            onChangeText={onChange(setPassword)}
+            textContentType="newPassword"
+            autoComplete="new-password"
+            returnKeyType="next"
+            onSubmitEditing={() => confirmRef.current?.focus()}
+            blurOnSubmit={false}
+          />
+
+          <TextField
+            ref={confirmRef}
+            label="Confirm password"
+            secure
+            revealed={showPwd}
+            showToggle={false}
+            placeholder="Repeat password"
+            value={confirmPwd}
+            onChangeText={onChange(setConfirmPwd)}
+            textContentType="newPassword"
+            returnKeyType="go"
+            onSubmitEditing={handleSignup}
           >
-            <Text style={styles.switchLinkText}>Already have an account? Log in</Text>
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <View style={styles.rules}>
+              <Rule met={longEnough} label={`${MIN_PASSWORD}+ characters`} />
+              <Rule met={matches} label="Passwords match" />
+            </View>
+          </TextField>
+        </View>
+
+        <FormError message={displayError} style={styles.formError} />
+
+        <Button
+          label={busy ? 'Creating account…' : 'Create account'}
+          onPress={handleSignup}
+          disabled={busy}
+          style={styles.submitBtn}
+        />
+
+        <SocialAuthButtons />
+
+        <Pressable
+          style={({ pressed }) => [styles.switchLink, pressed && { opacity: motion.pressOpacity }]}
+          onPress={() => {
+            if (error) clearError();
+            navigation.navigate('Login');
+          }}
+          hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
+          accessibilityRole="link"
+        >
+          <Text style={styles.switchLinkText}>Already have an account? Log in</Text>
+        </Pressable>
+      </FormScrollView>
     </SafeAreaView>
   );
 }

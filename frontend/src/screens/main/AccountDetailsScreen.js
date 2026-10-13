@@ -5,15 +5,12 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { ui, type, radii, motion } from '../../theme';
-import { Button, ConfirmDialog, showToast } from '../../components';
+import { Button, ConfirmDialog, showToast, FormScrollView } from '../../components';
 import { isRenewingStoreSubscription, storeName } from '../../utils/subscription';
 
 // Account details (Profile → Edit). PATCH /users/me only accepts name / bio /
@@ -57,80 +54,71 @@ export default function AccountDetailsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.header}>
-            <Pressable
-              style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
-              onPress={() => navigation.goBack()}
-            >
-              <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-            </Pressable>
-            <Text style={styles.headerTitle}>Account details</Text>
+      <FormScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.header}>
+          <Pressable
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Account details</Text>
+        </View>
+
+        <View style={styles.avatarWrap}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{(user?.name || 'U')[0].toUpperCase()}</Text>
+          </View>
+        </View>
+
+        <View style={styles.form}>
+          <View>
+            <Text style={[type.sectionLabel, styles.fieldLabel]}>Name</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Your name"
+              placeholderTextColor={ui.faint}
+              autoCapitalize="words"
+              autoCorrect={false}
+              textContentType="name"
+              autoComplete="name"
+            />
           </View>
 
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{(user?.name || 'U')[0].toUpperCase()}</Text>
+          <View>
+            <Text style={[type.sectionLabel, styles.fieldLabel]}>Email</Text>
+            <View style={[styles.input, styles.inputReadOnly]}>
+              <Text style={styles.readOnlyValue}>{user?.email}</Text>
+              <MaterialCommunityIcons name="lock-outline" size={16} color={ui.faint} />
             </View>
+            <Text style={styles.readOnlyHint}>Contact support to change your email.</Text>
           </View>
 
-          <View style={styles.form}>
-            <View>
-              <Text style={[type.sectionLabel, styles.fieldLabel]}>Name</Text>
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Your name"
-                placeholderTextColor={ui.faint}
-                autoCapitalize="words"
-                autoCorrect={false}
-                textContentType="name"
-                autoComplete="name"
-              />
-            </View>
+          <Button label="Save changes" onPress={handleSave} disabled={!canSave} />
+        </View>
 
-            <View>
-              <Text style={[type.sectionLabel, styles.fieldLabel]}>Email</Text>
-              <View style={[styles.input, styles.inputReadOnly]}>
-                <Text style={styles.readOnlyValue}>{user?.email}</Text>
-                <MaterialCommunityIcons name="lock-outline" size={16} color={ui.faint} />
-              </View>
-              <Text style={styles.readOnlyHint}>Contact support to change your email.</Text>
-            </View>
-
-            <Button label="Save changes" onPress={handleSave} disabled={!canSave} />
-          </View>
-
-          <View style={styles.dangerZone}>
-            <Text style={[type.sectionLabel, styles.dangerLabel]}>Danger zone</Text>
-            <Pressable
-              style={({ pressed }) => [styles.dangerRow, pressed && { opacity: motion.pressOpacity }]}
-              onPress={() => setConfirmDelete(true)}
-              disabled={deleting}
-              accessibilityRole="button"
-              accessibilityLabel="Delete account"
-            >
-              <MaterialCommunityIcons name="trash-can-outline" size={19} color={ui.danger} />
-              <Text style={styles.dangerRowText}>
-                {deleting ? 'Deleting account…' : 'Delete account'}
-              </Text>
-            </Pressable>
-            <Text style={styles.dangerHint}>
-              Your account is deactivated right away and permanently deleted after 30
-              days. Log back in before then to cancel.
+        <View style={styles.dangerZone}>
+          <Text style={[type.sectionLabel, styles.dangerLabel]}>Danger zone</Text>
+          <Pressable
+            style={({ pressed }) => [styles.dangerRow, pressed && { opacity: motion.pressOpacity }]}
+            onPress={() => setConfirmDelete(true)}
+            disabled={deleting}
+            accessibilityRole="button"
+            accessibilityLabel="Delete account"
+          >
+            <MaterialCommunityIcons name="trash-can-outline" size={19} color={ui.danger} />
+            <Text style={styles.dangerRowText}>
+              {deleting ? 'Deleting account…' : 'Delete account'}
             </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </Pressable>
+          <Text style={styles.dangerHint}>
+            Your account is deactivated right away and permanently deleted after 30
+            days. Log back in before then to cancel.
+          </Text>
+        </View>
+      </FormScrollView>
 
       <ConfirmDialog
         visible={confirmDelete}

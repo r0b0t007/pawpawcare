@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TextInput, Alert, Image,
+  View, Text, StyleSheet, TextInput, Alert, Image, Keyboard,
   ActivityIndicator, Linking, Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,7 +16,7 @@ import { useInFlight } from '../../hooks/useInFlight';
 import { resolveAsset } from '../../config';
 import { ui, type, PET_COLOR_PAIRS, motion, photos } from '../../theme';
 import {
-  Card, Button, ConfirmDialog, EmptyState, SegmentedControl, showToast,
+  Card, Button, ConfirmDialog, EmptyState, SegmentedControl, showToast, FormScrollView,
 } from '../../components';
 import LostPetCard from './LostPetCard';
 
@@ -110,6 +110,9 @@ export default function CommunityScreen({ navigation }) {
   const { run, isBusy } = useInFlight();
   const handlePost = () => {
     if (!draft.trim()) return undefined;
+    // The tap no longer closes the keyboard (FormScrollView), and it would
+    // hide the toast below if the post fails.
+    Keyboard.dismiss();
     return run('post', async () => {
       if (!(await addPost(draft.trim(), draftImage))) {
         showToast("Couldn't share that. Try again.");
@@ -162,7 +165,9 @@ export default function CommunityScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <FormScrollView
+        contentContainerStyle={styles.scroll}
+      >
         <Text style={styles.title}>Community</Text>
 
         <SegmentedControl
@@ -351,7 +356,7 @@ export default function CommunityScreen({ navigation }) {
             </Pressable>
           </View>
         )}
-      </ScrollView>
+      </FormScrollView>
 
       <ConfirmDialog
         visible={!!confirm}
@@ -406,16 +411,20 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
     }
   };
 
-  const submit = async () => {
+  // One comment per tap: a quick double tap must not post it twice.
+  const { run, isBusy } = useInFlight();
+  const submit = () => {
     const text = draft.trim();
-    if (!text) return;
-    setDraft('');
-    const c = await addComment(post.id, text);
-    if (c) {
-      setComments((prev) => [...(prev || []), c]);
-    } else {
-      setDraft(text); // restore the typed comment if the request failed
-    }
+    if (!text) return undefined;
+    return run('comment', async () => {
+      setDraft('');
+      const c = await addComment(post.id, text);
+      if (c) {
+        setComments((prev) => [...(prev || []), c]);
+      } else {
+        setDraft(text); // restore the typed comment if the request failed
+      }
+    });
   };
 
   const removeComment = async (id) => {
@@ -508,9 +517,9 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
               multiline
             />
             <Pressable
-              style={[styles.commentSend, !draft.trim() && { opacity: 0.4 }]}
+              style={[styles.commentSend, (!draft.trim() || isBusy('comment')) && { opacity: 0.4 }]}
               onPress={submit}
-              disabled={!draft.trim()}
+              disabled={!draft.trim() || isBusy('comment')}
             >
               <MaterialCommunityIcons name="send" size={15} color="#ffffff" />
             </Pressable>

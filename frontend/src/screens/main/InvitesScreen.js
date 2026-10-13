@@ -1,13 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, TextInput, ScrollView, Pressable, StyleSheet, RefreshControl,
+  View, Text, TextInput, Pressable, StyleSheet, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { ui, type, radii } from '../../theme';
-import { Card, Button, ConfirmDialog, showToast } from '../../components';
+import { Card, Button, ConfirmDialog, showToast, FormScrollView } from '../../components';
 
 // Invites are addressed by email, and signup never proves the address — so
 // the server hides them until the account confirms it with an emailed code.
@@ -158,9 +158,8 @@ export default function InvitesScreen({ navigation }) {
         <Text style={styles.title} numberOfLines={1}>Invitations</Text>
       </View>
 
-      <ScrollView
+      <FormScrollView
         contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {needsVerification ? (
@@ -213,7 +212,7 @@ export default function InvitesScreen({ navigation }) {
             </Card>
           ))
         )}
-      </ScrollView>
+      </FormScrollView>
 
       <ConfirmDialog
         visible={!!pendingDecline}

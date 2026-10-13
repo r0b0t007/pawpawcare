@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, RefreshControl, Linking, Pressable, TextInput,
+  View, Text, StyleSheet, RefreshControl, Linking, Pressable, TextInput, Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { ui, type, photos } from '../../theme';
-import { Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader } from '../../components';
+import { Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, FormScrollView } from '../../components';
 import LostPetCard from './LostPetCard';
 import { useInFlight } from '../../hooks/useInFlight';
 
@@ -52,6 +52,9 @@ export default function LostPetsScreen({ navigation }) {
   const submitting = isBusy('report');
   const handleSubmit = () => {
     if (!selectedPetId) return undefined;
+    // The tap no longer closes the keyboard (FormScrollView); close it so the
+    // result toast isn't hidden behind it.
+    Keyboard.dismiss();
     const pet = pets.find((p) => p.id === selectedPetId);
     return run('report', async () => {
       const saved = await reportPetLost(selectedPetId, {
@@ -83,9 +86,8 @@ export default function LostPetsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView
+      <FormScrollView
         contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {/* Header */}
@@ -205,7 +207,7 @@ export default function LostPetsScreen({ navigation }) {
             ))
           )}
         </View>
-      </ScrollView>
+      </FormScrollView>
 
       <ConfirmDialog
         visible={!!confirm}
