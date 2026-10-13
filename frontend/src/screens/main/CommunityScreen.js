@@ -11,14 +11,14 @@ import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { uploadImage } from '../../services/api';
 import { track } from '../../services/analytics';
-import { timeAgo } from '../../utils/dates';
 import { useInFlight } from '../../hooks/useInFlight';
 import { resolveAsset } from '../../config';
-import { ui, type, PET_COLOR_PAIRS, motion, photos } from '../../theme';
+import { ui, type, PET_COLOR_PAIRS, motion, photos, pairFor } from '../../theme';
 import {
   Card, Button, ConfirmDialog, EmptyState, SegmentedControl, showToast, FormScrollView,
 } from '../../components';
 import LostPetCard from './LostPetCard';
+import PostCard from './PostCard';
 
 // One screen, three peer sections (Feed / Lost pets / Groups) on a segmented
 // control. A lost pet from someone else always tops the feed — the
@@ -26,8 +26,6 @@ import LostPetCard from './LostPetCard';
 // The composer starts collapsed; lost-pet reporting lives on the pushed
 // LostPets screen — the section here only shows the board.
 
-// Identity colors only — never UI chrome.
-const pairFor = (name) => PET_COLOR_PAIRS[name ? name.charCodeAt(0) % PET_COLOR_PAIRS.length : 0];
 
 const GROUP_ICONS = ['dog', 'cat', 'bird', 'rabbit', 'paw'];
 
@@ -191,6 +189,7 @@ export default function CommunityScreen({ navigation }) {
                   <Pressable
                     onPress={() => setSection('lost')}
                     hitSlop={8}
+                    accessibilityRole="button"
                     style={({ pressed }) => [styles.moreLost, pressed && { opacity: motion.pressOpacity }]}
                   >
                     <Text style={styles.moreLostText}>
@@ -206,6 +205,8 @@ export default function CommunityScreen({ navigation }) {
               <Pressable
                 style={({ pressed }) => [styles.composerCollapsed, pressed && { borderColor: ui.faint }]}
                 onPress={() => setComposerOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Share a moment"
               >
                 <View style={[styles.composerAvatar, { backgroundColor: userPair.bg }]}>
                   <Text style={[styles.composerAvatarText, { color: userPair.fg }]}>{(user?.name || 'U')[0]}</Text>
@@ -219,6 +220,7 @@ export default function CommunityScreen({ navigation }) {
                   style={styles.composerInput}
                   placeholder="What's your pack up to?"
                   placeholderTextColor={ui.subtle}
+                  accessibilityLabel="New post"
                   value={draft}
                   onChangeText={setDraft}
                   multiline
@@ -231,25 +233,34 @@ export default function CommunityScreen({ navigation }) {
                       style={styles.draftRemove}
                       onPress={() => setDraftImage(null)}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove photo"
                     >
                       <MaterialCommunityIcons name="close" size={15} color="#ffffff" />
                     </Pressable>
                   </View>
                 )}
                 {attachFailed && !attaching && (
-                  <Pressable onPress={retryAttach} hitSlop={6} style={styles.attachFailedRow}>
+                  <Pressable onPress={retryAttach} hitSlop={6} style={styles.attachFailedRow} accessibilityRole="button">
                     <MaterialCommunityIcons name="alert-circle-outline" size={15} color={ui.dangerText} />
                     <Text style={styles.attachFailedText}>Image upload failed — tap to retry</Text>
                   </Pressable>
                 )}
                 <View style={styles.composerActions}>
-                  <Pressable onPress={attachImage} disabled={attaching} hitSlop={8}>
+                  <Pressable
+                    onPress={attachImage}
+                    disabled={attaching}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add a photo"
+                    accessibilityState={{ busy: attaching }}
+                  >
                     {attaching
                       ? <ActivityIndicator size="small" color={ui.accent} />
                       : <MaterialCommunityIcons name="image-plus" size={20} color={ui.accent} />}
                   </Pressable>
                   <View style={{ flex: 1 }} />
-                  <Pressable onPress={closeComposer} hitSlop={8} style={styles.cancelBtn}>
+                  <Pressable onPress={closeComposer} hitSlop={8} style={styles.cancelBtn} accessibilityRole="button">
                     <Text style={styles.cancelText}>Cancel</Text>
                   </Pressable>
                   <Button pill label="Post" onPress={handlePost} disabled={!draft.trim() || isBusy('post')} />
@@ -300,6 +311,11 @@ export default function CommunityScreen({ navigation }) {
                   </View>
                   <Pressable
                     onPress={() => handleToggleGroup(group)}
+                    accessibilityRole="button"
+                    // Starts with the visible word, so voice control's
+                    // "tap Joined" matches; the hint says what a tap does.
+                    accessibilityLabel={`${joined ? 'Joined' : 'Join'} ${group.name}`}
+                    accessibilityHint={joined ? 'Leaves the group' : 'Joins the group'}
                     style={({ pressed }) => [
                       styles.joinBtn,
                       joined && styles.joinBtnJoined,
@@ -350,6 +366,7 @@ export default function CommunityScreen({ navigation }) {
             <Pressable
               style={({ pressed }) => [styles.reportBtn, pressed && { backgroundColor: ui.pressTint }]}
               onPress={() => navigation.navigate('LostPets')}
+              accessibilityRole="button"
             >
               <MaterialCommunityIcons name="bullhorn-outline" size={19} color={ui.accent} />
               <Text style={styles.reportBtnText}>Report a missing pet</Text>
@@ -368,185 +385,6 @@ export default function CommunityScreen({ navigation }) {
         onConfirm={() => { const a = confirm?.action; setConfirm(null); a?.(); }}
       />
     </SafeAreaView>
-  );
-}
-
-function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment, reportPost, unreportPost }) {
-  const hasPawed = !!post.pawedByMe;
-  const pair = pairFor(post.authorName);
-  const isOwn = post.authorId === userId;
-
-  const [expanded, setExpanded] = useState(false);
-  const [comments, setComments] = useState(null); // null = never loaded
-  const [draft, setDraft] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [confirm, setConfirm] = useState(null); // comment pending deletion
-  const [confirmReport, setConfirmReport] = useState(false);
-
-  // Reported by me → the whole card collapses into a quiet hidden state with
-  // an Undo. `reportedByMe` comes from the feed payload, so it survives
-  // refreshes until the report is undone.
-  if (post.reportedByMe) {
-    return (
-      <Card style={styles.hiddenCard}>
-        <MaterialCommunityIcons name="flag-outline" size={18} color={ui.subtle} />
-        <Text style={styles.hiddenText}>
-          Post hidden — thanks for the report. Our team reviews within 24 hours.
-        </Text>
-        <Pressable onPress={() => unreportPost(post.id)} hitSlop={8}>
-          <Text style={styles.hiddenUndo}>Undo</Text>
-        </Pressable>
-      </Card>
-    );
-  }
-
-  const toggleComments = async () => {
-    const next = !expanded;
-    setExpanded(next);
-    if (next) {
-      // Reload on every expand so comments from others appear; spinner only first time.
-      if (comments === null) setLoading(true);
-      setComments(await getComments(post.id));
-      setLoading(false);
-    }
-  };
-
-  // One comment per tap: a quick double tap must not post it twice.
-  const { run, isBusy } = useInFlight();
-  const submit = () => {
-    const text = draft.trim();
-    if (!text) return undefined;
-    return run('comment', async () => {
-      setDraft('');
-      const c = await addComment(post.id, text);
-      if (c) {
-        setComments((prev) => [...(prev || []), c]);
-      } else {
-        setDraft(text); // restore the typed comment if the request failed
-      }
-    });
-  };
-
-  const removeComment = async (id) => {
-    if (!(await deleteComment(post.id, id))) {
-      showToast("Couldn't delete the comment. Try again.");
-      return;
-    }
-    setComments((prev) => (prev || []).filter((c) => c.id !== id));
-    showToast('Comment deleted');
-  };
-
-  const commentCount = comments ? comments.length : post.comments;
-
-  return (
-    <Card style={styles.postCard}>
-      <View style={styles.postHeader}>
-        <View style={[styles.postAvatar, { backgroundColor: pair.bg }]}>
-          <Text style={[styles.postAvatarText, { color: pair.fg }]}>{(post.authorName || '?')[0]}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.postAuthor}>{post.authorName}</Text>
-          <Text style={styles.postTime}>{timeAgo(post.createdAt)}</Text>
-        </View>
-        {!isOwn && (
-          <Pressable onPress={() => setConfirmReport(true)} hitSlop={8}>
-            <MaterialCommunityIcons name="dots-horizontal" size={20} color={ui.subtle} />
-          </Pressable>
-        )}
-      </View>
-      <Text style={styles.postContent}>{post.content}</Text>
-      {post.imageUrl ? (
-        <Image source={{ uri: resolveAsset(post.imageUrl) }} style={styles.postImage} resizeMode="cover" />
-      ) : null}
-      <View style={styles.postActions}>
-        <Pressable style={styles.actionBtn} onPress={onPaw} hitSlop={6}>
-          <MaterialCommunityIcons
-            name={hasPawed ? 'paw' : 'paw-outline'}
-            size={19}
-            color={hasPawed ? ui.accent : ui.sub}
-          />
-          <Text style={[styles.actionText, hasPawed && { color: ui.accent }]}>{post.paws}</Text>
-        </Pressable>
-        <Pressable style={styles.actionBtn} onPress={toggleComments} hitSlop={6}>
-          <MaterialCommunityIcons
-            name={expanded ? 'chat' : 'chat-outline'}
-            size={19}
-            color={expanded ? ui.accent : ui.sub}
-          />
-          <Text style={[styles.actionText, expanded && { color: ui.accent }]}>{commentCount}</Text>
-        </Pressable>
-      </View>
-
-      {expanded && (
-        <View style={styles.commentsWrap}>
-          {loading && comments === null ? (
-            <Text style={styles.commentEmpty}>Loading…</Text>
-          ) : comments && comments.length === 0 ? (
-            <Text style={styles.commentEmpty}>No comments yet — say something nice!</Text>
-          ) : (
-            (comments || []).map((c) => {
-              const cPair = pairFor(c.author_name);
-              const canDelete = c.author_id === userId || post.authorId === userId;
-              return (
-                <View key={c.id} style={styles.commentRow}>
-                  <View style={[styles.commentAvatar, { backgroundColor: cPair.bg }]}>
-                    <Text style={[styles.commentAvatarText, { color: cPair.fg }]}>{(c.author_name || '?')[0]}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.commentAuthor}>
-                      {c.author_name} <Text style={styles.commentTime}>· {timeAgo(c.created_at)}</Text>
-                    </Text>
-                    <Text style={styles.commentText}>{c.content}</Text>
-                  </View>
-                  {canDelete && (
-                    <Pressable onPress={() => setConfirm(c)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                      <MaterialCommunityIcons name="close" size={14} color={ui.faint} />
-                    </Pressable>
-                  )}
-                </View>
-              );
-            })
-          )}
-          <View style={styles.commentInputRow}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Add a comment…"
-              placeholderTextColor={ui.subtle}
-              value={draft}
-              onChangeText={setDraft}
-              multiline
-            />
-            <Pressable
-              style={[styles.commentSend, (!draft.trim() || isBusy('comment')) && { opacity: 0.4 }]}
-              onPress={submit}
-              disabled={!draft.trim() || isBusy('comment')}
-            >
-              <MaterialCommunityIcons name="send" size={15} color="#ffffff" />
-            </Pressable>
-          </View>
-        </View>
-      )}
-
-      <ConfirmDialog
-        visible={!!confirm}
-        title="Delete comment?"
-        message="This comment will be removed for everyone."
-        confirmLabel="Delete"
-        destructive
-        onCancel={() => setConfirm(null)}
-        onConfirm={() => { const c = confirm; setConfirm(null); if (c) removeComment(c.id); }}
-      />
-
-      <ConfirmDialog
-        visible={confirmReport}
-        title="Report this post?"
-        message="It's hidden for you right away, and our team reviews every report within 24 hours."
-        confirmLabel="Report"
-        destructive
-        onCancel={() => setConfirmReport(false)}
-        onConfirm={() => { setConfirmReport(false); reportPost(post.id); }}
-      />
-    </Card>
   );
 }
 
@@ -630,105 +468,6 @@ const styles = StyleSheet.create({
 
   // Feed
   feedList: { marginHorizontal: 24, gap: 14 },
-  postCard: { padding: 16 },
-  postHeader: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 10 },
-  postAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  postAvatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 16 },
-  postAuthor: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: ui.ink },
-  postTime: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11.5, color: ui.subtle },
-  postContent: {
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 14.5,
-    lineHeight: 21,
-    color: ui.ink,
-    marginBottom: 14,
-  },
-  postImage: {
-    width: '100%',
-    aspectRatio: 4 / 3,
-    borderRadius: 16,
-    borderCurve: 'continuous',
-    marginBottom: 14,
-    backgroundColor: ui.track,
-  },
-  postActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 22,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: ui.hairline,
-  },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44, minWidth: 44 },
-  actionText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.sub },
-
-  // Reported → hidden collapsed state
-  hiddenCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  hiddenText: {
-    flex: 1,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 12.5,
-    lineHeight: 18,
-    color: ui.sub,
-  },
-  hiddenUndo: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, color: ui.accent },
-
-  // Comments
-  commentsWrap: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: ui.hairline,
-    gap: 12,
-  },
-  commentEmpty: { ...type.secondary, color: ui.subtle },
-  commentRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  commentAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  commentAvatarText: { fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11 },
-  commentAuthor: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12.5, color: ui.ink },
-  commentTime: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, color: ui.subtle },
-  commentText: {
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 13,
-    lineHeight: 19,
-    color: ui.ink,
-    marginTop: 1,
-  },
-  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  commentInput: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: ui.controlBorder,
-    backgroundColor: ui.background,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 12.5,
-    color: ui.ink,
-    maxHeight: 90,
-  },
-  commentSend: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: ui.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 
   // Groups
   groupList: { marginHorizontal: 24, gap: 14 },

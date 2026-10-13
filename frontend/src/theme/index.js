@@ -139,6 +139,10 @@ export const PET_COLOR_PAIRS = [
 // The pair for a pet's stored color (falls back to peach for legacy colors).
 export const petPair = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg) ?? PET_COLOR_PAIRS[0];
 
+// A person's avatar pair, stable per name (Community authors). Identity
+// colors only — never UI chrome.
+export const pairFor = (name) => PET_COLOR_PAIRS[name ? name.charCodeAt(0) % PET_COLOR_PAIRS.length : 0];
+
 // The medical vault's surface (Health hub card + vault screen): the sky pair,
 // so both stay in step. A surface tint only — vault actions use ui.accent.
 export const vaultColors = PET_COLOR_PAIRS[1];
@@ -166,6 +170,7 @@ export const motion = {
   pressScale: 0.97,
   pressOpacity: 0.7, // bare pressables: icons, text links, back buttons
   pressOpacitySoft: 0.85, // filled buttons, cards
+  disabledOpacity: 0.5, // controls that can't be used yet
 
   duration: { press: 120, control: 200, toast: 250, sheet: 300 },
   // Easings live in components/motion.js — Reanimated CSS styles need its

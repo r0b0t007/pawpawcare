@@ -77,7 +77,7 @@ export default function Button({
         },
         shape,
         v.container,
-        disabled && { opacity: 0.5 },
+        disabled && { opacity: motion.disabledOpacity },
         pressed && !disabled && { opacity: motion.pressOpacitySoft },
         style,
       ]}
