@@ -11,6 +11,9 @@ jest.mock('../../services/api', () => ({
   getTokens: jest.fn(),
   storeTokens: jest.fn(() => Promise.resolve()),
   clearTokens: jest.fn(() => Promise.resolve()),
+  storePendingLogout: jest.fn(() => Promise.resolve()),
+  getPendingLogout: jest.fn(() => Promise.resolve(null)),
+  clearPendingLogout: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('../../services/notifications', () => ({
   registerForPushNotificationsAsync: jest.fn(() => Promise.resolve(null)),
@@ -44,7 +47,8 @@ import { AuthProvider, useAuth } from '../AuthContext';
 import { get, getTokens, clearTokens } from '../../services/api';
 
 const USER = { id: 'u1', name: 'E2E Tester', email: 'e2e@example.test', plan: 'free' };
-const offline = () => new Error('Network error: Failed to connect');
+const offline = () => Object.assign(new Error('Network error: Failed to connect'), { isNetworkError: true });
+const serverError = () => Object.assign(new Error('Request failed (503)'), { status: 503 });
 
 let auth;
 function Probe() {
@@ -106,7 +110,18 @@ describe('session restore at launch', () => {
     expect(auth.user).toBeNull();
     expect(auth.isLoading).toBe(false);
     expect(auth.restoreFailed).toBe(true);
+    expect(auth.restoreOffline).toBe(true);
     expect(clearTokens).not.toHaveBeenCalled();
+  });
+
+  // The server answered, so "check your connection" would be wrong.
+  it('tells a server error apart from no connection', async () => {
+    get.mockRejectedValue(serverError());
+    await launch();
+    await flushRetries();
+
+    expect(auth.restoreFailed).toBe(true);
+    expect(auth.restoreOffline).toBe(false);
   });
 
   it('recovers on a retry without showing the reconnect screen', async () => {
@@ -143,12 +158,14 @@ describe('session restore at launch', () => {
     expect(auth.restoreFailed).toBe(false);
   });
 
+  // No request at all: offline, it would hold the spinner for a whole
+  // connect timeout before the Welcome screen.
   it('shows the Welcome screen when there is no saved session to restore', async () => {
     getTokens.mockResolvedValue({ access: null, refresh: null });
     get.mockRejectedValue(offline());
     await launch();
 
-    expect(get).toHaveBeenCalledTimes(1);
+    expect(get).not.toHaveBeenCalled();
     expect(auth.isLoading).toBe(false);
     expect(auth.restoreFailed).toBe(false);
   });

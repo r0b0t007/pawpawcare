@@ -11,6 +11,9 @@ jest.mock('../../services/api', () => ({
   getTokens: jest.fn(() => Promise.resolve({ access: null, refresh: null })),
   storeTokens: jest.fn(() => Promise.resolve()),
   clearTokens: jest.fn(() => Promise.resolve()),
+  storePendingLogout: jest.fn(() => Promise.resolve()),
+  getPendingLogout: jest.fn(() => Promise.resolve(null)),
+  clearPendingLogout: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('../../services/notifications', () => ({
   registerForPushNotificationsAsync: jest.fn(() => Promise.resolve(null)),
@@ -41,7 +44,11 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
 }));
 
 import { AuthProvider, useAuth } from '../AuthContext';
-import { post, get, request, storeTokens, clearTokens } from '../../services/api';
+import {
+  post, get, request, getTokens, storeTokens, clearTokens,
+  storePendingLogout, getPendingLogout, clearPendingLogout,
+} from '../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { track } from '../../services/analytics';
 import { clearSentryUser, setSentryUser } from '../../services/sentry';
 import { loginPurchases, logoutPurchases } from '../../services/purchases';
@@ -54,8 +61,7 @@ function Probe() {
 }
 
 async function mount() {
-  // loadUser() runs on mount; a rejection leaves the provider logged-out.
-  get.mockRejectedValueOnce(new Error('SESSION_EXPIRED'));
+  // loadUser() runs on mount; with no saved tokens it stays logged out.
   await act(async () => {
     TestRenderer.create(
       <AuthProvider>
@@ -154,6 +160,68 @@ describe('AuthContext.logout', () => {
 
     expect(auth.user).toBeNull();
   });
+
+  // Signing out offline (e.g. from the reconnect screen): the server must
+  // still hear about it later, or it keeps pushing reminders to this phone.
+  describe('telling the server', () => {
+    const PENDING = { refresh_token: 'r', device_token: 'ExponentPushToken[x]' };
+    const settle = () => act(async () => { await new Promise((r) => setImmediate(r)); });
+
+    beforeEach(() => {
+      AsyncStorage.getItem.mockImplementation((key) =>
+        Promise.resolve(key === '@pawpawcare/push_token' ? 'ExponentPushToken[x]' : null));
+    });
+    afterEach(() => {
+      AsyncStorage.getItem.mockImplementation(() => Promise.resolve(null));
+      getTokens.mockImplementation(() => Promise.resolve({ access: null, refresh: null }));
+      post.mockReset();
+    });
+
+    async function signOutWith(logoutOutcome) {
+      await signInThen();
+      getTokens.mockResolvedValue({ access: 'a', refresh: 'r' });
+      post.mockImplementation((path) =>
+        path === '/auth/logout' ? logoutOutcome() : Promise.resolve(null));
+      await act(async () => {
+        await auth.logout();
+      });
+      await settle();
+    }
+
+    it('revokes the session and unregisters the phone in one request', async () => {
+      await signOutWith(() => Promise.resolve(null));
+
+      expect(post).toHaveBeenCalledWith('/auth/logout', PENDING, { skipAuth: true });
+      expect(clearPendingLogout).toHaveBeenCalled();
+    });
+
+    it('keeps the sign-out for later when the server is unreachable', async () => {
+      await signOutWith(() => Promise.reject(Object.assign(new Error('Network error'), { isNetworkError: true })));
+
+      expect(storePendingLogout).toHaveBeenCalledWith(PENDING);
+      expect(clearPendingLogout).not.toHaveBeenCalled();
+      expect(auth.user).toBeNull();
+    });
+
+    it('resends a kept sign-out on the next launch', async () => {
+      getPendingLogout.mockResolvedValueOnce(PENDING);
+      post.mockResolvedValueOnce(null);
+      await mount();
+      await settle();
+
+      expect(post).toHaveBeenCalledWith('/auth/logout', PENDING, { skipAuth: true });
+      expect(clearPendingLogout).toHaveBeenCalled();
+    });
+
+    it('signs out once on a double tap', async () => {
+      await signInThen();
+      await act(async () => {
+        await Promise.all([auth.logout(), auth.logout()]);
+      });
+
+      expect(clearTokens).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe('AuthContext.deleteAccount', () => {
@@ -189,7 +257,6 @@ describe('AuthContext.deleteAccount', () => {
 
     request.mockRejectedValueOnce(new Error('Network request failed'));
 
-    // mount() already burned one clearTokens call (SESSION_EXPIRED on load).
     const clearCallsBefore = clearTokens.mock.calls.length;
 
     await act(async () => {

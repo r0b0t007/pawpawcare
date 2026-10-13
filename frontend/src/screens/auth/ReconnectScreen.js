@@ -5,12 +5,12 @@ import { useAuth } from '../../context/AuthContext';
 import EmptyState from '../../components/EmptyState';
 import { ui, type, motion, photos } from '../../theme';
 
-// Shown at launch when a saved session couldn't be checked because the server
-// was unreachable (offline, timeout, server error). The session is still
+// Shown at launch when a saved session couldn't be checked: no connection, or
+// the server didn't answer (timeout, server error, rate limit). The session is still
 // valid, so this is "try again", never the Welcome screen — which would read
 // as being signed out. Signing out stays available as a quiet escape hatch.
 export default function ReconnectScreen() {
-  const { retryRestore, logout } = useAuth();
+  const { retryRestore, logout, restoreOffline } = useAuth();
   const insets = useSafeAreaInsets();
 
   return (
@@ -28,7 +28,11 @@ export default function ReconnectScreen() {
       <EmptyState
         photo={photos.emptyBlanket}
         title="Can't reach PawPawCare"
-        body="You're still signed in. Check your connection and try again."
+        body={
+          restoreOffline
+            ? "You're still signed in. Check your connection and try again."
+            : "You're still signed in. Our server isn't answering right now — try again in a moment."
+        }
         actionLabel="Try again"
         actionIcon="refresh"
         onAction={retryRestore}

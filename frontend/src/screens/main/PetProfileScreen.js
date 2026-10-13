@@ -420,12 +420,17 @@ export default function PetProfileScreen({ navigation, route }) {
   const upcoming = vaccinations.filter((v) => v.status !== 'completed');
   const completedVax = vaccinations.filter((v) => v.status === 'completed');
   const { status, label: statusLabel } = petHealthStatus(vaccinations);
+  // Vaccinations that didn't load (DataContext's pet.missing) have no status:
+  // no "All good" pill, and the tile says so instead of "Add a first vaccine".
+  const vaxUnknown = pet.missing?.includes('vaccinations');
   // The Health tile names the earliest open vaccine, neutrally — the status
   // itself is shown once, in the hero pill.
   const nextVax = [...upcoming]
     .filter((v) => v.dueDate)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
-  const healthTileValue = nextVax
+  const healthTileValue = vaxUnknown
+    ? "Couldn't load vaccines"
+    : nextVax
     ? `${nextVax.name} · ${fmtShort(parseDay(nextVax.dueDate))}`
     : completedVax.length
       ? `${completedVax.length} ${completedVax.length === 1 ? 'vaccine' : 'vaccines'} on record`
@@ -927,7 +932,7 @@ export default function PetProfileScreen({ navigation, route }) {
                 <Text style={[styles.speciesPillText, { color: pair.fg }]} numberOfLines={1}>{speciesLabel}</Text>
               </View>
               {/* Status shown exactly once on this screen. */}
-              <StatusPill status={status} label={statusLabel} style={{ alignSelf: 'auto' }} />
+              {!vaxUnknown && <StatusPill status={status} label={statusLabel} style={{ alignSelf: 'auto' }} />}
             </View>
             <Text style={[type.display, { color: heroFg }]} numberOfLines={1}>{pet.name}</Text>
             {heroMeta ? <Text style={[styles.heroMeta, { color: heroFg }]}>{heroMeta}</Text> : null}

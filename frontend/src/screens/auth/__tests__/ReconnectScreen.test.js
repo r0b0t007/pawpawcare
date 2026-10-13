@@ -5,7 +5,7 @@ jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: () => null }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-const mockAuth = { retryRestore: jest.fn(), logout: jest.fn() };
+const mockAuth = { retryRestore: jest.fn(), logout: jest.fn(), restoreOffline: true };
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => mockAuth }));
 
 import ReconnectScreen from '../ReconnectScreen';
@@ -28,6 +28,17 @@ describe('ReconnectScreen', () => {
     const shown = text(tree.root).join(' ');
     expect(shown).toContain("Can't reach PawPawCare");
     expect(shown).toContain("You're still signed in");
+    expect(shown).toContain('Check your connection');
+  });
+
+  it("doesn't blame the connection when the server answered with an error", () => {
+    mockAuth.restoreOffline = false;
+    act(() => tree.update(<ReconnectScreen />));
+    const shown = text(tree.root).join(' ');
+    mockAuth.restoreOffline = true;
+
+    expect(shown).not.toContain('Check your connection');
+    expect(shown).toContain("isn't answering");
   });
 
   it('retries the restore from "Try again"', () => {

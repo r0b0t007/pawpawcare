@@ -424,12 +424,16 @@ export function DataProvider({ children }) {
         // rest of the session (Home said "Welcome to PawPawCare", every
         // profile said "Pet not found") while the Pets tab, on React Query,
         // still listed them. Now a failed request keeps that pet's last good
-        // copy of the field (or empty on first load), and the domain still
-        // counts as failed below (logged as a partial load).
+        // copy of the field; with none, the field is listed in pet.missing so
+        // screens don't read the empty list as "nothing on record". The domain
+        // still counts as failed below (logged as a partial load).
         const previous = new Map(petsRef.current.map((p) => [p.id, p]));
         const failures = [];
         const fetchList = (petId, resource) =>
           get(`/pets/${petId}/${resource}`).catch((err) => {
+            // An expired session ends the load (and signs out below) at once,
+            // instead of after every other request has failed the same way.
+            if (err?.message === 'SESSION_EXPIRED') throw err;
             failures.push(err);
             return null;
           });
@@ -439,46 +443,35 @@ export function DataProvider({ children }) {
           vaccinations: 'vaccinations', activities: 'activities', foods: 'favoriteFoods',
           medications: 'medications', weights: 'weights', expenses: 'expenses',
         };
+        const RESOURCES = Object.keys(FIELDS);
         const buildPet = (apiPet, i, lists) => {
           const loaded = Object.fromEntries(Object.entries(lists).filter(([, list]) => list));
           const pet = toPet(apiPet, { ...loaded, index: i });
           const old = previous.get(apiPet.id);
-          if (old) {
-            for (const [resource, field] of Object.entries(FIELDS)) {
-              if (!loaded[resource]) pet[field] = old[field];
-            }
+          const missing = [];
+          for (const [resource, field] of Object.entries(FIELDS)) {
+            if (loaded[resource]) continue;
+            if (old) pet[field] = old[field];
+            if (!old || old.missing?.includes(field)) missing.push(field);
           }
+          if (missing.length) pet.missing = missing;
           return pet;
         };
 
-        // Paint the pets as soon as they can be drawn correctly: the cards
-        // render name + avatar + status ring, and the ring needs vaccinations
-        // (the same minimum usePets.js fetches for its list cards).
-        const vaccinationsByPet = await Promise.all(apiPets.map((p) => fetchList(p.id, 'vaccinations')));
-        dispatch({
-          type: 'SET_PETS',
-          payload: apiPets.map((apiPet, i) => buildPet(apiPet, i, { vaccinations: vaccinationsByPet[i] })),
-        });
-        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
-
-        // Then enrich with what only the profile and health screens read.
-        const petsWithData = await Promise.all(
-          apiPets.map(async (apiPet, i) => {
-            const [activities, foods, medications, weights, expenses] = await Promise.all(
-              ['activities', 'foods', 'medications', 'weights', 'expenses'].map((r) => fetchList(apiPet.id, r))
-            );
-            return buildPet(apiPet, i, {
-              vaccinations: vaccinationsByPet[i], activities, foods, medications, weights, expenses,
-            });
-          })
+        const listsByPet = await Promise.all(
+          apiPets.map((p) => Promise.all(RESOURCES.map((r) => fetchList(p.id, r))))
+        );
+        const petsWithData = apiPets.map((apiPet, i) =>
+          buildPet(apiPet, i, Object.fromEntries(RESOURCES.map((r, j) => [r, listsByPet[i][j]])))
         );
         dispatch({ type: 'SET_PETS', payload: petsWithData });
-        hydrateDoseDays(petsWithData);
+        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
+        // Hydrating prunes the stored dose history of every med it isn't
+        // given, so a pet whose medications never loaded would lose its
+        // history for good. Skip it; the next full load hydrates.
+        if (!petsWithData.some((p) => p.missing?.includes('medications'))) hydrateDoseDays(petsWithData);
 
-        if (failures.length) {
-          throw failures.find((e) => e?.message === 'SESSION_EXPIRED')
-            ?? new Error(`${failures.length} pet request(s) failed`);
-        }
+        if (failures.length) throw new Error(`${failures.length} pet request(s) failed`);
       },
       () => refreshPosts({ rethrow: true }),
       async () => {

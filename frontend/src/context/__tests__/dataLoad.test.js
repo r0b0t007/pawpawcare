@@ -27,6 +27,7 @@ jest.mock('../AuthContext', () => ({
 
 import { DataProvider, useData } from '../DataContext';
 import { get } from '../../services/api';
+import { getPref, setPref } from '../../services/prefs';
 
 const PET = { id: 'p1', owner_id: 'u1', name: 'Rex', type: 'dog' };
 const HEAVY = /\/pets\/p1\/(activities|foods|medications|weights|expenses)$/;
@@ -87,22 +88,10 @@ describe('DataContext initial load', () => {
     console.warn.mockRestore();
   });
 
-  it('exposes pets once /pets lands, without waiting on the heavy sub-resources', async () => {
+  it('loads pets with all their sub-resources', async () => {
     const pending = mockApi([[HEAVY, 'pending']]);
     await mount();
-
-    // The five slow sub-resource requests are still unresolved here. The pets
-    // row only needs name/avatar/status, so it must not be gated behind them —
-    // otherwise the dashboard renders an empty "Your pets" for as long as they
-    // take (measured at ~17s against a local backend with a single pet).
-    expect(pending.length).toBeGreaterThan(0);
-    expect(data.pets).toHaveLength(1);
-    expect(data.pets[0].name).toBe('Rex');
-  });
-
-  it('still enriches pets with sub-resources once they resolve', async () => {
-    const pending = mockApi([[HEAVY, 'pending']]);
-    await mount();
+    expect(data.pets).toHaveLength(0);
 
     await act(async () => {
       pending.forEach((resolve) => resolve());
@@ -110,7 +99,7 @@ describe('DataContext initial load', () => {
 
     expect(data.pets).toHaveLength(1);
     expect(data.pets[0].activities).toEqual([]);
-    expect(data.pets[0].expenses).toEqual([]);
+    expect(data.pets[0].missing).toBeUndefined();
     expect(data.dataLoaded).toBe(true);
     expect(console.warn).not.toHaveBeenCalled();
   });
@@ -128,6 +117,7 @@ describe('DataContext initial load', () => {
     expect(data.pets).toHaveLength(1);
     expect(data.pets[0].name).toBe('Rex');
     expect(data.pets[0].weights).toEqual([]);
+    expect(data.pets[0].missing).toEqual(['weights']);
     expect(data.pets[0].medications).toHaveLength(1);
     // Still reported as a partial load (the pets domain counts as failed).
     expect(data.dataLoaded).toBe(true);
@@ -139,14 +129,39 @@ describe('DataContext initial load', () => {
     await mount();
 
     expect(data.pets).toHaveLength(1);
-    expect(data.pets[0].vaccinations).toEqual([]);
+    // Listed as missing, so screens don't call the pet "all good".
+    expect(data.pets[0].missing).toEqual(['vaccinations']);
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('1/6 domains failed'));
   });
 
-  it('still signs out when a sub-resource reports an expired session', async () => {
-    mockApi([['/pets/p1/foods', new Error('SESSION_EXPIRED')]]);
+  // Pruning the stored dose history against a pet whose medications never
+  // loaded would delete that history for good.
+  it("leaves the stored dose history alone when a pet's medications fail", async () => {
+    mockApi([['/pets/p1/medications', new Error('Network error: timeout')]]);
+    await mount();
+
+    expect(data.pets[0].missing).toEqual(['medications']);
+    expect(getPref).not.toHaveBeenCalledWith('medDoseDays', expect.anything());
+    expect(setPref).not.toHaveBeenCalledWith('medDoseDays', expect.anything());
+  });
+
+  it('hydrates the dose history when medications load', async () => {
+    mockApi();
+    await mount();
+
+    expect(getPref).toHaveBeenCalledWith('medDoseDays', {});
+  });
+
+  // Signs out without waiting on the rest of the requests, and without
+  // showing pets for a session that has ended.
+  it('signs out as soon as a sub-resource reports an expired session', async () => {
+    mockApi([
+      ['/pets/p1/foods', new Error('SESSION_EXPIRED')],
+      [/\/pets\/p1\/(activities|weights)$/, 'pending'],
+    ]);
     await mount();
 
     expect(mockLogout).toHaveBeenCalledTimes(1);
+    expect(data.pets).toHaveLength(0);
   });
 });
