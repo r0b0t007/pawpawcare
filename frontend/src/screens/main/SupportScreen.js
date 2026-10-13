@@ -13,13 +13,14 @@ import { post } from '../../services/api';
 import { ui, type, radii, motion } from '../../theme';
 import { Card, ListRow, Button, Chip, showToast, FormScrollView } from '../../components';
 
-// Help & support (Profile → Help & support, or Profile → Send feedback with
-// the Feedback chip preselected). Static guide rows for now plus a private
-// message form: stored on the backend and forwarded to the team's inbox,
-// never posted anywhere, and deliberately unrelated to the store rating
-// prompt (services/storeReview). The whole screen sits in a FormScrollView
-// (keyboard-avoiding, taps pass through) so the send button is never trapped
-// behind the keyboard — a top competitor 1★ complaint.
+// Help & feedback (Profile → Help & feedback; other screens can preselect a
+// category with the `category` param). A private message form first, then
+// placeholder guide rows (real guides are a follow-up). Messages are stored
+// on the backend and forwarded to the team's inbox, never posted anywhere,
+// and deliberately unrelated to the store rating prompt (services/storeReview).
+// The whole screen sits in a FormScrollView (keyboard-avoiding, taps pass
+// through) so the send button is never trapped behind the keyboard — a top
+// competitor 1★ complaint.
 
 const GUIDES = [
   { icon: 'rocket-launch-outline', title: 'Getting started' },
@@ -35,6 +36,8 @@ const CATEGORIES = [
   { id: 'question', label: 'Question', placeholder: 'Ask us anything about the app.' },
 ];
 const DEFAULT_PLACEHOLDER = CATEGORIES.find((c) => c.id === 'problem').placeholder;
+const REPLY_CAPTION = 'Only our team reads this. We reply within 2 business days.';
+const NOTE_CAPTION = 'Only our team reads this, and we read every note.';
 
 // The installed app's version, for triage. Guarded like purchases.js: an
 // OTA update on a build without expo-application just sends none.
@@ -55,14 +58,15 @@ function appVersion() {
 
 export default function SupportScreen({ navigation, route }) {
   const initial = CATEGORIES.some((c) => c.id === route?.params?.category) ? route.params.category : null;
-  // Opened from Profile → Send feedback: lead with the form, titled to match.
-  const feedbackFirst = initial === 'feedback';
   const [category, setCategory] = useState(initial);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [focused, setFocused] = useState(false);
 
   const canSend = message.trim().length > 0 && !sending;
+  // Feedback and ideas don't need an answer; problems, questions and
+  // uncategorised messages get the reply promise.
+  const expectsReply = category !== 'feedback' && category !== 'idea';
   const placeholder = CATEGORIES.find((c) => c.id === category)?.placeholder || DEFAULT_PLACEHOLDER;
 
   const handleSend = async () => {
@@ -104,7 +108,7 @@ export default function SupportScreen({ navigation, route }) {
 
   const form = (
     <>
-      <Text style={[type.sectionLabel, styles.sectionLabel]}>Send feedback or get help</Text>
+      <Text style={[type.sectionLabel, styles.sectionLabel]}>Message our team</Text>
       <Card style={styles.contactCard}>
         <View style={styles.chips}>
           {CATEGORIES.map((c) => (
@@ -135,9 +139,7 @@ export default function SupportScreen({ navigation, route }) {
           onPress={handleSend}
           disabled={!canSend}
         />
-        <Text style={styles.caption}>
-          Only our team reads this — it's never posted publicly. We reply within 2 business days.
-        </Text>
+        <Text style={styles.caption}>{expectsReply ? REPLY_CAPTION : NOTE_CAPTION}</Text>
       </Card>
     </>
   );
@@ -155,12 +157,12 @@ export default function SupportScreen({ navigation, route }) {
             <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
           </Pressable>
           <Text style={styles.headerTitle} accessibilityRole="header">
-            {feedbackFirst ? 'Send feedback' : 'Help & support'}
+            Help & feedback
           </Text>
         </View>
 
-        {feedbackFirst ? form : guides}
-        {feedbackFirst ? guides : form}
+        {form}
+        {guides}
       </FormScrollView>
     </SafeAreaView>
   );

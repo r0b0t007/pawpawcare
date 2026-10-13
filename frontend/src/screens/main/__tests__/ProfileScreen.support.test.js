@@ -1,5 +1,6 @@
-// Support section: "Send feedback" opens the private form with the Feedback
-// category preselected; "Help & support" opens it with none.
+// Support section: one "Help & feedback" row opens the private form. It
+// replaced two rows ("Send feedback", "Help & support") that led to the same
+// screen.
 jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: () => null }));
 jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
@@ -37,7 +38,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import ProfileScreen from '../ProfileScreen';
 import ListRow from '../../../components/ListRow';
 
-test('the Support rows open the form, "Send feedback" with Feedback preselected', async () => {
+test('one "Help & feedback" row opens the form', async () => {
   const navigation = { navigate: jest.fn() };
   let tree;
   await act(async () => {
@@ -45,9 +46,9 @@ test('the Support rows open the form, "Send feedback" with Feedback preselected'
   });
   const row = (title) => tree.root.findAll((n) => n.type === ListRow && n.props.title === title)[0];
 
-  act(() => row('Send feedback').props.onPress());
-  expect(navigation.navigate).toHaveBeenLastCalledWith('Support', { category: 'feedback' });
+  expect(row('Send feedback')).toBeUndefined();
+  expect(row('Help & support')).toBeUndefined();
 
-  act(() => row('Help & support').props.onPress());
+  act(() => row('Help & feedback').props.onPress());
   expect(navigation.navigate).toHaveBeenLastCalledWith('Support');
 });
