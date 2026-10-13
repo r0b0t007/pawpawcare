@@ -219,6 +219,7 @@ export default function CommunityScreen({ navigation }) {
                   style={styles.composerInput}
                   placeholder="What's your pack up to?"
                   placeholderTextColor={ui.subtle}
+                  accessibilityLabel="New post"
                   value={draft}
                   onChangeText={setDraft}
                   multiline
@@ -371,7 +372,7 @@ export default function CommunityScreen({ navigation }) {
   );
 }
 
-function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment, reportPost, unreportPost }) {
+export function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment, reportPost, unreportPost }) {
   const hasPawed = !!post.pawedByMe;
   const pair = pairFor(post.authorName);
   const isOwn = post.authorId === userId;
@@ -449,7 +450,12 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
           <Text style={styles.postTime}>{timeAgo(post.createdAt)}</Text>
         </View>
         {!isOwn && (
-          <Pressable onPress={() => setConfirmReport(true)} hitSlop={8}>
+          <Pressable
+            onPress={() => setConfirmReport(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Report ${post.authorName}'s post`}
+          >
             <MaterialCommunityIcons name="dots-horizontal" size={20} color={ui.subtle} />
           </Pressable>
         )}
@@ -459,7 +465,17 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
         <Image source={{ uri: resolveAsset(post.imageUrl) }} style={styles.postImage} resizeMode="cover" />
       ) : null}
       <View style={styles.postActions}>
-        <Pressable style={styles.actionBtn} onPress={onPaw} hitSlop={6}>
+        {/* Icon + count buttons: screen readers get a sentence and the
+            on/open state, not the icon glyph and a bare number. */}
+        <Pressable
+          style={styles.actionBtn}
+          onPress={onPaw}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={`${post.paws} ${post.paws === 1 ? 'paw' : 'paws'}`}
+          accessibilityHint={hasPawed ? 'Takes back your paw' : 'Gives this post a paw'}
+          accessibilityState={{ selected: hasPawed }}
+        >
           <MaterialCommunityIcons
             name={hasPawed ? 'paw' : 'paw-outline'}
             size={19}
@@ -467,7 +483,15 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
           />
           <Text style={[styles.actionText, hasPawed && { color: ui.accent }]}>{post.paws}</Text>
         </Pressable>
-        <Pressable style={styles.actionBtn} onPress={toggleComments} hitSlop={6}>
+        <Pressable
+          style={styles.actionBtn}
+          onPress={toggleComments}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel={`${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`}
+          accessibilityHint={expanded ? 'Hides the comments' : 'Shows the comments'}
+          accessibilityState={{ expanded }}
+        >
           <MaterialCommunityIcons
             name={expanded ? 'chat' : 'chat-outline'}
             size={19}
@@ -499,7 +523,12 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
                     <Text style={styles.commentText}>{c.content}</Text>
                   </View>
                   {canDelete && (
-                    <Pressable onPress={() => setConfirm(c)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                    <Pressable
+                      onPress={() => setConfirm(c)}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${c.author_name}'s comment`}
+                    >
                       <MaterialCommunityIcons name="close" size={14} color={ui.faint} />
                     </Pressable>
                   )}
@@ -512,6 +541,7 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
               style={styles.commentInput}
               placeholder="Add a comment…"
               placeholderTextColor={ui.subtle}
+              accessibilityLabel="Add a comment"
               value={draft}
               onChangeText={setDraft}
               multiline
@@ -520,6 +550,9 @@ function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment,
               style={[styles.commentSend, (!draft.trim() || isBusy('comment')) && { opacity: 0.4 }]}
               onPress={submit}
               disabled={!draft.trim() || isBusy('comment')}
+              accessibilityRole="button"
+              accessibilityLabel="Send comment"
+              accessibilityState={{ disabled: !draft.trim() || isBusy('comment') }}
             >
               <MaterialCommunityIcons name="send" size={15} color="#ffffff" />
             </Pressable>
