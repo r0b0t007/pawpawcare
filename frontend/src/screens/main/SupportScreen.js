@@ -22,22 +22,31 @@ import { Card, ListRow, Button, Chip, showToast, FormScrollView } from '../../co
 // through) so the send button is never trapped behind the keyboard — a top
 // competitor 1★ complaint.
 
+// Placeholders until the real guides exist (CHW-175): shown as "Soon", not
+// tappable, so they don't read as broken links.
 const GUIDES = [
   { icon: 'rocket-launch-outline', title: 'Getting started' },
   { icon: 'bell-outline', title: 'Reminders & notifications' },
   { icon: 'account-group-outline', title: 'Sharing with family & your vet' },
 ];
 
-// Optional; matches SupportMessage::CATEGORIES on the backend.
+// Optional; ids match SupportMessage::CATEGORIES on the backend.
+// `expectsReply` drives both the caption and the sent toast: problems and
+// questions get the reply promise, feedback and ideas don't need an answer.
 const CATEGORIES = [
-  { id: 'feedback', label: 'Feedback', placeholder: "What's working, and what isn't? Every note is read." },
-  { id: 'problem', label: 'Problem', placeholder: "Tell us what's going on — the more detail, the faster we can help." },
-  { id: 'idea', label: 'Idea', placeholder: 'What would make PawPawCare better for you and your pets?' },
-  { id: 'question', label: 'Question', placeholder: 'Ask us anything about the app.' },
+  { id: 'feedback', label: 'Feedback', expectsReply: false, placeholder: "What's working, and what isn't? Every note is read." },
+  { id: 'problem', label: 'Problem', expectsReply: true, placeholder: "Tell us what's going on — the more detail, the faster we can help." },
+  { id: 'idea', label: 'Idea', expectsReply: false, placeholder: 'What would make PawPawCare better for you and your pets?' },
+  { id: 'question', label: 'Question', expectsReply: true, placeholder: 'Ask us anything about the app.' },
 ];
-const DEFAULT_PLACEHOLDER = CATEGORIES.find((c) => c.id === 'problem').placeholder;
-const REPLY_CAPTION = 'Only our team reads this. We reply within 2 business days.';
-const NOTE_CAPTION = 'Only our team reads this, and we read every note.';
+// No chip picked: a neutral prompt, and the reply promise (it may need one).
+const NO_CATEGORY = {
+  expectsReply: true,
+  placeholder: 'How can we help? Ask a question, report a problem or share an idea.',
+};
+const PRIVATE = "Only our team reads this, and it's never posted publicly.";
+const REPLY_CAPTION = `${PRIVATE} We reply within 2 business days.`;
+const NOTE_CAPTION = `${PRIVATE} We read every note.`;
 
 // The installed app's version, for triage. Guarded like purchases.js: an
 // OTA update on a build without expo-application just sends none.
@@ -64,10 +73,7 @@ export default function SupportScreen({ navigation, route }) {
   const [focused, setFocused] = useState(false);
 
   const canSend = message.trim().length > 0 && !sending;
-  // Feedback and ideas don't need an answer; problems, questions and
-  // uncategorised messages get the reply promise.
-  const expectsReply = category !== 'feedback' && category !== 'idea';
-  const placeholder = CATEGORIES.find((c) => c.id === category)?.placeholder || DEFAULT_PLACEHOLDER;
+  const { expectsReply, placeholder } = CATEGORIES.find((c) => c.id === category) ?? NO_CATEGORY;
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -80,7 +86,7 @@ export default function SupportScreen({ navigation, route }) {
         platform: Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : null,
       });
       setMessage('');
-      showToast(category === 'feedback' ? 'Thanks — we read every note' : "Sent — we'll reply within 2 business days");
+      showToast(expectsReply ? "Sent — we'll reply within 2 business days" : 'Thanks — we read every note');
       navigation.goBack();
     } catch (e) {
       showToast(e?.message || 'Could not send — try again');
@@ -97,8 +103,7 @@ export default function SupportScreen({ navigation, route }) {
             key={guide.title}
             icon={guide.icon}
             title={guide.title}
-            chevron
-            onPress={() => showToast('Guide coming soon')}
+            value="Soon"
             last={i === GUIDES.length - 1}
           />
         ))}

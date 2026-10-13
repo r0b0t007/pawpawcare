@@ -24,7 +24,7 @@ For every type below: **Linked to the user = Yes** (all keyed by account ID), **
 | Contact Info → Name | account name; Google/Apple sign-in name | App Functionality |
 | Contact Info → Email Address | account email; support messages | App Functionality |
 | User Content → Photos or Videos | pet photos, document scans | App Functionality |
-| User Content → Customer Support | Help & support messages | App Functionality |
+| User Content → Customer Support | Help & feedback messages | App Functionality |
 | User Content → Other User Content | pet records (vaccines, meds, weights, notes, documents), community posts, lost-pet reports | App Functionality |
 | Identifiers → User ID | our account UUID (PostHog, Sentry, RevenueCat) | App Functionality, Analytics |
 | Purchases → Purchase History | Plus subscription status/history via RevenueCat | App Functionality |

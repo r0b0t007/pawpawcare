@@ -12,6 +12,7 @@ import React from 'react';
 import { Platform, Text, TextInput } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import SupportScreen from '../SupportScreen';
+import ListRow from '../../../components/ListRow';
 import { post } from '../../../services/api';
 import { showToast } from '../../../components/Toast';
 
@@ -74,6 +75,36 @@ test('promises a reply only for messages that need one', async () => {
   expect(caption()).not.toMatch(/reply/);
   await act(async () => chip(tree, 'Question').props.onPress());
   expect(caption()).toMatch(/reply within 2 business days/);
+  expect(caption()).toMatch(/never posted publicly/);
+});
+
+// The toast after sending must keep the caption's promise.
+test('an idea is thanked, not promised a reply', async () => {
+  post.mockResolvedValue({ id: 'm3' });
+  const tree = await render({ category: 'idea' });
+
+  await type(tree, 'Dark mode please');
+  await send(tree);
+
+  expect(showToast).toHaveBeenCalledWith('Thanks — we read every note');
+});
+
+test('with no chip picked, the prompt is neutral rather than a problem report', async () => {
+  const tree = await render();
+  expect(input(tree).props.placeholder).toMatch(/how can we help/i);
+});
+
+// Placeholders until the real guides exist: labelled "Soon", nothing to tap.
+test('the placeholder guides read as coming soon, not as links', async () => {
+  const tree = await render();
+  const rows = tree.root.findAll((n) => n.type === ListRow);
+
+  expect(rows.length).toBeGreaterThan(0);
+  rows.forEach((row) => {
+    expect(row.props.value).toBe('Soon');
+    expect(row.props.onPress).toBeUndefined();
+    expect(row.props.chevron).toBeFalsy();
+  });
 });
 
 test('the chips are announced as one choice in a set', async () => {

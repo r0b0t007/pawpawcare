@@ -303,7 +303,7 @@ export default function ProfileScreen({ navigation }) {
           <ListRow
             icon="lifebuoy"
             title="Help & feedback"
-            subtitle="Questions, problems or ideas. Only our team reads it."
+            subtitle="Ask a question, report a problem or share feedback. Private to our team."
             chevron
             onPress={() => navigation.navigate('Support')}
             last
