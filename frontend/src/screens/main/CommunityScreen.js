@@ -13,12 +13,12 @@ import { uploadImage } from '../../services/api';
 import { track } from '../../services/analytics';
 import { useInFlight } from '../../hooks/useInFlight';
 import { resolveAsset } from '../../config';
-import { ui, type, PET_COLOR_PAIRS, motion, photos } from '../../theme';
+import { ui, type, PET_COLOR_PAIRS, motion, photos, pairFor } from '../../theme';
 import {
   Card, Button, ConfirmDialog, EmptyState, SegmentedControl, showToast, FormScrollView,
 } from '../../components';
 import LostPetCard from './LostPetCard';
-import PostCard, { pairFor } from './PostCard';
+import PostCard from './PostCard';
 
 // One screen, three peer sections (Feed / Lost pets / Groups) on a segmented
 // control. A lost pet from someone else always tops the feed — the
@@ -312,8 +312,10 @@ export default function CommunityScreen({ navigation }) {
                   <Pressable
                     onPress={() => handleToggleGroup(group)}
                     accessibilityRole="button"
-                    accessibilityLabel={joined ? `Leave ${group.name}` : `Join ${group.name}`}
-                    accessibilityState={{ selected: joined }}
+                    // Starts with the visible word, so voice control's
+                    // "tap Joined" matches; the hint says what a tap does.
+                    accessibilityLabel={`${joined ? 'Joined' : 'Join'} ${group.name}`}
+                    accessibilityHint={joined ? 'Leaves the group' : 'Joins the group'}
                     style={({ pressed }) => [
                       styles.joinBtn,
                       joined && styles.joinBtnJoined,

@@ -14,10 +14,13 @@ jest.mock('react-native-gesture-handler', () => {
   };
 });
 
+jest.mock('../../../components/Toast', () => ({ showToast: jest.fn(), ToastHost: () => null }));
+
 import React from 'react';
-import { Text } from 'react-native';
+import { AccessibilityInfo, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import PostCard from '../PostCard';
+import { showToast } from '../../../components/Toast';
 
 const POST = {
   id: 'p1',
@@ -56,6 +59,7 @@ async function render(overrides = {}, post = POST) {
     tree = TestRenderer.create(<PostCard post={post} {...props} />);
   });
 }
+beforeEach(() => jest.clearAllMocks());
 afterEach(() => act(() => tree?.unmount()));
 
 // What a screen reader reads: the host View a Pressable renders.
@@ -112,25 +116,110 @@ test('a failed comment load says so instead of showing an empty thread', async (
   expect(texts().join(' ')).not.toContain('No comments yet');
 });
 
+const typeComment = async (text) => {
+  const input = tree.root.findAll((n) => n.props.accessibilityLabel === 'Add a comment' && n.props.onChangeText)[0];
+  await act(async () => input.props.onChangeText(text));
+};
+
 test('a reload that started before a new comment cannot erase it', async () => {
   const slow = deferred();
+  const NEW = comment('c9', 'E2E', 'New one');
   const getComments = jest.fn()
     .mockResolvedValueOnce([comment('c1', 'E2E', 'Cute!')])
-    .mockReturnValueOnce(slow.promise);
-  await render({ getComments, addComment: jest.fn(() => Promise.resolve(comment('c9', 'E2E', 'New one'))) });
+    .mockReturnValueOnce(slow.promise)
+    .mockResolvedValueOnce([comment('c1', 'E2E', 'Cute!'), NEW]); // quiet reload after posting
+  await render({ getComments, addComment: jest.fn(() => Promise.resolve(NEW)) });
 
   await press('3 comments'); // open: loads c1
   await press('1 comment'); // close
   await press('1 comment'); // reopen: slow reload in flight
 
-  const input = tree.root.findAll((n) => n.props.accessibilityLabel === 'Add a comment' && n.props.onChangeText)[0];
-  await act(async () => input.props.onChangeText('New one'));
+  await typeComment('New one');
   await press('Send comment');
-  expect(texts()).toContain('New one');
-
   await act(async () => slow.resolve([comment('c1', 'E2E', 'Cute!')])); // stale list lands
+
   expect(texts()).toContain('New one');
   expect(host('2 comments')).toBeDefined();
+});
+
+test('posting during the first load still ends up with the whole thread', async () => {
+  const first = deferred();
+  const NEW = comment('c9', 'E2E', 'Mine');
+  const server = [comment('c1', 'A', 'one'), comment('c2', 'B', 'two'), comment('c3', 'C', 'three')];
+  const getComments = jest.fn()
+    .mockReturnValueOnce(first.promise) // first load, still running
+    .mockResolvedValueOnce([...server, NEW]); // quiet reload after posting
+  await render({ getComments, addComment: jest.fn(() => Promise.resolve(NEW)) });
+
+  await press('3 comments');
+  await typeComment('Mine');
+  await press('Send comment');
+  await act(async () => first.resolve(server)); // the old first load lands last
+
+  expect(host('4 comments')).toBeDefined();
+  expect(texts()).toEqual(expect.arrayContaining(['one', 'two', 'three', 'Mine']));
+});
+
+test('a reload from before a delete cannot bring the comment back', async () => {
+  const slow = deferred();
+  const c1 = comment('c1', 'E2E', 'Delete me');
+  const getComments = jest.fn()
+    .mockResolvedValueOnce([c1])
+    .mockReturnValueOnce(slow.promise) // reopen: reload in flight, still has c1
+    .mockResolvedValueOnce([]); // quiet reload after the delete
+  await render({ getComments, deleteComment: jest.fn(() => Promise.resolve(true)) });
+
+  await press('3 comments');
+  await press('1 comment');
+  await press('1 comment');
+  await press("Delete E2E's comment");
+  const confirm = tree.root.findAll((n) => n.props.label === 'Delete' && n.props.onPress)[0];
+  await act(async () => { confirm.props.onPress(); });
+  await act(async () => slow.resolve([c1]));
+
+  expect(texts()).not.toContain('Delete me');
+  expect(host('0 comments')).toBeDefined();
+});
+
+test('posting clears an earlier load error', async () => {
+  const NEW = comment('c9', 'E2E', 'Hi');
+  const getComments = jest.fn()
+    .mockResolvedValueOnce([comment('c1', 'E2E', 'Cute!')])
+    .mockResolvedValueOnce(null) // reopen fails
+    .mockResolvedValueOnce([comment('c1', 'E2E', 'Cute!'), NEW]);
+  await render({ getComments, addComment: jest.fn(() => Promise.resolve(NEW)) });
+
+  await press('3 comments');
+  await press('1 comment');
+  await press('1 comment');
+  expect(texts()).toContain("Couldn't load comments. Tap to retry.");
+
+  await typeComment('Hi');
+  await press('Send comment');
+  expect(texts()).not.toContain("Couldn't load comments. Tap to retry.");
+});
+
+test('a failed load is announced and the error row is a live region', async () => {
+  const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+  await render({ getComments: jest.fn(() => Promise.resolve(null)) });
+  await press('3 comments');
+
+  expect(announce).toHaveBeenCalledWith("Couldn't load comments");
+  const row = tree.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityLiveRegion === 'polite')[0];
+  expect(row).toBeDefined();
+  announce.mockRestore();
+});
+
+test('a failed paw says so', async () => {
+  await render({ onPaw: jest.fn(() => Promise.resolve(false)) });
+  await press('1 paw');
+  expect(showToast).toHaveBeenCalledWith("Couldn't update the paw. Try again.");
+});
+
+test('a post with no paw count reads 0 paws, not undefined', async () => {
+  await render({}, { ...POST, paws: undefined, pawedByMe: false });
+  expect(host('undefined paws')).toBeUndefined();
+  expect(host('0 paws')).toBeDefined();
 });
 
 test('a double tap on paw sends one toggle, not paw-then-unpaw', async () => {

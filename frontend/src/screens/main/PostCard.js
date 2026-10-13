@@ -1,20 +1,18 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Image, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Image, Pressable, AccessibilityInfo } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { timeAgo } from '../../utils/dates';
 import { useInFlight } from '../../hooks/useInFlight';
 import { resolveAsset } from '../../config';
-import { ui, type, PET_COLOR_PAIRS } from '../../theme';
+import { ui, type, motion, pairFor } from '../../theme';
 import { Card, ConfirmDialog, showToast } from '../../components';
-
-// Identity colors only — never UI chrome.
-export const pairFor = (name) => PET_COLOR_PAIRS[name ? name.charCodeAt(0) % PET_COLOR_PAIRS.length : 0];
 
 // One post in the Community feed: paws, comments (loaded on expand), report.
 // Every control is icon + count, so each carries a label, role and state for
 // screen readers rather than the icon glyph and a bare number.
 export default function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment, reportPost, unreportPost }) {
   const hasPawed = !!post.pawedByMe;
+  const paws = post.paws ?? 0; // partial payloads (UPDATE_POST, optimistic adds) may lack it
   const pair = pairFor(post.authorName);
   const isOwn = post.authorId === userId;
 
@@ -28,9 +26,10 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
   // One request per tap: paw is a toggle (a double tap would undo itself)
   // and a double-tapped comment would post twice.
   const { run, isBusy } = useInFlight();
-  // Bumped by every expand/collapse and every posted comment, so a reload
-  // that started earlier can't overwrite newer state when it lands.
+  // Bumped by every load and every collapse: only the newest load may apply
+  // its result, so an older one can't overwrite newer state when it lands.
   const loadSeq = useRef(0);
+  const loadedOnce = useRef(false); // the server's thread has been shown at least once
 
   // Every hook is above: reporting flips `reportedByMe` on a mounted card,
   // and an early return before a hook crashes the render (fewer hooks).
@@ -58,16 +57,28 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
 
   // Reload on every expand so comments from others appear; spinner only the
   // first time. A failed load keeps what was shown and says so, instead of
-  // reading as an empty thread.
-  const loadComments = async () => {
+  // reading as an empty thread. `quiet` reloads follow our own writes (post,
+  // delete): they replace any load still in flight, which could predate the
+  // write, and a failure there just keeps the local list.
+  const loadComments = async ({ quiet = false } = {}) => {
     const seq = ++loadSeq.current;
-    if (comments === null) setLoading(true);
-    setLoadFailed(false);
+    if (!quiet) {
+      if (comments === null) setLoading(true);
+      setLoadFailed(false);
+    }
     const result = await getComments(post.id);
-    if (seq !== loadSeq.current) return; // a newer expand or comment won
+    if (seq !== loadSeq.current) return; // a newer load or a collapse won
     setLoading(false);
-    if (result) setComments(result);
-    else setLoadFailed(true);
+    if (result) {
+      loadedOnce.current = true;
+      setComments(result);
+      setLoadFailed(false);
+    } else if (!quiet || !loadedOnce.current) {
+      // A quiet reload only stays silent when the thread loaded before;
+      // otherwise the list holds just our own comment and must say so.
+      setLoadFailed(true);
+      AccessibilityInfo.announceForAccessibility?.("Couldn't load comments");
+    }
   };
 
   const toggleComments = () => {
@@ -84,9 +95,12 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
       setDraft('');
       const c = await addComment(post.id, text);
       if (c) {
-        loadSeq.current += 1; // drop any reload fetched before this comment
+        // Show it now; the quiet reload brings the full thread with it (a
+        // first load still in flight would otherwise be dropped).
         setLoading(false);
+        setLoadFailed(false);
         setComments((prev) => [...(prev || []), c]);
+        loadComments({ quiet: true });
       } else {
         setDraft(text); // restore the typed comment if the request failed
       }
@@ -99,6 +113,7 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
       return;
     }
     setComments((prev) => (prev || []).filter((c) => c.id !== id));
+    loadComments({ quiet: true }); // a reload from before the delete can't bring it back
     showToast('Comment deleted');
   };
 
@@ -133,10 +148,12 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
       <View style={styles.postActions}>
         <Pressable
           style={styles.actionBtn}
-          onPress={() => run('paw', onPaw)}
+          onPress={() => run('paw', async () => {
+            if ((await onPaw()) === false) showToast("Couldn't update the paw. Try again.");
+          })}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel={`${post.paws} ${post.paws === 1 ? 'paw' : 'paws'}`}
+          accessibilityLabel={`${paws} ${paws === 1 ? 'paw' : 'paws'}`}
           accessibilityHint={hasPawed ? 'Takes back your paw' : 'Gives this post a paw'}
           accessibilityState={{ selected: hasPawed, busy: isBusy('paw') }}
         >
@@ -145,7 +162,7 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
             size={19}
             color={hasPawed ? ui.accent : ui.sub}
           />
-          <Text style={[styles.actionText, hasPawed && { color: ui.accent }]}>{post.paws}</Text>
+          <Text style={[styles.actionText, hasPawed && { color: ui.accent }]}>{paws}</Text>
         </Pressable>
         <Pressable
           style={styles.actionBtn}
@@ -168,13 +185,19 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
       {expanded && (
         <View style={styles.commentsWrap}>
           {loadFailed && (
-            <Pressable onPress={loadComments} hitSlop={6} accessibilityRole="button" style={styles.loadFailedRow}>
+            <Pressable
+              onPress={() => loadComments()}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLiveRegion="polite"
+              style={styles.loadFailedRow}
+            >
               <MaterialCommunityIcons name="alert-circle-outline" size={15} color={ui.dangerText} />
               <Text style={styles.loadFailedText}>Couldn't load comments. Tap to retry.</Text>
             </Pressable>
           )}
           {loading && comments === null ? (
-            <Text style={styles.commentEmpty}>Loading…</Text>
+            <Text style={styles.commentEmpty} accessibilityLiveRegion="polite">Loading comments…</Text>
           ) : comments && comments.length === 0 ? (
             <Text style={styles.commentEmpty}>No comments yet — say something nice!</Text>
           ) : (
@@ -219,13 +242,13 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
             />
             {/* Pressable reports `disabled` to screen readers itself. */}
             <Pressable
-              style={[styles.commentSend, sendDisabled && { opacity: 0.4 }]}
+              style={[styles.commentSend, sendDisabled && { opacity: motion.disabledOpacity }]}
               onPress={submit}
               disabled={sendDisabled}
               accessibilityRole="button"
               accessibilityLabel="Send comment"
             >
-              <MaterialCommunityIcons name="send" size={15} color="#ffffff" />
+              <MaterialCommunityIcons name="send" size={15} color={ui.onAccent} />
             </Pressable>
           </View>
         </View>

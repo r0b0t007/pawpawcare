@@ -132,7 +132,7 @@ const toPost = (p) => ({
   authorId: p.author_id,
   authorName: p.author_name || 'Unknown',
   content: p.content,
-  paws: p.paw_count,
+  paws: p.paw_count ?? 0,
   pawedBy: p.pawed_by_me ? ['me'] : [],
   pawedByMe: p.pawed_by_me,
   comments: p.comment_count ?? 0,
