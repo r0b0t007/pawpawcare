@@ -5,23 +5,21 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { post } from '../../services/api';
 import { ui, type, radii, motion } from '../../theme';
-import { Card, ListRow, Button, Chip, showToast } from '../../components';
+import { Card, ListRow, Button, Chip, showToast, FormScrollView } from '../../components';
 
 // Help & support (Profile → Help & support, or Profile → Send feedback with
 // the Feedback chip preselected). Static guide rows for now plus a private
 // message form: stored on the backend and forwarded to the team's inbox,
 // never posted anywhere, and deliberately unrelated to the store rating
-// prompt (services/storeReview). The whole screen sits inside
-// KeyboardAvoidingView + ScrollView (keyboardShouldPersistTaps) so the send
-// button is never trapped behind the keyboard — a top competitor 1★ complaint.
+// prompt (services/storeReview). The whole screen sits in a FormScrollView
+// (keyboard-avoiding, taps pass through) so the send button is never trapped
+// behind the keyboard — a top competitor 1★ complaint.
 
 const GUIDES = [
   { icon: 'rocket-launch-outline', title: 'Getting started' },
@@ -146,33 +144,24 @@ export default function SupportScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.header}>
-            <Pressable
-              style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
-              onPress={() => navigation.goBack()}
-              accessibilityRole="button"
-              accessibilityLabel="Back"
-            >
-              <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-            </Pressable>
-            <Text style={styles.headerTitle} accessibilityRole="header">
-              {feedbackFirst ? 'Send feedback' : 'Help & support'}
-            </Text>
-          </View>
+      <FormScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.header}>
+          <Pressable
+            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+          >
+            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
+          </Pressable>
+          <Text style={styles.headerTitle} accessibilityRole="header">
+            {feedbackFirst ? 'Send feedback' : 'Help & support'}
+          </Text>
+        </View>
 
-          {feedbackFirst ? form : guides}
-          {feedbackFirst ? guides : form}
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {feedbackFirst ? form : guides}
+        {feedbackFirst ? guides : form}
+      </FormScrollView>
     </SafeAreaView>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet,
-  ScrollView, KeyboardAvoidingView, Platform, Image, ActivityIndicator,
+  Image, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -9,7 +9,7 @@ import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { resolveAsset } from '../../config';
 import { ui, radii, type, PET_COLOR_PAIRS } from '../../theme';
-import { Button, ConfirmDialog, showToast, ScreenHeader } from '../../components';
+import { Button, ConfirmDialog, showToast, ScreenHeader, FormScrollView } from '../../components';
 
 // Edit pet: name, type, breed, identity color and photo. Deleting the pet
 // lives here — behind a danger zone + ConfirmDialog — never on the browse path.
@@ -104,137 +104,135 @@ export default function EditPetScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Header */}
-          <ScreenHeader title={`Edit ${pet.name}`} onBack={() => navigation.goBack()} style={styles.header} />
+      <FormScrollView contentContainerStyle={styles.scroll}>
+        {/* Header */}
+        <ScreenHeader title={`Edit ${pet.name}`} onBack={() => navigation.goBack()} style={styles.header} />
 
-          {/* Photo */}
-          <View style={styles.avatarArea}>
-            <Pressable onPress={pickAvatar} disabled={uploading} style={styles.avatarTap}>
-              <View style={[styles.avatar, { backgroundColor: form.color }]}>
-                {uploading ? (
-                  <ActivityIndicator color={petFg(form.color)} />
-                ) : localPreview ? (
-                  <Image source={{ uri: localPreview }} style={styles.avatarImg} />
-                ) : form.avatarUrl ? (
-                  <Image source={{ uri: resolveAsset(form.avatarUrl) }} style={styles.avatarImg} />
-                ) : (
-                  <Text style={[styles.avatarInitial, { color: petFg(form.color) }]}>
-                    {(form.name || pet.name)[0]}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.cameraBadge}>
-                <MaterialCommunityIcons name="camera" size={14} color="#fff" />
-              </View>
-            </Pressable>
-            <Text style={styles.avatarHint}>{form.avatarUrl ? 'Tap to change photo' : 'Tap to add a photo'}</Text>
-          </View>
-
-          {/* Name */}
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Luna"
-              placeholderTextColor={ui.subtle}
-              value={form.name}
-              onChangeText={(v) => set('name', v)}
-            />
-          </View>
-
-          {/* Type */}
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Type</Text>
-            <View style={styles.chipWrap}>
-              {PET_TYPES.map((t) => {
-                const on = form.type === t.id;
-                return (
-                  <Pressable
-                    key={t.id}
-                    style={[styles.typeChip, on && styles.typeChipOn]}
-                    onPress={() => set('type', t.id)}
-                  >
-                    <MaterialCommunityIcons name={t.icon} size={16} color={on ? ui.background : ui.ink} />
-                    <Text style={[styles.typeChipText, on && { color: ui.background }]}>{t.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Breed */}
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Breed (optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Golden Retriever"
-              placeholderTextColor={ui.subtle}
-              value={form.breed}
-              onChangeText={(v) => set('breed', v)}
-            />
-          </View>
-
-          {/* Profile color */}
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Profile color</Text>
-            <View style={styles.swatchRow}>
-              {PET_COLOR_PAIRS.map((c) => {
-                const on = form.color === c.bg;
-                return (
-                  <Pressable
-                    key={c.bg}
-                    style={[styles.swatchRing, on && { borderColor: ui.accent }]}
-                    onPress={() => set('color', c.bg)}
-                  >
-                    <View style={[styles.swatch, { backgroundColor: c.bg }]}>
-                      {on && <MaterialCommunityIcons name="check" size={18} color={c.fg} />}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Preview */}
-          <View style={styles.previewCard}>
-            <View style={[styles.previewAvatar, { backgroundColor: form.color }]}>
-              {form.avatarUrl ? (
+        {/* Photo */}
+        <View style={styles.avatarArea}>
+          <Pressable onPress={pickAvatar} disabled={uploading} style={styles.avatarTap}>
+            <View style={[styles.avatar, { backgroundColor: form.color }]}>
+              {uploading ? (
+                <ActivityIndicator color={petFg(form.color)} />
+              ) : localPreview ? (
+                <Image source={{ uri: localPreview }} style={styles.avatarImg} />
+              ) : form.avatarUrl ? (
                 <Image source={{ uri: resolveAsset(form.avatarUrl) }} style={styles.avatarImg} />
               ) : (
-                <Text style={[styles.previewInitial, { color: petFg(form.color) }]}>
+                <Text style={[styles.avatarInitial, { color: petFg(form.color) }]}>
                   {(form.name || pet.name)[0]}
                 </Text>
               )}
             </View>
-            <Text style={styles.previewText}>
-              This is how <Text style={styles.previewName}>{form.name.trim() || pet.name}</Text> will appear across the app.
-            </Text>
-          </View>
+            <View style={styles.cameraBadge}>
+              <MaterialCommunityIcons name="camera" size={14} color="#fff" />
+            </View>
+          </Pressable>
+          <Text style={styles.avatarHint}>{form.avatarUrl ? 'Tap to change photo' : 'Tap to add a photo'}</Text>
+        </View>
 
-          <Button
-            label={saving ? 'Saving…' : 'Save changes'}
-            onPress={handleSave}
-            disabled={saving || uploading}
+        {/* Name */}
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Luna"
+            placeholderTextColor={ui.subtle}
+            value={form.name}
+            onChangeText={(v) => set('name', v)}
           />
+        </View>
 
-          {/* Danger zone */}
-          <View style={styles.dangerZone}>
-            <Text style={styles.dangerLabel}>Danger zone</Text>
-            <Text style={styles.dangerHint}>
-              Removing {pet.name} deletes their records for everyone they're shared with.
-            </Text>
-            <Pressable
-              style={({ pressed }) => [styles.removeBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
-              onPress={() => setConfirmRemove(true)}
-            >
-              <MaterialCommunityIcons name="delete-outline" size={17} color={ui.danger} />
-              <Text style={styles.removeBtnText}>Remove {pet.name}</Text>
-            </Pressable>
+        {/* Type */}
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Type</Text>
+          <View style={styles.chipWrap}>
+            {PET_TYPES.map((t) => {
+              const on = form.type === t.id;
+              return (
+                <Pressable
+                  key={t.id}
+                  style={[styles.typeChip, on && styles.typeChipOn]}
+                  onPress={() => set('type', t.id)}
+                >
+                  <MaterialCommunityIcons name={t.icon} size={16} color={on ? ui.background : ui.ink} />
+                  <Text style={[styles.typeChipText, on && { color: ui.background }]}>{t.label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
+
+        {/* Breed */}
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Breed (optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Golden Retriever"
+            placeholderTextColor={ui.subtle}
+            value={form.breed}
+            onChangeText={(v) => set('breed', v)}
+          />
+        </View>
+
+        {/* Profile color */}
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Profile color</Text>
+          <View style={styles.swatchRow}>
+            {PET_COLOR_PAIRS.map((c) => {
+              const on = form.color === c.bg;
+              return (
+                <Pressable
+                  key={c.bg}
+                  style={[styles.swatchRing, on && { borderColor: ui.accent }]}
+                  onPress={() => set('color', c.bg)}
+                >
+                  <View style={[styles.swatch, { backgroundColor: c.bg }]}>
+                    {on && <MaterialCommunityIcons name="check" size={18} color={c.fg} />}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Preview */}
+        <View style={styles.previewCard}>
+          <View style={[styles.previewAvatar, { backgroundColor: form.color }]}>
+            {form.avatarUrl ? (
+              <Image source={{ uri: resolveAsset(form.avatarUrl) }} style={styles.avatarImg} />
+            ) : (
+              <Text style={[styles.previewInitial, { color: petFg(form.color) }]}>
+                {(form.name || pet.name)[0]}
+              </Text>
+            )}
+          </View>
+          <Text style={styles.previewText}>
+            This is how <Text style={styles.previewName}>{form.name.trim() || pet.name}</Text> will appear across the app.
+          </Text>
+        </View>
+
+        <Button
+          label={saving ? 'Saving…' : 'Save changes'}
+          onPress={handleSave}
+          disabled={saving || uploading}
+        />
+
+        {/* Danger zone */}
+        <View style={styles.dangerZone}>
+          <Text style={styles.dangerLabel}>Danger zone</Text>
+          <Text style={styles.dangerHint}>
+            Removing {pet.name} deletes their records for everyone they're shared with.
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.removeBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
+            onPress={() => setConfirmRemove(true)}
+          >
+            <MaterialCommunityIcons name="delete-outline" size={17} color={ui.danger} />
+            <Text style={styles.removeBtnText}>Remove {pet.name}</Text>
+          </Pressable>
+        </View>
+      </FormScrollView>
 
       <ConfirmDialog
         visible={confirmRemove}

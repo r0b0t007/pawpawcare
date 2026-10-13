@@ -4,15 +4,12 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useInFlight } from '../../hooks/useInFlight';
 import { ui, type, motion, photos } from '../../theme';
-import { Button, TextField, ScreenHeader, PhotoBand, FormError } from '../../components';
+import { Button, TextField, ScreenHeader, PhotoBand, FormError, FormScrollView } from '../../components';
 import SocialAuthButtons from '../../components/SocialAuthButtons';
 
 // "Lively & Light" log in: a small photo band carries the warmth of Welcome
@@ -56,92 +53,83 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ScreenHeader onBack={() => navigation.goBack()} style={styles.header} />
+      <FormScrollView contentContainerStyle={styles.scroll}>
+        <ScreenHeader onBack={() => navigation.goBack()} style={styles.header} />
 
-          <PhotoBand source={photos.welcomeHero} height={120} />
+        <PhotoBand source={photos.welcomeHero} height={120} />
 
-          <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Welcome back</Text>
-          <Text style={styles.subtitle}>The pack missed you.</Text>
+        <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Welcome back</Text>
+        <Text style={styles.subtitle}>The pack missed you.</Text>
 
-          <View style={styles.form}>
-            <TextField
-              label="Email"
-              placeholder="you@example.com"
-              value={email}
-              onChangeText={onChange(setEmail)}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="emailAddress"
-              autoComplete="email"
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              blurOnSubmit={false}
-            />
-
-            <TextField
-              ref={passwordRef}
-              label="Password"
-              secure
-              placeholder="Your password"
-              value={password}
-              onChangeText={onChange(setPassword)}
-              textContentType="password"
-              autoComplete="password"
-              returnKeyType="go"
-              onSubmitEditing={handleLogin}
-            >
-              <View style={styles.forgotRow}>
-                <Text style={styles.pasteHint}>
-                  Paste from your password manager always works
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    if (error) clearError();
-                    navigation.navigate('ForgotPassword');
-                  }}
-                  hitSlop={HIT}
-                  accessibilityRole="link"
-                >
-                  <Text style={styles.forgotLink}>Forgot password?</Text>
-                </Pressable>
-              </View>
-            </TextField>
-          </View>
-
-          <FormError message={displayError} style={styles.formError} />
-
-          <Button
-            label={busy ? 'Logging in…' : 'Log in'}
-            onPress={handleLogin}
-            disabled={busy}
-            style={styles.submitBtn}
+        <View style={styles.form}>
+          <TextField
+            label="Email"
+            placeholder="you@example.com"
+            value={email}
+            onChangeText={onChange(setEmail)}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="emailAddress"
+            autoComplete="email"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            blurOnSubmit={false}
           />
 
-          <SocialAuthButtons />
-
-          <Pressable
-            style={({ pressed }) => [styles.switchLink, pressed && { opacity: motion.pressOpacity }]}
-            onPress={() => {
-              if (error) clearError();
-              navigation.navigate('Signup');
-            }}
-            hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
-            accessibilityRole="link"
+          <TextField
+            ref={passwordRef}
+            label="Password"
+            secure
+            placeholder="Your password"
+            value={password}
+            onChangeText={onChange(setPassword)}
+            textContentType="password"
+            autoComplete="password"
+            returnKeyType="go"
+            onSubmitEditing={handleLogin}
           >
-            <Text style={styles.switchLinkText}>New here? Create an account</Text>
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <View style={styles.forgotRow}>
+              <Text style={styles.pasteHint}>
+                Paste from your password manager always works
+              </Text>
+              <Pressable
+                onPress={() => {
+                  if (error) clearError();
+                  navigation.navigate('ForgotPassword');
+                }}
+                hitSlop={HIT}
+                accessibilityRole="link"
+              >
+                <Text style={styles.forgotLink}>Forgot password?</Text>
+              </Pressable>
+            </View>
+          </TextField>
+        </View>
+
+        <FormError message={displayError} style={styles.formError} />
+
+        <Button
+          label={busy ? 'Logging in…' : 'Log in'}
+          onPress={handleLogin}
+          disabled={busy}
+          style={styles.submitBtn}
+        />
+
+        <SocialAuthButtons />
+
+        <Pressable
+          style={({ pressed }) => [styles.switchLink, pressed && { opacity: motion.pressOpacity }]}
+          onPress={() => {
+            if (error) clearError();
+            navigation.navigate('Signup');
+          }}
+          hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
+          accessibilityRole="link"
+        >
+          <Text style={styles.switchLinkText}>New here? Create an account</Text>
+        </Pressable>
+      </FormScrollView>
     </SafeAreaView>
   );
 }

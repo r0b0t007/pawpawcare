@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, Keyboard } from 'react-native';
 import Animated, { FadeIn, FadeOut, Keyframe } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { ui, radii } from '../theme';
@@ -26,6 +26,12 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }) {
+  // Opened from a screen that still has the keyboard up (taps pass through
+  // FormScrollView): close it, or it covers the buttons and the toast after.
+  useEffect(() => {
+    if (visible) Keyboard.dismiss();
+  }, [visible]);
+
   const handleConfirm = () => {
     if (destructive) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onConfirm?.();
