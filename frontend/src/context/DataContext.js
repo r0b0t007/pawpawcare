@@ -1247,12 +1247,13 @@ export function DataProvider({ children }) {
     }
   };
 
+  // null on failure, never [] — an empty list would read as "no comments".
   const getComments = async (postId) => {
     try {
       return await get(`/community/posts/${postId}/comments`);
     } catch (err) {
       handleApiError(err);
-      return [];
+      return null;
     }
   };
 
