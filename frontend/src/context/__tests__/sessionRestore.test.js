@@ -63,9 +63,9 @@ async function launch() {
   });
 }
 
-// Run out the retry waits (1s, then 3s) with the requests in between.
+// Run out the retry wait (2s) with the requests around it.
 async function flushRetries() {
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < 3; i += 1) {
     await act(async () => {
       await jest.advanceTimersByTimeAsync(3000);
     });
@@ -102,7 +102,7 @@ describe('session restore at launch', () => {
     await launch();
     await flushRetries();
 
-    expect(get).toHaveBeenCalledTimes(3); // first try + two retries
+    expect(get).toHaveBeenCalledTimes(2); // first try + one retry
     expect(auth.user).toBeNull();
     expect(auth.isLoading).toBe(false);
     expect(auth.restoreFailed).toBe(true);

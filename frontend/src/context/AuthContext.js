@@ -20,8 +20,10 @@ const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
 const FOREGROUND_REFRESH_MS = 5 * 60 * 1000;
 
 // Restoring a saved session at launch: waits before each retry when the server
-// can't be reached, before offering "Try again".
-const RESTORE_RETRY_MS = [1000, 3000];
+// can't be reached, before offering "Try again". One retry: on Android a
+// hanging server costs ~10s per attempt (OkHttp's connect timeout), measured
+// on the emulator at ~30s of spinner with two.
+const RESTORE_RETRY_MS = [2000];
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const AuthContext = createContext(null);
