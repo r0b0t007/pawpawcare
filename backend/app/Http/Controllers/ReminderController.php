@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Pet;
 use App\Models\Reminder;
+use App\Models\Vaccination;
 use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,15 @@ class ReminderController extends Controller
     public function index(Request $request): JsonResponse
     {
         $reminders = Reminder::where('user_id', $request->user()->id)
+            // Spent vaccination reminders (fired, then the dose was given or
+            // the record deleted) are kept only for the inbox history; listing
+            // them would offer a switch that re-arms a reminder for nothing.
+            ->where(function ($q) {
+                $q->whereNull('related_type')
+                    ->orWhere('related_type', '!=', 'vaccination')
+                    ->orWhere('enabled', true)
+                    ->orWhereIn('related_id', Vaccination::select('id')->where('status', '!=', 'completed'));
+            })
             ->orderBy('next_fire_at')
             ->get();
 
