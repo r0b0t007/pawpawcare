@@ -127,15 +127,15 @@ class User extends Model implements AuthenticatableContract
     //
     // This is required, not cosmetic: Laravel's ThrottleRequests calls
     // getAuthIdentifier() on $request->user() to scope numeric rate limits
-    // (`throttle:30,1` and friends). Without it every such route 500s once
-    // authentication runs before throttling.
+    // (`throttle:30,1` and friends). Without it every such route 500s, since
+    // JwtAuth (an AuthenticatesRequests) runs before throttling.
 
     public function getAuthIdentifierName(): string
     {
         return 'id';
     }
 
-    public function getAuthIdentifier(): string
+    public function getAuthIdentifier(): ?string
     {
         return $this->id;
     }

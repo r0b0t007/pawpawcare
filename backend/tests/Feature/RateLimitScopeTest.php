@@ -94,12 +94,14 @@ class RateLimitScopeTest extends TestCase
 
     public function test_one_user_burning_the_budget_does_not_throttle_another(): void
     {
-        [$userA, $tokenA] = $this->user();
+        [, $tokenA] = $this->user();
         [, $tokenB] = $this->user();
 
-        // Exhaust A's 120/min allowance directly, rather than firing 120 real
-        // requests, so the test stays fast and deterministic.
-        RateLimiter::increment(md5('api'.'api|'.$userA->id), 60, 120);
+        // Spend A's 120/min allowance with real requests: seeding the cache key
+        // directly would tie the test to the framework's private key format.
+        for ($i = 0; $i < 120; $i++) {
+            $this->authedGet($tokenA)->assertOk();
+        }
 
         $this->authedGet($tokenA)->assertStatus(429);
         $this->authedGet($tokenB)->assertOk();
