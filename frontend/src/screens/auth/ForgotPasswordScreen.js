@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   fieldLabel: { color: ui.subtle, marginBottom: 8 },
   input: {
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: radii.control,
     borderCurve: 'continuous',
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: radii.control,
     borderCurve: 'continuous',
@@ -317,7 +317,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: ui.ink,
   },
-  inputFocused: { borderColor: ui.accent },
+  // Focus = darker AND thicker (accent vs the tan outline is only 1.9:1).
+  inputFocused: { borderColor: ui.accent, borderWidth: 2 },
   errorText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 13,

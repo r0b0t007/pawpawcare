@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   messageInput: {
     minHeight: 96,
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: 14,
     borderCurve: 'continuous',
@@ -217,7 +217,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: ui.ink,
   },
-  inputFocused: { borderColor: ui.accent },
+  // Focus = darker AND thicker (accent vs the tan outline is only 1.9:1).
+  inputFocused: { borderColor: ui.accent, borderWidth: 2 },
   caption: {
     fontFamily: 'PlusJakartaSans_400Regular',
     fontSize: 12,

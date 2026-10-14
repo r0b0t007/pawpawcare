@@ -707,7 +707,7 @@ const styles = StyleSheet.create({
   petChipLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: ui.ink },
   input: {
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: radii.control,
     paddingVertical: 13,

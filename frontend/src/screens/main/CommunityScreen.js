@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
   composerCard: { marginHorizontal: 24, marginBottom: 18, padding: 16, gap: 12 },
   composerInput: {
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: 14,
     paddingHorizontal: 14,

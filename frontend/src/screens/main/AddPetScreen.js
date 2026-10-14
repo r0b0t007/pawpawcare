@@ -358,7 +358,8 @@ export default function AddPetScreen({ navigation }) {
         <View style={[styles.field, { flex: 1 }]}>
           <Text style={styles.fieldLabel}>Unit</Text>
           <Pressable
-            style={({ pressed }) => [styles.dateBtn, { justifyContent: 'center' }, pressed && { backgroundColor: ui.pressTint }]}
+            // A button (its text identifies it), so the soft border, not the field outline.
+            style={({ pressed }) => [styles.dateBtn, { justifyContent: 'center', borderColor: ui.controlBorder }, pressed && { backgroundColor: ui.pressTint }]}
             onPress={() => set('weightUnit', form.weightUnit === 'kg' ? 'lbs' : 'kg')}
             accessibilityRole="button"
             accessibilityLabel={`Unit ${form.weightUnit}, tap to switch`}
@@ -783,7 +784,7 @@ const styles = StyleSheet.create({
   fieldLabel: { ...type.sectionLabel, color: ui.subtle, marginBottom: 8 },
   input: {
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.surface,
     borderRadius: radii.control,
     borderCurve: 'continuous',
@@ -804,7 +805,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.surface,
     borderRadius: radii.control,
     borderCurve: 'continuous',

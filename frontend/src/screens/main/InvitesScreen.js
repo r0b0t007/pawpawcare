@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   codeInput: {
     alignSelf: 'stretch',
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: radii.control,
     borderCurve: 'continuous',
@@ -293,7 +293,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: ui.ink,
   },
-  codeInputFocused: { borderColor: ui.accent },
+  // Focus = darker AND thicker (accent vs the tan outline is only 1.9:1).
+  codeInputFocused: { borderColor: ui.accent, borderWidth: 2 },
   errorText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 13,
