@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
   messageInput: {
     minHeight: 96,
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: 14,
     borderCurve: 'continuous',

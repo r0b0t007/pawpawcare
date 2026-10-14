@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
   fieldLabel: { ...type.sectionLabel, color: ui.subtle, marginBottom: 8 },
   input: {
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.surface,
     borderRadius: radii.control,
     padding: 14,

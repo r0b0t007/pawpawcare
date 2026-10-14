@@ -16,13 +16,14 @@ export const ui = {
   accentTint: '#ffddb8',
   danger: '#ba1a1a', // overdue, destructive confirm
   dangerTint: '#ffdad6',
-  warn: '#d4a000', // due soon
+  warn: '#b08500', // due soon (3:1 on light surfaces, WCAG non-text)
   warnTint: '#fff3d0',
   success: '#1a6b3a', // all good
   successTint: '#e6f4ea',
-  ringOk: '#7cbf8e',
+  ringOk: '#4c9b61', // 3:1 on light surfaces, WCAG non-text
   // Interactive neutrals
-  controlBorder: '#e3d5c2', // chip / ghost-button outline
+  controlBorder: '#e3d5c2', // chip / ghost-button outline (their label identifies them)
+  inputBorder: '#ad8550', // text-field outline: the only thing marking a field, so 3:1 (WCAG 1.4.11)
   track: '#f3ead9', // segmented track, dialog cancel button
   faint: '#cbb897', // chevrons, dashed add-outline (decorative only: 1.9:1)
   placeholder: '#8a6f4d', // input placeholder text (= subtle, 4.5:1 on background)

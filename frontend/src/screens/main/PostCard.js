@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
   commentInput: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: 999,
     paddingHorizontal: 14,

@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   codeInput: {
     alignSelf: 'stretch',
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: radii.control,
     borderCurve: 'continuous',

@@ -1919,7 +1919,7 @@ const styles = StyleSheet.create({
   // Sheet form bits
   input: {
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: radii.control,
     paddingVertical: 13,
@@ -1946,7 +1946,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: radii.control,
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },

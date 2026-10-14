@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   formLabel: { ...type.sectionLabel, color: ui.subtle },
   input: {
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: radii.control,
     padding: 14,
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     borderWidth: 1.5,
-    borderColor: ui.controlBorder,
+    borderColor: ui.inputBorder,
     backgroundColor: ui.background,
     borderRadius: radii.control,
     padding: 14,

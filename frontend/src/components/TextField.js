@@ -39,7 +39,7 @@ const TextField = forwardRef(function TextField(
           alignItems: 'center',
           gap: 8,
           borderWidth: 1.5,
-          borderColor: focused ? ui.accent : ui.controlBorder,
+          borderColor: focused ? ui.accent : ui.inputBorder,
           backgroundColor: ui.surface,
           borderRadius: radii.md,
           borderCurve: 'continuous',
