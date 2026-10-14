@@ -19,7 +19,8 @@ export default function DeleteButton({ label, onPress, size = 17, style }) {
         style,
       ]}
     >
-      <MaterialCommunityIcons name="trash-can-outline" size={size} color={ui.faint} />
+      {/* subtle, not faint: an icon that does something needs 3:1 contrast. */}
+      <MaterialCommunityIcons name="trash-can-outline" size={size} color={ui.subtle} />
     </Pressable>
   );
 }

@@ -8,7 +8,11 @@ import { EASE_IN_OUT } from './motion';
 // Tint track + white raised thumb. `segments` is [{ value, label }].
 // The thumb is one absolutely-positioned childless pill that slides between
 // segments (measured via onLayout) — the sanctioned width animation.
-export default function SegmentedControl({ segments, value, onChange, style }) {
+// `role`: 'tabs' (default) when segments switch views, 'radio' when they pick
+// one value (e.g. the paywall's Annual/Monthly plan) — screen readers announce
+// a tab list or a radio group accordingly.
+export default function SegmentedControl({ segments, value, onChange, style, role = 'tabs' }) {
+  const radio = role === 'radio';
   const [layouts, setLayouts] = useState({});
   const x = useSharedValue(0);
   const w = useSharedValue(0);
@@ -37,6 +41,7 @@ export default function SegmentedControl({ segments, value, onChange, style }) {
 
   return (
     <View
+      accessibilityRole={radio ? 'radiogroup' : 'tablist'}
       style={[
         {
           flexDirection: 'row',
@@ -68,6 +73,8 @@ export default function SegmentedControl({ segments, value, onChange, style }) {
         return (
           <Pressable
             key={seg.value}
+            accessibilityRole={radio ? 'radio' : 'tab'}
+            accessibilityState={radio ? { checked: on } : { selected: on }}
             onLayout={(e) => {
               const { x: lx, width } = e.nativeEvent.layout;
               setLayouts((prev) =>
@@ -91,7 +98,8 @@ export default function SegmentedControl({ segments, value, onChange, style }) {
               style={{
                 fontFamily: 'PlusJakartaSans_700Bold',
                 fontSize: 13,
-                color: on ? ui.ink : ui.subtle,
+                // sub, not subtle: unselected labels sit on the track (AA).
+                color: on ? ui.ink : ui.sub,
               }}
             >
               {seg.label}

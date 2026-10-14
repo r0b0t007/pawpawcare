@@ -265,11 +265,11 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
             <View style={styles.iosSheet}>
               <View style={styles.iosHandle} />
               <View style={styles.iosHeader}>
-                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={hit}>
+                <Pressable accessibilityRole="button" onPress={() => setShowDatePicker(false)} hitSlop={hit}>
                   <Text style={styles.iosCancel}>Cancel</Text>
                 </Pressable>
                 <Text style={styles.iosTitle}>Due date</Text>
-                <Pressable onPress={() => setShowDatePicker(false)} hitSlop={hit}>
+                <Pressable accessibilityRole="button" onPress={() => setShowDatePicker(false)} hitSlop={hit}>
                   <Text style={styles.iosDone}>Done</Text>
                 </Pressable>
               </View>

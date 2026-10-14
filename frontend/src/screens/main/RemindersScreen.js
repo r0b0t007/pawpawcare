@@ -93,11 +93,11 @@ export default function RemindersScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="e.g. Give Rex his heartworm pill"
-            placeholderTextColor={ui.subtle}
+            placeholderTextColor={ui.placeholder}
             value={title}
             onChangeText={setTitle}
           />
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={({ pressed }) => [styles.whenRow, pressed && { backgroundColor: ui.surface }]}
             onPress={() => setShowDate(true)}
           >

@@ -71,7 +71,7 @@ function VerifyEmailCard({ email, onVerified }) {
         <TextInput
           style={[styles.codeInput, focused && styles.codeInputFocused]}
           placeholder="000000"
-          placeholderTextColor={ui.faint}
+          placeholderTextColor={ui.placeholder}
           value={code}
           onChangeText={(v) => { setCode(v.replace(/\D/g, '')); if (error) setError(null); }}
           keyboardType="number-pad"
@@ -93,7 +93,7 @@ function VerifyEmailCard({ email, onVerified }) {
         style={styles.verifyBtn}
       />
       {step === 'code' && (
-        <Pressable onPress={send} disabled={busy} style={styles.resendLink}>
+        <Pressable accessibilityRole="button" onPress={send} disabled={busy} style={styles.resendLink}>
           <Text style={styles.resendLinkText}>Send a new code</Text>
         </Pressable>
       )}
@@ -152,6 +152,8 @@ export default function InvitesScreen({ navigation }) {
           style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: ui.background }]}
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
         >
           <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
         </Pressable>

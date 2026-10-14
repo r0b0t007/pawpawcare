@@ -223,7 +223,7 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
                       // A deleted author's name comes back empty.
                       accessibilityLabel={c.author_name ? `Delete ${c.author_name}'s comment` : 'Delete this comment'}
                     >
-                      <MaterialCommunityIcons name="close" size={14} color={ui.faint} />
+                      <MaterialCommunityIcons name="close" size={14} color={ui.subtle} />
                     </Pressable>
                   )}
                 </View>
@@ -234,7 +234,7 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
             <TextInput
               style={styles.commentInput}
               placeholder="Add a comment…"
-              placeholderTextColor={ui.subtle}
+              placeholderTextColor={ui.placeholder}
               accessibilityLabel="Add a comment"
               value={draft}
               onChangeText={setDraft}

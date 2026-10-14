@@ -100,6 +100,8 @@ export default function ForgotPasswordScreen({ navigation }) {
         <Pressable
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
           onPress={handleBack}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
         >
           <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
         </Pressable>
@@ -117,7 +119,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                 <TextInput
                   style={[styles.input, focused === 'email' && styles.inputFocused]}
                   placeholder="you@example.com"
-                  placeholderTextColor={ui.faint}
+                  placeholderTextColor={ui.placeholder}
                   value={email}
                   onChangeText={onChange(setEmail)}
                   keyboardType="email-address"
@@ -162,7 +164,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                     focused === 'code' && styles.inputFocused,
                   ]}
                   placeholder="123456"
-                  placeholderTextColor={ui.faint}
+                  placeholderTextColor={ui.placeholder}
                   value={code}
                   onChangeText={onChange(setCode)}
                   keyboardType="number-pad"
@@ -180,7 +182,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                   <TextInput
                     style={styles.inputInner}
                     placeholder="At least 8 characters"
-                    placeholderTextColor={ui.faint}
+                    placeholderTextColor={ui.placeholder}
                     value={password}
                     onChangeText={onChange(setPassword)}
                     secureTextEntry={!showPwd}
@@ -192,11 +194,13 @@ export default function ForgotPasswordScreen({ navigation }) {
                   <Pressable
                     onPress={() => setShowPwd(!showPwd)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={showPwd ? 'Hide password' : 'Show password'}
                   >
                     <MaterialCommunityIcons
                       name={showPwd ? 'eye-off-outline' : 'eye-outline'}
                       size={20}
-                      color={ui.faint}
+                      color={ui.subtle}
                     />
                   </Pressable>
                 </View>
@@ -207,7 +211,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                 <TextInput
                   style={[styles.input, focused === 'confirm' && styles.inputFocused]}
                   placeholder="Same password again"
-                  placeholderTextColor={ui.faint}
+                  placeholderTextColor={ui.placeholder}
                   value={confirm}
                   onChangeText={onChange(setConfirm)}
                   secureTextEntry={!showPwd}
@@ -228,7 +232,7 @@ export default function ForgotPasswordScreen({ navigation }) {
               style={styles.submitBtn}
             />
 
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={({ pressed }) => [styles.resendLink, pressed && { opacity: motion.pressOpacity }]}
               onPress={() => sendCode({ again: true })}
               disabled={sending}

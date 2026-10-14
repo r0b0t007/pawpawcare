@@ -125,6 +125,8 @@ export default function ModerationScreen({ navigation }) {
           <Pressable
             style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
             onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
           >
             <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
           </Pressable>

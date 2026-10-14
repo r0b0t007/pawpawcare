@@ -48,7 +48,7 @@ const TextField = forwardRef(function TextField(
       >
         <TextInput
           ref={ref}
-          placeholderTextColor={ui.faint}
+          placeholderTextColor={ui.placeholder}
           {...inputProps}
           secureTextEntry={secure && !shown}
           accessibilityLabel={accessibilityLabel ?? label}

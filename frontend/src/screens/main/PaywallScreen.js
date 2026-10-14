@@ -228,6 +228,7 @@ export default function PaywallScreen({ navigation, route }) {
       <View style={styles.purchase}>
         {choices.length > 1 && (
           <SegmentedControl
+            role="radio"
             segments={choices.map((p) => ({ value: p.packageType, label: p.packageType === 'ANNUAL' ? 'Annual' : 'Monthly' }))}
             value={selected.packageType}
             onChange={(value) => {

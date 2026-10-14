@@ -29,7 +29,7 @@ function Rule({ met, label }) {
         accessibilityElementsHidden
         name={met ? 'check-circle' : 'checkbox-blank-circle-outline'}
         size={15}
-        color={met ? ui.success : ui.faint}
+        color={met ? ui.success : ui.subtle}
       />
       <Text style={[styles.ruleText, met && { color: ui.success }]}>{label}</Text>
     </View>

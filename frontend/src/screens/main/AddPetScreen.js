@@ -227,7 +227,7 @@ export default function AddPetScreen({ navigation }) {
       <TextInput
         style={[styles.input, styles.nameInput, nameFocused && styles.inputFocused]}
         placeholder="e.g. Luna"
-        placeholderTextColor={ui.subtle}
+        placeholderTextColor={ui.placeholder}
         value={form.name}
         onChangeText={(v) => set('name', v)}
         onFocus={() => setNameFocused(true)}
@@ -261,7 +261,7 @@ export default function AddPetScreen({ navigation }) {
         <TextInput
           style={[styles.input, suggestions.length > 0 && { marginTop: 10 }]}
           placeholder={suggestions.length ? 'Or type a breed' : 'e.g. Holland Lop'}
-          placeholderTextColor={ui.subtle}
+          placeholderTextColor={ui.placeholder}
           value={form.breed}
           onChangeText={(v) => set('breed', v)}
           accessibilityLabel="Breed"
@@ -283,7 +283,7 @@ export default function AddPetScreen({ navigation }) {
               onPress={() => set('color', c.bg)}
               accessibilityRole="radio"
               accessibilityState={{ checked: on }}
-              accessibilityLabel={`Color ${i + 1}`}
+              accessibilityLabel={`${c.name} profile color`}
             >
               <View style={[styles.swatch, { backgroundColor: c.bg }]}>
                 {on && <MaterialCommunityIcons name="check" size={18} color={c.fg} />}
@@ -303,7 +303,7 @@ export default function AddPetScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="2"
-            placeholderTextColor={ui.subtle}
+            placeholderTextColor={ui.placeholder}
             value={form.age}
             onChangeText={(v) => set('age', v)}
             keyboardType="number-pad"
@@ -348,7 +348,7 @@ export default function AddPetScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="e.g. 28"
-            placeholderTextColor={ui.subtle}
+            placeholderTextColor={ui.placeholder}
             value={form.weight}
             onChangeText={(v) => set('weight', v)}
             keyboardType="decimal-pad"
@@ -643,11 +643,11 @@ export default function AddPetScreen({ navigation }) {
             <View style={styles.iosPickerSheet}>
               <View style={styles.sheetHandle} />
               <View style={styles.iosPickerHeader}>
-                <Pressable onPress={() => setDatePickerField(null)} hitSlop={HIT}>
+                <Pressable accessibilityRole="button" onPress={() => setDatePickerField(null)} hitSlop={HIT}>
                   <Text style={styles.iosPickerCancel}>Cancel</Text>
                 </Pressable>
                 <Text style={styles.iosPickerTitle}>{datePickerField === 'adoptedOn' ? 'Gotcha day' : 'Birthday'}</Text>
-                <Pressable onPress={() => setDatePickerField(null)} hitSlop={HIT}>
+                <Pressable accessibilityRole="button" onPress={() => setDatePickerField(null)} hitSlop={HIT}>
                   <Text style={styles.iosPickerDone}>Done</Text>
                 </Pressable>
               </View>

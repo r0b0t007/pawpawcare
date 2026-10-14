@@ -129,7 +129,7 @@ export default function SupportScreen({ navigation, route }) {
         <TextInput
           style={[styles.messageInput, focused && styles.inputFocused]}
           placeholder={placeholder}
-          placeholderTextColor={ui.faint}
+          placeholderTextColor={ui.placeholder}
           accessibilityLabel="Your message"
           value={message}
           onChangeText={setMessage}

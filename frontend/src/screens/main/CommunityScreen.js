@@ -219,7 +219,7 @@ export default function CommunityScreen({ navigation }) {
                 <TextInput
                   style={styles.composerInput}
                   placeholder="What's your pack up to?"
-                  placeholderTextColor={ui.subtle}
+                  placeholderTextColor={ui.placeholder}
                   accessibilityLabel="New post"
                   value={draft}
                   onChangeText={setDraft}
