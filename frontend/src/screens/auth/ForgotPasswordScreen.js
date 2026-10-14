@@ -9,8 +9,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { post } from '../../services/api';
-import { ui, type, radii, motion } from '../../theme';
-import { Button, showToast, FormScrollView } from '../../components';
+import { ui, type, radii, motion, photos } from '../../theme';
+import { Button, showToast, FormScrollView, ScreenHeader, PhotoBand } from '../../components';
 
 // Code-based password reset. Step 1 asks for the email; step 2 confirms a
 // 6-digit code was sent and collects code + new password. The backend always
@@ -97,14 +97,9 @@ export default function ForgotPasswordScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
-        <Pressable
-          style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
-          onPress={handleBack}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-        </Pressable>
+        <ScreenHeader onBack={handleBack} style={styles.header} />
+
+        <PhotoBand source={photos.emptyBlanket} height={120} />
 
         {step === 'email' ? (
           <>
@@ -250,18 +245,9 @@ export default function ForgotPasswordScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  header: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 16 }, // as on Log in
   safe: { flex: 1, backgroundColor: ui.background },
-  scroll: { flexGrow: 1, paddingTop: 12, paddingHorizontal: 28, paddingBottom: 40 },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  scroll: { flexGrow: 1, paddingTop: 12, paddingHorizontal: 24, paddingBottom: 40 },
   iconWrap: {
     width: 60,
     height: 60,
@@ -271,7 +257,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 26,
   },
-  title: { color: ui.ink, marginTop: 26, marginBottom: 6 },
+  title: { color: ui.ink, marginTop: 22, marginBottom: 6 },
   subtitle: {
     fontFamily: 'PlusJakartaSans_400Regular',
     fontSize: 14,

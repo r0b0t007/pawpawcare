@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { ui, type, radii, motion } from '../../theme';
-import { Button, ConfirmDialog, showToast, FormScrollView } from '../../components';
+import { Button, ConfirmDialog, showToast, FormScrollView, ScreenHeader } from '../../components';
 import { isRenewingStoreSubscription, storeName } from '../../utils/subscription';
 
 // Account details (Profile → Edit). PATCH /users/me only accepts name / bio /
@@ -55,17 +55,7 @@ export default function AccountDetailsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Account details</Text>
-        </View>
+        <ScreenHeader title="Account details" onBack={() => navigation.goBack()} style={styles.header} />
 
         <View style={styles.avatarWrap}>
           <View style={styles.avatar}>
@@ -141,25 +131,9 @@ export default function AccountDetailsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  header: { paddingHorizontal: 0, paddingTop: 0 }, // the scroll already pads; ScreenHeader adds the rest
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingTop: 12, paddingHorizontal: 24, paddingBottom: 32 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 26 },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 22,
-    letterSpacing: -0.3,
-    color: ui.ink,
-  },
   avatarWrap: { alignItems: 'center', marginBottom: 26 },
   avatar: {
     width: 84,

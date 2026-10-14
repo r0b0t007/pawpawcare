@@ -1,17 +1,12 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  Platform,
+  View, Text, TextInput, StyleSheet, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+
 import { post } from '../../services/api';
-import { ui, type, radii, motion } from '../../theme';
-import { Card, ListRow, Button, Chip, showToast, FormScrollView } from '../../components';
+import { ui, type } from '../../theme';
+import { Card, ListRow, Button, Chip, showToast, FormScrollView, ScreenHeader } from '../../components';
 
 // Help & feedback (Profile → Help & feedback; other screens can preselect a
 // category with the `category` param). A private message form first, then
@@ -152,19 +147,7 @@ export default function SupportScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle} accessibilityRole="header">
-            Help & feedback
-          </Text>
-        </View>
+        <ScreenHeader title="Help & feedback" onBack={() => navigation.goBack()} style={styles.header} />
 
         {form}
         {guides}
@@ -174,31 +157,9 @@ export default function SupportScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
+  header: { paddingTop: 0 }, // the scroll already pads; ScreenHeader adds the rest
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingTop: 12, paddingBottom: 32 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 24,
-    marginBottom: 26,
-  },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 22,
-    letterSpacing: -0.3,
-    color: ui.ink,
-  },
   sectionLabel: { color: ui.subtle, marginHorizontal: 24, marginBottom: 8 },
   sectionCard: { marginHorizontal: 24, marginBottom: 22 },
   contactCard: { marginHorizontal: 24, marginBottom: 22, padding: 18, gap: 14 },

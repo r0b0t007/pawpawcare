@@ -1,20 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Image,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
+  View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { get, post, del } from '../../services/api';
 import { resolveAsset } from '../../config';
-import { ui, type, radii, motion } from '../../theme';
-import { Card, Button, ConfirmDialog, showToast } from '../../components';
+import { ui, type, radii } from '../../theme';
+import { Card, Button, ConfirmDialog, showToast, ScreenHeader } from '../../components';
 
 // Admin-only review queue (Profile → Moderation). Lists every community post
 // with open reports — including ones auto-hidden from the feed at 3+ reports —
@@ -121,17 +114,7 @@ export default function ModerationScreen({ navigation }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />
         }
       >
-        <View style={styles.header}>
-          <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Moderation</Text>
-        </View>
+        <ScreenHeader title="Moderation" onBack={() => navigation.goBack()} style={styles.header} />
 
         {loading ? (
           <ActivityIndicator size="large" color={ui.accent} style={styles.spinner} />
@@ -221,31 +204,9 @@ export default function ModerationScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  header: { paddingTop: 0 }, // the scroll already pads; ScreenHeader adds the rest
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingTop: 12, paddingBottom: 32 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 24,
-    marginBottom: 26,
-  },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 22,
-    letterSpacing: -0.3,
-    color: ui.ink,
-  },
   spinner: { marginTop: 64 },
   empty: { alignItems: 'center', paddingTop: 72, paddingHorizontal: 40 },
   emptyIcon: {
