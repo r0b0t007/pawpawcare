@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
-import { View, Text, ScrollView, Pressable, Linking, StyleSheet } from 'react-native';
+import { Text, ScrollView, Linking, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+
 import { usePlan, useRestore } from '../../hooks/useSubscription';
 import { getManagementUrl } from '../../services/purchases';
 import {
@@ -12,8 +12,8 @@ import {
   restoreOutcome,
   storeName,
 } from '../../utils/subscription';
-import { ui, type, radii, motion } from '../../theme';
-import { Card, ListRow, StatusPill, Button, showToast } from '../../components';
+import { ui, type } from '../../theme';
+import { Card, ListRow, StatusPill, Button, showToast, ScreenHeader } from '../../components';
 
 // Profile → Subscription. The plan comes from the server (/users/me); billing
 // itself lives in the user's App Store / Google Play account, so managing or
@@ -48,17 +48,7 @@ export default function SubscriptionScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Pressable
-            style={({ pressed }) => [styles.backBtn, pressed && { opacity: motion.pressOpacity }]}
-            onPress={() => navigation.goBack()}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-          </Pressable>
-          <Text style={[type.headerTitle, styles.ink]}>Subscription</Text>
-        </View>
+        <ScreenHeader title="Subscription" onBack={() => navigation.goBack()} style={styles.header} />
 
         <Card style={styles.planCard}>
           <Text style={[type.cardTitle, styles.ink]}>{planTitle(plan, included)}</Text>
@@ -115,19 +105,9 @@ export default function SubscriptionScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  header: { paddingTop: 0 }, // the scroll already pads; ScreenHeader adds the rest
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingTop: 12, paddingBottom: 32 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 24, marginBottom: 26 },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: radii.full,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   ink: { color: ui.ink },
   sub: { color: ui.sub },
   planCard: { marginHorizontal: 24, marginBottom: 22, padding: 18, gap: 12 },

@@ -6,8 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { ui, type, radii } from '../../theme';
-import { Card, Button, ConfirmDialog, showToast, FormScrollView } from '../../components';
+import { ui, type, radii, photos } from '../../theme';
+import { Card, Button, ConfirmDialog, showToast, FormScrollView, ScreenHeader, EmptyState } from '../../components';
 
 // Invites are addressed by email, and signup never proves the address — so
 // the server hides them until the account confirms it with an emailed code.
@@ -147,18 +147,7 @@ export default function InvitesScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.topRow}>
-        <Pressable
-          style={({ pressed }) => [styles.backBtn, pressed && { backgroundColor: ui.background }]}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-        >
-          <MaterialCommunityIcons name="arrow-left" size={19} color={ui.ink} />
-        </Pressable>
-        <Text style={styles.title} numberOfLines={1}>Invitations</Text>
-      </View>
+      <ScreenHeader title="Invitations" onBack={() => navigation.goBack()} />
 
       <FormScrollView
         contentContainerStyle={styles.scroll}
@@ -167,13 +156,12 @@ export default function InvitesScreen({ navigation }) {
         {needsVerification ? (
           <VerifyEmailCard email={user.email} onVerified={() => refreshInvites()} />
         ) : invites.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <MaterialCommunityIcons name="email-heart-outline" size={34} color={ui.accent} />
-            </View>
-            <Text style={styles.emptyTitle}>No pending invitations</Text>
-            <Text style={styles.emptySub}>When someone shares a pet with you, the invite will appear here.</Text>
-          </View>
+          <EmptyState
+            compact
+            photo={photos.emptyKitten}
+            title="No pending invitations"
+            body="When someone shares a pet with you, the invite will appear here."
+          />
         ) : (
           invites.map((inv) => (
             <Card key={inv.id} style={styles.inviteCard}>
@@ -231,25 +219,6 @@ export default function InvitesScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 16,
-  },
-  backBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ui.surface,
-    borderWidth: 1,
-    borderColor: ui.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: { ...type.screenTitle, flex: 1, color: ui.ink },
   scroll: { paddingHorizontal: 24, paddingBottom: 32, gap: 12 },
   inviteCard: { padding: 16, gap: 14 },
   inviteBody: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
@@ -265,7 +234,6 @@ const styles = StyleSheet.create({
   bold: { fontFamily: 'PlusJakartaSans_700Bold', color: ui.ink },
   inviteSub: { ...type.secondary, color: ui.subtle, marginTop: 2 },
   inviteActions: { flexDirection: 'row', gap: 10 },
-  empty: { alignItems: 'center', paddingTop: 56, gap: 10 },
   emptyIcon: {
     width: 76,
     height: 76,
