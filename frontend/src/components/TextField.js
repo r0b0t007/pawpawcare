@@ -38,7 +38,9 @@ const TextField = forwardRef(function TextField(
           flexDirection: 'row',
           alignItems: 'center',
           gap: 8,
-          borderWidth: 1.5,
+          // Focus thickens the border as well as darkening it: the accent is
+          // only 1.9:1 against the resting tan, so color alone barely shows.
+          borderWidth: focused ? 2 : 1.5,
           borderColor: focused ? ui.accent : ui.inputBorder,
           backgroundColor: ui.surface,
           borderRadius: radii.md,

@@ -20,7 +20,7 @@ export const ui = {
   warnTint: '#fff3d0',
   success: '#1a6b3a', // all good
   successTint: '#e6f4ea',
-  ringOk: '#4c9b61', // 3:1 on light surfaces, WCAG non-text
+  ringOk: '#49945d', // 3:1 on light surfaces and the progress track, WCAG non-text
   // Interactive neutrals
   controlBorder: '#e3d5c2', // chip / ghost-button outline (their label identifies them)
   inputBorder: '#ad8550', // text-field outline: the only thing marking a field, so 3:1 (WCAG 1.4.11)

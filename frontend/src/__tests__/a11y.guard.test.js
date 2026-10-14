@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 import { ui, PET_COLOR_PAIRS } from '../theme';
+import { contrast } from '../test-utils/contrast';
 
 const SRC = path.join(__dirname, '..');
 
@@ -92,16 +93,6 @@ test('no subtle text on the track background', () => {
   expect(offenders).toEqual([]);
 });
 
-function luminance(hex) {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-function contrast(a, b) {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
-
 // The text/background pairs the app actually renders (small text: 4.5:1).
 const USED_TEXT_PAIRS = [
   ['ink', 'background'], ['ink', 'surface'], ['ink', 'track'],
@@ -122,4 +113,20 @@ test('the text pairs the app uses meet WCAG AA (4.5:1)', () => {
 
   const petFailing = PET_COLOR_PAIRS.filter((p) => contrast(p.fg, p.bg) < 4.5).map((p) => p.name);
   expect(petFailing).toEqual([]);
+});
+
+// Non-text colors (WCAG 1.4.11: 3:1) against the backgrounds each is drawn
+// on: field outlines on cards and screens, the "all good" green on cards
+// and as the dose progress-bar fill on its track, due-soon on cards.
+const USED_NON_TEXT_PAIRS = [
+  ['inputBorder', 'background'], ['inputBorder', 'surface'],
+  ['ringOk', 'background'], ['ringOk', 'surface'], ['ringOk', 'track'],
+  ['warn', 'background'], ['warn', 'surface'],
+];
+
+test('field outlines and status colors reach 3:1 where they are drawn', () => {
+  const failing = USED_NON_TEXT_PAIRS
+    .map(([fg, bg]) => ({ pair: `${fg} on ${bg}`, ratio: Number(contrast(ui[fg], ui[bg]).toFixed(2)) }))
+    .filter(({ ratio }) => ratio < 3);
+  expect(failing).toEqual([]);
 });

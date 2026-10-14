@@ -1946,7 +1946,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: radii.control,
     borderWidth: 1.5,
-    borderColor: ui.inputBorder,
+    borderColor: ui.controlBorder, // a label, not a field: no field outline
     alignItems: 'center',
     justifyContent: 'center',
   },
