@@ -81,7 +81,7 @@ export default function AccountDetailsScreen({ navigation }) {
               value={name}
               onChangeText={setName}
               placeholder="Your name"
-              placeholderTextColor={ui.subtle}
+              placeholderTextColor={ui.placeholder}
               autoCapitalize="words"
               autoCorrect={false}
               textContentType="name"

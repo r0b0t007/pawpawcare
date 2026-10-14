@@ -110,7 +110,14 @@ export default function EditPetScreen({ navigation, route }) {
 
         {/* Photo */}
         <View style={styles.avatarArea}>
-          <Pressable accessibilityRole="button" onPress={pickAvatar} disabled={uploading} style={styles.avatarTap}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={uploading ? 'Uploading photo' : `Change ${pet.name}'s photo`}
+            accessibilityState={{ busy: uploading }}
+            onPress={pickAvatar}
+            disabled={uploading}
+            style={styles.avatarTap}
+          >
             <View style={[styles.avatar, { backgroundColor: form.color }]}>
               {uploading ? (
                 <ActivityIndicator color={petFg(form.color)} />
@@ -137,7 +144,7 @@ export default function EditPetScreen({ navigation, route }) {
           <TextInput
             style={styles.input}
             placeholder="e.g. Luna"
-            placeholderTextColor={ui.subtle}
+            placeholderTextColor={ui.placeholder}
             value={form.name}
             onChangeText={(v) => set('name', v)}
           />
@@ -171,7 +178,7 @@ export default function EditPetScreen({ navigation, route }) {
           <TextInput
             style={styles.input}
             placeholder="e.g. Golden Retriever"
-            placeholderTextColor={ui.subtle}
+            placeholderTextColor={ui.placeholder}
             value={form.breed}
             onChangeText={(v) => set('breed', v)}
           />

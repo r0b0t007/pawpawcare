@@ -528,7 +528,7 @@ export default function HealthHubScreen({ navigation }) {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Rabies booster"
-                placeholderTextColor={ui.subtle}
+                placeholderTextColor={ui.placeholder}
                 value={recName}
                 onChangeText={setRecName}
               />

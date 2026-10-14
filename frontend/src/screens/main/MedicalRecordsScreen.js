@@ -860,7 +860,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
           {sel.vaccinations.length > 0 && <ExGroup icon="needle" label="Vaccinations" />}
           {sel.vaccinations.map((v, i) => (
             <PickRow key={`vax-${i}`} label={`Include vaccine ${v.name || i + 1}`} included={v.included} onToggle={() => setVax(i, { included: !v.included })}>
-              <TextInput style={styles.exInput} value={v.name} placeholder="Vaccine name" placeholderTextColor={ui.subtle} onChangeText={(t) => setVax(i, { name: t })} />
+              <TextInput style={styles.exInput} value={v.name} placeholder="Vaccine name" placeholderTextColor={ui.placeholder} onChangeText={(t) => setVax(i, { name: t })} />
               <View style={styles.exDates}>
                 <ExDate label="Given" value={v.administered} onChange={(t) => setVax(i, { administered: t })} />
                 <ExDate label="Next due" value={v.due} onChange={(t) => setVax(i, { due: t })} />
@@ -871,9 +871,9 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
           {sel.medications.length > 0 && <ExGroup icon="pill" label="Medications" />}
           {sel.medications.map((m, i) => (
             <PickRow key={`med-${i}`} label={`Include medication ${m.name || i + 1}`} included={m.included} onToggle={() => setMed(i, { included: !m.included })}>
-              <TextInput style={styles.exInput} value={m.name} placeholder="Medication name" placeholderTextColor={ui.subtle} onChangeText={(t) => setMed(i, { name: t })} />
+              <TextInput style={styles.exInput} value={m.name} placeholder="Medication name" placeholderTextColor={ui.placeholder} onChangeText={(t) => setMed(i, { name: t })} />
               <View style={styles.exDates}>
-                <TextInput style={[styles.exInput, { flex: 1 }]} value={m.dosage} placeholder="Dosage" placeholderTextColor={ui.subtle} onChangeText={(t) => setMed(i, { dosage: t })} />
+                <TextInput style={[styles.exInput, { flex: 1 }]} value={m.dosage} placeholder="Dosage" placeholderTextColor={ui.placeholder} onChangeText={(t) => setMed(i, { dosage: t })} />
                 {!!m.frequency && <Text style={styles.exHint}>{m.frequency.replace('_', ' ')}</Text>}
               </View>
             </PickRow>
@@ -908,7 +908,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
             <>
               <ExGroup icon="hospital-building" label="Clinic" />
               <PickRow label="Include clinic" included={sel.clinic.included} onToggle={() => setSel({ ...sel, clinic: { ...sel.clinic, included: !sel.clinic.included } })}>
-                <TextInput style={styles.exInput} value={sel.clinic.name} placeholder="Clinic name" placeholderTextColor={ui.subtle} onChangeText={(t) => setSel({ ...sel, clinic: { ...sel.clinic, name: t } })} />
+                <TextInput style={styles.exInput} value={sel.clinic.name} placeholder="Clinic name" placeholderTextColor={ui.placeholder} onChangeText={(t) => setSel({ ...sel, clinic: { ...sel.clinic, name: t } })} />
               </PickRow>
             </>
           )}
@@ -958,7 +958,7 @@ function ExGroup({ icon, label }) {
 // off the fields beside it.
 function PickRow({ included, onToggle, label, children }) {
   return (
-    <View style={[styles.exRow, !included && { opacity: 0.45 }]}>
+    <View style={styles.exRow}>
       <Pressable
         onPress={onToggle}
         hitSlop={hit}
@@ -973,7 +973,9 @@ function PickRow({ included, onToggle, label, children }) {
           color={included ? ui.accent : ui.subtle}
         />
       </Pressable>
-      <View style={{ flex: 1, gap: 6 }}>{children}</View>
+      {/* Only the fields fade when excluded: a faded checkbox would drop
+          below 3:1 and hide the very control that brings them back. */}
+      <View style={[{ flex: 1, gap: 6 }, !included && { opacity: 0.45 }]}>{children}</View>
     </View>
   );
 }
@@ -986,7 +988,7 @@ function ExDate({ label, value, onChange }) {
         style={[styles.exInput, styles.exDateInput]}
         value={value}
         placeholder="YYYY-MM-DD"
-        placeholderTextColor={ui.subtle}
+        placeholderTextColor={ui.placeholder}
         onChangeText={onChange}
         autoCapitalize="none"
         accessibilityLabel={label}

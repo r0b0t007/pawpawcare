@@ -93,7 +93,7 @@ export default function RemindersScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="e.g. Give Rex his heartworm pill"
-            placeholderTextColor={ui.subtle}
+            placeholderTextColor={ui.placeholder}
             value={title}
             onChangeText={setTitle}
           />

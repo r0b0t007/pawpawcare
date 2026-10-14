@@ -24,7 +24,8 @@ export const ui = {
   // Interactive neutrals
   controlBorder: '#e3d5c2', // chip / ghost-button outline
   track: '#f3ead9', // segmented track, dialog cancel button
-  faint: '#cbb897', // chevrons, dashed add-outline
+  faint: '#cbb897', // chevrons, dashed add-outline (decorative only: 1.9:1)
+  placeholder: '#8a6f4d', // input placeholder text (= subtle, 4.5:1 on background)
   dangerText: '#93000a', // text on dangerTint
   warnText: '#7a5c00', // text on warnTint
   pressTint: '#fffdf8', // row pressed-state background

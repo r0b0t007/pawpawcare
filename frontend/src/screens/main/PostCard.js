@@ -234,7 +234,7 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
             <TextInput
               style={styles.commentInput}
               placeholder="Add a comment…"
-              placeholderTextColor={ui.subtle}
+              placeholderTextColor={ui.placeholder}
               accessibilityLabel="Add a comment"
               value={draft}
               onChangeText={setDraft}

@@ -71,7 +71,7 @@ function VerifyEmailCard({ email, onVerified }) {
         <TextInput
           style={[styles.codeInput, focused && styles.codeInputFocused]}
           placeholder="000000"
-          placeholderTextColor={ui.subtle}
+          placeholderTextColor={ui.placeholder}
           value={code}
           onChangeText={(v) => { setCode(v.replace(/\D/g, '')); if (error) setError(null); }}
           keyboardType="number-pad"

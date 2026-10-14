@@ -133,7 +133,7 @@ export default function LostPetsScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="e.g. Marina Park, near the fountain"
-              placeholderTextColor={ui.subtle}
+              placeholderTextColor={ui.placeholder}
               value={lastSeen}
               onChangeText={setLastSeen}
             />
@@ -144,7 +144,7 @@ export default function LostPetsScreen({ navigation }) {
             <TextInput
               style={[styles.input, styles.inputMultiline]}
               placeholder="Collar color, temperament, responds to…"
-              placeholderTextColor={ui.subtle}
+              placeholderTextColor={ui.placeholder}
               value={note}
               onChangeText={setNote}
               multiline
@@ -156,7 +156,7 @@ export default function LostPetsScreen({ navigation }) {
             <TextInput
               style={styles.input}
               placeholder="So helpers can reach you"
-              placeholderTextColor={ui.subtle}
+              placeholderTextColor={ui.placeholder}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"

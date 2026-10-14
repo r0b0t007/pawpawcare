@@ -119,7 +119,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                 <TextInput
                   style={[styles.input, focused === 'email' && styles.inputFocused]}
                   placeholder="you@example.com"
-                  placeholderTextColor={ui.subtle}
+                  placeholderTextColor={ui.placeholder}
                   value={email}
                   onChangeText={onChange(setEmail)}
                   keyboardType="email-address"
@@ -164,7 +164,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                     focused === 'code' && styles.inputFocused,
                   ]}
                   placeholder="123456"
-                  placeholderTextColor={ui.subtle}
+                  placeholderTextColor={ui.placeholder}
                   value={code}
                   onChangeText={onChange(setCode)}
                   keyboardType="number-pad"
@@ -182,7 +182,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                   <TextInput
                     style={styles.inputInner}
                     placeholder="At least 8 characters"
-                    placeholderTextColor={ui.subtle}
+                    placeholderTextColor={ui.placeholder}
                     value={password}
                     onChangeText={onChange(setPassword)}
                     secureTextEntry={!showPwd}
@@ -211,7 +211,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                 <TextInput
                   style={[styles.input, focused === 'confirm' && styles.inputFocused]}
                   placeholder="Same password again"
-                  placeholderTextColor={ui.subtle}
+                  placeholderTextColor={ui.placeholder}
                   value={confirm}
                   onChangeText={onChange(setConfirm)}
                   secureTextEntry={!showPwd}
