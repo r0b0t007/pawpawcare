@@ -97,7 +97,7 @@ export default function RemindersScreen({ navigation }) {
             value={title}
             onChangeText={setTitle}
           />
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={({ pressed }) => [styles.whenRow, pressed && { backgroundColor: ui.surface }]}
             onPress={() => setShowDate(true)}
           >

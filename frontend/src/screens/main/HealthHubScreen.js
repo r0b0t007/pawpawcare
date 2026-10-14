@@ -320,8 +320,9 @@ export default function HealthHubScreen({ navigation }) {
                 // Honest state: local scheduling is off, so no notification
                 // will fire — never fake reassurance.
                 <View style={[styles.deliveryPill, { backgroundColor: ui.track }]}>
-                  <MaterialCommunityIcons name="bell-off-outline" size={11} color={ui.subtle} />
-                  <Text style={[styles.deliveryPillText, { color: ui.subtle }]}>
+                  {/* sub, not subtle: subtle on track is under 4.5:1 */}
+                  <MaterialCommunityIcons name="bell-off-outline" size={11} color={ui.sub} />
+                  <Text style={[styles.deliveryPillText, { color: ui.sub }]}>
                     Notifications off
                   </Text>
                 </View>
@@ -532,7 +533,7 @@ export default function HealthHubScreen({ navigation }) {
                 onChangeText={setRecName}
               />
             </View>
-            <Pressable style={styles.dateRow} onPress={() => setShowDatePicker(true)}>
+            <Pressable accessibilityRole="button" style={styles.dateRow} onPress={() => setShowDatePicker(true)}>
               <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={ui.accent} />
               <Text style={styles.dateText}>
                 Due {recDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}

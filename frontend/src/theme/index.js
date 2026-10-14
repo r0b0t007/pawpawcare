@@ -128,12 +128,13 @@ export const radii = {
 
 // Pet identity colors — tint that pet's cards, avatar ring and header, never
 // UI chrome or actions. fg is the paired text/icon color (AA on bg).
+// `name` is what a screen reader says for a color swatch.
 export const PET_COLOR_PAIRS = [
-  { bg: '#ffddb8', fg: '#8a5300' },
-  { bg: '#c5e7ff', fg: '#004c6a' },
-  { bg: '#d0f0c0', fg: '#1a6b3a' },
-  { bg: '#ffd6e7', fg: '#96375c' },
-  { bg: '#e9e2f4', fg: '#5c4a82' },
+  { bg: '#ffddb8', fg: '#8a5300', name: 'Peach' },
+  { bg: '#c5e7ff', fg: '#004c6a', name: 'Sky blue' },
+  { bg: '#d0f0c0', fg: '#1a6b3a', name: 'Mint' },
+  { bg: '#ffd6e7', fg: '#96375c', name: 'Pink' },
+  { bg: '#e9e2f4', fg: '#5c4a82', name: 'Lavender' },
 ];
 
 // The pair for a pet's stored color (falls back to peach for legacy colors).

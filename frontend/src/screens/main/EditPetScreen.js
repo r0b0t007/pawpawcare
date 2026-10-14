@@ -110,7 +110,7 @@ export default function EditPetScreen({ navigation, route }) {
 
         {/* Photo */}
         <View style={styles.avatarArea}>
-          <Pressable onPress={pickAvatar} disabled={uploading} style={styles.avatarTap}>
+          <Pressable accessibilityRole="button" onPress={pickAvatar} disabled={uploading} style={styles.avatarTap}>
             <View style={[styles.avatar, { backgroundColor: form.color }]}>
               {uploading ? (
                 <ActivityIndicator color={petFg(form.color)} />
@@ -154,6 +154,8 @@ export default function EditPetScreen({ navigation, route }) {
                   key={t.id}
                   style={[styles.typeChip, on && styles.typeChipOn]}
                   onPress={() => set('type', t.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: on }}
                 >
                   <MaterialCommunityIcons name={t.icon} size={16} color={on ? ui.background : ui.ink} />
                   <Text style={[styles.typeChipText, on && { color: ui.background }]}>{t.label}</Text>
@@ -186,6 +188,9 @@ export default function EditPetScreen({ navigation, route }) {
                   key={c.bg}
                   style={[styles.swatchRing, on && { borderColor: ui.accent }]}
                   onPress={() => set('color', c.bg)}
+                  accessibilityRole="radio"
+                  accessibilityLabel={`${c.name} profile color`}
+                  accessibilityState={{ checked: on }}
                 >
                   <View style={[styles.swatch, { backgroundColor: c.bg }]}>
                     {on && <MaterialCommunityIcons name="check" size={18} color={c.fg} />}
@@ -224,7 +229,7 @@ export default function EditPetScreen({ navigation, route }) {
           <Text style={styles.dangerHint}>
             Removing {pet.name} deletes their records for everyone they're shared with.
           </Text>
-          <Pressable
+          <Pressable accessibilityRole="button"
             style={({ pressed }) => [styles.removeBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
             onPress={() => setConfirmRemove(true)}
           >

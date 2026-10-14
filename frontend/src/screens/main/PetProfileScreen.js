@@ -486,7 +486,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const renderOverview = () => (
     <View>
       {activeReport && (
-        <Pressable style={({ pressed }) => [styles.lostBanner, pressed && { backgroundColor: ui.dangerPressTint }]} onPress={handleMarkFound}>
+        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.lostBanner, pressed && { backgroundColor: ui.dangerPressTint }]} onPress={handleMarkFound}>
           <MaterialCommunityIcons name="map-marker-alert" size={20} color={ui.danger} />
           <View style={{ flex: 1 }}>
             <Text style={styles.lostTitle}>{pet.name} is reported lost</Text>
@@ -639,8 +639,13 @@ export default function PetProfileScreen({ navigation, route }) {
                 <View key={w.id} style={[styles.weightRow, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
                   <Text style={styles.weightRowVal}>{w.value.toFixed(1)} {wUnit}</Text>
                   <Text style={styles.weightRowDate}>{fullDate(w.loggedAt)}</Text>
-                  <Pressable onPress={() => handleDeleteWeight(w)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <MaterialCommunityIcons name="close" size={16} color={ui.faint} />
+                  <Pressable
+                    onPress={() => handleDeleteWeight(w)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete weight from ${fullDate(w.loggedAt)}`}
+                  >
+                    <MaterialCommunityIcons name="close" size={16} color={ui.subtle} />
                   </Pressable>
                 </View>
               ))}
@@ -719,8 +724,13 @@ export default function PetProfileScreen({ navigation, route }) {
                 <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>{fullDate(e.incurredOn)}</Text>
               </View>
               <Text style={styles.expenseAmount}>{Number(e.amount).toFixed(2)}</Text>
-              <Pressable onPress={() => handleDeleteExpense(e)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <MaterialCommunityIcons name="close" size={15} color={ui.faint} />
+              <Pressable
+                onPress={() => handleDeleteExpense(e)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Delete ${m.label} expense from ${fullDate(e.incurredOn)}`}
+              >
+                <MaterialCommunityIcons name="close" size={15} color={ui.subtle} />
               </Pressable>
             </View>
           );
@@ -988,8 +998,13 @@ export default function PetProfileScreen({ navigation, route }) {
               <View key={food.id} style={styles.foodChip}>
                 <MaterialCommunityIcons name="food-drumstick-outline" size={13} color={ui.accent} />
                 <Text style={styles.foodChipText}>{food.name}</Text>
-                <Pressable onPress={() => handleRemoveFood(food)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                  <MaterialCommunityIcons name="close" size={13} color={ui.faint} />
+                <Pressable
+                  onPress={() => handleRemoveFood(food)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${food.name}`}
+                >
+                  <MaterialCommunityIcons name="close" size={13} color={ui.subtle} />
                 </Pressable>
               </View>
             ))}
@@ -1003,7 +1018,13 @@ export default function PetProfileScreen({ navigation, route }) {
             value={newFood}
             onChangeText={setNewFood}
           />
-          <Pressable style={styles.inlineAddBtn} onPress={handleAddFood} disabled={isBusy('food')}>
+          <Pressable
+            style={styles.inlineAddBtn}
+            onPress={handleAddFood}
+            disabled={isBusy('food')}
+            accessibilityRole="button"
+            accessibilityLabel="Add food"
+          >
             <MaterialCommunityIcons name="plus" size={20} color={ui.onAccent} />
           </Pressable>
         </View>
@@ -1195,8 +1216,13 @@ export default function PetProfileScreen({ navigation, route }) {
               <Text style={[type.secondary, { color: ui.sub }]}>{m.email}</Text>
             </View>
             {isOwner ? (
-              <Pressable onPress={() => handleRemoveMember(m)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <MaterialCommunityIcons name="close" size={18} color={ui.faint} />
+              <Pressable
+                onPress={() => handleRemoveMember(m)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${m.name || m.email} from the care team`}
+              >
+                <MaterialCommunityIcons name="close" size={18} color={ui.subtle} />
               </Pressable>
             ) : (
               <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>Co-owner</Text></View>
@@ -1212,8 +1238,13 @@ export default function PetProfileScreen({ navigation, route }) {
               <Text style={[type.rowTitle, { color: ui.ink }]}>{inv.email}</Text>
               <Text style={[type.secondary, { color: ui.sub }]}>Invitation pending</Text>
             </View>
-            <Pressable onPress={() => handleCancelInvite(inv)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <MaterialCommunityIcons name="close" size={18} color={ui.faint} />
+            <Pressable
+              onPress={() => handleCancelInvite(inv)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Cancel the invite to ${inv.email}`}
+            >
+              <MaterialCommunityIcons name="close" size={18} color={ui.subtle} />
             </Pressable>
           </View>
         ))}
@@ -1245,7 +1276,7 @@ export default function PetProfileScreen({ navigation, route }) {
             <Text style={styles.sheetHint}>
               Shared with you{share?.owner ? ` by ${share.owner.name}` : ''}. You can view and update {pet.name}'s records.
             </Text>
-            <Pressable
+            <Pressable accessibilityRole="button"
               style={({ pressed }) => [styles.dangerOutlineBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
               onPress={handleLeave}
             >
@@ -1346,8 +1377,13 @@ function MedicationRow({ med, pair, streakLabel, onLog, onDelete }) {
         )}
       </View>
       <Button pill small label="Log" onPress={onLog} />
-      <Pressable onPress={onDelete} hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}>
-        <MaterialCommunityIcons name="close" size={16} color={ui.faint} />
+      <Pressable
+        onPress={onDelete}
+        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+        accessibilityRole="button"
+        accessibilityLabel={`Delete ${med.name}`}
+      >
+        <MaterialCommunityIcons name="close" size={16} color={ui.subtle} />
       </Pressable>
     </View>
   );
@@ -1381,7 +1417,7 @@ function IconChip({ icon, pair }) {
 // Dashed "add" row at the bottom of a card.
 function AddRow({ label, onPress }) {
   return (
-    <Pressable style={({ pressed }) => [styles.addRow, pressed && { backgroundColor: ui.pressTint }]} onPress={onPress}>
+    <Pressable accessibilityRole="button" style={({ pressed }) => [styles.addRow, pressed && { backgroundColor: ui.pressTint }]} onPress={onPress}>
       <MaterialCommunityIcons name="plus" size={17} color={ui.accent} />
       <Text style={styles.addRowText}>{label}</Text>
     </Pressable>
@@ -1473,7 +1509,7 @@ function VetShareSheet({ visible, petName, onClose, onCreate, onRevoke }) {
         </>
       )}
 
-      <Pressable style={styles.revokeBtn} onPress={() => setConfirmRevoke(true)} disabled={busy}>
+      <Pressable accessibilityRole="button" style={styles.revokeBtn} onPress={() => setConfirmRevoke(true)} disabled={busy}>
         <MaterialCommunityIcons name="link-off" size={15} color={ui.danger} />
         <Text style={styles.revokeText}>Revoke all active links</Text>
       </Pressable>
@@ -1654,7 +1690,7 @@ function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
               />
             </View>
           )}
-          <Pressable style={styles.revokeBtn} onPress={() => setConfirmRevoke(true)} disabled={busy}>
+          <Pressable accessibilityRole="button" style={styles.revokeBtn} onPress={() => setConfirmRevoke(true)} disabled={busy}>
             <MaterialCommunityIcons name="link-off" size={15} color={ui.danger} />
             <Text style={styles.revokeText}>Revoke all active links</Text>
           </Pressable>
@@ -1938,7 +1974,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
   },
-  roleBadgeText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: ui.subtle },
+  roleBadgeText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, color: ui.sub }, // sub: AA on track
   linkBox: {
     flexDirection: 'row',
     alignItems: 'center',

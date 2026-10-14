@@ -643,11 +643,11 @@ export default function AddPetScreen({ navigation }) {
             <View style={styles.iosPickerSheet}>
               <View style={styles.sheetHandle} />
               <View style={styles.iosPickerHeader}>
-                <Pressable onPress={() => setDatePickerField(null)} hitSlop={HIT}>
+                <Pressable accessibilityRole="button" onPress={() => setDatePickerField(null)} hitSlop={HIT}>
                   <Text style={styles.iosPickerCancel}>Cancel</Text>
                 </Pressable>
                 <Text style={styles.iosPickerTitle}>{datePickerField === 'adoptedOn' ? 'Gotcha day' : 'Birthday'}</Text>
-                <Pressable onPress={() => setDatePickerField(null)} hitSlop={HIT}>
+                <Pressable accessibilityRole="button" onPress={() => setDatePickerField(null)} hitSlop={HIT}>
                   <Text style={styles.iosPickerDone}>Done</Text>
                 </Pressable>
               </View>

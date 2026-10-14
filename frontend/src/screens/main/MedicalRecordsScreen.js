@@ -859,7 +859,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
         <>
           {sel.vaccinations.length > 0 && <ExGroup icon="needle" label="Vaccinations" />}
           {sel.vaccinations.map((v, i) => (
-            <PickRow key={`vax-${i}`} included={v.included} onToggle={() => setVax(i, { included: !v.included })}>
+            <PickRow key={`vax-${i}`} label={`Include vaccine ${v.name || i + 1}`} included={v.included} onToggle={() => setVax(i, { included: !v.included })}>
               <TextInput style={styles.exInput} value={v.name} placeholder="Vaccine name" placeholderTextColor={ui.subtle} onChangeText={(t) => setVax(i, { name: t })} />
               <View style={styles.exDates}>
                 <ExDate label="Given" value={v.administered} onChange={(t) => setVax(i, { administered: t })} />
@@ -870,7 +870,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
 
           {sel.medications.length > 0 && <ExGroup icon="pill" label="Medications" />}
           {sel.medications.map((m, i) => (
-            <PickRow key={`med-${i}`} included={m.included} onToggle={() => setMed(i, { included: !m.included })}>
+            <PickRow key={`med-${i}`} label={`Include medication ${m.name || i + 1}`} included={m.included} onToggle={() => setMed(i, { included: !m.included })}>
               <TextInput style={styles.exInput} value={m.name} placeholder="Medication name" placeholderTextColor={ui.subtle} onChangeText={(t) => setMed(i, { name: t })} />
               <View style={styles.exDates}>
                 <TextInput style={[styles.exInput, { flex: 1 }]} value={m.dosage} placeholder="Dosage" placeholderTextColor={ui.subtle} onChangeText={(t) => setMed(i, { dosage: t })} />
@@ -882,7 +882,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
           {sel.weight && (
             <>
               <ExGroup icon="scale-bathroom" label="Weight" />
-              <PickRow included={sel.weight.included} onToggle={() => setSel({ ...sel, weight: { ...sel.weight, included: !sel.weight.included } })}>
+              <PickRow label="Include weight" included={sel.weight.included} onToggle={() => setSel({ ...sel, weight: { ...sel.weight, included: !sel.weight.included } })}>
                 <View style={styles.exDates}>
                   <TextInput style={[styles.exInput, { flex: 1 }]} value={sel.weight.value} keyboardType="decimal-pad" onChangeText={(t) => setSel({ ...sel, weight: { ...sel.weight, value: t } })} />
                   <Text style={styles.exHint}>{sel.weight.unit}</Text>
@@ -895,7 +895,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
           {sel.expense && (
             <>
               <ExGroup icon="cash" label="Expense" />
-              <PickRow included={sel.expense.included} onToggle={() => setSel({ ...sel, expense: { ...sel.expense, included: !sel.expense.included } })}>
+              <PickRow label="Include expense" included={sel.expense.included} onToggle={() => setSel({ ...sel, expense: { ...sel.expense, included: !sel.expense.included } })}>
                 <View style={styles.exDates}>
                   <TextInput style={[styles.exInput, { flex: 1 }]} value={sel.expense.amount} keyboardType="decimal-pad" onChangeText={(t) => setSel({ ...sel, expense: { ...sel.expense, amount: t } })} />
                   <ExDate label="On" value={sel.expense.date} onChange={(t) => setSel({ ...sel, expense: { ...sel.expense, date: t } })} />
@@ -907,7 +907,7 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
           {sel.clinic && (
             <>
               <ExGroup icon="hospital-building" label="Clinic" />
-              <PickRow included={sel.clinic.included} onToggle={() => setSel({ ...sel, clinic: { ...sel.clinic, included: !sel.clinic.included } })}>
+              <PickRow label="Include clinic" included={sel.clinic.included} onToggle={() => setSel({ ...sel, clinic: { ...sel.clinic, included: !sel.clinic.included } })}>
                 <TextInput style={styles.exInput} value={sel.clinic.name} placeholder="Clinic name" placeholderTextColor={ui.subtle} onChangeText={(t) => setSel({ ...sel, clinic: { ...sel.clinic, name: t } })} />
               </PickRow>
             </>
@@ -916,12 +916,12 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
       )}
 
       {!!ex.suggested_title && (
-        <PickRow included={sel.setTitle} onToggle={() => setSel({ ...sel, setTitle: !sel.setTitle })}>
+        <PickRow label={`Rename document to ${ex.suggested_title}`} included={sel.setTitle} onToggle={() => setSel({ ...sel, setTitle: !sel.setTitle })}>
           <Text style={styles.exToggleText} numberOfLines={2}>Rename document to “{ex.suggested_title}”</Text>
         </PickRow>
       )}
       {!!ex.document_type && ex.document_type !== 'other' && (
-        <PickRow included={sel.setCategory} onToggle={() => setSel({ ...sel, setCategory: !sel.setCategory })}>
+        <PickRow label={`Set category to ${docMeta(ex.document_type).label}`} included={sel.setCategory} onToggle={() => setSel({ ...sel, setCategory: !sel.setCategory })}>
           <Text style={styles.exToggleText}>Set category to {docMeta(ex.document_type).label}</Text>
         </PickRow>
       )}
@@ -954,7 +954,9 @@ function ExGroup({ icon, label }) {
   );
 }
 
-function PickRow({ included, onToggle, children }) {
+// `label` names what the checkbox includes; screen readers can't read it
+// off the fields beside it.
+function PickRow({ included, onToggle, label, children }) {
   return (
     <View style={[styles.exRow, !included && { opacity: 0.45 }]}>
       <Pressable
@@ -962,12 +964,13 @@ function PickRow({ included, onToggle, children }) {
         hitSlop={hit}
         style={styles.exCheck}
         accessibilityRole="checkbox"
+        accessibilityLabel={label}
         accessibilityState={{ checked: !!included }}
       >
         <MaterialCommunityIcons
           name={included ? 'checkbox-marked-circle' : 'checkbox-blank-circle-outline'}
           size={22}
-          color={included ? ui.accent : ui.faint}
+          color={included ? ui.accent : ui.subtle}
         />
       </Pressable>
       <View style={{ flex: 1, gap: 6 }}>{children}</View>

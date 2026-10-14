@@ -183,7 +183,12 @@ export default function Sheet({ visible, onClose, title, children, style }) {
             backdropStyle,
           ]}
         >
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          />
         </Animated.View>
         <Animated.View
           onLayout={onSheetLayout}

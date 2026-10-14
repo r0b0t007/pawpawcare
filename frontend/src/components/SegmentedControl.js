@@ -68,6 +68,8 @@ export default function SegmentedControl({ segments, value, onChange, style }) {
         return (
           <Pressable
             key={seg.value}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
             onLayout={(e) => {
               const { x: lx, width } = e.nativeEvent.layout;
               setLayouts((prev) =>
@@ -91,7 +93,8 @@ export default function SegmentedControl({ segments, value, onChange, style }) {
               style={{
                 fontFamily: 'PlusJakartaSans_700Bold',
                 fontSize: 13,
-                color: on ? ui.ink : ui.subtle,
+                // sub, not subtle: unselected labels sit on the track (AA).
+                color: on ? ui.ink : ui.sub,
               }}
             >
               {seg.label}
