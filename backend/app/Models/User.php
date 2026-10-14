@@ -6,13 +6,14 @@ use App\Casts\UploadUrl;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\Subscriptions\Entitlements;
 use App\Support\Uploads;
+use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class User extends Model
+class User extends Model implements AuthenticatableContract
 {
     use HasUuids;
 
@@ -116,6 +117,56 @@ class User extends Model
     {
         return $this->email_verified_at !== null;
     }
+
+    // ── Authenticatable ──────────────────────────────────────────────────────
+    //
+    // Implemented by hand rather than via the Authenticatable trait, because
+    // that trait assumes a `password` column and a `remember_token` column,
+    // and this schema has `hashed_password` and neither remembers nor uses
+    // Laravel's session guards (auth is the stateless JwtAuth middleware).
+    //
+    // This is required, not cosmetic: Laravel's ThrottleRequests calls
+    // getAuthIdentifier() on $request->user() to scope numeric rate limits
+    // (`throttle:30,1` and friends). Without it every such route 500s once
+    // authentication runs before throttling.
+
+    public function getAuthIdentifierName(): string
+    {
+        return 'id';
+    }
+
+    public function getAuthIdentifier(): string
+    {
+        return $this->id;
+    }
+
+    public function getAuthPasswordName(): string
+    {
+        return 'hashed_password';
+    }
+
+    public function getAuthPassword(): string
+    {
+        return (string) $this->hashed_password;
+    }
+
+    /** Stateless JWT auth: there is no remember-me token and no column for one. */
+    public function getRememberToken(): ?string
+    {
+        return null;
+    }
+
+    public function setRememberToken($value): void
+    {
+        // no-op
+    }
+
+    public function getRememberTokenName(): ?string
+    {
+        return null;
+    }
+
+    // ── Relations ────────────────────────────────────────────────────────────
 
     public function pets(): HasMany
     {

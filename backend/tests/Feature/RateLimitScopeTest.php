@@ -1,0 +1,184 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Pet;
+use App\Models\User;
+use App\Services\JwtService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Tests\TestCase;
+
+/**
+ * Regression guard for the rate limiter being scoped per USER, not per IP.
+ *
+ * Laravel sorts each route's pipeline by the middleware priority list.
+ * ThrottleRequests is on that list and `auth.jwt` is not, so without the
+ * prependToPriorityList() call in bootstrap/app.php the throttle middleware
+ * runs BEFORE authentication, sees a null $request->user(), and falls back to
+ * keying by $request->ip().
+ *
+ * That is invisible in normal use and catastrophic behind CGNAT: every mobile
+ * user sharing a carrier egress IP shares one 120/min budget and 429s the rest.
+ *
+ * These tests all drive real HTTP requests, because the bug lives in middleware
+ * ORDERING — asserting on the limiter closure in isolation passes either way.
+ */
+class RateLimitScopeTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /** @return array{0: User, 1: string} */
+    private function user(): array
+    {
+        $u = User::create([
+            'name' => 'U',
+            'email' => 'u'.uniqid().'@example.com',
+            'hashed_password' => Hash::make('secret123'),
+        ]);
+
+        return [$u, JwtService::createAccessToken($u->id)];
+    }
+
+    private function pet(User $owner): Pet
+    {
+        return Pet::create([
+            'owner_id' => $owner->id,
+            'name' => 'Luna',
+            'type' => 'cat',
+            'weight_unit' => 'kg',
+        ]);
+    }
+
+    private function authedGet(string $token, string $uri = '/users/me')
+    {
+        return $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+            'Accept' => 'application/json',
+        ])->getJson($uri);
+    }
+
+    private function authedPost(string $token, string $uri, array $body = [])
+    {
+        return $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+            'Accept' => 'application/json',
+        ])->postJson($uri, $body);
+    }
+
+    public function test_throttle_api_buckets_are_per_user_not_per_ip(): void
+    {
+        [, $tokenA] = $this->user();
+        [, $tokenB] = $this->user();
+
+        // Same source IP for both (the test client always is), so if the limiter
+        // keyed by IP these would share one bucket and Remaining would keep
+        // falling instead of resetting for the second user.
+        $first = $this->authedGet($tokenA);
+        $first->assertOk();
+        $remainingAfterA = (int) $first->headers->get('X-RateLimit-Remaining');
+
+        $second = $this->authedGet($tokenB);
+        $second->assertOk();
+        $remainingAfterB = (int) $second->headers->get('X-RateLimit-Remaining');
+
+        $this->assertSame(
+            $remainingAfterA,
+            $remainingAfterB,
+            'A second user on the same IP must start from its own full budget. '
+            .'Equal remaining counts mean per-user buckets; a decrement means the '
+            .'limiter fell back to keying by IP (middleware priority regression).'
+        );
+    }
+
+    public function test_one_user_burning_the_budget_does_not_throttle_another(): void
+    {
+        [$userA, $tokenA] = $this->user();
+        [, $tokenB] = $this->user();
+
+        // Exhaust A's 120/min allowance directly, rather than firing 120 real
+        // requests, so the test stays fast and deterministic.
+        RateLimiter::increment(md5('api'.'api|'.$userA->id), 60, 120);
+
+        $this->authedGet($tokenA)->assertStatus(429);
+        $this->authedGet($tokenB)->assertOk();
+    }
+
+    public function test_numeric_route_throttles_are_also_per_user(): void
+    {
+        // The numeric throttles (`throttle:20,1,share-link:` and friends) key off
+        // Laravel's internal resolveRequestSignature(), a different code path to
+        // the named limiters above, but one that reads $request->user() just the
+        // same. It must be a genuinely numeric-throttled route: /notifications
+        // carries only `throttle:api`, which would silently re-test the named
+        // limiter instead.
+        [$userA, $tokenA] = $this->user();
+        [$userB, $tokenB] = $this->user();
+
+        $a = $this->authedPost($tokenA, '/pets/'.$this->pet($userA)->id.'/share-link');
+        $a->assertOk();
+
+        $b = $this->authedPost($tokenB, '/pets/'.$this->pet($userB)->id.'/share-link');
+        $b->assertOk();
+
+        $this->assertSame(20, (int) $a->headers->get('X-RateLimit-Limit'), 'expected the share-link limit, not throttle:api');
+        $this->assertSame(
+            (int) $a->headers->get('X-RateLimit-Remaining'),
+            (int) $b->headers->get('X-RateLimit-Remaining'),
+        );
+    }
+
+    public function test_each_numeric_throttle_has_its_own_budget(): void
+    {
+        // resolveRequestSignature() has no route component, so without a distinct
+        // $prefix per route every numeric throttle shares one counter per user.
+        // That is not just a shared budget: RateLimiter::increment() sets the TTL
+        // with cache->add(), so whichever route creates the key also decides the
+        // window — an upload (1 min) would turn account deletion's 5-per-60-min
+        // into 5 per minute.
+        [$user, $token] = $this->user();
+        $pet = $this->pet($user);
+
+        $this->authedPost($token, '/pets/'.$pet->id.'/share-link')->assertOk();
+        $this->authedPost($token, '/pets/'.$pet->id.'/share-link')->assertOk();
+
+        $delete = $this->withHeaders([
+            'Authorization' => 'Bearer '.$token,
+            'Accept' => 'application/json',
+        ])->deleteJson('/users/me');
+
+        $delete->assertOk();
+        $this->assertSame(5, (int) $delete->headers->get('X-RateLimit-Limit'));
+        $this->assertSame(
+            4,
+            (int) $delete->headers->get('X-RateLimit-Remaining'),
+            'Account deletion must start from its own 5/hour budget. A lower number '
+            .'means the two share-link calls drained it, i.e. the throttle prefixes '
+            .'in routes/api.php were lost.'
+        );
+    }
+
+    public function test_public_routes_still_throttle_by_ip(): void
+    {
+        // Unauthenticated traffic has no user to key by, so the IP fallback is
+        // correct and must keep working — it is what buckets anonymous floods.
+        //
+        // Note what this deliberately does NOT claim: since authentication now
+        // runs before throttling, invalid-token requests to AUTHENTICATED routes
+        // are rejected with 401 without consuming any budget. See the ordering
+        // trade-off in bootstrap/app.php.
+        $key = 'auth:'.sha1('|127.0.0.1');
+
+        $this->assertSame(0, RateLimiter::attempts($key));
+
+        $this->postJson('/auth/login', ['email' => 'nobody@example.com', 'password' => 'wrong'])
+            ->assertStatus(401);
+
+        $this->assertSame(
+            1,
+            RateLimiter::attempts($key),
+            'A public auth request should increment the IP-keyed `auth:` bucket.'
+        );
+    }
+}

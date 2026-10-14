@@ -39,21 +39,21 @@ Route::get('/health', HealthController::class);
 // The URL is minted only for users with pet access via /pets/{pet}/documents/{id}/url
 // and expires within minutes, so a leaked link can't grant lasting access.
 Route::get('/documents/{document}/raw', [DocumentController::class, 'raw'])
-    ->middleware(['signed', 'throttle:60,1'])
+    ->middleware(['signed', 'throttle:60,1,doc-raw:'])
     ->name('documents.raw');
 
 // ── Vet share page (no JWT — same signed-URL trust model as documents.raw) ────
 // A read-only medical summary a vet opens in a browser. Minted only by users
 // with pet access via POST /pets/{pet}/share-link, expiring in hours/days.
 Route::get('/share/{pet}', [PetShareController::class, 'show'])
-    ->middleware(['signed', 'throttle:60,1'])
+    ->middleware(['signed', 'throttle:60,1,pet-share:'])
     ->name('pets.share');
 
 // ── Caretaker page (no JWT — signed-URL trust model, independent care_token) ──
 // A read-only sitter handoff: care notes, feeding, active meds, emergency
 // contact. Minted via POST /pets/{pet}/care-link, expiring in days.
 Route::get('/care/{pet}', [CareController::class, 'page'])
-    ->middleware(['signed', 'throttle:60,1'])
+    ->middleware(['signed', 'throttle:60,1,care-page:'])
     ->name('pets.care');
 
 // ── Auth (public, rate-limited to blunt brute-force) ─────────────────────────
@@ -62,9 +62,9 @@ Route::get('/care/{pet}', [CareController::class, 'page'])
 // delivers from a small pool, so it's generous; unauthenticated requests are
 // rejected before any database work.
 Route::post('/webhooks/revenuecat', [RevenueCatWebhookController::class, 'handle'])
-    ->middleware('throttle:600,1');
+    ->middleware('throttle:600,1,rc-webhook:');
 
-Route::middleware('throttle:20,1')->group(function () {
+Route::middleware('throttle:20,1,auth:')->group(function () {
     Route::post('/auth/signup', [AuthController::class, 'signup']);
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('/auth/google', [AuthController::class, 'google']);
@@ -86,15 +86,15 @@ Route::post('/auth/reset-password', [AuthController::class, 'resetPassword'])
 // backstops every route; the tighter per-route limiters below stack on top.
 Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
     // Uploads (images)
-    Route::post('/uploads', [UploadController::class, 'store'])->middleware('throttle:30,1');
+    Route::post('/uploads', [UploadController::class, 'store'])->middleware('throttle:30,1,upload:');
 
     // Users
     Route::get('/users/me', [UserController::class, 'me']);
     Route::patch('/users/me', [UserController::class, 'update']);
     // GDPR deletion: disables now, purges after the 30-day grace period.
-    Route::delete('/users/me', [UserController::class, 'destroy'])->middleware('throttle:5,60');
+    Route::delete('/users/me', [UserController::class, 'destroy'])->middleware('throttle:5,60,acct-delete:');
     // After a purchase / restore: re-read the caller's plan from RevenueCat.
-    Route::post('/users/me/subscription/sync', [SubscriptionController::class, 'sync'])->middleware('throttle:10,1');
+    Route::post('/users/me/subscription/sync', [SubscriptionController::class, 'sync'])->middleware('throttle:10,1,sub-sync:');
 
     // Email ownership (emailed 6-digit code). Required before pet invites —
     // which are addressed by email alone — can be seen or accepted.
@@ -116,13 +116,13 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
     Route::delete('/pets/{pet}', [PetController::class, 'destroy']);
 
     // Vet share link (read-only medical summary for a browser)
-    Route::post('/pets/{pet}/share-link', [PetShareController::class, 'create'])->middleware('throttle:20,1');
+    Route::post('/pets/{pet}/share-link', [PetShareController::class, 'create'])->middleware('throttle:20,1,share-link:');
     Route::delete('/pets/{pet}/share-link', [PetShareController::class, 'revoke']);
 
     // Caretaker mode — sitter handoff profile + time-limited caretaker link
     Route::get('/pets/{pet}/care', [CareController::class, 'show']);
     Route::put('/pets/{pet}/care', [CareController::class, 'update']);
-    Route::post('/pets/{pet}/care-link', [CareController::class, 'createLink'])->middleware('throttle:20,1');
+    Route::post('/pets/{pet}/care-link', [CareController::class, 'createLink'])->middleware('throttle:20,1,care-link:');
     Route::delete('/pets/{pet}/care-link', [CareController::class, 'revokeLink']);
 
     // Vaccinations
@@ -160,7 +160,7 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
 
     // Pet sharing (co-owners)
     Route::get('/pets/{pet}/members', [PetSharingController::class, 'members']);
-    Route::post('/pets/{pet}/invites', [PetSharingController::class, 'invite'])->middleware('throttle:20,1');
+    Route::post('/pets/{pet}/invites', [PetSharingController::class, 'invite'])->middleware('throttle:20,1,invite:');
     Route::delete('/pets/{pet}/invites/{invite}', [PetSharingController::class, 'cancelInvite']);
     Route::delete('/pets/{pet}/members/{member}', [PetSharingController::class, 'removeMember']);
     Route::post('/pets/{pet}/leave', [PetSharingController::class, 'leave']);
@@ -182,22 +182,22 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
     Route::delete('/pets/{pet}/appointments/{appointment}', [AppointmentController::class, 'destroy']);
 
     Route::get('/pets/{pet}/documents', [DocumentController::class, 'index']);
-    Route::post('/pets/{pet}/documents', [DocumentController::class, 'store'])->middleware('throttle:30,1');
+    Route::post('/pets/{pet}/documents', [DocumentController::class, 'store'])->middleware('throttle:30,1,doc-upload:');
     Route::get('/pets/{pet}/documents/{document}/url', [DocumentController::class, 'url']);
     // AI intake — expensive model call, so throttled tighter than other routes.
-    Route::post('/pets/{pet}/documents/{document}/extract', [DocumentController::class, 'extract'])->middleware('throttle:10,1');
+    Route::post('/pets/{pet}/documents/{document}/extract', [DocumentController::class, 'extract'])->middleware('throttle:10,1,doc-extract:');
     Route::post('/pets/{pet}/documents/{document}/apply', [DocumentController::class, 'applyExtraction']);
     Route::delete('/pets/{pet}/documents/{document}', [DocumentController::class, 'destroy']);
 
     // Lost pets (community alerts)
     Route::get('/lost-pets', [LostPetController::class, 'index']);
     Route::get('/lost-pets/mine', [LostPetController::class, 'mine']);
-    Route::post('/pets/{pet}/lost-report', [LostPetController::class, 'report'])->middleware('throttle:10,1');
+    Route::post('/pets/{pet}/lost-report', [LostPetController::class, 'report'])->middleware('throttle:10,1,lost-report:');
     Route::patch('/lost-pets/{report}/resolve', [LostPetController::class, 'resolve']);
 
     // Community
     Route::get('/community/posts', [CommunityController::class, 'listPosts']);
-    Route::post('/community/posts', [CommunityController::class, 'createPost'])->middleware('throttle:30,1');
+    Route::post('/community/posts', [CommunityController::class, 'createPost'])->middleware('throttle:30,1,post:');
     Route::delete('/community/posts/{post}', [CommunityController::class, 'deletePost']);
     Route::post('/community/posts/{post}/paw', [CommunityController::class, 'togglePaw']);
     // Reporting: POST is throttled (named limiter, 10/hour per user); the
@@ -206,7 +206,7 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
         ->middleware('throttle:post-report');
     Route::delete('/community/posts/{post}/report', [CommunityController::class, 'unreportPost']);
     Route::get('/community/posts/{post}/comments', [CommunityController::class, 'listComments']);
-    Route::post('/community/posts/{post}/comments', [CommunityController::class, 'addComment'])->middleware('throttle:30,1');
+    Route::post('/community/posts/{post}/comments', [CommunityController::class, 'addComment'])->middleware('throttle:30,1,comment:');
     Route::delete('/community/posts/{post}/comments/{comment}', [CommunityController::class, 'deleteComment']);
     Route::get('/community/groups', [CommunityController::class, 'listGroups']);
     Route::post('/community/groups/{group}/join', [CommunityController::class, 'toggleGroup']);
