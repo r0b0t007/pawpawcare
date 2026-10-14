@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 import { Text, ScrollView, Linking, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { usePlan, useRestore } from '../../hooks/useSubscription';
 import { getManagementUrl } from '../../services/purchases';
 import {
@@ -48,7 +47,7 @@ export default function SubscriptionScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <ScreenHeader title="Subscription" onBack={() => navigation.goBack()} style={styles.header} />
+        <ScreenHeader title="Subscription" onBack={() => navigation.goBack()} />
 
         <Card style={styles.planCard}>
           <Text style={[type.cardTitle, styles.ink]}>{planTitle(plan, included)}</Text>
@@ -105,9 +104,8 @@ export default function SubscriptionScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingTop: 0 }, // the scroll already pads; ScreenHeader adds the rest
   safe: { flex: 1, backgroundColor: ui.background },
-  scroll: { paddingTop: 12, paddingBottom: 32 },
+  scroll: { paddingBottom: 32 }, // ScreenHeader pads the top
   ink: { color: ui.ink },
   sub: { color: ui.sub },
   planCard: { marginHorizontal: 24, marginBottom: 22, padding: 18, gap: 12 },

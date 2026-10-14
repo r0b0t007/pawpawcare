@@ -57,11 +57,11 @@ function VerifyEmailCard({ email, onVerified }) {
 
   return (
     <Card style={styles.verifyCard}>
-      <View style={styles.emptyIcon}>
+      <View style={styles.verifyIcon}>
         <MaterialCommunityIcons name="email-check-outline" size={34} color={ui.accent} />
       </View>
-      <Text style={styles.emptyTitle}>Confirm your email</Text>
-      <Text style={styles.emptySub}>
+      <Text style={styles.verifyTitle}>Confirm your email</Text>
+      <Text style={styles.verifySub}>
         {step === 'intro'
           ? `Pets are shared by email. Confirm ${email} is yours and invitations sent to it will appear here.`
           : `We sent a 6-digit code to ${email}. It's valid for 30 minutes.`}
@@ -125,24 +125,25 @@ export default function InvitesScreen({ navigation }) {
     setRefreshing(false);
   }, [refreshInvites]);
 
+  // Resolves true when the server took it (acceptInvite/declineInvite never throw).
   const respond = async (id, action) => {
     setBusyId(id);
-    if (action === 'accept') await acceptInvite(id);
-    else await declineInvite(id);
+    const ok = action === 'accept' ? await acceptInvite(id) : await declineInvite(id);
     setBusyId(null);
+    return ok;
   };
 
   const onAccept = async (inv) => {
-    await respond(inv.id, 'accept');
-    showToast(`You're now caring for ${inv.petName}`);
+    if (await respond(inv.id, 'accept')) showToast(`You're now caring for ${inv.petName}`);
+    else showToast(`Couldn't accept the invite for ${inv.petName}. Try again.`);
   };
 
   const confirmDecline = async () => {
     const inv = pendingDecline;
     setPendingDecline(null);
     if (!inv) return;
-    await respond(inv.id, 'decline');
-    showToast('Invitation declined');
+    if (await respond(inv.id, 'decline')) showToast('Invitation declined');
+    else showToast("Couldn't decline the invitation. Try again.");
   };
 
   return (
@@ -158,6 +159,7 @@ export default function InvitesScreen({ navigation }) {
         ) : invites.length === 0 ? (
           <EmptyState
             compact
+            style={styles.emptyState}
             photo={photos.emptyKitten}
             title="No pending invitations"
             body="When someone shares a pet with you, the invite will appear here."
@@ -218,6 +220,7 @@ export default function InvitesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  emptyState: { paddingTop: 40 }, // breathing room under the header
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingHorizontal: 24, paddingBottom: 32, gap: 12 },
   inviteCard: { padding: 16, gap: 14 },
@@ -234,7 +237,7 @@ const styles = StyleSheet.create({
   bold: { fontFamily: 'PlusJakartaSans_700Bold', color: ui.ink },
   inviteSub: { ...type.secondary, color: ui.subtle, marginTop: 2 },
   inviteActions: { flexDirection: 'row', gap: 10 },
-  emptyIcon: {
+  verifyIcon: {
     width: 76,
     height: 76,
     borderRadius: 38,
@@ -243,8 +246,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  emptyTitle: { ...type.cardTitle, color: ui.ink },
-  emptySub: { ...type.body, color: ui.sub, textAlign: 'center', paddingHorizontal: 24 },
+  verifyTitle: { ...type.cardTitle, color: ui.ink },
+  verifySub: { ...type.body, color: ui.sub, textAlign: 'center', paddingHorizontal: 24 },
   verifyCard: { padding: 20, gap: 12, alignItems: 'center', marginTop: 24 },
   codeInput: {
     alignSelf: 'stretch',

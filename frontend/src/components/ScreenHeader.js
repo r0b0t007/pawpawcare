@@ -11,7 +11,9 @@ const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 // (e.g. the pet's face on its vault). Without a title it's just the back
 // button (form screens that set their own large heading). Same place, same size on every
 // screen, so "where am I and how do I get back" never needs reading.
-export default function ScreenHeader({ title, subtitle, onBack, avatar, right, style }) {
+// `flush` drops the side and top padding for screens whose scroll view
+// already pads its content (form screens), instead of each overriding it.
+export default function ScreenHeader({ title, subtitle, onBack, avatar, right, flush, style }) {
   return (
     <View
       style={[
@@ -19,8 +21,8 @@ export default function ScreenHeader({ title, subtitle, onBack, avatar, right, s
           flexDirection: 'row',
           alignItems: 'center',
           gap: 14,
-          paddingHorizontal: 24,
-          paddingTop: 12,
+          paddingHorizontal: flush ? 0 : 24,
+          paddingTop: flush ? 0 : 12,
           paddingBottom: 16,
         },
         style,
@@ -52,7 +54,9 @@ export default function ScreenHeader({ title, subtitle, onBack, avatar, right, s
       {avatar}
       {title ? (
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={[type.headerTitle, { color: ui.ink }]} numberOfLines={1} accessibilityRole="header">
+          {/* Two lines, not one: at large system font sizes a title wraps
+              instead of being cut to "Help & fe…". */}
+          <Text style={[type.headerTitle, { color: ui.ink }]} numberOfLines={2} accessibilityRole="header">
             {title}
           </Text>
           {subtitle ? (

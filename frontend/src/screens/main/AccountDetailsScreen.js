@@ -33,8 +33,12 @@ export default function AccountDetailsScreen({ navigation }) {
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
-    await updateUser({ name: trimmed });
+    const saved = await updateUser({ name: trimmed });
     setSaving(false);
+    if (!saved) {
+      showToast("Couldn't save your name. Try again.");
+      return; // stay, with the typed name, so it can be retried
+    }
     showToast('Saved');
     navigation.goBack();
   };
@@ -55,7 +59,7 @@ export default function AccountDetailsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
-        <ScreenHeader title="Account details" onBack={() => navigation.goBack()} style={styles.header} />
+        <ScreenHeader title="Account details" onBack={() => navigation.goBack()} flush />
 
         <View style={styles.avatarWrap}>
           <View style={styles.avatar}>
@@ -131,7 +135,6 @@ export default function AccountDetailsScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 0, paddingTop: 0 }, // the scroll already pads; ScreenHeader adds the rest
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingTop: 12, paddingHorizontal: 24, paddingBottom: 32 },
   avatarWrap: { alignItems: 'center', marginBottom: 26 },
