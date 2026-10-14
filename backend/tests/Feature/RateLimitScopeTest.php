@@ -7,17 +7,17 @@ use App\Models\User;
 use App\Services\JwtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 /**
  * Regression guard for the rate limiter being scoped per USER, not per IP.
  *
- * Laravel sorts each route's pipeline by the middleware priority list.
- * ThrottleRequests is on that list and `auth.jwt` is not, so without the
- * prependToPriorityList() call in bootstrap/app.php the throttle middleware
- * runs BEFORE authentication, sees a null $request->user(), and falls back to
- * keying by $request->ip().
+ * Laravel sorts each route's pipeline by the middleware priority list, which
+ * puts AuthenticatesRequests ahead of ThrottleRequests. JwtAuth implements
+ * that marker interface; drop it and the throttle middleware runs BEFORE
+ * authentication, sees a null $request->user(), and falls back to keying by
+ * $request->ip().
  *
  * That is invisible in normal use and catastrophic behind CGNAT: every mobile
  * user sharing a carrier egress IP shares one 120/min budget and 429s the rest.
@@ -161,6 +161,36 @@ class RateLimitScopeTest extends TestCase
         );
     }
 
+    public function test_every_numeric_throttle_has_a_prefix(): void
+    {
+        // The guard for test_each_numeric_throttle_has_its_own_budget: an
+        // unprefixed `throttle:N,M` on a new route would silently share a
+        // per-user counter (and its window) with every other unprefixed one.
+        $missing = [];
+        $prefixes = [];
+
+        foreach (Route::getRoutes() as $route) {
+            foreach ($route->gatherMiddleware() as $middleware) {
+                if (! is_string($middleware) || ! preg_match('/^throttle:(\d+),(\d+)(?:,(.*))?$/', $middleware, $m)) {
+                    continue;
+                }
+                $name = $route->methods()[0].' /'.ltrim($route->uri(), '/');
+                if (($m[3] ?? '') === '') {
+                    $missing[] = $name;
+                } else {
+                    $prefixes[$m[3]][] = $name;
+                }
+            }
+        }
+
+        $this->assertSame([], $missing, 'Numeric throttles need a distinct prefix: throttle:N,M,<name>:');
+
+        // A group throttle (e.g. `auth:`) legitimately covers several routes;
+        // anything else sharing a prefix is a copy-paste slip.
+        $shared = array_filter($prefixes, fn ($routes, $prefix) => count($routes) > 1 && $prefix !== 'auth:', ARRAY_FILTER_USE_BOTH);
+        $this->assertSame([], $shared, 'Two routes share a throttle prefix.');
+    }
+
     public function test_public_routes_still_throttle_by_ip(): void
     {
         // Unauthenticated traffic has no user to key by, so the IP fallback is
@@ -168,19 +198,28 @@ class RateLimitScopeTest extends TestCase
         //
         // Note what this deliberately does NOT claim: since authentication now
         // runs before throttling, invalid-token requests to AUTHENTICATED routes
-        // are rejected with 401 without consuming any budget. See the ordering
-        // trade-off in bootstrap/app.php.
-        $key = 'auth:'.sha1('|127.0.0.1');
+        // are rejected with 401 without consuming any budget. See the trade-off
+        // in the JwtAuth docblock.
+        //
+        // /auth/refresh carries only the group's `throttle:20,1,auth:`, so the
+        // rate-limit headers are that bucket's (login adds a second limiter).
+        $refresh = fn (string $ip) => $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->postJson('/auth/refresh', ['refresh_token' => 'not-a-token']);
 
-        $this->assertSame(0, RateLimiter::attempts($key));
+        $first = $refresh('198.51.100.7')->assertStatus(401);
+        $second = $refresh('198.51.100.7')->assertStatus(401);
+        $otherIp = $refresh('198.51.100.8')->assertStatus(401);
 
-        $this->postJson('/auth/login', ['email' => 'nobody@example.com', 'password' => 'wrong'])
-            ->assertStatus(401);
-
+        $this->assertSame(20, (int) $first->headers->get('X-RateLimit-Limit'));
         $this->assertSame(
-            1,
-            RateLimiter::attempts($key),
-            'A public auth request should increment the IP-keyed `auth:` bucket.'
+            (int) $first->headers->get('X-RateLimit-Remaining') - 1,
+            (int) $second->headers->get('X-RateLimit-Remaining'),
+            'Two requests from one IP should draw on one bucket.'
+        );
+        $this->assertSame(
+            (int) $first->headers->get('X-RateLimit-Remaining'),
+            (int) $otherIp->headers->get('X-RateLimit-Remaining'),
+            'A different IP should get its own bucket.'
         );
     }
 }

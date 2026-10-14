@@ -145,9 +145,10 @@ class User extends Model implements AuthenticatableContract
         return 'hashed_password';
     }
 
-    public function getAuthPassword(): string
+    /** Null for Google/Apple-only accounts: never fake an empty password. */
+    public function getAuthPassword(): ?string
     {
-        return (string) $this->hashed_password;
+        return $this->hashed_password;
     }
 
     /** Stateless JWT auth: there is no remember-me token and no column for one. */
