@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -94,16 +94,30 @@ export default function ForgotPasswordScreen({ navigation }) {
     }
   };
 
+  // Android's back button and the iOS swipe behave like the on-screen
+  // arrow: on the code step they return to the email step instead of
+  // closing the screen and losing the code. A deliberate navigate (to
+  // Login after a reset) isn't a back action, so it's let through.
+  useEffect(() => {
+    if (step !== 'code') return undefined;
+    return navigation.addListener('beforeRemove', (e) => {
+      if (e.data.action.type !== 'GO_BACK' && e.data.action.type !== 'POP') return;
+      e.preventDefault();
+      setError(null);
+      setStep('email');
+    });
+  }, [navigation, step]);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
-        <ScreenHeader onBack={handleBack} style={styles.header} />
+        <ScreenHeader onBack={handleBack} flush />
 
         <PhotoBand source={photos.emptyBlanket} height={120} />
 
         {step === 'email' ? (
           <>
-            <Text style={[type.screenTitle, styles.title]}>Reset your password</Text>
+            <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Reset your password</Text>
             <Text style={styles.subtitle}>
               Enter your account email and we'll send you a 6-digit code.
             </Text>
@@ -142,7 +156,7 @@ export default function ForgotPasswordScreen({ navigation }) {
             <View style={styles.iconWrap}>
               <MaterialCommunityIcons name="email-check-outline" size={30} color={ui.accent} />
             </View>
-            <Text style={[type.screenTitle, styles.title, { marginTop: 18 }]}>
+            <Text style={[type.screenTitle, styles.title, { marginTop: 18 }]} accessibilityRole="header">
               Check your inbox
             </Text>
             <Text style={styles.subtitle}>
@@ -245,7 +259,6 @@ export default function ForgotPasswordScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 16 }, // as on Log in
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { flexGrow: 1, paddingTop: 12, paddingHorizontal: 24, paddingBottom: 40 },
   iconWrap: {

@@ -91,7 +91,7 @@ export default function LostPetsScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {/* Header */}
-        <ScreenHeader title="Report missing pet" onBack={() => navigation.goBack()} style={styles.header} />
+        <ScreenHeader title="Report missing pet" onBack={() => navigation.goBack()} flush style={{ paddingBottom: 8 }} />
         <Text style={styles.intro}>
           Your report is shared with owners nearby. Most pets are reunited within 48 hours.
         </Text>
@@ -225,7 +225,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 32 },
   // The scroll already pads the sides and top.
-  header: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, marginBottom: 8 },
   intro: {
     fontFamily: 'PlusJakartaSans_400Regular',
     fontSize: 13,

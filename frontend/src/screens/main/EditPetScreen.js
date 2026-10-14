@@ -106,7 +106,7 @@ export default function EditPetScreen({ navigation, route }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
         {/* Header */}
-        <ScreenHeader title={`Edit ${pet.name}`} onBack={() => navigation.goBack()} style={styles.header} />
+        <ScreenHeader title={`Edit ${pet.name}`} onBack={() => navigation.goBack()} flush style={{ paddingBottom: 20 }} />
 
         {/* Photo */}
         <View style={styles.avatarArea}>
@@ -263,7 +263,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 32 },
   // The scroll already pads the sides and top.
-  header: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 0, marginBottom: 20 },
   avatarArea: { alignItems: 'center', marginBottom: 20 },
   avatarTap: { position: 'relative' },
   avatar: {

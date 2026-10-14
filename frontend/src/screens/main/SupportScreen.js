@@ -3,7 +3,6 @@ import {
   View, Text, TextInput, StyleSheet, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { post } from '../../services/api';
 import { ui, type } from '../../theme';
 import { Card, ListRow, Button, Chip, showToast, FormScrollView, ScreenHeader } from '../../components';
@@ -147,7 +146,7 @@ export default function SupportScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
-        <ScreenHeader title="Help & feedback" onBack={() => navigation.goBack()} style={styles.header} />
+        <ScreenHeader title="Help & feedback" onBack={() => navigation.goBack()} />
 
         {form}
         {guides}
@@ -157,9 +156,8 @@ export default function SupportScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingTop: 0 }, // the scroll already pads; ScreenHeader adds the rest
   safe: { flex: 1, backgroundColor: ui.background },
-  scroll: { paddingTop: 12, paddingBottom: 32 },
+  scroll: { paddingBottom: 32 }, // ScreenHeader pads the top
   sectionLabel: { color: ui.subtle, marginHorizontal: 24, marginBottom: 8 },
   sectionCard: { marginHorizontal: 24, marginBottom: 22 },
   contactCard: { marginHorizontal: 24, marginBottom: 22, padding: 18, gap: 14 },

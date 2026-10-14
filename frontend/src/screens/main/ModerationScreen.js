@@ -3,11 +3,10 @@ import {
   View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { get, post, del } from '../../services/api';
 import { resolveAsset } from '../../config';
-import { ui, type, radii } from '../../theme';
-import { Card, Button, ConfirmDialog, showToast, ScreenHeader } from '../../components';
+import { ui, type, radii, photos } from '../../theme';
+import { Card, Button, ConfirmDialog, showToast, ScreenHeader, EmptyState } from '../../components';
 
 // Admin-only review queue (Profile → Moderation). Lists every community post
 // with open reports — including ones auto-hidden from the feed at 3+ reports —
@@ -114,18 +113,18 @@ export default function ModerationScreen({ navigation }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />
         }
       >
-        <ScreenHeader title="Moderation" onBack={() => navigation.goBack()} style={styles.header} />
+        <ScreenHeader title="Moderation" onBack={() => navigation.goBack()} />
 
         {loading ? (
           <ActivityIndicator size="large" color={ui.accent} style={styles.spinner} />
         ) : items.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <MaterialCommunityIcons name="shield-check" size={30} color={ui.success} />
-            </View>
-            <Text style={styles.emptyTitle}>All clear</Text>
-            <Text style={styles.emptySub}>No open reports right now.</Text>
-          </View>
+          <EmptyState
+            compact
+            style={styles.emptyState}
+            photo={photos.communityPals}
+            title="All clear"
+            body="No open reports right now."
+          />
         ) : (
           <>
             {items.map(({ post: p, report_count: count, hidden }) => (
@@ -204,28 +203,10 @@ export default function ModerationScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingTop: 0 }, // the scroll already pads; ScreenHeader adds the rest
+  emptyState: { paddingTop: 40 }, // breathing room under the header
   safe: { flex: 1, backgroundColor: ui.background },
-  scroll: { paddingTop: 12, paddingBottom: 32 },
+  scroll: { paddingBottom: 32 }, // ScreenHeader pads the top
   spinner: { marginTop: 64 },
-  empty: { alignItems: 'center', paddingTop: 72, paddingHorizontal: 40 },
-  emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: ui.successTint,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 17, color: ui.ink },
-  emptySub: {
-    fontFamily: 'PlusJakartaSans_400Regular',
-    fontSize: 13,
-    color: ui.sub,
-    marginTop: 4,
-    textAlign: 'center',
-  },
   itemCard: { marginHorizontal: 24, marginBottom: 14, padding: 16, gap: 10 },
   itemHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   author: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: ui.ink, flexShrink: 1 },

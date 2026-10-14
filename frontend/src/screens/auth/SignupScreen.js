@@ -86,7 +86,7 @@ export default function SignupScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
-        <ScreenHeader onBack={() => navigation.goBack()} style={styles.header} />
+        <ScreenHeader onBack={() => navigation.goBack()} flush />
 
         <PhotoBand source={photos.communityPals} height={104} />
 
@@ -194,7 +194,6 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 1, paddingTop: 12, paddingHorizontal: 24, paddingBottom: 40 },
   // Decorative, and short enough to keep four fields reachable on small phones.
   // The scroll already pads the sides and top; the photo band sits 16 below.
-  header: { paddingHorizontal: 0, paddingTop: 0, paddingBottom: 16 },
   title: { color: ui.ink, marginTop: 22, marginBottom: 4 },
   formError: { marginTop: 16 },
   subtitle: { ...type.body, color: ui.sub, marginBottom: 24 },
