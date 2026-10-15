@@ -90,28 +90,14 @@ cd frontend && npx eas build --profile e2e --platform android # one build credit
 adb install -r -g <downloaded.apk>
 ```
 
-> **The `e2e` profile is not committed to `eas.json` yet, on purpose.** The
-> runtime fingerprint (`runtimeVersion.policy: "fingerprint"`) hashes the whole
-> of `frontend/eas.json` (fingerprint reason `easBuild`), so adding *any*
-> profile changes the production and preview runtimes too: OTA updates from
-> `main` would stop reaching every installed app until it is rebuilt. The profile
-> lands with the next native build round (CHW-161), when the runtime changes
-> anyway. Until then, add this block under `"build"` in your **local**
-> `frontend/eas.json` before running the build, and do not commit it (EAS packs
-> uncommitted changes, which is how the 2026-09-13 run below was built):
->
-> ```json
-> "e2e": {
->   "extends": "preview",
->   "channel": "e2e",
->   "env": { "ENVIRONMENT": "e2e", "EXPO_PUBLIC_API_URL": "http://10.0.2.2:8080" }
-> }
-> ```
->
-> `extends` keeps it in step with preview (internal APK, Google client IDs,
-> `SENTRY_ALLOW_FAILURE`; EAS merges `env`). **Android only:** build it with
-> `--platform android`, never `all`. An iOS build can't reach `10.0.2.2`,
-> which is an Android-emulator alias, and ATS would block the plain HTTP anyway.
+> **Android only:** build with `--platform android`, never `all`. An iOS build
+> can't reach `10.0.2.2`, which is an Android-emulator alias, and ATS would
+> block the plain HTTP anyway. The profile `extends` preview (internal APK,
+> Google client IDs, `SENTRY_ALLOW_FAILURE`) and overrides only the channel,
+> `ENVIRONMENT` and `EXPO_PUBLIC_API_URL`. It was committed in the 2026-10-15
+> native build round (#134). Until then it lived only in local `eas.json`,
+> because the runtime fingerprint hashes the whole of `eas.json`: any edit
+> there moves the production and preview runtimes.
 
 `EXPO_PUBLIC_API_URL` is **`http://10.0.2.2:8080`** — note the port. `10.0.2.2` is
 the emulator's alias for the **host's loopback**, so `php artisan serve` bound to
