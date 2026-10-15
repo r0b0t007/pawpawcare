@@ -85,7 +85,7 @@ clicking around freely against that creates real pets, reminders and vault
 entries. The `e2e` profile exists so test data stays on your laptop:
 
 ```bash
-cd backend && php artisan serve --port=8080                    # terminal 1 (NOT 8000)
+cd backend && php artisan serve --port=8080 --no-reload                    # terminal 1 (NOT 8000)
 cd frontend && npx eas build --profile e2e --platform android # one build credit
 adb install -r -g <downloaded.apk>
 ```
@@ -102,17 +102,16 @@ adb install -r -g <downloaded.apk>
 >
 > ```json
 > "e2e": {
+>   "extends": "preview",
 >   "channel": "e2e",
->   "distribution": "internal",
->   "android": { "buildType": "apk" },
->   "env": {
->     "ENVIRONMENT": "e2e",
->     "EXPO_PUBLIC_API_URL": "http://10.0.2.2:8080",
->     "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "<same as the preview profile>",
->     "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "<same as the preview profile>"
->   }
+>   "env": { "ENVIRONMENT": "e2e", "EXPO_PUBLIC_API_URL": "http://10.0.2.2:8080" }
 > }
 > ```
+>
+> `extends` keeps it in step with preview (internal APK, Google client IDs,
+> `SENTRY_ALLOW_FAILURE`; EAS merges `env`). **Android only:** build it with
+> `--platform android`, never `all`. An iOS build can't reach `10.0.2.2`,
+> which is an Android-emulator alias, and ATS would block the plain HTTP anyway.
 
 `EXPO_PUBLIC_API_URL` is **`http://10.0.2.2:8080`** — note the port. `10.0.2.2` is
 the emulator's alias for the **host's loopback**, so `php artisan serve` bound to
@@ -142,11 +141,15 @@ nothing persistent changes (`*.sqlite*` is already gitignored):
 cd backend
 touch database/e2e.sqlite
 DB_CONNECTION=sqlite DB_DATABASE="$(pwd)/database/e2e.sqlite" php artisan migrate --force
-DB_CONNECTION=sqlite DB_DATABASE="$(pwd)/database/e2e.sqlite" php artisan serve --port=8080
+DB_CONNECTION=sqlite DB_DATABASE="$(pwd)/database/e2e.sqlite" php artisan serve --port=8080 --no-reload
 ```
 
 Laravel's Dotenv loader is immutable, so real process env vars win over `.env`
-without editing it. Delete `database/e2e.sqlite` to reset all test data.
+without editing it. **Keep `--no-reload`:** without it, `artisan serve`
+starts the real server as a child process and hands it only a short passthrough
+list of `$_ENV` keys, so on a PHP install whose `variables_order` includes `E`
+the `DB_*` overrides are dropped and the child reloads `.env`, writing the LLM's
+junk into your dev MySQL after all. Delete `database/e2e.sqlite` to reset all test data.
 
 Verify the emulator can actually reach it before spending LLM tokens — note that
 the emulator image has no `curl` or `wget`, so use `toybox nc`:
