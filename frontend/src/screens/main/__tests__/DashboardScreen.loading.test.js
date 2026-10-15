@@ -1,6 +1,7 @@
-// Home's first load: the pets row comes in as soon as DataContext has painted
-// pets (petsReady), but nothing that states a verdict ("All caught up",
-// "Nothing scheduled") may show until every domain has landed (dataLoaded).
+// Home's first load: the pets row shows (read-only) as soon as the React Query
+// pets list has arrived, while DataContext's full load is still running. No
+// verdict ("all good", "All caught up", "Nothing scheduled") may show, and no
+// pet can be opened, until that full load (dataLoaded) has landed.
 
 jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: () => null }));
 jest.mock('react-native-safe-area-context', () => {
@@ -37,11 +38,15 @@ jest.mock('../../../context/DataContext', () => ({
     ...mockStore,
   }),
 }));
+let mockEarlyPets;
+const mockUsePetsQuery = jest.fn(() => ({ data: mockEarlyPets }));
+jest.mock('../../../hooks/usePets', () => ({ usePetsQuery: (opts) => mockUsePetsQuery(opts) }));
 
 import React from 'react';
 import { Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import DashboardScreen from '../DashboardScreen';
+import PetCard from '../../../components/PetCard';
 
 const BISCUIT = {
   id: 'p1',
@@ -60,43 +65,55 @@ const BISCUIT = {
 
 const navigation = { navigate: jest.fn(), addListener: jest.fn(() => jest.fn()) };
 const texts = (tree) => tree.root.findAllByType(Text).map((t) => [].concat(t.props.children).join(''));
+// Case-insensitive: the headline says "Biscuit is\nall good".
+const VERDICTS = /all good|all caught up|nothing needs attention|nothing scheduled/i;
 
 let tree;
-async function render(store) {
+async function render({ store, early }) {
   mockStore = store;
+  mockEarlyPets = early;
   await act(async () => {
     tree = TestRenderer.create(<DashboardScreen navigation={navigation} />);
   });
   return texts(tree);
 }
 
+beforeEach(() => jest.clearAllMocks());
 afterEach(() => {
   act(() => tree?.unmount());
   tree = undefined;
 });
 
-const VERDICTS = /All caught up|Nothing needs attention|Nothing scheduled/;
-
-test('shows only placeholders before pets have painted', async () => {
-  const shown = await render({ dataLoaded: false, petsReady: false, pets: [] });
+test('shows only placeholders before the pets list arrives', async () => {
+  const shown = await render({ store: { dataLoaded: false, pets: [] }, early: undefined });
 
   expect(shown).not.toContain('Your pets');
   expect(shown.join('\n')).not.toMatch(VERDICTS);
 });
 
-test('shows the pets row as soon as pets paint, without any verdict', async () => {
-  const shown = await render({ dataLoaded: false, petsReady: true, pets: [BISCUIT] });
+test('shows the pets row from the pets list mid-load, read-only and without any verdict', async () => {
+  const shown = await render({ store: { dataLoaded: false, pets: [] }, early: [BISCUIT] });
 
   expect(shown).toContain('Your pets');
   expect(shown).toContain('Biscuit');
-  // The hero and "Coming up" still wait for the rest of the load.
   expect(shown.join('\n')).not.toMatch(VERDICTS);
   expect(shown).not.toContain('Coming up');
+
+  // Opening a pet waits for the full record; so does adding one.
+  const cards = tree.root.findAllByType(PetCard);
+  expect(cards).toHaveLength(1);
+  expect(cards[0].props.disabled).toBe(true);
+  expect(shown).not.toContain('Add');
+  // Only fetched while the first load runs.
+  expect(mockUsePetsQuery).toHaveBeenCalledWith({ enabled: true });
 });
 
-test('shows the whole screen once everything has loaded', async () => {
-  const shown = await render({ dataLoaded: true, petsReady: true, pets: [BISCUIT] });
+test('shows the whole screen, interactive, once everything has loaded', async () => {
+  const shown = await render({ store: { dataLoaded: true, pets: [BISCUIT] }, early: [BISCUIT] });
 
   expect(shown).toContain('Biscuit');
   expect(shown).toContain('Coming up');
+  expect(shown).toContain('Add');
+  expect(tree.root.findAllByType(PetCard)[0].props.disabled).toBe(false);
+  expect(mockUsePetsQuery).toHaveBeenCalledWith({ enabled: false });
 });

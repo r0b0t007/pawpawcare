@@ -88,30 +88,10 @@ describe('DataContext initial load', () => {
     console.warn.mockRestore();
   });
 
-  // The pets row (name, avatar, status ring) needs only vaccinations. Gating
-  // it on the five slow sub-resources left Home on an empty "Your pets" for
-  // ~17s (measured, one pet, local backend).
-  it('paints pets as soon as vaccinations land, before the slow sub-resources', async () => {
-    const pending = mockApi([
-      ['/pets/p1/vaccinations', [{ id: 'v1', pet_id: 'p1', name: 'Rabies', due_date: '2099-01-01' }]],
-      [HEAVY, 'pending'],
-    ]);
-    await mount();
-
-    expect(pending).toHaveLength(5);
-    expect(data.pets).toHaveLength(1);
-    expect(data.pets[0].name).toBe('Rex');
-    expect(data.pets[0].vaccinations).toHaveLength(1);
-    // Not fetched yet is not a failed load: nothing is flagged missing.
-    expect(data.pets[0].missing).toBeUndefined();
-    // Home draws the pets row on this; everything else waits for dataLoaded.
-    expect(data.petsReady).toBe(true);
-    expect(data.dataLoaded).toBe(false);
-  });
-
-  it('then enriches pets with all their sub-resources', async () => {
+  it('loads pets with all their sub-resources', async () => {
     const pending = mockApi([[HEAVY, 'pending']]);
     await mount();
+    expect(data.pets).toHaveLength(0);
 
     await act(async () => {
       pending.forEach((resolve) => resolve());
@@ -122,20 +102,6 @@ describe('DataContext initial load', () => {
     expect(data.pets[0].missing).toBeUndefined();
     expect(data.dataLoaded).toBe(true);
     expect(console.warn).not.toHaveBeenCalled();
-  });
-
-  // The status ring can't be drawn without them, so no early paint.
-  it('waits for vaccinations before the first paint', async () => {
-    const pending = mockApi([['/pets/p1/vaccinations', 'pending']]);
-    await mount();
-
-    expect(data.pets).toHaveLength(0);
-
-    await act(async () => {
-      pending.forEach((resolve) => resolve());
-    });
-
-    expect(data.pets).toHaveLength(1);
   });
 
   // Seen on the emulator: one dropped request among the 1 + 6N left the store
@@ -188,29 +154,14 @@ describe('DataContext initial load', () => {
 
   // Signs out without waiting on the rest of the requests, and without
   // showing pets for a session that has ended.
-  it('signs out before painting when vaccinations report an expired session', async () => {
+  it('signs out as soon as a sub-resource reports an expired session', async () => {
     mockApi([
-      ['/pets/p1/vaccinations', new Error('SESSION_EXPIRED')],
+      ['/pets/p1/foods', new Error('SESSION_EXPIRED')],
       [/\/pets\/p1\/(activities|weights)$/, 'pending'],
     ]);
     await mount();
 
     expect(mockLogout).toHaveBeenCalledTimes(1);
     expect(data.pets).toHaveLength(0);
-  });
-
-  // Pets may already have painted from vaccinations; logout() then clears the
-  // store (the user-change effect), so this only has to sign out once and
-  // never dispatch the enriched pets.
-  it('signs out once when a slow sub-resource reports an expired session', async () => {
-    mockApi([
-      ['/pets/p1/foods', new Error('SESSION_EXPIRED')],
-      ['/pets/p1/activities', [{ id: 'a1', pet_id: 'p1', type: 'walk' }]],
-      ['/pets/p1/weights', 'pending'],
-    ]);
-    await mount();
-
-    expect(mockLogout).toHaveBeenCalledTimes(1);
-    expect(data.pets.every((p) => p.activities.length === 0)).toBe(true);
   });
 });

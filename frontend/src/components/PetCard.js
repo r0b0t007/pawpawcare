@@ -24,6 +24,7 @@ export default function PetCard({
   status,
   statusLabel,
   onPress,
+  disabled = false,
   width,
   photoHeight = 128,
   style,
@@ -35,10 +36,12 @@ export default function PetCard({
   return (
     <AnimatedPressable
       onPress={onPress}
+      disabled={disabled}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
       pressRetentionOffset={16}
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
       accessibilityLabel={[name, meta, s && (statusLabel ?? s.label)].filter(Boolean).join(', ')}
       style={[
         {

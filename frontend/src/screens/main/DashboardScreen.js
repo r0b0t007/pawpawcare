@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { usePetsQuery } from '../../hooks/usePets';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
@@ -70,13 +71,18 @@ const MED_ROWS = 4;
 export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
   const {
-    dataLoaded, petsReady, pets, posts, reminders, unreadCount, medDoseDays, medDoseCounts,
+    dataLoaded, pets, posts, reminders, unreadCount, medDoseDays, medDoseCounts,
     markVaccinationComplete, logMedicationDose,
   } = useData();
 
   // TTI: the dashboard is the main entry screen — interactive once the initial
   // data fan-out has rendered. Safe to call repeatedly; first call wins.
   const { markInteractive } = useObserve();
+  // The first load waits on every domain, including all 1 + 6N pet requests
+  // (~17s for one pet on a slow link). The pets row only needs names and
+  // photos, which the React Query pets list has long before that, so it
+  // shows from there while the rest of Home still loads. Off once loaded.
+  const { data: earlyPets } = usePetsQuery({ enabled: !dataLoaded });
   useEffect(() => {
     if (dataLoaded) markInteractive();
   }, [dataLoaded, markInteractive]);
@@ -375,9 +381,10 @@ export default function DashboardScreen({ navigation }) {
   const addPet = () => navigation.navigate('Pets', { screen: 'AddPet' });
   const noPets = dataLoaded && pets.length === 0;
 
-  // Shared by the early render (petsReady, mid-load) and the loaded one, so
-  // the row doesn't jump or re-mount when the rest of Home arrives.
-  const petsSection = (
+  // `interactive` is false mid-load: the cards show, but opening a pet (or
+  // adding one) waits until DataContext has the whole record, so nothing
+  // reads a half-loaded pet as "No medications yet".
+  const renderPets = (list, interactive) => (
     <>
       <View style={styles.sectionHead}>
         <Text style={styles.sectionLabel}>Your pets</Text>
@@ -390,7 +397,7 @@ export default function DashboardScreen({ navigation }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.petsRow}
       >
-        {pets.map((pet) => (
+        {list.map((pet) => (
           <PetCard
             key={pet.id}
             width={158}
@@ -401,17 +408,20 @@ export default function DashboardScreen({ navigation }) {
             photo={petPhoto(pet)}
             species={pet.type}
             onPress={() => goPet(pet)}
+            disabled={!interactive}
           />
         ))}
-        <Pressable
-          style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
-          onPress={addPet}
-          accessibilityRole="button"
-          accessibilityLabel="Add a pet"
-        >
-          <MaterialCommunityIcons name="plus" size={24} color={ui.accent} />
-          <Text style={styles.addCardText}>Add</Text>
-        </Pressable>
+        {interactive && (
+          <Pressable
+            style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
+            onPress={addPet}
+            accessibilityRole="button"
+            accessibilityLabel="Add a pet"
+          >
+            <MaterialCommunityIcons name="plus" size={24} color={ui.accent} />
+            <Text style={styles.addCardText}>Add</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </>
   );
@@ -456,15 +466,19 @@ export default function DashboardScreen({ navigation }) {
         {!dataLoaded ? (
           // Placeholders until the first load lands — never "All caught up" or
           // "Nothing scheduled" for data that simply hasn't arrived yet. The
-          // pets row is the exception: it shows names and photos, never a
-          // verdict, so it comes in as soon as the pets have painted
-          // (petsReady) instead of after every domain (~17s on a slow link).
-          petsReady && pets.length > 0 ? (
+          // pets row is the exception: names and photos are no verdict, so it
+          // shows (read-only) as soon as the pets list has arrived. It moves
+          // down once the hero and Today cards land above it.
+          earlyPets?.length > 0 ? (
             <>
-              <View style={[styles.loading, styles.loadingHero]} accessibilityLabel="Loading">
+              <View
+                style={[styles.loading, styles.loadingHero]}
+                accessible
+                accessibilityLabel="Loading your pets' care summary"
+              >
                 <Skeleton width="100%" height={170} radius={20} />
               </View>
-              {petsSection}
+              {renderPets(earlyPets, false)}
             </>
           ) : (
             <View style={styles.loading} accessibilityLabel="Loading your pets">
@@ -612,7 +626,7 @@ export default function DashboardScreen({ navigation }) {
               </Card>
             )}
 
-            {petsSection}
+            {renderPets(pets, true)}
 
             <CareStreakCard streaks={careStreaks} style={styles.hero} />
 
