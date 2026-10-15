@@ -15,7 +15,9 @@ async function fetchPets() {
   );
 }
 
-export function usePetsQuery() {
-  return useQuery({ queryKey: petsKeys.all, queryFn: fetchPets });
+// `options` pass through to useQuery (e.g. Home only needs it during the
+// first load: `{ enabled: !dataLoaded }`).
+export function usePetsQuery(options = {}) {
+  return useQuery({ queryKey: petsKeys.all, queryFn: fetchPets, ...options });
 }
 

@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { usePetsQuery } from '../../hooks/usePets';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
@@ -77,6 +78,11 @@ export default function DashboardScreen({ navigation }) {
   // TTI: the dashboard is the main entry screen — interactive once the initial
   // data fan-out has rendered. Safe to call repeatedly; first call wins.
   const { markInteractive } = useObserve();
+  // The first load waits on every domain, including all 1 + 6N pet requests
+  // (~17s for one pet on a slow link). The pets row only needs names and
+  // photos, which the React Query pets list has long before that, so it
+  // shows from there while the rest of Home still loads. Off once loaded.
+  const { data: earlyPets } = usePetsQuery({ enabled: !dataLoaded });
   useEffect(() => {
     if (dataLoaded) markInteractive();
   }, [dataLoaded, markInteractive]);
@@ -375,6 +381,51 @@ export default function DashboardScreen({ navigation }) {
   const addPet = () => navigation.navigate('Pets', { screen: 'AddPet' });
   const noPets = dataLoaded && pets.length === 0;
 
+  // `interactive` is false mid-load: the cards show, but opening a pet (or
+  // adding one) waits until DataContext has the whole record, so nothing
+  // reads a half-loaded pet as "No medications yet".
+  const renderPets = (list, interactive) => (
+    <>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionLabel}>Your pets</Text>
+        <Pressable onPress={() => navigation.navigate('Pets')} hitSlop={8} accessibilityRole="link">
+          <Text style={styles.sectionLink}>See all</Text>
+        </Pressable>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.petsRow}
+      >
+        {list.map((pet) => (
+          <PetCard
+            key={pet.id}
+            width={158}
+            photoHeight={96}
+            name={pet.name}
+            meta={petMeta(pet)}
+            color={pet.color}
+            photo={petPhoto(pet)}
+            species={pet.type}
+            onPress={() => goPet(pet)}
+            disabled={!interactive}
+          />
+        ))}
+        {interactive && (
+          <Pressable
+            style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
+            onPress={addPet}
+            accessibilityRole="button"
+            accessibilityLabel="Add a pet"
+          >
+            <MaterialCommunityIcons name="plus" size={24} color={ui.accent} />
+            <Text style={styles.addCardText}>Add</Text>
+          </Pressable>
+        )}
+      </ScrollView>
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -414,15 +465,31 @@ export default function DashboardScreen({ navigation }) {
 
         {!dataLoaded ? (
           // Placeholders until the first load lands — never "All caught up" or
-          // "Nothing scheduled" for data that simply hasn't arrived yet.
-          <View style={styles.loading} accessibilityLabel="Loading your pets">
-            <Skeleton width="100%" height={170} radius={20} />
-            <Skeleton width={110} height={11} style={{ marginTop: 28 }} />
-            <View style={styles.loadingRow}>
-              <Skeleton width={158} height={150} radius={22} />
-              <Skeleton width={158} height={150} radius={22} />
+          // "Nothing scheduled" for data that simply hasn't arrived yet. The
+          // pets row is the exception: names and photos are no verdict, so it
+          // shows (read-only) as soon as the pets list has arrived. It moves
+          // down once the hero and Today cards land above it.
+          earlyPets?.length > 0 ? (
+            <>
+              <View
+                style={[styles.loading, styles.loadingHero]}
+                accessible
+                accessibilityLabel="Loading your pets' care summary"
+              >
+                <Skeleton width="100%" height={170} radius={20} />
+              </View>
+              {renderPets(earlyPets, false)}
+            </>
+          ) : (
+            <View style={styles.loading} accessibilityLabel="Loading your pets">
+              <Skeleton width="100%" height={170} radius={20} />
+              <Skeleton width={110} height={11} style={{ marginTop: 28 }} />
+              <View style={styles.loadingRow}>
+                <Skeleton width={158} height={150} radius={22} />
+                <Skeleton width={158} height={150} radius={22} />
+              </View>
             </View>
-          </View>
+          )
         ) : noPets ? (
           <View style={styles.empty}>
             <EmptyState
@@ -559,40 +626,7 @@ export default function DashboardScreen({ navigation }) {
               </Card>
             )}
 
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionLabel}>Your pets</Text>
-              <Pressable onPress={() => navigation.navigate('Pets')} hitSlop={8} accessibilityRole="link">
-                <Text style={styles.sectionLink}>See all</Text>
-              </Pressable>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.petsRow}
-            >
-              {pets.map((pet) => (
-                <PetCard
-                  key={pet.id}
-                  width={158}
-                  photoHeight={96}
-                  name={pet.name}
-                  meta={petMeta(pet)}
-                  color={pet.color}
-                  photo={petPhoto(pet)}
-                  species={pet.type}
-                  onPress={() => goPet(pet)}
-                />
-              ))}
-              <Pressable
-                style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
-                onPress={addPet}
-                accessibilityRole="button"
-                accessibilityLabel="Add a pet"
-              >
-                <MaterialCommunityIcons name="plus" size={24} color={ui.accent} />
-                <Text style={styles.addCardText}>Add</Text>
-              </Pressable>
-            </ScrollView>
+            {renderPets(pets, true)}
 
             <CareStreakCard streaks={careStreaks} style={styles.hero} />
 
@@ -775,6 +809,7 @@ const styles = StyleSheet.create({
   },
   empty: { paddingHorizontal: 24, paddingTop: 8 },
   loading: { paddingHorizontal: 16 },
+  loadingHero: { marginBottom: 22 },
   loadingRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
   benefitText: { ...type.rowTitle, fontSize: 15, color: ui.ink, flex: 1 },
