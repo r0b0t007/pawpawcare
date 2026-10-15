@@ -1,0 +1,24 @@
+# Build context is the repo root (docker-compose.yml: context ..). BuildKit
+# reads this file because it sits next to the Dockerfile and shares its name.
+#
+# Only backend/ and loadtest/entrypoint.sh are copied in. Everything else is
+# excluded so the context stays small, and so the image never picks up:
+#  - backend/vendor: the host's dev install (Windows paths, dev packages)
+#    would overwrite the image's `composer install --no-dev`.
+#  - backend/.env: a developer's real secrets. The stack is configured
+#    entirely through docker-compose.yml environment variables.
+*
+!backend/
+!loadtest/entrypoint.sh
+
+backend/vendor/
+backend/node_modules/
+backend/.env
+backend/.env.*
+backend/storage/logs/*.log
+backend/storage/app/public/*
+backend/storage/app/private/*
+backend/storage/framework/cache/data/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*.php
+backend/bootstrap/cache/*.php

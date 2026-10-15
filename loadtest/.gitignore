@@ -1,0 +1,7 @@
+# The seeded user pool contains live access tokens for throwaway accounts.
+# Regenerate it with `php artisan loadtest:seed-users`; never commit it.
+users.json
+
+# Run output.
+summary.json
+results/
