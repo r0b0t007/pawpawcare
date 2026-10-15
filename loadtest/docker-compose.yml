@@ -1,0 +1,88 @@
+# Load-test target: nginx + php-fpm + mysql, shaped like cPanel's PHP-FPM
+# setup rather than `php artisan serve`. Run from the REPO ROOT:
+#
+#   docker compose -f loadtest/docker-compose.yml up --build -d
+#
+# Separate from backend/docker-compose.yml on purpose: that one is the dev/e2e
+# target, this one exists to be saturated. See docs/load-testing.md.
+
+name: pawpawcare-loadtest
+
+services:
+  db:
+    image: mysql:8.4
+    command: --max-connections=500
+    environment:
+      MYSQL_DATABASE: pawpawcare
+      MYSQL_ROOT_PASSWORD: password
+    tmpfs:
+      # Keeps disk I/O out of the measurement. The database is disposable;
+      # anything worth keeping is in the k6 summary, not in MySQL.
+      - /var/lib/mysql
+    healthcheck:
+      # --protocol=TCP is load-bearing. `-h localhost` uses the unix socket, and
+      # because the datadir is on tmpfs MySQL re-initialises on every boot and
+      # answers on the socket while still not listening on 3306 — so the plain
+      # ping goes green and the API then dies with "Connection refused".
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-P", "3306", "--protocol=TCP", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+
+  api:
+    build:
+      context: ..
+      dockerfile: loadtest/Dockerfile
+    environment:
+      APP_ENV: local
+      # The opt-in loadtest:seed-users requires; nothing else sets it.
+      LOADTEST_SEEDING: "1"
+      APP_DEBUG: "false"
+      APP_KEY: base64:Zm9yLWxvYWQtdGVzdGluZy1vbmx5LW5vdC1hLXNlY3JldA==
+      SECRET_KEY: loadtest-signing-key-not-a-secret
+      JWT_ALGO: HS256
+      # Must outlive the whole run; k6 uses tokens minted before it starts.
+      ACCESS_TOKEN_EXPIRE_MINUTES: 240
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: pawpawcare
+      DB_USERNAME: root
+      DB_PASSWORD: password
+      SESSION_DRIVER: array
+
+      # ── The three knobs worth A/B-ing ────────────────────────────────────
+      # Concurrency ceiling. 20 = CloudLinux's default entry-process limit,
+      # i.e. what Namecheap shared hosting gives you. Raise it to see what the
+      # app could do on a VPS.
+      PHP_FPM_MAX_CHILDREN: "${PHP_FPM_MAX_CHILDREN:-20}"
+      # Production runs CACHE_STORE=file. Every authenticated request does a
+      # flock'd read+write here for throttle:api, so under load the rate
+      # limiter contends with itself. Flip to `database` to quantify it.
+      CACHE_STORE: "${CACHE_STORE:-file}"
+      # Production runs QUEUE_CONNECTION=sync, so mail/PDF/AI jobs run INLINE
+      # and hold a worker for their full duration. Flip to `database` to
+      # quantify that too.
+      QUEUE_CONNECTION: "${QUEUE_CONNECTION:-sync}"
+    volumes:
+      # So `docker compose exec api php artisan loadtest:seed-users` writes
+      # users.json straight onto the host for k6 to read. Seeding INSIDE the
+      # container matters: tokens must be signed with the same SECRET_KEY the
+      # API verifies with, and seeding from the host would use a different
+      # backend/.env and mint tokens the API rejects with 401.
+      - ./:/loadtest
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: nginx:1.27-alpine
+    ports:
+      # Loopback only: APP_KEY and SECRET_KEY above are published, so anyone
+      # who can reach this port can forge tokens for the stack.
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
