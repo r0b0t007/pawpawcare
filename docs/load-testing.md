@@ -307,6 +307,52 @@ Run-to-run variance is significant on this setup (200 req/s measured anywhere
 from 90ms to 607ms p95 across runs). Only compare runs made from a **fresh
 stack** (`down -v` then `up`), which is how the table above was produced.
 
+## Results (2026-10-15, after #130, with production's real limits)
+
+**Production's CloudLinux limits** (read over SSH with `uapi ResourceUsage get_usages`):
+CPU **200%** (2 cores), entry processes **20**, physical memory 1 GB, IOPS 1024,
+I/O 50 MB/s, processes 200. The host is a 40-thread Xeon E5-2650 v3 @ 2.3 GHz
+(2014, slower per core than the dev laptop), shared, load average ~11.
+
+Local, same hardware and method as above (500 users, 45s holds, p95 budget
+1000ms, fresh stack per run, `file` cache):
+
+| Run | API CPUs | fpm workers | Highest rate within budget |
+|---|---|---|---|
+| A2 / A3 | all 8 | 20 | **250 / 200 req/s** (matches 2026-09-20; no regression from #130) |
+| D | all 8 | 64 | 250 req/s (p95 210ms, did not break) |
+| **B, production-shaped** | **2** | **20** | **75 req/s** (100 broke at 1322ms) |
+| C | 1 | 20 | 25 req/s (50 broke at 1476ms) |
+
+Zero 429s, 502/504s and 5xx in every run. One more run (A, 100 req/s) was an
+outlier: it was the first build of the session, and two repeats on fresh stacks
+landed at 200 to 250. B and C are single runs; treat them as ±25%.
+
+**Production calibration probe** (owner-approved, not a load test): one
+throwaway account with the same 2-pet / 16-vaccination shape, the same read mix,
+1.5 req/s for 2 minutes, then deleted. 181/181 checks passed with no 429s.
+Median latency is 206 to 218ms, but the TCP connect alone is about 200ms
+(Morocco to Phoenix), so **server time is about 8ms (`/users/me`) to 20ms
+(`/dashboard`)**, in line with the local stack.
+
+**Estimate for production:** about **50 to 75 req/s** sustained. That is run B,
+discounted for the older CPU and for MySQL sharing the host. As users:
+
+- Opening the app costs about **2 + 6 x pets + ~10** requests (DataContext loads
+  six sub-resources per pet), so about 25 for a 2-pet user, then about 1
+  request every 10s while navigating. A 3-minute session is roughly 40 to 45
+  requests, about **0.25 req/s per active user**.
+- So **about 200 to 300 people actively using the app at the same moment**.
+  With short sessions (a few minutes a day) and a 3x peak hour, that is very
+  roughly **15,000 to 25,000 daily active users** before p95 passes 1s. That
+  is an order-of-magnitude guide, not a promise.
+- **The real risk is bursts, not the average.** Each app open fires about 25
+  requests at once and production allows 20 entry processes. A push that
+  reaches every user at the same minute (for example a 9:00 reminder fan-out)
+  makes everyone open the app together, and the excess gets 508s. Stagger
+  pushes before the user count makes that matter; it is cheaper than a bigger
+  plan.
+
 ## Fixed: `throttle:api` was bucketing by IP, not by user
 
 **This is a production bug, not a test artifact.** `AppServiceProvider` intends
