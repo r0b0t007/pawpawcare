@@ -5,11 +5,28 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use App\Services\JwtService;
 use Closure;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Http\Request;
 use Sentry\State\Scope;
 use Symfony\Component\HttpFoundation\Response;
 
-class JwtAuth
+/**
+ * Implements AuthenticatesRequests (a marker interface) so Laravel's
+ * middleware priority list sorts this ahead of ThrottleRequests. Without it,
+ * throttling ran first with $request->user() still null, and every limit on
+ * an authenticated route keyed by IP instead of by user — `throttle:api`, the
+ * numeric throttles and the named limiters alike. Behind carrier CGNAT,
+ * thousands of users share one egress IP and would 429 each other.
+ * RateLimitScopeTest guards this.
+ *
+ * Accepted trade-off: a request rejected here with 401 consumes no throttle
+ * budget. A forged token costs one HMAC check. A genuinely signed but revoked
+ * or deactivated token (≤ 60 min until it expires) costs one primary-key
+ * lookup, the same as the first step of any authenticated request. A per-IP
+ * cap on 401s was tried and dropped: a junk token could spend it and lock
+ * out everyone else on a shared carrier IP.
+ */
+class JwtAuth implements AuthenticatesRequests
 {
     public function handle(Request $request, Closure $next): Response
     {
@@ -41,8 +58,9 @@ class JwtAuth
 
         $request->setUserResolver(fn () => $user);
 
-        // User isn't Laravel's Authenticatable, so Sentry can't pick it up
-        // automatically. Attach the pseudonymous id only (never email/name).
+        // No auth guard runs (and no Authenticated event fires), so Sentry
+        // can't pick the user up automatically. Attach the pseudonymous id
+        // only (never email/name).
         \Sentry\configureScope(fn (Scope $scope) => $scope->setUser(['id' => (string) $user->id]));
 
         return $next($request);
