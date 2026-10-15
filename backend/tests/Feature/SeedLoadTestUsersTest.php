@@ -26,6 +26,7 @@ class SeedLoadTestUsersTest extends TestCase
 
     protected function tearDown(): void
     {
+        putenv('LOADTEST_SEEDING');
         @unlink($this->out);
         parent::tearDown();
     }
@@ -48,12 +49,54 @@ class SeedLoadTestUsersTest extends TestCase
         $this->assertFileDoesNotExist($this->out);
     }
 
+    public function test_env_flag_cannot_bypass_the_configured_environment(): void
+    {
+        // `php artisan ... --env=local` on the production server: Laravel takes
+        // the runtime environment from the flag, but config('app.env') still
+        // comes from production's .env / cached config.
+        $this->app['env'] = 'local';
+        config(['app.env' => 'production']);
+        putenv('LOADTEST_SEEDING=1');
+
+        $this->artisan('loadtest:seed-users', ['--count' => 1, '--out' => $this->out, '--force' => true])
+            ->assertFailed();
+        $this->artisan('loadtest:seed-users', ['--purge' => true, '--force' => true])->assertFailed();
+
+        $this->assertSame(0, User::count());
+    }
+
+    public function test_local_needs_the_docker_opt_in(): void
+    {
+        $this->app['env'] = 'local';
+        config(['app.env' => 'local']);
+
+        $this->artisan('loadtest:seed-users', ['--count' => 1, '--out' => $this->out, '--force' => true])
+            ->assertFailed();
+        $this->assertSame(0, User::count());
+
+        putenv('LOADTEST_SEEDING=1');
+        $this->artisan('loadtest:seed-users', ['--count' => 1, '--out' => $this->out, '--force' => true])
+            ->assertSuccessful();
+        $this->assertSame(1, User::count());
+    }
+
+    public function test_purge_asks_before_deleting(): void
+    {
+        $this->artisan('loadtest:seed-users', ['--count' => 1, '--out' => $this->out, '--force' => true])->assertSuccessful();
+
+        $this->artisan('loadtest:seed-users', ['--purge' => true])
+            ->expectsConfirmation('Delete every load-test user and their data?', 'no')
+            ->assertFailed();
+
+        $this->assertSame(1, User::count());
+    }
+
     public function test_refuses_to_purge_outside_local_and_testing(): void
     {
         $this->artisan('loadtest:seed-users', ['--count' => 1, '--out' => $this->out, '--force' => true])->assertSuccessful();
         $this->app['env'] = 'production';
 
-        $this->artisan('loadtest:seed-users', ['--purge' => true])->assertFailed();
+        $this->artisan('loadtest:seed-users', ['--purge' => true, '--force' => true])->assertFailed();
 
         $this->assertSame(1, User::count());
     }
@@ -81,7 +124,7 @@ class SeedLoadTestUsersTest extends TestCase
         $real = User::create(['name' => 'Real', 'email' => 'real@example.com', 'hashed_password' => 'x']);
         $this->artisan('loadtest:seed-users', ['--count' => 2, '--out' => $this->out, '--force' => true])->assertSuccessful();
 
-        $this->artisan('loadtest:seed-users', ['--purge' => true])->assertSuccessful();
+        $this->artisan('loadtest:seed-users', ['--purge' => true, '--force' => true])->assertSuccessful();
 
         $this->assertSame([$real->id], User::pluck('id')->all());
     }

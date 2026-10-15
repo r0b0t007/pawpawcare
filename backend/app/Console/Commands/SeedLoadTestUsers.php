@@ -67,6 +67,10 @@ class SeedLoadTestUsers extends Command
                 return self::FAILURE;
             }
 
+            if (! $this->option('force') && ! $this->confirm('Delete every load-test user and their data?', false)) {
+                return self::FAILURE;
+            }
+
             $this->line("Deleted {$this->purge()} load-test user(s). Nothing seeded (--purge).");
 
             return self::SUCCESS;
@@ -149,7 +153,7 @@ class SeedLoadTestUsers extends Command
         $ttl = (int) config('jwt.access_ttl');
         $this->newLine();
         $this->info("Seeded {$count} users, ".($count * $petsPer).' pets, '.count($vaxRows).' vaccinations.');
-        $this->line('Pool written to: '.realpath($out ?: '.') ?: $out);
+        $this->line('Pool written to: '.(realpath($out) ?: $out));
         $this->line('Safe offered load: up to ~'.($count * 2).' req/s before throttle:api (120/min/user) bites.');
         $this->line("Tokens expire in {$ttl} min (ACCESS_TOKEN_EXPIRE_MINUTES) — re-run this command for a longer test.");
 
@@ -181,21 +185,38 @@ class SeedLoadTestUsers extends Command
     }
 
     /**
-     * An allow-list, not a production deny-list: this command ships with the
-     * app (so it is on the production server too), and a mistyped or missing
-     * APP_ENV must not let it seed accounts with a published password there.
-     * The Docker load-test stack runs as `local`.
+     * This command ships with the app, so it is on the production server too,
+     * and it seeds accounts that share a published password. Three locks:
+     *
+     *  1. An allow-list, not a production deny-list, so a mistyped or missing
+     *     APP_ENV fails closed.
+     *  2. Both app()->environment() AND config('app.env') must pass:
+     *     `--env=local` on the command line overrides the former but not the
+     *     latter, which still reads production's .env / cached config.
+     *  3. Outside the test suite, LOADTEST_SEEDING=1 must be in the real
+     *     process environment. Only loadtest/docker-compose.yml sets it. Read
+     *     with getenv(), not env(): the stack caches config, and env() returns
+     *     null under a config cache.
      */
     private function allowedEnvironment(): bool
     {
-        if (app()->environment(self::ALLOWED_ENVIRONMENTS)) {
-            return true;
+        $runtime = app()->environment();
+        $configured = (string) config('app.env');
+
+        if (! in_array($runtime, self::ALLOWED_ENVIRONMENTS, true) || ! in_array($configured, self::ALLOWED_ENVIRONMENTS, true)) {
+            $this->error("Refusing to run: APP_ENV={$configured}".($runtime !== $configured ? " (--env={$runtime})" : '').' (allowed: '.implode(', ', self::ALLOWED_ENVIRONMENTS).').');
+            $this->line('These accounts share one published password. Point this at the Docker load-test stack (docs/load-testing.md).');
+
+            return false;
         }
 
-        $this->error('Refusing to run: APP_ENV='.app()->environment().' (allowed: '.implode(', ', self::ALLOWED_ENVIRONMENTS).').');
-        $this->line('These accounts share one published password. Point this at the Docker load-test stack (docs/load-testing.md).');
+        if ($configured !== 'testing' && getenv('LOADTEST_SEEDING') !== '1') {
+            $this->error('Refusing to run: LOADTEST_SEEDING=1 is not set. Only the Docker load-test stack sets it (docs/load-testing.md).');
 
-        return false;
+            return false;
+        }
+
+        return true;
     }
 
     /**

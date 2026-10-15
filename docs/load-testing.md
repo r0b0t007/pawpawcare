@@ -257,6 +257,16 @@ See Results below for the numbers.
   becomes `/app/C:/Program Files/Git/loadtest/users.json` inside the container,
   so no pool reaches the host and k6 fails with "cannot find users.json". Prefix
   the `docker compose exec` with `MSYS_NO_PATHCONV=1`, or run it from PowerShell.
+- **`loadtest:seed-users` refuses to run outside the stack.** It ships with the
+  app, so it is on the production server too, and its accounts share a
+  published password. It needs `APP_ENV` local or testing in **both** the runtime
+  (`--env`) and the configured `.env`/cached config, plus `LOADTEST_SEEDING=1`
+  in the process environment, which only `docker-compose.yml` sets. So
+  `--env=local` on production does not get past it. Running it on the host
+  outside Docker needs `LOADTEST_SEEDING=1` set on purpose.
+- **The stack listens on loopback only** (`127.0.0.1:8080`). Its `APP_KEY` and
+  `SECRET_KEY` are published, so binding it to the LAN would let anyone there
+  forge tokens for it.
 - **The image copies `backend/` from the host.** `loadtest/Dockerfile.dockerignore`
   keeps the host's `backend/vendor` (a dev install) and `backend/.env` (real
   secrets) out of the image. Keep it next to the Dockerfile if you move either.

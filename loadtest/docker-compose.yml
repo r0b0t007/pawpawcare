@@ -36,6 +36,8 @@ services:
       dockerfile: loadtest/Dockerfile
     environment:
       APP_ENV: local
+      # The opt-in loadtest:seed-users requires; nothing else sets it.
+      LOADTEST_SEEDING: "1"
       APP_DEBUG: "false"
       APP_KEY: base64:Zm9yLWxvYWQtdGVzdGluZy1vbmx5LW5vdC1hLXNlY3JldA==
       SECRET_KEY: loadtest-signing-key-not-a-secret
@@ -77,7 +79,9 @@ services:
   web:
     image: nginx:1.27-alpine
     ports:
-      - "8080:80"
+      # Loopback only: APP_KEY and SECRET_KEY above are published, so anyone
+      # who can reach this port can forge tokens for the stack.
+      - "127.0.0.1:8080:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
