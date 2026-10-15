@@ -171,7 +171,9 @@ class RateLimitScopeTest extends TestCase
 
         foreach (Route::getRoutes() as $route) {
             foreach ($route->gatherMiddleware() as $middleware) {
-                if (! is_string($middleware) || ! preg_match('/^throttle:(\d+),(\d+)(?:,(.*))?$/', $middleware, $m)) {
+                // The alias form and the class form (ThrottleRequests::with()).
+                $throttle = '/^(?:throttle|Illuminate\\\\Routing\\\\Middleware\\\\ThrottleRequests(?:WithRedis)?):(\d+),(\d+)(?:,(.*))?$/';
+                if (! is_string($middleware) || ! preg_match($throttle, $middleware, $m)) {
                     continue;
                 }
                 $name = $route->methods()[0].' /'.ltrim($route->uri(), '/');
@@ -185,9 +187,16 @@ class RateLimitScopeTest extends TestCase
 
         $this->assertSame([], $missing, 'Numeric throttles need a distinct prefix: throttle:N,M,<name>:');
 
-        // A group throttle (e.g. `auth:`) legitimately covers several routes;
-        // anything else sharing a prefix is a copy-paste slip.
-        $shared = array_filter($prefixes, fn ($routes, $prefix) => count($routes) > 1 && $prefix !== 'auth:', ARRAY_FILTER_USE_BOTH);
+        // The `auth:` group throttle legitimately covers the public /auth/*
+        // routes, and only those. Anything else sharing a prefix (or borrowing
+        // `auth:` outside /auth/) is a copy-paste slip.
+        $shared = array_filter($prefixes, function ($routes, $prefix) {
+            if ($prefix === 'auth:') {
+                return array_filter($routes, fn ($r) => ! str_starts_with($r, 'POST /auth/')) !== [];
+            }
+
+            return count($routes) > 1;
+        }, ARRAY_FILTER_USE_BOTH);
         $this->assertSame([], $shared, 'Two routes share a throttle prefix.');
     }
 
