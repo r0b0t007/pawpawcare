@@ -2,7 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Tiny device-local preference store (JSON values on AsyncStorage). Used for
 // settings that have no backend representation yet, e.g. the Profile tab's
-// notification toggles. Keys in use: 'careReminders', 'communityDigest'.
+// notification toggles. Keys in use: 'careReminders', 'communityDigest',
+// 'language' (src/i18n: 'device' | 'en' | 'fr' | 'es').
 
 const PREFIX = '@pawpawcare/pref:';
 

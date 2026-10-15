@@ -1,6 +1,11 @@
+import i18n from '../../i18n';
 import {
-  fmtShort, fmtDay, fmtTime, fmtFull, fmtMonth, fmtClock, fmtDayTime, dayDiff, relativeDay, timeAgo, daysOverdue, overdueLabel, parseDay,
+  fmtShort, fmtDay, fmtTime, fmtFull, fmtMonth, fmtClock, fmtDayTime, fmtDate, fmtWeekday, dayDiff, relativeDay, timeAgo, daysOverdue,
+  overdueLabel, parseDay,
 } from '../dates';
+
+// The English cases below run in 'en' (jest-setup pins the device locale) and
+// assert the exact strings the app showed before i18n.
 
 // Fixed "today" for determinism (local time).
 const TODAY = new Date('2026-10-12T10:00:00');
@@ -105,5 +110,74 @@ describe('fmtClock / fmtDayTime', () => {
     expect(fmtDayTime(new Date('2026-10-15T09:00:00'), today)).toBe('Thu 9:00 AM');
     expect(fmtDayTime(new Date('2026-11-02T09:00:00'), today)).toBe('Mon 2 Nov 9:00 AM');
     expect(fmtDayTime(new Date('nope'), today)).toBe('');
+  });
+});
+
+describe('fmtDate / fmtWeekday', () => {
+  it('formats any Intl options in the app language, empty when invalid', () => {
+    const d = new Date('2026-10-13T09:00:00');
+    expect(fmtWeekday(d)).toBe('Tue');
+    expect(fmtDate(d, { weekday: 'short', month: 'short', day: 'numeric' })).toBe('Tue, Oct 13');
+    expect(fmtDate(new Date('nope'), { month: 'short' })).toBe('');
+  });
+});
+
+// Intl owns month and weekday spellings (they can vary a little between ICU
+// versions), so those are compared with Intl itself; the words around them
+// are the app's own translations and are asserted exactly.
+describe.each([
+  ['fr', 'fr-FR', {
+    relative: ['il y a 3 jours', 'hier', "aujourd'hui", 'demain', 'dans 8 jours', 'dans 3 semaines'],
+    on: (day, month) => `le ${day} ${month}`,
+    ago: ['il y a 1 min', 'il y a 15 min', 'il y a 3 h', 'il y a 2 j'],
+    overdue: ['En retard · 1 jour', 'En retard · 10 jours'],
+    today: (time) => `aujourd'hui à ${time}`,
+    yesterday: (time) => `hier à ${time}`,
+  }],
+  ['es', 'es-ES', {
+    relative: ['hace 3 días', 'ayer', 'hoy', 'mañana', 'dentro de 8 días', 'dentro de 3 semanas'],
+    on: (day, month) => `el ${day} de ${month}`,
+    ago: ['hace 1 min', 'hace 15 min', 'hace 3 h', 'hace 2 d'],
+    overdue: ['Atrasado · 1 día', 'Atrasado · 10 días'],
+    today: (time) => `hoy, ${time}`,
+    yesterday: (time) => `ayer, ${time}`,
+  }],
+])('in %s', (lng, tag, expected) => {
+  const intl = (date, options) => new Intl.DateTimeFormat(tag, options).format(date);
+  beforeAll(() => i18n.changeLanguage(lng));
+  afterAll(() => i18n.changeLanguage('en'));
+
+  it('words relative days in the language', () => {
+    expect([plus(-3), plus(-1), plus(0), plus(1), plus(8), plus(21)].map((d) => relativeDay(d, TODAY)))
+      .toEqual(expected.relative);
+    const xmas = new Date('2026-12-25T12:00:00');
+    expect(relativeDay(xmas, TODAY)).toBe(expected.on(25, intl(xmas, { month: 'short' })));
+  });
+
+  it('says how long ago, and how overdue', () => {
+    const now = new Date('2026-10-12T10:00:00Z').getTime();
+    expect(['2026-10-12T09:59:50Z', '2026-10-12T09:45:00Z', '2026-10-12T07:00:00Z', '2026-10-10T10:00:00Z']
+      .map((iso) => timeAgo(iso, now))).toEqual(expected.ago);
+    expect(overdueLabel('2026-10-11', new Date('2026-10-12T09:00:00'))).toBe(expected.overdue[0]);
+    expect(overdueLabel('2026-10-02', new Date('2026-10-12T21:00:00'))).toBe(expected.overdue[1]);
+  });
+
+  it("formats dates and times with the language's Intl locale", () => {
+    const day = new Date('2026-10-14T12:00:00');
+    expect(fmtShort(day)).toBe(intl(day, { month: 'short', day: 'numeric' }));
+    expect(fmtShort(day)).not.toBe('Oct 14');
+    expect(fmtFull(day)).toBe(intl(day, { month: 'short', day: 'numeric', year: 'numeric' }));
+    expect(fmtMonth(day)).toBe(intl(day, { month: 'short' }).toLocaleUpperCase(tag));
+    expect(fmtDay(day)).toContain(intl(day, { weekday: 'short' }));
+    // 24-hour clocks: never AM/PM.
+    expect(fmtTime('18:30')).toBe('18:30');
+    expect(fmtClock(new Date('2026-10-12T09:05:00'))).not.toMatch(/AM|PM/);
+    const today = new Date('2026-10-12T23:30:00');
+    const nine = new Date('2026-10-12T21:00:00');
+    expect(fmtDayTime(nine, today)).toBe(expected.today(fmtClock(nine)));
+    const six = new Date('2026-10-11T18:00:00');
+    expect(fmtDayTime(six, today)).toBe(expected.yesterday(fmtClock(six)));
+    expect(fmtDate(new Date('nope'), { month: 'short' })).toBe('');
+    expect(fmtShort(new Date('nope'))).toBe('—');
   });
 });

@@ -1,0 +1,110 @@
+{
+  "languages": {
+    "device": "Device default",
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  },
+  "dates": {
+    "today": "today",
+    "tomorrow": "tomorrow",
+    "yesterday": "yesterday",
+    "daysAgo_one": "{{count}} day ago",
+    "daysAgo_other": "{{count}} days ago",
+    "inDays_one": "in {{count}} day",
+    "inDays_other": "in {{count}} days",
+    "inWeeks_one": "in {{count}} week",
+    "inWeeks_other": "in {{count}} weeks",
+    "onDayMonth": "on {{day}} {{month}}",
+    "dayMonth": "{{weekday}} {{day}} {{month}}",
+    "dayAtTime": "{{day}} {{time}}",
+    "minutesAgoShort": "{{count}}m ago",
+    "hoursAgoShort": "{{count}}h ago",
+    "daysAgoShort": "{{count}}d ago",
+    "overdue_one": "Overdue · {{count}} day",
+    "overdue_other": "Overdue · {{count}} days"
+  },
+  "profile": {
+    "title": "Profile",
+    "greeting": "Hi, {{name}}",
+    "edit": "Edit",
+    "editA11y": "Edit account details",
+    "careNone": "Add a pet to get started",
+    "careOne": "Caring for {{name}}",
+    "careMany_one": "Caring for {{count}} pet",
+    "careMany_other": "Caring for {{count}} pets",
+    "sections": {
+      "subscription": "Subscription",
+      "notifications": "Notifications",
+      "sharing": "Sharing & data",
+      "privacy": "Privacy",
+      "language": "Language",
+      "admin": "Admin",
+      "support": "Support"
+    },
+    "subscription": {
+      "earlyMember": "Thanks for being an early member",
+      "free": "Records and exports free forever"
+    },
+    "notifications": {
+      "careTitle": "Care reminders",
+      "careSubtitle": "Vaccines, meds, vet visits",
+      "digestTitle": "Community digest",
+      "digestSubtitle": "Weekly highlights from your groups",
+      "celebrationsTitle": "Celebrations & recaps",
+      "celebrationsSubtitle": "Birthdays, gotcha days, weekly care recap",
+      "celebrationsA11y": "Celebrations and recaps"
+    },
+    "sharing": {
+      "invitesTitle": "Pet sharing & invites",
+      "invitesWaiting_one": "{{count}} waiting for you",
+      "invitesWaiting_other": "{{count}} waiting for you",
+      "invitesSubtitle": "Family, sitters and co-owners",
+      "invitesPendingA11y_one": "{{count}} pending invite",
+      "invitesPendingA11y_other": "{{count}} pending invites",
+      "exportTitle": "Export health records",
+      "exportSubtitle": "PDF or CSV · free forever",
+      "caption": "Your records belong to you — export everything, anytime."
+    },
+    "privacy": {
+      "analyticsTitle": "Share usage analytics",
+      "analyticsSubtitle": "Which features you use — never pet records or health data",
+      "saveFailed": "Couldn't save your choice — try again"
+    },
+    "language": {
+      "title": "App language",
+      "sheetTitle": "App language",
+      "caption": "Device default follows your phone's language. Pet names, notes and posts always stay as written."
+    },
+    "admin": {
+      "moderationTitle": "Moderation",
+      "moderationSubtitle": "Review reported posts",
+      "testErrorTitle": "Send test error report",
+      "testErrorSubtitle": "Checks crash reporting end to end",
+      "crashReportingOff": "Crash reporting is off in this build",
+      "testReportSent": "Test report sent"
+    },
+    "support": {
+      "helpTitle": "Help & feedback",
+      "helpSubtitle": "Ask a question, report a problem or share feedback. Private to our team."
+    },
+    "logout": {
+      "row": "Log out",
+      "confirmTitle": "Log out?",
+      "confirmMessage": "Your pets' records stay safe and synced.",
+      "confirmLabel": "Log out"
+    },
+    "export": {
+      "sheetTitle": "Export health records",
+      "pets": "Pets",
+      "format": "Format",
+      "pdf": "PDF",
+      "csv": "CSV",
+      "exporting": "Exporting…",
+      "exportPdf": "Export PDF",
+      "exportCsv": "Export CSV",
+      "caption": "Free forever — your records are never locked behind a plan.",
+      "failed": "Export failed — nothing was lost, try again"
+    }
+  }
+}

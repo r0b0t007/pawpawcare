@@ -1,5 +1,6 @@
 // Pure helpers for subscription copy: periods, savings, intro offers and the
 // one status a plan shows. Kept free of React so they're easy to test.
+import { fmtDate } from './dates';
 
 const UNIT_WORDS = { D: 'day', W: 'week', M: 'month', Y: 'year' };
 const RC_UNITS = { DAY: 'D', WEEK: 'W', MONTH: 'M', YEAR: 'Y' };
@@ -87,7 +88,7 @@ function formatDate(iso) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  return fmtDate(d, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /**

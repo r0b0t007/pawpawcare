@@ -11,6 +11,7 @@ import { ui, radii, type, motion, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, reminderIcon, Toggle, DeleteButton } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
 import { petById } from '../../utils/pets';
+import { fmtDate } from '../../utils/dates';
 import { EASE_OUT_CSS } from '../../components/motion';
 
 const ROW_OUT = FadeOut.duration(150);
@@ -25,9 +26,9 @@ function defaultWhen() {
 
 function formatWhen(iso) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('en-US', {
+  return fmtDate(new Date(iso), {
     month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-  });
+  }) || '—';
 }
 
 function scheduleSummary(r) {

@@ -14,6 +14,7 @@ import { track } from '../services/analytics';
 import { identify, resetIdentity } from '../services/identity';
 import { cancelPendingReview } from '../services/storeReview';
 import { showToast } from '../components/Toast';
+import { currentLocale } from '../i18n';
 
 const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
 
@@ -153,8 +154,9 @@ export function AuthProvider({ children }) {
     // remove the registration made below.
     await flushPendingLogout();
     const tz = deviceTimezone();
-    // Always tell the server the timezone — needed even when push is unavailable.
-    patch('/users/me', { timezone: tz }).catch(() => {});
+    // Always tell the server the timezone and the app language — needed even
+    // when push is unavailable (reminder times, server-sent pushes and email).
+    patch('/users/me', { timezone: tz, locale: currentLocale() }).catch(() => {});
     try {
       const reg = await registerForPushNotificationsAsync();
       if (reg?.token) {

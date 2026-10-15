@@ -1,0 +1,117 @@
+{
+  "languages": {
+    "device": "Langue de l'appareil",
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  },
+  "dates": {
+    "today": "aujourd'hui",
+    "tomorrow": "demain",
+    "yesterday": "hier",
+    "daysAgo_one": "il y a {{count}} jour",
+    "daysAgo_many": "il y a {{count}} jours",
+    "daysAgo_other": "il y a {{count}} jours",
+    "inDays_one": "dans {{count}} jour",
+    "inDays_many": "dans {{count}} jours",
+    "inDays_other": "dans {{count}} jours",
+    "inWeeks_one": "dans {{count}} semaine",
+    "inWeeks_many": "dans {{count}} semaines",
+    "inWeeks_other": "dans {{count}} semaines",
+    "onDayMonth": "le {{day}} {{month}}",
+    "dayMonth": "{{weekday}} {{day}} {{month}}",
+    "dayAtTime": "{{day}} à {{time}}",
+    "minutesAgoShort": "il y a {{count}} min",
+    "hoursAgoShort": "il y a {{count}} h",
+    "daysAgoShort": "il y a {{count}} j",
+    "overdue_one": "En retard · {{count}} jour",
+    "overdue_many": "En retard · {{count}} jours",
+    "overdue_other": "En retard · {{count}} jours"
+  },
+  "profile": {
+    "title": "Profil",
+    "greeting": "Bonjour, {{name}}",
+    "edit": "Modifier",
+    "editA11y": "Modifier les informations du compte",
+    "careNone": "Ajoutez un animal pour commencer",
+    "careOne": "Vous prenez soin de {{name}}",
+    "careMany_one": "Vous prenez soin de {{count}} animal",
+    "careMany_many": "Vous prenez soin de {{count}} animaux",
+    "careMany_other": "Vous prenez soin de {{count}} animaux",
+    "sections": {
+      "subscription": "Abonnement",
+      "notifications": "Notifications",
+      "sharing": "Partage et données",
+      "privacy": "Confidentialité",
+      "language": "Langue",
+      "admin": "Administration",
+      "support": "Assistance"
+    },
+    "subscription": {
+      "earlyMember": "Merci de faire partie de nos premiers membres",
+      "free": "Dossiers et exports gratuits pour toujours"
+    },
+    "notifications": {
+      "careTitle": "Rappels de soins",
+      "careSubtitle": "Vaccins, médicaments, visites chez le vétérinaire",
+      "digestTitle": "Résumé de la communauté",
+      "digestSubtitle": "Les temps forts de vos groupes, chaque semaine",
+      "celebrationsTitle": "Célébrations et bilans",
+      "celebrationsSubtitle": "Anniversaires, jours d'adoption, bilan de soins hebdomadaire",
+      "celebrationsA11y": "Célébrations et bilans"
+    },
+    "sharing": {
+      "invitesTitle": "Partage et invitations",
+      "invitesWaiting_one": "{{count}} invitation vous attend",
+      "invitesWaiting_many": "{{count}} invitations vous attendent",
+      "invitesWaiting_other": "{{count}} invitations vous attendent",
+      "invitesSubtitle": "Famille, gardiens et copropriétaires",
+      "invitesPendingA11y_one": "{{count}} invitation en attente",
+      "invitesPendingA11y_many": "{{count}} invitations en attente",
+      "invitesPendingA11y_other": "{{count}} invitations en attente",
+      "exportTitle": "Exporter les dossiers de santé",
+      "exportSubtitle": "PDF ou CSV · gratuit pour toujours",
+      "caption": "Vos dossiers vous appartiennent : exportez tout, à tout moment."
+    },
+    "privacy": {
+      "analyticsTitle": "Partager les statistiques d'utilisation",
+      "analyticsSubtitle": "Les fonctionnalités que vous utilisez, jamais les dossiers ni les données de santé de vos animaux",
+      "saveFailed": "Impossible d'enregistrer votre choix. Veuillez réessayer."
+    },
+    "language": {
+      "title": "Langue de l'application",
+      "sheetTitle": "Langue de l'application",
+      "caption": "« Langue de l'appareil » suit la langue de votre téléphone. Les noms de vos animaux, vos notes et vos publications restent tels que vous les avez écrits."
+    },
+    "admin": {
+      "moderationTitle": "Modération",
+      "moderationSubtitle": "Examiner les publications signalées",
+      "testErrorTitle": "Envoyer un rapport d'erreur de test",
+      "testErrorSubtitle": "Vérifie la remontée des plantages de bout en bout",
+      "crashReportingOff": "Les rapports de plantage sont désactivés dans cette version",
+      "testReportSent": "Rapport de test envoyé"
+    },
+    "support": {
+      "helpTitle": "Aide et commentaires",
+      "helpSubtitle": "Posez une question, signalez un problème ou donnez votre avis. Visible uniquement par notre équipe."
+    },
+    "logout": {
+      "row": "Se déconnecter",
+      "confirmTitle": "Se déconnecter ?",
+      "confirmMessage": "Les dossiers de vos animaux restent protégés et synchronisés.",
+      "confirmLabel": "Se déconnecter"
+    },
+    "export": {
+      "sheetTitle": "Exporter les dossiers de santé",
+      "pets": "Animaux",
+      "format": "Format",
+      "pdf": "PDF",
+      "csv": "CSV",
+      "exporting": "Export en cours…",
+      "exportPdf": "Exporter en PDF",
+      "exportCsv": "Exporter en CSV",
+      "caption": "Gratuit pour toujours : vos dossiers ne sont jamais réservés à un abonnement.",
+      "failed": "Échec de l'export. Rien n'a été perdu, veuillez réessayer."
+    }
+  }
+}

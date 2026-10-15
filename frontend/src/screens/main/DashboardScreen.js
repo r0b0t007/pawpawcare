@@ -21,7 +21,7 @@ import { track } from '../../services/analytics';
 import { noteGoodMoment } from '../../services/storeReview';
 import { dayKey } from '../../utils/streaks';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
-import { dayDiff, fmtShort, fmtTime, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
+import { dayDiff, fmtClock, fmtShort, fmtTime, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
 import { petById, petMeta, petPhoto } from '../../utils/pets';
 import { ui, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
@@ -263,7 +263,7 @@ export default function DashboardScreen({ navigation }) {
         ))
         .map(({ r, date }) => {
           const pet = petById(pets, r.pet_id);
-          const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+          const time = fmtClock(date);
           return {
             key: `rem-${r.id}`,
             date,

@@ -7,7 +7,8 @@ jest.mock('../tokenStorage', () => ({
 }));
 jest.mock('expo-file-system', () => ({ File: function File() {} }));
 
-import { get, uploadImage } from '../api';
+import { get, uploadImage, uploadDocument } from '../api';
+import i18n from '../../i18n';
 import { clearTokens } from '../tokenStorage';
 
 const originalDev = global.__DEV__;
@@ -108,4 +109,34 @@ test('uploads tag offline failures as network errors too', async () => {
 
   expect(err.isNetworkError).toBe(true);
   expect(err.message).toBe('Network error: Network request failed');
+});
+
+describe('Accept-Language', () => {
+  afterEach(() => i18n.changeLanguage('en'));
+  const lang = (call) => call[1].headers['Accept-Language'];
+
+  test('every JSON request, the token refresh and the retry carry the app language', async () => {
+    global.__DEV__ = false;
+    global.fetch = jest.fn().mockResolvedValue(json(200, []));
+    await get('/pets');
+    expect(lang(global.fetch.mock.calls[0])).toBe('en');
+
+    await i18n.changeLanguage('es');
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(json(401))
+      .mockResolvedValueOnce(json(200, { access_token: 'a2', refresh_token: 'r2' }))
+      .mockResolvedValueOnce(json(200, []));
+    await get('/pets');
+    expect(global.fetch.mock.calls.map(lang)).toEqual(['es', 'es', 'es']);
+  });
+
+  test('uploads carry it too', async () => {
+    global.__DEV__ = false;
+    await i18n.changeLanguage('fr');
+    global.fetch = jest.fn().mockResolvedValue(json(200, { url: '/storage/x.jpg', id: 'd1' }));
+    await uploadImage('file:///tmp/photo.jpg');
+    await uploadDocument('p1', { uri: 'file:///tmp/scan.pdf', name: 'scan.pdf' });
+    expect(global.fetch.mock.calls.map(lang)).toEqual(['fr', 'fr']);
+  });
 });

@@ -11,6 +11,7 @@ import { isAnalyticsEnabled, setAnalyticsEnabled } from '../../services/analytic
 import { usePlan } from '../../hooks/useSubscription';
 import { useInFlight } from '../../hooks/useInFlight';
 import { planStatus, planTitle } from '../../utils/subscription';
+import { useTranslation, LANGUAGE_CHOICES, languageChoice, setLanguageChoice } from '../../i18n';
 import { ui, type, motion } from '../../theme';
 import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, PetFaceStack, Toggle, showToast } from '../../components';
 
@@ -19,6 +20,8 @@ import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, PetFaceStack, Toggle
 // reading), then short grouped lists — notifications, sharing & data,
 // privacy, support — and log out as a quiet danger row at the very end,
 // behind a confirm. One accent, used only for actions and switches.
+// Every string comes from i18n (src/i18n/*.json, `profile.*`); pet and
+// account names are interpolated as entered, never translated.
 
 const FACES = 4; // pet faces shown on the account card; the rest are "+N"
 
@@ -27,6 +30,7 @@ function SectionLabel({ children }) {
 }
 
 export default function ProfileScreen({ navigation }) {
+  const { t } = useTranslation();
   const { user, isAdmin, logout, updateUser } = useAuth();
   const { invites, reminders, pets } = useData();
   // Subscription row: only once the server shows subscriptions to this
@@ -107,7 +111,7 @@ export default function ProfileScreen({ navigation }) {
     if (!saved) {
       setShareAnalytics(previous);
       setAnalyticsEnabled(previous);
-      showToast("Couldn't save your choice — try again");
+      showToast(t('profile.privacy.saveFailed'));
     }
   };
 
@@ -115,11 +119,11 @@ export default function ProfileScreen({ navigation }) {
   // (pawpawcare-app) symbolicated, tagged with this build's update id.
   const sendTestErrorReport = () => {
     if (!isSentryEnabled()) {
-      showToast('Crash reporting is off in this build');
+      showToast(t('profile.admin.crashReportingOff'));
       return;
     }
     captureException(new Error('Test error report from the PawPawCare app'));
-    showToast('Test report sent');
+    showToast(t('profile.admin.testReportSent'));
   };
 
   const openExport = () => {
@@ -142,22 +146,34 @@ export default function ProfileScreen({ navigation }) {
         // Don't swallow the cause — a silent catch here is what made an Android
         // download failure hard to diagnose. Friendly toast, but log the real one.
         console.warn('Export failed', err);
-        showToast('Export failed — nothing was lost, try again');
+        showToast(t('profile.export.failed'));
       }
     });
+
+  // Language: applied at once (no restart) and kept on this device; the
+  // account copy (server emails and pushes) is a fire-and-forget PATCH —
+  // updateUser never throws, and the device setting stands either way.
+  const [language, setLanguage] = useState(languageChoice);
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const chooseLanguage = async (next) => {
+    setLanguageOpen(false);
+    setLanguage(next);
+    const shown = await setLanguageChoice(next);
+    updateUser({ locale: shown });
+  };
 
   const firstName = user?.name?.split(' ')[0];
   const careLine =
     pets.length === 0
-      ? 'Add a pet to get started'
+      ? t('profile.careNone')
       : pets.length === 1
-        ? `Caring for ${pets[0].name}`
-        : `Caring for ${pets.length} pets`;
+        ? t('profile.careOne', { name: pets[0].name })
+        : t('profile.careMany', { count: pets.length });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Profile</Text>
+        <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">{t('profile.title')}</Text>
 
         {/* Account card — the screen's one elevated hero. */}
         <Card padded elevated style={styles.userCard}>
@@ -167,7 +183,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.userName} numberOfLines={1}>
-                {firstName ? `Hi, ${firstName}` : user?.name}
+                {firstName ? t('profile.greeting', { name: firstName }) : user?.name}
               </Text>
               <Text style={styles.userEmail} numberOfLines={1} selectable>{user?.email}</Text>
             </View>
@@ -176,9 +192,9 @@ export default function ProfileScreen({ navigation }) {
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               style={({ pressed }) => [styles.editBtn, pressed && { opacity: motion.pressOpacity }]}
               accessibilityRole="button"
-              accessibilityLabel="Edit account details"
+              accessibilityLabel={t('profile.editA11y')}
             >
-              <Text style={styles.editLink}>Edit</Text>
+              <Text style={styles.editLink}>{t('profile.edit')}</Text>
             </Pressable>
           </View>
           <View style={styles.careRow}>
@@ -189,12 +205,12 @@ export default function ProfileScreen({ navigation }) {
 
         {(subscriptionsVisible || plan.active) && (
           <>
-            <SectionLabel>Subscription</SectionLabel>
+            <SectionLabel>{t('profile.sections.subscription')}</SectionLabel>
             <Card style={styles.sectionCard}>
               <ListRow
                 icon="star-four-points-outline"
                 title={planTitle(plan, included)}
-                subtitle={planLine ? planLine.label : included ? 'Thanks for being an early member' : 'Records and exports free forever'}
+                subtitle={planLine ? planLine.label : included ? t('profile.subscription.earlyMember') : t('profile.subscription.free')}
                 chevron
                 onPress={() => navigation.navigate('Subscription')}
                 last
@@ -203,38 +219,38 @@ export default function ProfileScreen({ navigation }) {
           </>
         )}
 
-        <SectionLabel>Notifications</SectionLabel>
+        <SectionLabel>{t('profile.sections.notifications')}</SectionLabel>
         <Card style={styles.sectionCard}>
           <ListRow
             icon="bell-outline"
-            title="Care reminders"
-            subtitle="Vaccines, meds, vet visits"
-            right={<Toggle value={careReminders} onValueChange={toggleCareReminders} accessibilityLabel="Care reminders" />}
+            title={t('profile.notifications.careTitle')}
+            subtitle={t('profile.notifications.careSubtitle')}
+            right={<Toggle value={careReminders} onValueChange={toggleCareReminders} accessibilityLabel={t('profile.notifications.careTitle')} />}
           />
           <ListRow
             icon="newspaper-variant-outline"
-            title="Community digest"
-            subtitle="Weekly highlights from your groups"
-            right={<Toggle value={communityDigest} onValueChange={toggleCommunityDigest} accessibilityLabel="Community digest" />}
+            title={t('profile.notifications.digestTitle')}
+            subtitle={t('profile.notifications.digestSubtitle')}
+            right={<Toggle value={communityDigest} onValueChange={toggleCommunityDigest} accessibilityLabel={t('profile.notifications.digestTitle')} />}
           />
           <ListRow
             icon="cake-variant-outline"
-            title="Celebrations & recaps"
-            subtitle="Birthdays, gotcha days, weekly care recap"
-            right={<Toggle value={engagementPushes} onValueChange={toggleEngagementPushes} accessibilityLabel="Celebrations and recaps" />}
+            title={t('profile.notifications.celebrationsTitle')}
+            subtitle={t('profile.notifications.celebrationsSubtitle')}
+            right={<Toggle value={engagementPushes} onValueChange={toggleEngagementPushes} accessibilityLabel={t('profile.notifications.celebrationsA11y')} />}
             last
           />
         </Card>
 
-        <SectionLabel>Sharing & data</SectionLabel>
+        <SectionLabel>{t('profile.sections.sharing')}</SectionLabel>
         <Card style={[styles.sectionCard, styles.dataCard]}>
           <ListRow
             icon="account-group-outline"
-            title="Pet sharing & invites"
-            subtitle={invites.length > 0 ? `${invites.length} waiting for you` : 'Family, sitters and co-owners'}
+            title={t('profile.sharing.invitesTitle')}
+            subtitle={invites.length > 0 ? t('profile.sharing.invitesWaiting', { count: invites.length }) : t('profile.sharing.invitesSubtitle')}
             right={
               invites.length > 0 ? (
-                <View style={styles.badge} accessibilityLabel={`${invites.length} pending invites`}>
+                <View style={styles.badge} accessibilityLabel={t('profile.sharing.invitesPendingA11y', { count: invites.length })}>
                   <Text style={styles.badgeText}>{invites.length}</Text>
                 </View>
               ) : null
@@ -244,50 +260,60 @@ export default function ProfileScreen({ navigation }) {
           />
           <ListRow
             icon="download-outline"
-            title="Export health records"
-            subtitle="PDF or CSV · free forever"
+            title={t('profile.sharing.exportTitle')}
+            subtitle={t('profile.sharing.exportSubtitle')}
             chevron
             onPress={openExport}
             last
           />
         </Card>
-        <Text style={styles.caption}>
-          Your records belong to you — export everything, anytime.
-        </Text>
+        <Text style={styles.caption}>{t('profile.sharing.caption')}</Text>
 
-        <SectionLabel>Privacy</SectionLabel>
+        <SectionLabel>{t('profile.sections.privacy')}</SectionLabel>
         <Card style={styles.sectionCard}>
           <ListRow
             icon="chart-box-outline"
-            title="Share usage analytics"
-            subtitle="Which features you use — never pet records or health data"
+            title={t('profile.privacy.analyticsTitle')}
+            subtitle={t('profile.privacy.analyticsSubtitle')}
             right={
               <Toggle
                 value={shareAnalytics}
                 onValueChange={toggleShareAnalytics}
                 disabled={savingAnalytics}
-                accessibilityLabel="Share usage analytics"
+                accessibilityLabel={t('profile.privacy.analyticsTitle')}
               />
             }
             last
           />
         </Card>
 
+        <SectionLabel>{t('profile.sections.language')}</SectionLabel>
+        <Card style={styles.sectionCard}>
+          <ListRow
+            icon="translate"
+            title={t('profile.language.title')}
+            value={t(`languages.${language}`)}
+            chevron
+            onPress={() => setLanguageOpen(true)}
+            last
+          />
+        </Card>
+
         {isAdmin && (
           <>
-            <SectionLabel>Admin</SectionLabel>
+            <SectionLabel>{t('profile.sections.admin')}</SectionLabel>
             <Card style={styles.sectionCard}>
               <ListRow
                 icon="shield-check-outline"
-                title="Moderation"
-                subtitle="Review reported posts"
+                title={t('profile.admin.moderationTitle')}
+                subtitle={t('profile.admin.moderationSubtitle')}
                 chevron
                 onPress={() => navigation.navigate('Moderation')}
               />
               <ListRow
                 icon="bug-outline"
-                title="Send test error report"
-                subtitle="Checks crash reporting end to end"
+                title={t('profile.admin.testErrorTitle')}
+                subtitle={t('profile.admin.testErrorSubtitle')}
                 onPress={sendTestErrorReport}
                 last
               />
@@ -295,15 +321,15 @@ export default function ProfileScreen({ navigation }) {
           </>
         )}
 
-        <SectionLabel>Support</SectionLabel>
+        <SectionLabel>{t('profile.sections.support')}</SectionLabel>
         <Card style={styles.sectionCard}>
           {/* One entry for help and feedback (two rows led to the same
               screen). Private, open to everyone, and never tied to the store
               rating prompt (services/storeReview), per store policy. */}
           <ListRow
             icon="lifebuoy"
-            title="Help & feedback"
-            subtitle="Ask a question, report a problem or share feedback. Private to our team."
+            title={t('profile.support.helpTitle')}
+            subtitle={t('profile.support.helpSubtitle')}
             chevron
             onPress={() => navigation.navigate('Support')}
             last
@@ -312,14 +338,14 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Log out: a quiet danger row at the end, behind a confirm. */}
         <Card style={styles.sectionCard}>
-          <ListRow icon="logout" title="Log out" danger onPress={() => setConfirmLogout(true)} last />
+          <ListRow icon="logout" title={t('profile.logout.row')} danger onPress={() => setConfirmLogout(true)} last />
         </Card>
       </ScrollView>
 
-      <Sheet visible={exportOpen} onClose={() => setExportOpen(false)} title="Export health records">
+      <Sheet visible={exportOpen} onClose={() => setExportOpen(false)} title={t('profile.export.sheetTitle')}>
         {pets.length > 1 && (
           <View>
-            <Text style={[type.sectionLabel, styles.sheetLabel]}>Pets</Text>
+            <Text style={[type.sectionLabel, styles.sheetLabel]}>{t('profile.export.pets')}</Text>
             <View style={styles.sheetChips}>
               {pets.map((pet) => (
                 <Chip
@@ -333,31 +359,45 @@ export default function ProfileScreen({ navigation }) {
           </View>
         )}
         <View>
-          <Text style={[type.sectionLabel, styles.sheetLabel]}>Format</Text>
+          <Text style={[type.sectionLabel, styles.sheetLabel]}>{t('profile.export.format')}</Text>
           <View style={styles.sheetChips}>
-            <Chip accessibilityRole="radio" label="PDF" active={exportFormat === 'pdf'} onPress={() => setExportFormat('pdf')} />
-            <Chip accessibilityRole="radio" label="CSV" active={exportFormat === 'csv'} onPress={() => setExportFormat('csv')} />
+            <Chip accessibilityRole="radio" label={t('profile.export.pdf')} active={exportFormat === 'pdf'} onPress={() => setExportFormat('pdf')} />
+            <Chip accessibilityRole="radio" label={t('profile.export.csv')} active={exportFormat === 'csv'} onPress={() => setExportFormat('csv')} />
           </View>
         </View>
         {/* Nothing to export with no pets. Pet chips only render with 2+ pets,
             so a selection is only required then; with one pet an empty
             selection already means "all pets". */}
         <Button
-          label={exporting ? 'Exporting…' : exportFormat === 'pdf' ? 'Export PDF' : 'Export CSV'}
+          label={exporting ? t('profile.export.exporting') : exportFormat === 'pdf' ? t('profile.export.exportPdf') : t('profile.export.exportCsv')}
           icon="download-outline"
           onPress={handleExport}
           disabled={exporting || pets.length === 0 || (pets.length > 1 && exportPets.length === 0)}
         />
-        <Text style={styles.sheetCaption}>
-          Free forever — your records are never locked behind a plan.
-        </Text>
+        <Text style={styles.sheetCaption}>{t('profile.export.caption')}</Text>
+      </Sheet>
+
+      {/* One choice in a set: radio chips, like the export format. */}
+      <Sheet visible={languageOpen} onClose={() => setLanguageOpen(false)} title={t('profile.language.sheetTitle')}>
+        <View style={styles.sheetChips}>
+          {LANGUAGE_CHOICES.map((choice) => (
+            <Chip
+              key={choice}
+              accessibilityRole="radio"
+              label={t(`languages.${choice}`)}
+              active={language === choice}
+              onPress={() => chooseLanguage(choice)}
+            />
+          ))}
+        </View>
+        <Text style={styles.languageCaption}>{t('profile.language.caption')}</Text>
       </Sheet>
 
       <ConfirmDialog
         visible={confirmLogout}
-        title="Log out?"
-        message="Your pets' records stay safe and synced."
-        confirmLabel="Log out"
+        title={t('profile.logout.confirmTitle')}
+        message={t('profile.logout.confirmMessage')}
+        confirmLabel={t('profile.logout.confirmLabel')}
         destructive
         onConfirm={() => {
           setConfirmLogout(false);
@@ -421,6 +461,7 @@ const styles = StyleSheet.create({
     color: ui.subtle,
     textAlign: 'center',
   },
+  languageCaption: { ...type.secondary, color: ui.sub },
   badge: {
     minWidth: 22,
     height: 22,

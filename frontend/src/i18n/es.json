@@ -1,0 +1,117 @@
+{
+  "languages": {
+    "device": "Idioma del dispositivo",
+    "en": "English",
+    "fr": "Français",
+    "es": "Español"
+  },
+  "dates": {
+    "today": "hoy",
+    "tomorrow": "mañana",
+    "yesterday": "ayer",
+    "daysAgo_one": "hace {{count}} día",
+    "daysAgo_many": "hace {{count}} días",
+    "daysAgo_other": "hace {{count}} días",
+    "inDays_one": "dentro de {{count}} día",
+    "inDays_many": "dentro de {{count}} días",
+    "inDays_other": "dentro de {{count}} días",
+    "inWeeks_one": "dentro de {{count}} semana",
+    "inWeeks_many": "dentro de {{count}} semanas",
+    "inWeeks_other": "dentro de {{count}} semanas",
+    "onDayMonth": "el {{day}} de {{month}}",
+    "dayMonth": "{{weekday}} {{day}} {{month}}",
+    "dayAtTime": "{{day}}, {{time}}",
+    "minutesAgoShort": "hace {{count}} min",
+    "hoursAgoShort": "hace {{count}} h",
+    "daysAgoShort": "hace {{count}} d",
+    "overdue_one": "Atrasado · {{count}} día",
+    "overdue_many": "Atrasado · {{count}} días",
+    "overdue_other": "Atrasado · {{count}} días"
+  },
+  "profile": {
+    "title": "Perfil",
+    "greeting": "Hola, {{name}}",
+    "edit": "Editar",
+    "editA11y": "Editar los datos de la cuenta",
+    "careNone": "Añada una mascota para empezar",
+    "careOne": "Cuidando de {{name}}",
+    "careMany_one": "Cuidando de {{count}} mascota",
+    "careMany_many": "Cuidando de {{count}} mascotas",
+    "careMany_other": "Cuidando de {{count}} mascotas",
+    "sections": {
+      "subscription": "Suscripción",
+      "notifications": "Notificaciones",
+      "sharing": "Compartir y datos",
+      "privacy": "Privacidad",
+      "language": "Idioma",
+      "admin": "Administración",
+      "support": "Ayuda"
+    },
+    "subscription": {
+      "earlyMember": "Gracias por ser uno de nuestros primeros miembros",
+      "free": "Historiales y exportaciones gratis para siempre"
+    },
+    "notifications": {
+      "careTitle": "Recordatorios de cuidados",
+      "careSubtitle": "Vacunas, medicamentos, visitas al veterinario",
+      "digestTitle": "Resumen de la comunidad",
+      "digestSubtitle": "Lo más destacado de sus grupos, cada semana",
+      "celebrationsTitle": "Celebraciones y resúmenes",
+      "celebrationsSubtitle": "Cumpleaños, aniversarios de adopción, resumen semanal de cuidados",
+      "celebrationsA11y": "Celebraciones y resúmenes"
+    },
+    "sharing": {
+      "invitesTitle": "Compartir mascotas e invitaciones",
+      "invitesWaiting_one": "{{count}} invitación pendiente",
+      "invitesWaiting_many": "{{count}} invitaciones pendientes",
+      "invitesWaiting_other": "{{count}} invitaciones pendientes",
+      "invitesSubtitle": "Familia, cuidadores y copropietarios",
+      "invitesPendingA11y_one": "{{count}} invitación pendiente",
+      "invitesPendingA11y_many": "{{count}} invitaciones pendientes",
+      "invitesPendingA11y_other": "{{count}} invitaciones pendientes",
+      "exportTitle": "Exportar historiales de salud",
+      "exportSubtitle": "PDF o CSV · gratis para siempre",
+      "caption": "Sus historiales le pertenecen: expórtelos cuando quiera."
+    },
+    "privacy": {
+      "analyticsTitle": "Compartir estadísticas de uso",
+      "analyticsSubtitle": "Qué funciones utiliza; nunca los historiales ni los datos de salud de sus mascotas",
+      "saveFailed": "No se ha podido guardar su elección. Inténtelo de nuevo."
+    },
+    "language": {
+      "title": "Idioma de la aplicación",
+      "sheetTitle": "Idioma de la aplicación",
+      "caption": "«Idioma del dispositivo» usa el idioma de su teléfono. Los nombres de sus mascotas, sus notas y sus publicaciones siempre se mantienen tal como los escribió."
+    },
+    "admin": {
+      "moderationTitle": "Moderación",
+      "moderationSubtitle": "Revisar publicaciones denunciadas",
+      "testErrorTitle": "Enviar informe de error de prueba",
+      "testErrorSubtitle": "Comprueba los informes de errores de principio a fin",
+      "crashReportingOff": "Los informes de errores están desactivados en esta versión",
+      "testReportSent": "Informe de prueba enviado"
+    },
+    "support": {
+      "helpTitle": "Ayuda y comentarios",
+      "helpSubtitle": "Haga una pregunta, informe de un problema o envíenos sus comentarios. Solo lo verá nuestro equipo."
+    },
+    "logout": {
+      "row": "Cerrar sesión",
+      "confirmTitle": "¿Cerrar sesión?",
+      "confirmMessage": "Los historiales de sus mascotas siguen seguros y sincronizados.",
+      "confirmLabel": "Cerrar sesión"
+    },
+    "export": {
+      "sheetTitle": "Exportar historiales de salud",
+      "pets": "Mascotas",
+      "format": "Formato",
+      "pdf": "PDF",
+      "csv": "CSV",
+      "exporting": "Exportando…",
+      "exportPdf": "Exportar PDF",
+      "exportCsv": "Exportar CSV",
+      "caption": "Gratis para siempre: sus historiales nunca quedan bloqueados tras un plan.",
+      "failed": "Error al exportar. No se ha perdido nada; inténtelo de nuevo."
+    }
+  }
+}
