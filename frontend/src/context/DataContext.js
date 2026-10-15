@@ -231,6 +231,7 @@ const REMINDER_REFETCH_DELAY = 90000;
 function dataReducer(state, action) {
   switch (action.type) {
     case 'SET_DATA_LOADED': return { ...state, dataLoaded: action.payload };
+    case 'SET_PETS_READY':  return { ...state, petsReady: action.payload };
     case 'SET_PETS':   return { ...state, pets: action.payload };
     case 'ADD_PET':    return { ...state, pets: [...state.pets, action.payload] };
     case 'UPDATE_PET': return { ...state, pets: state.pets.map((p) => (p.id === action.payload.id ? action.payload : p)) };
@@ -307,7 +308,7 @@ function dataReducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
-    lostPets: [], myReports: [], invites: [], dataLoaded: false, lastSyncedAt: null,
+    lostPets: [], myReports: [], invites: [], dataLoaded: false, petsReady: false, lastSyncedAt: null,
     medDoseDays: {}, medDoseCounts: {},
   });
   const { user, logout } = useAuth();
@@ -370,6 +371,7 @@ export function DataProvider({ children }) {
     } else {
       queryClient.removeQueries({ queryKey: petsKeys.all });
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
+      dispatch({ type: 'SET_PETS_READY', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
       dispatch({ type: 'SET_POSTS', payload: [] });
       dispatch({ type: 'SET_REMINDERS', payload: [] });
@@ -444,7 +446,10 @@ export function DataProvider({ children }) {
           medications: 'medications', weights: 'weights', expenses: 'expenses',
         };
         const RESOURCES = Object.keys(FIELDS);
-        const buildPet = (apiPet, i, lists) => {
+        // `pending` resources haven't been fetched yet (the first paint below):
+        // they keep the last good copy and are only flagged missing if they
+        // already were — not knowing *yet* isn't a failed load.
+        const buildPet = (apiPet, i, lists, pending = []) => {
           const loaded = Object.fromEntries(Object.entries(lists).filter(([, list]) => list));
           const pet = toPet(apiPet, { ...loaded, index: i });
           const old = previous.get(apiPet.id);
@@ -452,20 +457,42 @@ export function DataProvider({ children }) {
           for (const [resource, field] of Object.entries(FIELDS)) {
             if (loaded[resource]) continue;
             if (old) pet[field] = old[field];
-            if (!old || old.missing?.includes(field)) missing.push(field);
+            const flag = pending.includes(resource)
+              ? old?.missing?.includes(field)
+              : !old || old.missing?.includes(field);
+            if (flag) missing.push(field);
           }
           if (missing.length) pet.missing = missing;
           return pet;
         };
 
-        const listsByPet = await Promise.all(
-          apiPets.map((p) => Promise.all(RESOURCES.map((r) => fetchList(p.id, r))))
-        );
+        // All 6N requests start together, but the pets row paints as soon as
+        // every pet's vaccinations are in — that's all it shows (name, avatar,
+        // status ring). Gating it on the slow five left Home on an empty "Your
+        // pets" for ~17s (measured, one pet, local backend).
+        const requests = apiPets.map((p) => RESOURCES.map((r) => fetchList(p.id, r)));
+        const allLists = Promise.all(requests.map((reqs) => Promise.all(reqs)));
+        // Awaited below; this only stops an early rejection (an expired
+        // session from a slow request) from being reported as unhandled.
+        allLists.catch(() => {});
+        const VAX = RESOURCES.indexOf('vaccinations');
+        const vaxByPet = await Promise.all(requests.map((reqs) => reqs[VAX]));
+        dispatch({
+          type: 'SET_PETS',
+          payload: apiPets.map((apiPet, i) =>
+            buildPet(apiPet, i, { vaccinations: vaxByPet[i] }, RESOURCES.filter((r) => r !== 'vaccinations'))
+          ),
+        });
+        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
+        // Lets Home draw the pets row before every other domain has landed
+        // (dataLoaded); the rest of the screen still waits for that.
+        dispatch({ type: 'SET_PETS_READY', payload: true });
+
+        const listsByPet = await allLists;
         const petsWithData = apiPets.map((apiPet, i) =>
           buildPet(apiPet, i, Object.fromEntries(RESOURCES.map((r, j) => [r, listsByPet[i][j]])))
         );
         dispatch({ type: 'SET_PETS', payload: petsWithData });
-        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
         // Hydrating prunes the stored dose history of every med it isn't
         // given, so a pet whose medications never loaded would lose its
         // history for good. Skip it; the next full load hydrates.
@@ -1285,6 +1312,7 @@ export function DataProvider({ children }) {
     <DataContext.Provider
       value={{
         dataLoaded: state.dataLoaded,
+        petsReady: state.petsReady,
         lastSyncedAt: state.lastSyncedAt,
         pets: state.pets,
         posts: state.posts,

@@ -70,7 +70,7 @@ const MED_ROWS = 4;
 export default function DashboardScreen({ navigation }) {
   const { user } = useAuth();
   const {
-    dataLoaded, pets, posts, reminders, unreadCount, medDoseDays, medDoseCounts,
+    dataLoaded, petsReady, pets, posts, reminders, unreadCount, medDoseDays, medDoseCounts,
     markVaccinationComplete, logMedicationDose,
   } = useData();
 
@@ -375,6 +375,47 @@ export default function DashboardScreen({ navigation }) {
   const addPet = () => navigation.navigate('Pets', { screen: 'AddPet' });
   const noPets = dataLoaded && pets.length === 0;
 
+  // Shared by the early render (petsReady, mid-load) and the loaded one, so
+  // the row doesn't jump or re-mount when the rest of Home arrives.
+  const petsSection = (
+    <>
+      <View style={styles.sectionHead}>
+        <Text style={styles.sectionLabel}>Your pets</Text>
+        <Pressable onPress={() => navigation.navigate('Pets')} hitSlop={8} accessibilityRole="link">
+          <Text style={styles.sectionLink}>See all</Text>
+        </Pressable>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.petsRow}
+      >
+        {pets.map((pet) => (
+          <PetCard
+            key={pet.id}
+            width={158}
+            photoHeight={96}
+            name={pet.name}
+            meta={petMeta(pet)}
+            color={pet.color}
+            photo={petPhoto(pet)}
+            species={pet.type}
+            onPress={() => goPet(pet)}
+          />
+        ))}
+        <Pressable
+          style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
+          onPress={addPet}
+          accessibilityRole="button"
+          accessibilityLabel="Add a pet"
+        >
+          <MaterialCommunityIcons name="plus" size={24} color={ui.accent} />
+          <Text style={styles.addCardText}>Add</Text>
+        </Pressable>
+      </ScrollView>
+    </>
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
@@ -414,15 +455,27 @@ export default function DashboardScreen({ navigation }) {
 
         {!dataLoaded ? (
           // Placeholders until the first load lands — never "All caught up" or
-          // "Nothing scheduled" for data that simply hasn't arrived yet.
-          <View style={styles.loading} accessibilityLabel="Loading your pets">
-            <Skeleton width="100%" height={170} radius={20} />
-            <Skeleton width={110} height={11} style={{ marginTop: 28 }} />
-            <View style={styles.loadingRow}>
-              <Skeleton width={158} height={150} radius={22} />
-              <Skeleton width={158} height={150} radius={22} />
+          // "Nothing scheduled" for data that simply hasn't arrived yet. The
+          // pets row is the exception: it shows names and photos, never a
+          // verdict, so it comes in as soon as the pets have painted
+          // (petsReady) instead of after every domain (~17s on a slow link).
+          petsReady && pets.length > 0 ? (
+            <>
+              <View style={[styles.loading, styles.loadingHero]} accessibilityLabel="Loading">
+                <Skeleton width="100%" height={170} radius={20} />
+              </View>
+              {petsSection}
+            </>
+          ) : (
+            <View style={styles.loading} accessibilityLabel="Loading your pets">
+              <Skeleton width="100%" height={170} radius={20} />
+              <Skeleton width={110} height={11} style={{ marginTop: 28 }} />
+              <View style={styles.loadingRow}>
+                <Skeleton width={158} height={150} radius={22} />
+                <Skeleton width={158} height={150} radius={22} />
+              </View>
             </View>
-          </View>
+          )
         ) : noPets ? (
           <View style={styles.empty}>
             <EmptyState
@@ -559,40 +612,7 @@ export default function DashboardScreen({ navigation }) {
               </Card>
             )}
 
-            <View style={styles.sectionHead}>
-              <Text style={styles.sectionLabel}>Your pets</Text>
-              <Pressable onPress={() => navigation.navigate('Pets')} hitSlop={8} accessibilityRole="link">
-                <Text style={styles.sectionLink}>See all</Text>
-              </Pressable>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.petsRow}
-            >
-              {pets.map((pet) => (
-                <PetCard
-                  key={pet.id}
-                  width={158}
-                  photoHeight={96}
-                  name={pet.name}
-                  meta={petMeta(pet)}
-                  color={pet.color}
-                  photo={petPhoto(pet)}
-                  species={pet.type}
-                  onPress={() => goPet(pet)}
-                />
-              ))}
-              <Pressable
-                style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
-                onPress={addPet}
-                accessibilityRole="button"
-                accessibilityLabel="Add a pet"
-              >
-                <MaterialCommunityIcons name="plus" size={24} color={ui.accent} />
-                <Text style={styles.addCardText}>Add</Text>
-              </Pressable>
-            </ScrollView>
+            {petsSection}
 
             <CareStreakCard streaks={careStreaks} style={styles.hero} />
 
@@ -775,6 +795,7 @@ const styles = StyleSheet.create({
   },
   empty: { paddingHorizontal: 24, paddingTop: 8 },
   loading: { paddingHorizontal: 16 },
+  loadingHero: { marginBottom: 22 },
   loadingRow: { flexDirection: 'row', gap: 12, marginTop: 14 },
   benefit: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
   benefitText: { ...type.rowTitle, fontSize: 15, color: ui.ink, flex: 1 },
