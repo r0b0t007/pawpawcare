@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\AuthController;
 use App\Http\Middleware\JwtAuth;
 use App\Http\Middleware\SetLocale;
+use App\Models\Medication;
 use App\Models\Pet;
 use App\Models\User;
 use App\Services\JwtService;
@@ -13,7 +15,9 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -110,6 +114,26 @@ class LocaleTest extends TestCase
             ->assertExactJson(['detail' => 'Invalid or expired access token']);
     }
 
+    public function test_an_expired_signed_link_follows_accept_language(): void
+    {
+        [$user] = $this->actingUser();
+        $pet = Pet::create(['owner_id' => $user->id, 'name' => 'Luna', 'weight_unit' => 'kg']);
+        $expired = URL::temporarySignedRoute('pets.share', now()->subMinute(), ['pet' => $pet->id]);
+
+        $this->getJson($expired, ['Accept-Language' => 'fr-FR,fr;q=0.9'])
+            ->assertForbidden()
+            ->assertExactJson(['detail' => "Ce lien a expiré ou n'est pas valide."]);
+
+        $this->getJson($expired, ['Accept-Language' => 'es-ES'])
+            ->assertForbidden()
+            ->assertExactJson(['detail' => 'Este enlace ha caducado o no es válido.']);
+
+        // English keeps the framework's wording.
+        $this->getJson($expired)
+            ->assertForbidden()
+            ->assertExactJson(['detail' => 'Invalid signature.']);
+    }
+
     // ── Authenticated routes: the saved locale wins ─────────────────────────
 
     public function test_authenticated_error_uses_the_users_saved_locale_over_the_header(): void
@@ -138,6 +162,47 @@ class LocaleTest extends TestCase
             ->postJson("/pets/{$pet->id}/weights", ['weight' => 12, 'logged_at' => now()->addDays(3)->toDateString()])
             ->assertStatus(422)
             ->assertExactJson(['detail' => "Le champ date d'enregistrement doit être une date antérieure ou égale à aujourd'hui."]);
+    }
+
+    public function test_reminder_and_dose_validation_has_no_english_fragments(): void
+    {
+        [$user, $token] = $this->actingUser('fr');
+        $pet = Pet::create(['owner_id' => $user->id, 'name' => 'Luna', 'weight_unit' => 'kg']);
+        $med = Medication::create(['pet_id' => $pet->id, 'name' => 'Simparica', 'times' => ['08:00']]);
+        $past = now()->subHour()->toIso8601String();
+        $future = now()->addHour()->toIso8601String();
+
+        $expected = [
+            'fr' => [
+                'Le champ date du rappel doit être une date postérieure à maintenant.',
+                'Le champ date du rappel est obligatoire lorsque type de rappel vaut ponctuel.',
+                'Le champ récurrence est obligatoire lorsque type de rappel vaut récurrent.',
+                'Le champ date de la prise doit être une date antérieure ou égale à maintenant.',
+            ],
+            'es' => [
+                'El campo fecha del recordatorio debe ser una fecha posterior a ahora.',
+                'El campo fecha del recordatorio es obligatorio cuando tipo de recordatorio sea puntual.',
+                'El campo recurrencia es obligatorio cuando tipo de recordatorio sea periódico.',
+                'El campo fecha de la toma debe ser una fecha anterior o igual a ahora.',
+            ],
+        ];
+
+        foreach ($expected as $locale => [$afterNow, $oneTime, $recurring, $dose]) {
+            $user->forceFill(['locale' => $locale])->save();
+
+            $this->withToken($token)
+                ->postJson('/reminders', ['title' => 'Vet', 'schedule_type' => 'one_time', 'fire_at' => $past])
+                ->assertStatus(422)->assertExactJson(['detail' => $afterNow]);
+            $this->withToken($token)
+                ->postJson('/reminders', ['title' => 'Vet', 'schedule_type' => 'one_time'])
+                ->assertStatus(422)->assertExactJson(['detail' => $oneTime]);
+            $this->withToken($token)
+                ->postJson('/reminders', ['title' => 'Vet', 'schedule_type' => 'recurring'])
+                ->assertStatus(422)->assertExactJson(['detail' => $recurring]);
+            $this->withToken($token)
+                ->postJson("/pets/{$pet->id}/medications/{$med->id}/log", ['administered_at' => $future])
+                ->assertStatus(422)->assertExactJson(['detail' => $dose]);
+        }
     }
 
     public function test_upgrade_required_translates_detail_but_keeps_machine_codes(): void
@@ -242,10 +307,41 @@ class LocaleTest extends TestCase
     {
         $this->assertNotContains('locale', (new User)->getFillable());
 
+        // A `locale` in the body is ignored; only the request language counts.
         $this->postJson('/auth/signup', [
             'name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'secret123', 'locale' => 'fr',
         ])->assertCreated();
         $this->assertSame('en', User::where('email', 'ana@example.com')->first()->locale);
+    }
+
+    public function test_a_new_account_starts_in_the_language_it_signed_up_in(): void
+    {
+        $token = $this->postJson('/auth/signup', [
+            'name' => 'Ana', 'email' => 'ana@example.com', 'password' => 'secret123', 'locale' => 'fr',
+        ], ['Accept-Language' => 'es-ES,es;q=0.9'])->assertCreated()->json('access_token');
+        $this->assertSame('es', User::where('email', 'ana@example.com')->first()->locale);
+
+        // Signed in, the account's errors stay Spanish without the header.
+        $this->withToken($token)->getJson('/pets/'.Str::uuid().'/weights')
+            ->assertExactJson(['detail' => __('Pet not found', [], 'es')]);
+    }
+
+    public function test_a_new_social_account_starts_in_the_request_language(): void
+    {
+        // Called directly: the sign-in endpoints need RSA test keys, and the
+        // account-creation branch is the part that sets the locale.
+        $login = new \ReflectionMethod(AuthController::class, 'loginSocialUser');
+
+        App::setLocale('fr');
+        [$created] = $login->invoke(app(AuthController::class), 'google', 'sub-fr', 'marie@example.com', true, 'Marie');
+        $this->assertSame('fr', $created->fresh()->locale);
+
+        // A returning user keeps the saved choice whatever the request says.
+        $created->forceFill(['locale' => 'es'])->save();
+        App::setLocale('en');
+        [$returning] = $login->invoke(app(AuthController::class), 'google', 'sub-fr', 'marie@example.com', true, 'Marie');
+        $this->assertSame($created->id, $returning->id);
+        $this->assertSame('es', $returning->fresh()->locale);
     }
 
     // ── Accept-Language parsing ─────────────────────────────────────────────
@@ -294,7 +390,8 @@ class LocaleTest extends TestCase
 
     public function test_every_translated_api_message_has_french_and_spanish_entries(): void
     {
-        $keys = ['Too Many Attempts.']; // the framework's throttle message, translated in bootstrap/app.php
+        // The framework's throttle and signed-URL messages, translated in bootstrap/app.php.
+        $keys = ['Too Many Attempts.', 'Invalid signature.'];
         $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path()));
         foreach ([...iterator_to_array($files), new \SplFileInfo(base_path('bootstrap/app.php'))] as $file) {
             if ($file->isFile() && $file->getExtension() === 'php') {

@@ -16,8 +16,8 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Registered twice (bootstrap/app.php), because no single slot sees both
  * cases. As global middleware it runs before routing, so every response —
- * public routes, signed pages, 404s, and JwtAuth's own 401s — follows the
- * header. As 'api' group middleware, sorted right after JwtAuth, it runs
+ * public routes, signed pages (including their expired-link 403s), and
+ * JwtAuth's own 401s — follows the header. As 'api' group middleware, sorted right after JwtAuth, it runs
  * again once the user is known, so the saved preference wins over the header.
  */
 class SetLocale

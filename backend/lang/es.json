@@ -24,6 +24,7 @@
     "Invalid or expired access token": "Token de acceso no válido o caducado",
     "Invalid or expired code": "Código no válido o caducado",
     "Invalid refresh token": "Token de actualización no válido",
+    "Invalid signature.": "Este enlace ha caducado o no es válido.",
     "Invite not found": "No se ha encontrado la invitación",
     "Medication not found": "No se ha encontrado el medicamento",
     "Member not found": "No se ha encontrado el miembro",

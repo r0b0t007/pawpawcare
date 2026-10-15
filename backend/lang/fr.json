@@ -24,6 +24,7 @@
     "Invalid or expired access token": "Jeton d'accès non valide ou expiré",
     "Invalid or expired code": "Code non valide ou expiré",
     "Invalid refresh token": "Jeton d'actualisation non valide",
+    "Invalid signature.": "Ce lien a expiré ou n'est pas valide.",
     "Invite not found": "Invitation introuvable",
     "Medication not found": "Médicament introuvable",
     "Member not found": "Membre introuvable",

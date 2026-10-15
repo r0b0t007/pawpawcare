@@ -47,11 +47,13 @@ class AuthController extends Controller
             abort(409, __('Email already registered'));
         }
 
-        $user = User::create([
+        $user = new User([
             'name' => $data['name'],
             'email' => $data['email'],
             'hashed_password' => Hash::make($data['password']),
         ]);
+        $user->locale = User::requestLocale();
+        $user->save();
 
         return response()->json($this->issueTokens($user), 201);
     }
@@ -547,7 +549,7 @@ class AuthController extends Controller
         if (! $user) {
             $useEmail = $email && $emailVerified && ! User::where('email', $email)->exists();
             try {
-                $created = User::create([
+                $created = new User([
                     'name' => $name ?: 'PawPaw friend',
                     'email' => $useEmail ? $email : $provider.'_'.$providerId.'@users.noreply.pawpawcare.app',
                     'hashed_password' => null,
@@ -558,6 +560,8 @@ class AuthController extends Controller
                     // below would otherwise see null and 403 every new sign-in.
                     'is_active' => true,
                 ]);
+                $created->locale = User::requestLocale();
+                $created->save();
                 if ($useEmail) {
                     // The provider vouched for this address.
                     $created->forceFill(['email_verified_at' => now()])->save();
