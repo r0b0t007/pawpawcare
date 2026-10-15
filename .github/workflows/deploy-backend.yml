@@ -80,29 +80,61 @@ jobs:
     environment: production
     steps:
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1
+        # Pinned to a commit: `@v1` once silently dropped `script_stop`, which
+        # changed how this script ran without any review. Dependabot
+        # (github-actions) proposes bumps.
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ secrets.DEPLOY_SSH_HOST }}
           username: ${{ secrets.DEPLOY_SSH_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_SSH_PORT }}
-          script_stop: true
+          # Rules for editing this script (the host's login shell is bash):
+          # - `set -e` stops at the first failed step, and the EXIT trap then
+          #   puts the PREVIOUS release back (code, vendor, caches), so a
+          #   failure never leaves new code running on old caches.
+          # - Steps that must never fail a deploy end in `|| echo`/`|| true`.
+          # - Migrations are not reversed on rollback. Keep them additive, so
+          #   the previous release still runs on a partly migrated schema.
           script: |
+            set -e
             export PHP_BIN="${{ vars.PHP_BIN || 'php' }}"
             cd ${{ vars.DEPLOY_PATH || '~/pawpawcare' }}
+            APP=$(pwd)
+            COMPOSER="$(command -v composer || echo $HOME/bin/composer)"
+            PREV=""
+            rollback() {
+              st=$?
+              [ "$st" -eq 0 ] || [ -z "$PREV" ] && exit "$st"
+              set +e
+              echo "::error::Deploy failed (exit $st). Rolling back to $PREV."
+              cd "$APP" && git reset --hard "$PREV" && cd backend \
+                && "$PHP_BIN" "$COMPOSER" install --no-dev --optimize-autoloader --no-interaction \
+                && git rev-parse --short HEAD > .release \
+                && "$PHP_BIN" artisan config:cache && "$PHP_BIN" artisan route:cache \
+                && echo "Rolled back to $(cat .release)." \
+                || echo "::error::ROLLBACK FAILED: production may be half-updated. SSH in and fix it now."
+              "$PHP_BIN" artisan queue:restart >/dev/null 2>&1
+              exit "$st"
+            }
+            trap rollback EXIT
             # Refuse to deploy without a real JWT signing key (JwtSecretGuard
             # would otherwise disable sign-in). Runs before any change, so the
-            # live app stays untouched. The value is never printed.
-            SK=$(sed -n 's/^SECRET_KEY=//p' backend/.env | tail -n 1 | tr -d '"\r')
+            # live app stays untouched. The value is never printed. The read
+            # can't fail on its own (`|| true`), so a missing .env reaches the
+            # error below instead of dying silently under `set -e`.
+            SK=$(sed -n 's/^SECRET_KEY=//p' backend/.env 2>/dev/null | tail -n 1 | tr -d '"\r') || true
             if [ "${#SK}" -lt 32 ] || [ "$SK" = "change-me-to-a-long-random-secret-in-production" ]; then
               echo "::error::backend/.env SECRET_KEY is missing, shorter than 32 chars, or the .env.example placeholder. Set it (openssl rand -base64 48) and re-run. Nothing was deployed."
               exit 1
             fi
             unset SK
             git fetch origin main
+            # From here on a failure rolls back to this commit.
+            PREV=$(git rev-parse HEAD)
             git reset --hard origin/main
             cd backend
-            "$PHP_BIN" "$(command -v composer || echo $HOME/bin/composer)" install --no-dev --optimize-autoloader --no-interaction
+            "$PHP_BIN" "$COMPOSER" install --no-dev --optimize-autoloader --no-interaction
             "$PHP_BIN" artisan migrate --force
             # Release (short SHA) for Sentry events and cron check-ins; read by
             # config/sentry.php, so it also survives a later config:clear.
@@ -118,6 +150,9 @@ jobs:
             "$PHP_BIN" artisan queue:restart || true
 
       - name: Health check
+        # Also after a failed deploy, so the log says what production is
+        # actually serving (the rolled-back release, or a broken one).
+        if: ${{ always() }}
         run: |
           sleep 5
           status=$(curl -s -o /dev/null -w "%{http_code}" -m 20 https://api.pawpawcare.app/health)
