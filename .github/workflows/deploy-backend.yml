@@ -86,8 +86,15 @@ jobs:
           username: ${{ secrets.DEPLOY_SSH_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: ${{ secrets.DEPLOY_SSH_PORT }}
-          script_stop: true
+          # appleboy/ssh-action v1 dropped `script_stop` (it logged "Unexpected
+          # input" and kept going), so the script stops itself: `set -e` makes
+          # a failed composer install or migrate fail the deploy instead of
+          # running config:cache and route:cache over a half-updated app.
+          # Steps that must never fail it carry `|| echo`/`|| true`. Plain
+          # `-e`, no pipefail: the SECRET_KEY pipeline below must reach its own
+          # clear error message. The host's login shell is bash.
           script: |
+            set -e
             export PHP_BIN="${{ vars.PHP_BIN || 'php' }}"
             cd ${{ vars.DEPLOY_PATH || '~/pawpawcare' }}
             # Refuse to deploy without a real JWT signing key (JwtSecretGuard
