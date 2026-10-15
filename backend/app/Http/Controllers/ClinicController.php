@@ -67,7 +67,7 @@ class ClinicController extends Controller
     {
         $clinic = Clinic::where('id', $clinicId)->where('pet_id', $petId)->first();
         if (! $clinic) {
-            abort(404, 'Clinic not found');
+            abort(404, __('Clinic not found'));
         }
 
         return $clinic;
@@ -77,7 +77,7 @@ class ClinicController extends Controller
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         return $pet;

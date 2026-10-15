@@ -85,7 +85,7 @@ class NotificationController extends Controller
             ->first();
 
         if (! $delivery) {
-            abort(404, 'Notification not found');
+            abort(404, __('Notification not found'));
         }
 
         return $delivery;

@@ -56,6 +56,9 @@ class RevenueCatWebhookController extends Controller
 
     public function handle(Request $request, EntitlementWriter $writer): JsonResponse
     {
+        // Every message here stays English, not __(): the reader is
+        // RevenueCat's delivery log (server to server), never an app user.
+        //
         // Plain responses (not abort()): an unconfigured webhook is an
         // expected state, not an error to report for every scanner request.
         $secret = (string) config('services.revenuecat.webhook_auth');

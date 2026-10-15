@@ -31,7 +31,7 @@ class EmailVerificationController extends Controller
             return response()->json(['status' => 'already_verified']);
         }
         if (str_ends_with(strtolower($user->email), self::PLACEHOLDER_DOMAIN)) {
-            abort(422, 'This account has no email address to confirm.');
+            abort(422, __('This account has no email address to confirm.'));
         }
 
         // Per-user cap enforced here, not just by route middleware, so it
@@ -39,7 +39,7 @@ class EmailVerificationController extends Controller
         // codes would make the 6-digit space brute-forceable.
         $key = 'email-verify-send|'.$user->id;
         if (RateLimiter::tooManyAttempts($key, 5)) {
-            abort(429, 'Too many codes requested — try again in an hour.');
+            abort(429, __('Too many codes requested — try again in an hour.'));
         }
         RateLimiter::hit($key, 3600);
 
@@ -96,13 +96,13 @@ class EmailVerificationController extends Controller
             : 0;
 
         if ($reserved !== 1 || ! Hash::check($data['code'], $record->code_hash)) {
-            abort(400, 'Invalid or expired code');
+            abort(400, __('Invalid or expired code'));
         }
 
         // Single-use: only the request that marks it used verifies.
         $used = EmailVerificationCode::where('id', $record->id)->whereNull('used_at')->update(['used_at' => now()]);
         if ($used !== 1) {
-            abort(400, 'Invalid or expired code');
+            abort(400, __('Invalid or expired code'));
         }
         $user->forceFill(['email_verified_at' => now()])->save();
 

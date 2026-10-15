@@ -30,7 +30,7 @@ class PetShareController extends Controller
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         $data = $request->validate([
@@ -63,7 +63,7 @@ class PetShareController extends Controller
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         $pet->forceFill(['share_token' => Str::random(40)])->save();
@@ -86,14 +86,14 @@ class PetShareController extends Controller
         ])->find($petId);
 
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         // The signature is valid (middleware passed), but the embedded token
         // must still match the pet's current one — a rotated token means this
         // link was revoked. 410 Gone distinguishes it from a tampered 403.
         if (! $pet->share_token || ! hash_equals($pet->share_token, (string) $request->query('t'))) {
-            abort(410, 'This share link has been revoked.');
+            abort(410, __('This share link has been revoked.'));
         }
 
         // Document links piggyback on this page's own expiry (the `expires`

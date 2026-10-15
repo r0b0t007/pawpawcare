@@ -38,7 +38,7 @@ class ExportController extends Controller
                 ->values();
             $pets = $query->whereIn('id', $ids)->orderBy('name')->get();
             if ($pets->count() !== $ids->count()) {
-                abort(404, 'Pet not found');
+                abort(404, __('Pet not found'));
             }
         } else {
             $pets = $query->orderBy('name')->get();

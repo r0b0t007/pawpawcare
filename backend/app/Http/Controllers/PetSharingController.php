@@ -35,7 +35,7 @@ class PetSharingController extends Controller
 
         // Can't invite yourself.
         if ($email === strtolower($pet->owner->email ?? $request->user()->email)) {
-            abort(422, 'You already own this pet');
+            abort(422, __('You already own this pet'));
         }
 
         // Already a co-owner? Nothing to do.
@@ -43,7 +43,7 @@ class PetSharingController extends Controller
             ->whereRaw('LOWER(users.email) = ?', [$email])
             ->exists();
         if ($alreadyMember) {
-            abort(422, 'That person already has access to this pet');
+            abort(422, __('That person already has access to this pet'));
         }
 
         // Reuse an existing pending invite so a double-tap can't create duplicates.
@@ -63,7 +63,7 @@ class PetSharingController extends Controller
 
         $member = $pet->members()->where('users.id', $userId)->first();
         if (! $member) {
-            abort(404, 'Member not found');
+            abort(404, __('Member not found'));
         }
         $pet->members()->detach($userId);
         ReminderScheduler::purgeForMember($pet, $member);
@@ -81,7 +81,7 @@ class PetSharingController extends Controller
             ->where('status', 'pending')
             ->first();
         if (! $invite) {
-            abort(404, 'Invite not found');
+            abort(404, __('Invite not found'));
         }
         $invite->delete();
 
@@ -94,7 +94,7 @@ class PetSharingController extends Controller
         $user = $request->user();
         $pet = Pet::where('id', $petId)->first();
         if (! $pet || ! $pet->members()->where('users.id', $user->id)->exists()) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
         $pet->members()->detach($user->id);
         ReminderScheduler::purgeForMember($pet, $user);
@@ -138,7 +138,7 @@ class PetSharingController extends Controller
         // flips no row and no membership is granted.
         $accepted = PetInvite::where('id', $invite->id)->where('status', 'pending')->update(['status' => 'accepted']);
         if ($accepted !== 1) {
-            abort(404, 'Invite not found');
+            abort(404, __('Invite not found'));
         }
 
         // Idempotent: re-accepting (or owning) won't create a duplicate row.
@@ -186,7 +186,7 @@ class PetSharingController extends Controller
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         return $pet;
@@ -196,7 +196,7 @@ class PetSharingController extends Controller
     {
         $pet = Pet::where('id', $petId)->where('owner_id', $request->user()->id)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         return $pet;
@@ -205,7 +205,7 @@ class PetSharingController extends Controller
     private function myPendingInviteOr404(string $inviteId, User $user): PetInvite
     {
         if (! $user->hasVerifiedEmail()) {
-            abort(403, 'Confirm your email address to respond to invitations');
+            abort(403, __('Confirm your email address to respond to invitations'));
         }
 
         $invite = PetInvite::where('id', $inviteId)
@@ -213,7 +213,7 @@ class PetSharingController extends Controller
             ->where('status', 'pending')
             ->first();
         if (! $invite || ! self::sameEmail($invite->email, $user->email)) {
-            abort(404, 'Invite not found');
+            abort(404, __('Invite not found'));
         }
 
         return $invite;

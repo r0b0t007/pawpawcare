@@ -23,6 +23,12 @@ class User extends Model implements AuthenticatableContract
      */
     public const DELETION_GRACE_DAYS = 30;
 
+    /**
+     * Languages the API speaks (`users.locale`, SetLocale middleware, lang/).
+     * The first one is the default and the fallback for anything else.
+     */
+    public const LOCALES = ['en', 'fr', 'es'];
+
     protected $keyType = 'string';
 
     public $incrementing = false;
@@ -38,6 +44,8 @@ class User extends Model implements AuthenticatableContract
         });
     }
 
+    // `locale` is deliberately absent: UserController::update and
+    // DeviceController::store assign it explicitly after Rule::in(LOCALES).
     protected $fillable = [
         'name', 'email', 'hashed_password', 'avatar_url', 'bio', 'is_active', 'timezone',
         'provider', 'provider_id',
@@ -233,6 +241,7 @@ class User extends Model implements AuthenticatableContract
             'is_admin' => (bool) $this->is_admin,
             'engagement_pushes_enabled' => (bool) $this->engagement_pushes_enabled,
             'analytics_opt_out' => (bool) $this->analytics_opt_out,
+            'locale' => $this->locale ?? self::LOCALES[0],
             'email_verified' => $this->hasVerifiedEmail(),
             // Subscription state + server-side switches (paywall, visibility,
             // which features would ask this user to upgrade).

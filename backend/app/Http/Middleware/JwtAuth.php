@@ -33,13 +33,13 @@ class JwtAuth implements AuthenticatesRequests
         $header = (string) $request->header('Authorization', '');
 
         if (! str_starts_with($header, 'Bearer ')) {
-            return response()->json(['detail' => 'Invalid or expired access token'], 401);
+            return response()->json(['detail' => __('Invalid or expired access token')], 401);
         }
 
         $payload = JwtService::decode(substr($header, 7));
 
         if (! $payload || ($payload['type'] ?? null) !== 'access') {
-            return response()->json(['detail' => 'Invalid or expired access token'], 401);
+            return response()->json(['detail' => __('Invalid or expired access token')], 401);
         }
 
         $user = User::where('id', $payload['sub'] ?? '')
@@ -47,13 +47,13 @@ class JwtAuth implements AuthenticatesRequests
             ->first();
 
         if (! $user) {
-            return response()->json(['detail' => 'User not found'], 401);
+            return response()->json(['detail' => __('User not found')], 401);
         }
 
         // Revoked by User::revokeAllSessions() (password reset, social-link
         // takeover). Tokens minted before `ver` existed count as version 0.
         if ((int) ($payload['ver'] ?? 0) !== (int) $user->token_version) {
-            return response()->json(['detail' => 'Invalid or expired access token'], 401);
+            return response()->json(['detail' => __('Invalid or expired access token')], 401);
         }
 
         $request->setUserResolver(fn () => $user);

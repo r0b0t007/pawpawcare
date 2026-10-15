@@ -111,12 +111,12 @@ class CareController extends Controller
         ])->find($petId);
 
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         // Valid signature, but a rotated token means the link was revoked.
         if (! $pet->care_token || ! hash_equals($pet->care_token, (string) $request->query('t'))) {
-            abort(410, 'This caretaker link has been revoked.');
+            abort(410, __('This caretaker link has been revoked.'));
         }
 
         return response()
@@ -132,7 +132,7 @@ class CareController extends Controller
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         return $pet;

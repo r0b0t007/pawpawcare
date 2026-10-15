@@ -116,7 +116,7 @@ class MedicationController extends Controller
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         return $pet;
@@ -126,7 +126,7 @@ class MedicationController extends Controller
     {
         $med = Medication::where('id', $medicationId)->where('pet_id', $petId)->first();
         if (! $med) {
-            abort(404, 'Medication not found');
+            abort(404, __('Medication not found'));
         }
 
         return $med;

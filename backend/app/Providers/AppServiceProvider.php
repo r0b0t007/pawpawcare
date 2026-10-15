@@ -159,7 +159,7 @@ class AppServiceProvider extends ServiceProvider
                 // The app surfaces this `detail` verbatim in the export sheet,
                 // so say something friendlier than "Too Many Attempts."
                 ->response(fn () => response()->json(
-                    ['detail' => 'Too many exports — please try again in an hour.'], 429
+                    ['detail' => __('Too many exports — please try again in an hour.')], 429
                 ));
         });
 

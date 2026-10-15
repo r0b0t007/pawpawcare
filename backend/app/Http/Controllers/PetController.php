@@ -109,7 +109,7 @@ class PetController extends Controller
 
         // Deleting a pet is destructive and owner-only; co-owners can only `leave`.
         if ($pet->owner_id !== $request->user()->id) {
-            abort(403, 'Only the owner can delete this pet');
+            abort(403, __('Only the owner can delete this pet'));
         }
         $pet->delete();
 
@@ -164,7 +164,7 @@ class PetController extends Controller
 
         $vax = Vaccination::where('id', $vaxId)->where('pet_id', $petId)->first();
         if (! $vax) {
-            abort(404, 'Vaccination not found');
+            abort(404, __('Vaccination not found'));
         }
 
         $vax->status = 'completed';
@@ -186,7 +186,7 @@ class PetController extends Controller
 
         $vax = Vaccination::where('id', $vaxId)->where('pet_id', $petId)->first();
         if (! $vax) {
-            abort(404, 'Vaccination not found');
+            abort(404, __('Vaccination not found'));
         }
         ReminderScheduler::cancelVaccinationReminder($vax);
         $vax->delete();
@@ -227,7 +227,7 @@ class PetController extends Controller
 
         $activity = Activity::where('id', $activityId)->where('pet_id', $petId)->first();
         if (! $activity) {
-            abort(404, 'Activity not found');
+            abort(404, __('Activity not found'));
         }
         $activity->delete();
 
@@ -264,7 +264,7 @@ class PetController extends Controller
 
         $food = FavoriteFood::where('id', $foodId)->where('pet_id', $petId)->first();
         if (! $food) {
-            abort(404, 'Food not found');
+            abort(404, __('Food not found'));
         }
         $food->delete();
 
@@ -316,7 +316,7 @@ class PetController extends Controller
 
         $log = WeightLog::where('id', $weightId)->where('pet_id', $petId)->first();
         if (! $log) {
-            abort(404, 'Weight entry not found');
+            abort(404, __('Weight entry not found'));
         }
         $log->delete();
 
@@ -396,7 +396,7 @@ class PetController extends Controller
 
         $expense = Expense::where('id', $expenseId)->where('pet_id', $petId)->first();
         if (! $expense) {
-            abort(404, 'Expense not found');
+            abort(404, __('Expense not found'));
         }
         $expense->delete();
 
@@ -412,7 +412,7 @@ class PetController extends Controller
             ->first();
 
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         return $pet;

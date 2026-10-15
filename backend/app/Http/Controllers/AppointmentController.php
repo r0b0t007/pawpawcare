@@ -78,7 +78,7 @@ class AppointmentController extends Controller
     private function assertClinicBelongs(?string $clinicId, string $petId): void
     {
         if ($clinicId && ! Clinic::where('id', $clinicId)->where('pet_id', $petId)->exists()) {
-            abort(422, 'Clinic not found for this pet');
+            abort(422, __('Clinic not found for this pet'));
         }
     }
 
@@ -86,7 +86,7 @@ class AppointmentController extends Controller
     {
         $appt = Appointment::where('id', $appointmentId)->where('pet_id', $petId)->first();
         if (! $appt) {
-            abort(404, 'Appointment not found');
+            abort(404, __('Appointment not found'));
         }
 
         return $appt;
@@ -96,7 +96,7 @@ class AppointmentController extends Controller
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         return $pet;
