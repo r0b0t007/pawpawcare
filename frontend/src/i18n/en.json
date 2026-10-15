@@ -106,5 +106,20 @@
       "caption": "Free forever — your records are never locked behind a plan.",
       "failed": "Export failed — nothing was lost, try again"
     }
+  },
+  "subscription": {
+    "plan": {
+      "plus": "PawPawCare Plus",
+      "included": "Plus features included",
+      "free": "Free plan"
+    },
+    "status": {
+      "lifetime": "Lifetime",
+      "paymentIssue": "Payment issue",
+      "renews": "Renews {{date}}",
+      "active": "Active",
+      "ends": "Ends {{date}}",
+      "endsSoon": "Ends soon"
+    }
   }
 }

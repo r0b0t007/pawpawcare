@@ -11,6 +11,7 @@ import {
   restoreOutcome,
   storeName,
 } from '../../utils/subscription';
+import { useLocale } from '../../i18n';
 import { ui, type } from '../../theme';
 import { Card, ListRow, StatusPill, Button, showToast, ScreenHeader } from '../../components';
 
@@ -19,6 +20,9 @@ import { Card, ListRow, StatusPill, Button, showToast, ScreenHeader } from '../.
 // cancelling opens the store. Status is shown once, in the pill.
 
 export default function SubscriptionScreen({ navigation }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const { plan, included, canPurchase } = usePlan();
   const restore = useRestore();
   const status = planStatus(plan);

@@ -117,3 +117,27 @@ test('shows the whole screen, interactive, once everything has loaded', async ()
   expect(tree.root.findAllByType(PetCard)[0].props.disabled).toBe(false);
   expect(mockUsePetsQuery).toHaveBeenCalledWith({ enabled: false });
 });
+
+// Home stays mounted under the tab bar, so a language switch made in Profile
+// must re-render it — including the Coming up rows its memo built (CHW-188).
+test('switching the language re-renders Coming up dates and times at once', async () => {
+  const i18n = require('../../../i18n').default;
+  const reminder = {
+    id: 'r1', pet_id: 'p1', title: 'Flea drops', enabled: true,
+    schedule_type: 'once', fire_at: '2026-10-17T09:00:00',
+  };
+  const shown = await render({ store: { dataLoaded: true, pets: [BISCUIT], reminders: [reminder] }, early: [BISCUIT] });
+  expect(shown).toContain('Biscuit · Oct 17, 9:00 AM');
+
+  try {
+    await act(async () => {
+      await i18n.changeLanguage('fr');
+    });
+    expect(texts(tree)).toContain('Biscuit · 17 oct., 9:00');
+  } finally {
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+  }
+  expect(texts(tree)).toContain('Biscuit · Oct 17, 9:00 AM');
+});

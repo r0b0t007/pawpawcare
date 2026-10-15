@@ -12,6 +12,7 @@ import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHead
 import { useInFlight } from '../../hooks/useInFlight';
 import { petById } from '../../utils/pets';
 import { fmtDate } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 import { EASE_OUT_CSS } from '../../components/motion';
 
 const ROW_OUT = FadeOut.duration(150);
@@ -40,6 +41,9 @@ function scheduleSummary(r) {
 }
 
 export default function RemindersScreen({ navigation }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const { reminders, pets, addReminder, updateReminder, deleteReminder } = useData();
   // A reminder tied to a pet shows that pet's face — recognised before read.
   const petOf = (r) => petById(pets, r.pet_id) || null;

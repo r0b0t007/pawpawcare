@@ -1,4 +1,5 @@
-// Language setting (CHW-188): Device default / English / Français / Español.
+// Language setting (CHW-188): English / Français / Español (Device default
+// joins them once device detection is rolled out, see src/i18n/rollout.js).
 // Choosing one switches the app at once (no restart), is saved on the device,
 // and is sent to the account fire-and-forget.
 jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: () => null }));
@@ -70,14 +71,16 @@ afterEach(() => act(async () => {
   await i18n.changeLanguage('en');
 }));
 
-test('the Language row follows the device by default and offers the four choices', async () => {
+test('the Language row starts in English and offers the three languages', async () => {
   const tree = await render();
   const row = languageRow(tree, 'App language');
-  expect(row.props.value).toBe('Device default');
+  expect(row.props.value).toBe('English');
 
   await act(async () => row.props.onPress());
-  expect(['Device default', 'English', 'Français', 'Español'].map((l) => chip(tree, l).props.active))
-    .toEqual([true, false, false, false]);
+  expect(['English', 'Français', 'Español'].map((l) => chip(tree, l).props.active))
+    .toEqual([true, false, false]);
+  // Not offered until the whole app is translated.
+  expect(chip(tree, 'Device default')).toBeUndefined();
 });
 
 test('choosing Français switches the screen at once, saves it and tells the account', async () => {
@@ -104,7 +107,7 @@ test('choosing Français switches the screen at once, saves it and tells the acc
   expect(languageRow(tree, 'Langue de l\'application').props.value).toBe('Français');
 });
 
-test('Español uses formal es-ES copy, and Device default goes back to the device language', async () => {
+test('Español uses formal es-ES copy, and English goes back to English', async () => {
   const tree = await render();
   await act(async () => languageRow(tree, 'App language').props.onPress());
   await act(async () => {
@@ -115,11 +118,10 @@ test('Español uses formal es-ES copy, and Device default goes back to the devic
 
   await act(async () => languageRow(tree, 'Idioma de la aplicación').props.onPress());
   await act(async () => {
-    await chip(tree, 'Idioma del dispositivo').props.onPress();
+    await chip(tree, 'English').props.onPress();
   });
-  // jest-setup pins the device to English.
   expect(i18n.language).toBe('en');
-  expect(setPref).toHaveBeenLastCalledWith('language', 'device');
+  expect(setPref).toHaveBeenLastCalledWith('language', 'en');
   expect(mockUpdateUser).toHaveBeenLastCalledWith({ locale: 'en' });
-  expect(languageRow(tree, 'App language').props.value).toBe('Device default');
+  expect(languageRow(tree, 'App language').props.value).toBe('English');
 });

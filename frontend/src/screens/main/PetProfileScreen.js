@@ -17,6 +17,7 @@ import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
 import { fmtDate, fmtFull, fmtMonth, fmtShort, fmtTime, parseDay } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
@@ -77,6 +78,9 @@ const vaxPill = (v) => (v.status === 'overdue'
 const NO_WEIGHTS = [];
 
 export default function PetProfileScreen({ navigation, route }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const { petId } = route.params;
   const {
     pets, myReports, medDoseDays, medDoseCounts, addFavoriteFood, removeFavoriteFood, addActivity,

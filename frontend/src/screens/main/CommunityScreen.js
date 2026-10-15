@@ -19,6 +19,7 @@ import {
 } from '../../components';
 import LostPetCard from './LostPetCard';
 import PostCard from './PostCard';
+import { useLocale } from '../../i18n';
 
 // One screen, three peer sections (Feed / Lost pets / Groups) on a segmented
 // control. A lost pet from someone else always tops the feed — the
@@ -36,6 +37,9 @@ const SECTIONS = [
 ];
 
 export default function CommunityScreen({ navigation }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const { user } = useAuth();
   const {
     posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets,

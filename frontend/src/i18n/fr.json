@@ -113,5 +113,20 @@
       "caption": "Gratuit pour toujours : vos dossiers ne sont jamais réservés à un abonnement.",
       "failed": "Échec de l'export. Rien n'a été perdu, veuillez réessayer."
     }
+  },
+  "subscription": {
+    "plan": {
+      "plus": "PawPawCare Plus",
+      "included": "Fonctionnalités Plus incluses",
+      "free": "Offre gratuite"
+    },
+    "status": {
+      "lifetime": "À vie",
+      "paymentIssue": "Problème de paiement",
+      "renews": "Renouvellement le {{date}}",
+      "active": "Actif",
+      "ends": "Se termine le {{date}}",
+      "endsSoon": "Se termine bientôt"
+    }
   }
 }

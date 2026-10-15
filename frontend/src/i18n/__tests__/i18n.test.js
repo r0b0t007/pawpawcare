@@ -2,6 +2,16 @@
 // their language, everything else English; a saved choice wins over the
 // device; on Android the device language is re-read on return to foreground
 // while the setting follows the device.
+//
+// Detection ships switched off (./rollout) until every CHW-187 screen is
+// translated: the app then starts in English and only an explicit choice
+// changes it. Both modes are covered; `follow` picks one per test.
+let mockFollowDevice = true;
+jest.mock('../rollout', () => ({
+  get FOLLOW_DEVICE_LANGUAGE() {
+    return mockFollowDevice;
+  },
+}));
 let mockDeviceLanguage = 'en';
 jest.mock('expo-localization', () => ({
   getLocales: () => [{ languageCode: mockDeviceLanguage }],
@@ -18,7 +28,8 @@ jest.mock('../../services/prefs', () => ({
 const { AppState, Platform } = require('react-native');
 
 // A fresh i18n module per test (it initialises at import).
-function load({ device = 'en', saved, os = 'android' } = {}) {
+function load({ device = 'en', saved, os = 'android', follow = true } = {}) {
+  mockFollowDevice = follow;
   mockDeviceLanguage = device;
   Object.keys(mockPrefs).forEach((k) => delete mockPrefs[k]);
   if (saved !== undefined) mockPrefs.language = saved;
@@ -100,4 +111,36 @@ test('iOS restarts the app on a language change, so no listener there', async ()
   const { initI18n } = load({ device: 'en', os: 'ios' });
   await initI18n();
   expect(appStateListener).toBeNull();
+});
+
+describe('before the device-language rollout (FOLLOW_DEVICE_LANGUAGE off)', () => {
+  test.each(['fr', 'es', 'de'])('a %s device still starts in English', async (device) => {
+    const { initI18n, currentLocale, intlLocale, languageChoice } = load({ device, follow: false });
+    expect(currentLocale()).toBe('en');
+    expect(intlLocale()).toBe('en-US');
+    expect(await initI18n()).toBe('en');
+    expect(languageChoice()).toBe('en');
+  });
+
+  test('"Device default" is not offered, and a saved "device" reads as English', async () => {
+    const { initI18n, LANGUAGE_CHOICES, languageChoice, currentLocale } = load({ device: 'fr', saved: 'device', follow: false });
+    expect(LANGUAGE_CHOICES).toEqual(['en', 'fr', 'es']);
+    expect(await initI18n()).toBe('en');
+    expect(languageChoice()).toBe('en');
+    expect(currentLocale()).toBe('en');
+  });
+
+  test('an explicit choice still switches the app, and is kept', async () => {
+    const { initI18n, setLanguageChoice, currentLocale } = load({ device: 'en', saved: 'es', follow: false });
+    expect(await initI18n()).toBe('es');
+    expect(currentLocale()).toBe('es');
+    expect(await setLanguageChoice('fr')).toBe('fr');
+    expect(mockPrefs.language).toBe('fr');
+  });
+
+  test('the device language is never re-read on Android', async () => {
+    const { initI18n } = load({ device: 'en', follow: false });
+    await initI18n();
+    expect(appStateListener).toBeNull();
+  });
 });

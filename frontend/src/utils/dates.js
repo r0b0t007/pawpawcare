@@ -15,8 +15,7 @@ const isValid = (date) => date instanceof Date && !Number.isNaN(date.getTime());
 // ('yesterday', 'in 3 weeks', '5m ago') are i18n strings, not Intl output.
 // Formatters are cached per locale + options: building one is costly on Hermes.
 const formatters = new Map();
-const formatter = (options) => {
-  const locale = intlLocale();
+const formatter = (options, locale = intlLocale()) => {
   const key = `${locale}|${JSON.stringify(options)}`;
   let f = formatters.get(key);
   if (!f) {
@@ -26,8 +25,12 @@ const formatter = (options) => {
   return f;
 };
 
-/** Any date in the app language with Intl options; '' if invalid. */
-export const fmtDate = (date, options) => (isValid(date) ? formatter(options).format(date) : '');
+/**
+ * Any date in the app language with Intl options; '' if invalid. `locale`
+ * overrides the app language's Intl locale (a BCP 47 tag) for the rare
+ * caller that needs one.
+ */
+export const fmtDate = (date, options, locale) => (isValid(date) ? formatter(options, locale).format(date) : '');
 
 const weekday = (date) => fmtDate(date, { weekday: 'short' });
 const monthName = (date) => fmtDate(date, { month: 'short' });

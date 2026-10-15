@@ -9,6 +9,7 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { getPref } from '../../services/prefs';
 import { fmtShort, fmtDay, fmtDate, fmtClock, fmtWeekday, dayDiff, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 import { petById } from '../../utils/pets';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
@@ -72,6 +73,9 @@ function PetFilterChip({ pet, active, onPress }) {
 }
 
 export default function HealthHubScreen({ navigation }) {
+  // The app language: tabs stay mounted, so a language switch must re-render
+  // (and re-run the memos below that build date strings).
+  const locale = useLocale();
   const { pets, reminders, lastSyncedAt, addVaccination, markVaccinationComplete } = useData();
 
   const [filter, setFilter] = useState('all');
@@ -203,7 +207,7 @@ export default function HealthHubScreen({ navigation }) {
       ].filter((sec) => sec.items.length > 0),
       history: done,
     };
-  }, [shownPets, pets, listedReminders, filter, navigation, today, reminderTick]);
+  }, [shownPets, pets, listedReminders, filter, navigation, today, reminderTick, locale]);
 
   // The "Scheduled on this device" caption sits on the first section holding
   // a reminder, and stays hidden when there are none (findIndex → -1).

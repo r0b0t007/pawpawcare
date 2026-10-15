@@ -113,5 +113,20 @@
       "caption": "Gratis para siempre: sus historiales nunca quedan bloqueados tras un plan.",
       "failed": "Error al exportar. No se ha perdido nada; inténtelo de nuevo."
     }
+  },
+  "subscription": {
+    "plan": {
+      "plus": "PawPawCare Plus",
+      "included": "Funciones Plus incluidas",
+      "free": "Plan gratuito"
+    },
+    "status": {
+      "lifetime": "De por vida",
+      "paymentIssue": "Problema con el pago",
+      "renews": "Se renueva el {{date}}",
+      "active": "Activo",
+      "ends": "Finaliza el {{date}}",
+      "endsSoon": "Finaliza pronto"
+    }
   }
 }

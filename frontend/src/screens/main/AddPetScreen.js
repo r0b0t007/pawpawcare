@@ -15,6 +15,7 @@ import { pickAndUploadImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
 import { useInFlight } from '../../hooks/useInFlight';
 import { fmtFull, parseDay } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 import { resolveAsset } from '../../config';
 import { ui, radii, type, motion, petPair, photos, scrim, PET_COLOR_PAIRS } from '../../theme';
 import { Button, Card, Chip, StepProgress, Toggle, showToast, speciesIcon } from '../../components';
@@ -72,6 +73,9 @@ const blankForm = () => ({
 });
 
 export default function AddPetScreen({ navigation }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const { addPet } = useData();
 
   const [form, setForm] = useState(blankForm);

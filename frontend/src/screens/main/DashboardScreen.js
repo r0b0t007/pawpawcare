@@ -22,6 +22,7 @@ import { noteGoodMoment } from '../../services/storeReview';
 import { dayKey } from '../../utils/streaks';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { dayDiff, fmtClock, fmtShort, fmtTime, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 import { petById, petMeta, petPhoto } from '../../utils/pets';
 import { ui, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
@@ -69,6 +70,9 @@ const TEASER_PAIR = PET_COLOR_PAIRS[3];
 const MED_ROWS = 4;
 
 export default function DashboardScreen({ navigation }) {
+  // The app language: tabs stay mounted, so a language switch must re-render
+  // (and re-run the memos below that build date strings).
+  const locale = useLocale();
   const { user } = useAuth();
   const {
     dataLoaded, pets, posts, reminders, unreadCount, medDoseDays, medDoseCounts,
@@ -288,7 +292,7 @@ export default function DashboardScreen({ navigation }) {
       hiddenOverdue: hidden('overdue'),
       hiddenDue: hidden('due_soon'),
     };
-  }, [pets, reminders, today, reminderTick]);
+  }, [pets, reminders, today, reminderTick, locale]);
 
   // Today's daily care across the household: active daily meds, counted in
   // doses (one per scheduled time), so a twice-daily med is half done after
