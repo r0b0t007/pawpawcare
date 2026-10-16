@@ -102,7 +102,7 @@ test('Vaccines', async () => {
   expect(shown).toContain('Rabies needs booking');
   expect(shown).toContain('Was due Oct 1, 2026');
   await inFrench(async () => {
-    expect(texts(tree)).toContain('Rendez-vous à prendre pour Rabies');
+    expect(texts(tree)).toContain('Rendez-vous à prendre : Rabies');
   });
 });
 
@@ -133,7 +133,7 @@ test('Medical records', async () => {
   );
   expect(shown).toContain("Start Biscuit's vault");
   await inFrench(async () => {
-    expect(texts(tree)).toContain('Commencez le coffre de Biscuit');
+    expect(texts(tree)).toContain('Créez le coffre de Biscuit');
   });
 });
 

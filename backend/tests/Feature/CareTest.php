@@ -198,7 +198,7 @@ class CareTest extends TestCase
 
         $this->withHeader('Accept-Language', 'es')->get($url)
             ->assertStatus(410)
-            ->assertJsonPath('detail', 'Este enlace de cuidador se ha revocado.');
+            ->assertJsonPath('detail', 'Este enlace para cuidadores se ha revocado.');
     }
 
     public function test_care_and_vet_links_revoke_independently(): void

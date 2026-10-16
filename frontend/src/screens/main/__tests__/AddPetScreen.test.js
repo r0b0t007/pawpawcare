@@ -52,7 +52,7 @@ test('French: chrome translated; a breed chip shows French in the field but stor
   });
   const tree = render();
   expect(texts(tree)).toEqual(expect.arrayContaining([
-    'Étape 1 sur 3', 'De qui allons-nous prendre soin ?', 'Chien', 'Chat',
+    'Étape 1 sur 3', 'De qui allons-nous prendre soin ?', 'Chien', 'Chat',
   ]));
 
   act(() => pressable(tree, 'Continuer').props.onPress());

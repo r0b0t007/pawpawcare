@@ -57,7 +57,7 @@
       "digestTitle": "Resumen de la comunidad",
       "digestSubtitle": "Lo más destacado de sus grupos, cada semana",
       "celebrationsTitle": "Celebraciones y resúmenes",
-      "celebrationsSubtitle": "Cumpleaños, aniversarios de adopción, resumen semanal de cuidados",
+      "celebrationsSubtitle": "Cumpleaños, días de adopción, resumen semanal de cuidados",
       "celebrationsA11y": "Celebraciones y resúmenes"
     },
     "sharing": {
@@ -143,7 +143,7 @@
     "restoring": "Restaurando…",
     "restoreSubtitle": "Comprado en otro dispositivo o cuenta",
     "deleteCaption": "Eliminar su cuenta de PawPawCare no cancela la facturación: cancélela primero en {{store}}.",
-    "openStoreFailed": "No se ha podido abrir la tienda: inténtelo desde sus ajustes",
+    "openStoreFailed": "No se ha podido abrir la tienda: inténtelo desde los ajustes de la tienda",
     "manageInStore": "Gestiónela desde los ajustes de su tienda de aplicaciones",
     "restoreFailed": "No se han podido restaurar las compras: inténtelo de nuevo",
     "restoreOutcome": {
@@ -199,7 +199,7 @@
   },
   "auth": {
     "emailLabel": "Correo electrónico",
-    "emailPlaceholder": "usted@ejemplo.com",
+    "emailPlaceholder": "nombre@ejemplo.com",
     "passwordLabel": "Contraseña",
     "confirmPasswordLabel": "Confirmar contraseña",
     "reactivated": "Bienvenido de nuevo: se ha cancelado la eliminación de su cuenta.",
@@ -226,7 +226,7 @@
       "title": "Cree su cuenta",
       "subtitle": "Los historiales de su manada, seguros en un solo lugar.",
       "nameLabel": "Su nombre",
-      "namePlaceholder": "p. ej., Ahmed",
+      "namePlaceholder": "p. ej. Ahmed",
       "minChars": "Mínimo {{min}} caracteres",
       "confirmPlaceholder": "Repita la contraseña",
       "rulesMatch": "Las contraseñas coinciden",
@@ -266,7 +266,7 @@
       "title": "No se puede conectar con PawPawCare",
       "offline": "Su sesión sigue iniciada. Compruebe su conexión e inténtelo de nuevo.",
       "serverDown": "Su sesión sigue iniciada. Nuestro servidor no responde en este momento: inténtelo de nuevo en un instante.",
-      "retry": "Intentar de nuevo",
+      "retry": "Reintentar",
       "signOut": "Cerrar sesión"
     },
     "social": {
@@ -289,7 +289,7 @@
     "dangerZone": "Zona de peligro",
     "delete": "Eliminar cuenta",
     "deleting": "Eliminando cuenta…",
-    "deleteHint": "Su cuenta se desactiva de inmediato y se elimina definitivamente pasados 30 días. Vuelva a iniciar sesión antes de esa fecha para cancelarlo.",
+    "deleteHint": "Su cuenta se desactiva de inmediato y se elimina definitivamente pasados 30 días. Vuelva a iniciar sesión antes de esa fecha para cancelar la eliminación.",
     "deleteFailed": "No se ha podido eliminar su cuenta: inténtelo de nuevo",
     "confirmTitle": "¿Eliminar su cuenta?",
     "confirmMessage": "Su cuenta se desactivará ahora y se eliminará definitivamente dentro de 30 días, con mascotas, historiales, fotos y publicaciones incluidos. Si vuelve a iniciar sesión antes, se cancela la eliminación.",
@@ -298,8 +298,8 @@
   "paywall": {
     "title": "PawPawCare Plus",
     "close": "Cerrar",
-    "done": "Listo",
-    "retry": "Intentar de nuevo",
+    "done": "Hecho",
+    "retry": "Reintentar",
     "reason": {
       "ai_extraction": "La lectura de documentos veterinarios con IA forma parte de Plus.",
       "care_links": "Los enlaces para cuidadores forman parte de Plus."
@@ -439,7 +439,7 @@
     "crash": {
       "title": "Algo ha salido mal",
       "body": "La app ha encontrado un error inesperado. Sus mascotas e historiales están a salvo: inténtelo de nuevo y, si sigue ocurriendo, escriba a {{email}}.",
-      "retry": "Intentar de nuevo"
+      "retry": "Reintentar"
     }
   },
   "home": {
@@ -452,19 +452,19 @@
     "friend": "amigo",
     "meetYourPets": "Conozcamos a sus mascotas",
     "status": {
-      "overdue_one": "{{count}} cosa requiere\nsu atención",
-      "overdue_many": "{{count}} cosas requieren\nsu atención",
-      "overdue_other": "{{count}} cosas requieren\nsu atención",
+      "overdue_one": "{{count}} cosa requiere\nsu atención hoy",
+      "overdue_many": "{{count}} cosas requieren\nsu atención hoy",
+      "overdue_other": "{{count}} cosas requieren\nsu atención hoy",
       "dueSoon_one": "{{count}} cosa vence\npronto",
       "dueSoon_many": "{{count}} cosas vencen\npronto",
       "dueSoon_other": "{{count}} cosas vencen\npronto",
-      "unknown": "Algunos registros\nno se cargaron",
+      "unknown": "Algunos registros\nno se han cargado",
       "oneOk": "{{name}} está\nperfectamente",
       "twoOk": "{{first}} y {{second}}\nestán perfectamente",
       "allOk": "Sus {{total}} mascotas\nestán perfectamente"
     },
-    "vaccinesFailedOne": "No se pudieron cargar las vacunas de {{name}}. Compruebe su conexión.",
-    "vaccinesFailedSome": "No se pudieron cargar algunas vacunas. Compruebe su conexión.",
+    "vaccinesFailedOne": "No se han podido cargar las vacunas de {{name}}. Compruebe su conexión.",
+    "vaccinesFailedSome": "No se han podido cargar algunas vacunas. Compruebe su conexión.",
     "okPets_one": "{{count}} de sus {{total}} mascotas está perfectamente.",
     "okPets_many": "{{count}} de sus {{total}} mascotas están perfectamente.",
     "okPets_other": "{{count}} de sus {{total}} mascotas están perfectamente.",
@@ -507,9 +507,9 @@
     },
     "toast": {
       "doseLogged": "{{med}} de {{pet}} registrado",
-      "doseFailed": "No se pudo registrar {{med}} de {{pet}}. Inténtelo de nuevo.",
-      "vaccineDone": "{{name}} marcado como hecho",
-      "vaccineFailed": "No se pudo marcar {{name}} como hecho. Inténtelo de nuevo."
+      "doseFailed": "No se ha podido registrar {{med}} de {{pet}}. Inténtelo de nuevo.",
+      "vaccineDone": "Marcada como administrada: {{name}}",
+      "vaccineFailed": "No se ha podido marcar como administrada: {{name}}. Inténtelo de nuevo."
     },
     "more": {
       "overdue_one": "{{count}} más atrasado",
@@ -580,10 +580,10 @@
     },
     "toast": {
       "addPetFirst": "Añada primero una mascota",
-      "saveFailed": "No se pudo guardar el registro. Inténtelo de nuevo.",
+      "saveFailed": "No se ha podido guardar el registro. Inténtelo de nuevo.",
       "saved": "Registro guardado",
-      "vaccineDone": "{{name}} marcado como hecho",
-      "vaccineFailed": "No se pudo marcar {{name}} como hecho. Inténtelo de nuevo."
+      "vaccineDone": "Marcada como administrada: {{name}}",
+      "vaccineFailed": "No se ha podido marcar como administrada: {{name}}. Inténtelo de nuevo."
     },
     "dueWhen": "Vence {{when}}",
     "scheduledAt": "Programado · {{time}}",
@@ -598,14 +598,14 @@
     "noPets": {
       "title": "Aún no hay mascotas",
       "body": "Añada su primera mascota y sus vacunas, medicamentos y visitas al veterinario aparecerán aquí.",
-      "action": "Añadir una mascota"
+      "action": "Añadir mascota"
     },
     "scheduledOnDevice": "Programado en este dispositivo",
     "vault": {
       "title": "Archivo médico",
       "petTitle": "Archivo médico de {{name}}",
       "subtitle": "Historiales veterinarios, análisis y documentos",
-      "pickPet": "Elija una mascota para abrir sus registros"
+      "pickPet": "Elija una mascota para abrir su historial"
     },
     "history": "Historial",
     "addRecord": "Añadir registro",
@@ -620,7 +620,7 @@
       "type": "Tipo",
       "pet": "Mascota",
       "name": "Nombre",
-      "namePlaceholder": "p. ej., refuerzo de la rabia",
+      "namePlaceholder": "p. ej. refuerzo de la rabia",
       "dueDate": "Vence el {{date}}",
       "saveOn": "Guardar · {{date}}",
       "thePet": "la mascota",
@@ -642,20 +642,20 @@
       "none": "Aún no hay registros de vacunas"
     },
     "toast": {
-      "scheduleFailed": "No se pudo programar la vacunación. Inténtelo de nuevo.",
+      "scheduleFailed": "No se ha podido programar la vacunación. Inténtelo de nuevo.",
       "scheduled": "Vacunación programada",
-      "done": "{{name}} marcado como hecho",
-      "doneFailed": "No se pudo marcar {{name}} como hecho. Inténtelo de nuevo.",
+      "done": "Marcada como administrada: {{name}}",
+      "doneFailed": "No se ha podido marcar como administrada: {{name}}. Inténtelo de nuevo.",
       "deleted": "Registro eliminado",
-      "deleteFailed": "No se pudo eliminar el registro. Inténtelo de nuevo."
+      "deleteFailed": "No se ha podido eliminar el registro. Inténtelo de nuevo."
     },
     "confirmDone": {
       "title": "Marcar como administrada",
       "message": "¿Marcar «{{name}}» como administrada hoy?",
-      "confirm": "Marcar como hecho"
+      "confirm": "Marcar como administrada"
     },
     "confirmDelete": {
-      "title": "Eliminar registro",
+      "title": "¿Eliminar el registro?",
       "message": "¿Eliminar el registro «{{name}}»?",
       "confirm": "Eliminar"
     },
@@ -663,12 +663,12 @@
     "wasDueOn": "Vencía el {{date}}",
     "dueOn": "Vence el {{date}}",
     "done": "Hecho",
-    "markDoneA11y": "Marcar {{name}} como hecho",
+    "markDoneA11y": "Hecho: marcar como administrada, {{name}}",
     "deleteA11y": "Eliminar {{name}}",
     "sections": {
       "needs": "Requiere atención",
       "upcoming": "Próximas",
-      "done": "Hechas"
+      "done": "Administradas"
     },
     "add": "Añadir vacuna",
     "empty": {
@@ -678,7 +678,7 @@
     "sheet": {
       "title": "Nueva vacuna",
       "name": "Nombre de la vacuna",
-      "namePlaceholder": "p. ej., refuerzo de la rabia",
+      "namePlaceholder": "p. ej. refuerzo de la rabia",
       "dueDate": "Fecha de vencimiento",
       "dueDateA11y": "Fecha de vencimiento, {{date}}",
       "notSet": "sin definir",
@@ -687,7 +687,7 @@
     },
     "picker": {
       "cancel": "Cancelar",
-      "done": "Listo"
+      "done": "Hecho"
     }
   },
   "reminders": {
@@ -700,14 +700,14 @@
       "oneTime": "Una sola vez"
     },
     "toast": {
-      "addFailed": "No se pudo añadir el recordatorio. Inténtelo de nuevo.",
+      "addFailed": "No se ha podido añadir el recordatorio. Inténtelo de nuevo.",
       "added": "Recordatorio añadido",
       "deleted": "Recordatorio eliminado",
-      "deleteFailed": "No se pudo eliminar el recordatorio. Inténtelo de nuevo."
+      "deleteFailed": "No se ha podido eliminar el recordatorio. Inténtelo de nuevo."
     },
     "form": {
       "title": "Nuevo recordatorio",
-      "placeholder": "p. ej., dar a Rex su pastilla contra el gusano del corazón",
+      "placeholder": "p. ej. dar a Rex su pastilla contra el gusano del corazón",
       "add": "Añadir recordatorio"
     },
     "listTitle": "Sus recordatorios",
@@ -758,7 +758,7 @@
     "empty": {
       "title": "Está todo al día",
       "body": "Aquí aparecerán los recordatorios de vacunas, medicamentos y cuidados.",
-      "action": "Añadir un recordatorio"
+      "action": "Añadir recordatorio"
     }
   },
   "records": {
@@ -766,7 +766,7 @@
     "titlePet": "Archivo de {{name}}",
     "subtitle": "Historiales veterinarios, análisis y documentos",
     "opening": "Abriendo el archivo…",
-    "openFailed": "No se pudo abrir el archivo",
+    "openFailed": "No se ha podido abrir el archivo",
     "loadingA11y": "Cargando registros",
     "thisPet": "esta mascota",
     "yourPet": "su mascota",
@@ -801,30 +801,30 @@
       "clinics_other": "{{count}} clínicas"
     },
     "toast": {
-      "refreshFailed": "No se pudo actualizar el archivo. Se muestra lo que ya había.",
-      "openFailed": "No se pudo abrir este archivo",
+      "refreshFailed": "No se ha podido actualizar el archivo. Se muestra lo que ya había.",
+      "openFailed": "No se ha podido abrir este archivo",
       "stillReading": "Todavía se está leyendo otro registro. Inténtelo de nuevo en un momento.",
-      "readFailed": "No se pudo leer el documento"
+      "readFailed": "No se ha podido leer el documento"
     },
     "delete": {
       "confirm": "Eliminar",
       "document": {
         "title": "¿Eliminar el documento?",
-        "message": "¿Quitar este documento del archivo de {{name}}?",
+        "message": "¿Eliminar este documento del archivo de {{name}}?",
         "removed": "Documento eliminado",
-        "failed": "No se pudo eliminar el documento. Inténtelo de nuevo."
+        "failed": "No se ha podido eliminar el documento. Inténtelo de nuevo."
       },
       "appointment": {
         "title": "¿Eliminar la cita?",
-        "message": "¿Quitar esta cita del archivo de {{name}}?",
+        "message": "¿Eliminar esta cita del archivo de {{name}}?",
         "removed": "Cita eliminada",
-        "failed": "No se pudo eliminar la cita. Inténtelo de nuevo."
+        "failed": "No se ha podido eliminar la cita. Inténtelo de nuevo."
       },
       "clinic": {
         "title": "¿Eliminar la clínica?",
-        "message": "¿Quitar esta clínica del archivo de {{name}}?",
+        "message": "¿Eliminar esta clínica del archivo de {{name}}?",
         "removed": "Clínica eliminada",
-        "failed": "No se pudo eliminar la clínica. Inténtelo de nuevo."
+        "failed": "No se ha podido eliminar la clínica. Inténtelo de nuevo."
       }
     },
     "deleteA11y": "Eliminar {{name}}",
@@ -846,7 +846,7 @@
     "hero": {
       "title": "Todo lo que el veterinario podría pedir",
       "nextVisit": "Próxima visita {{when}}: {{title}}",
-      "private": "Privado para usted y su equipo de cuidado"
+      "private": "Privado para usted y su equipo de cuidados"
     },
     "sections": {
       "documents": "Documentos",
@@ -865,23 +865,23 @@
     "doc": {
       "openHint": "Abre el archivo",
       "open": "Abrir",
-      "review": "Revisar lo que se leyó",
+      "review": "Revisar lo que se ha leído",
       "readWithAi": "Leer con IA",
-      "reviewA11y": "Revisar lo que se leyó de {{title}}",
+      "reviewA11y": "Revisar lo que se ha leído de {{title}}",
       "readA11y": "Leer {{title}} con IA",
       "read": "Leer",
       "permission": "Se necesita permiso para acceder a las fotos.",
-      "pickFailed": "No se pudo seleccionar el archivo.",
+      "pickFailed": "No se ha podido seleccionar el archivo.",
       "defaultTitle": "Registro: {{category}}",
       "uploaded": "Documento subido",
-      "retry": "Reintentar la subida",
+      "retry": "Reintentar subida",
       "uploadAction": "Subir",
       "uploading": "Subiendo…",
       "uploadFailed": "Error al subir: no se ha perdido nada.",
       "chosenA11y": "Archivo elegido: {{name}}, toque para cambiarlo",
       "choose": "Elegir una foto del registro",
       "title": "Título",
-      "titlePlaceholder": "p. ej., certificado de la rabia",
+      "titlePlaceholder": "p. ej. certificado de la rabia",
       "titleA11y": "Título del documento",
       "category": "Categoría"
     },
@@ -889,11 +889,11 @@
       "fallback": "Clínica veterinaria",
       "callA11y": "Llamar a {{name}}",
       "added": "Clínica añadida",
-      "saveFailed": "No se pudo guardar la clínica.",
+      "saveFailed": "No se ha podido guardar la clínica.",
       "sheetTitle": "Añadir clínica veterinaria",
       "save": "Añadir clínica",
       "name": "Nombre de la clínica",
-      "namePlaceholder": "p. ej., Clínica Veterinaria del Río",
+      "namePlaceholder": "p. ej. Clínica Veterinaria del Río",
       "vetName": "Nombre del veterinario (opcional)",
       "phone": "Teléfono",
       "email": "Correo electrónico",
@@ -901,10 +901,10 @@
     },
     "visit": {
       "logged": "Cita registrada",
-      "saveFailed": "No se pudo guardar la cita.",
+      "saveFailed": "No se ha podido guardar la cita.",
       "save": "Guardar",
       "reason": "Motivo",
-      "reasonPlaceholder": "p. ej., revisión anual",
+      "reasonPlaceholder": "p. ej. revisión anual",
       "reasonA11y": "Motivo de la visita",
       "whenA11y": "Fecha y hora, {{when}}",
       "clinic": "Clínica (opcional)",
@@ -917,7 +917,7 @@
       "withSkipped_one": "{{added}} · {{count}} omitido",
       "withSkipped_many": "{{added}} · {{count}} omitidos",
       "withSkipped_other": "{{added}} · {{count}} omitidos",
-      "applyFailed": "No se pudieron aplicar los registros.",
+      "applyFailed": "No se han podido aplicar los registros.",
       "title": "Revise lo que hemos leído",
       "apply": "Aplicar",
       "applyCount_one": "Aplicar {{count}}",
@@ -925,7 +925,7 @@
       "applyCount_other": "Aplicar {{count}}",
       "otherPet": "Puede que este documento sea de otra mascota distinta de {{name}}. Compruébelo antes de aplicar.",
       "thisOne": "esta",
-      "nothingFound": "No se encontraron datos médicos en este documento.",
+      "nothingFound": "No se han encontrado datos médicos en este documento.",
       "vaccinations": "Vacunas",
       "includeVaccine": "Incluir la vacuna {{name}}",
       "vaccineName": "Nombre de la vacuna",
@@ -936,7 +936,7 @@
       "medicationName": "Nombre del medicamento",
       "dosage": "Dosis",
       "frequency": {
-        "daily": "diario",
+        "daily": "diaria",
         "weekly": "semanal",
         "monthly": "mensual",
         "as_needed": "según necesidad"
@@ -955,7 +955,7 @@
     },
     "export": {
       "failed": "Error al exportar ({{status}})",
-      "dialogTitle": "Exportar registros de salud"
+      "dialogTitle": "Exportar historial de salud"
     }
   },
   "gamification": {
@@ -979,10 +979,10 @@
       "pickUp": "Retome donde lo dejó"
     },
     "careStreaks": {
-      "title": "Rachas de cuidado",
-      "weeks_one": "{{count}} semana de cuidado constante",
-      "weeks_many": "{{count}} semanas de cuidado constante",
-      "weeks_other": "{{count}} semanas de cuidado constante",
+      "title": "Rachas de cuidados",
+      "weeks_one": "{{count}} semana de cuidados constantes",
+      "weeks_many": "{{count}} semanas de cuidados constantes",
+      "weeks_other": "{{count}} semanas de cuidados constantes",
       "freshStart": "Nueva semana, nuevo comienzo",
       "firstEntry": "Empieza con un registro"
     },
@@ -1052,7 +1052,7 @@
       "notes": "Notas"
     },
     "vaxStatus": {
-      "overdue": "Vencida",
+      "overdue": "Atrasada",
       "dueSoon": "Vence pronto",
       "scheduled": "Programada"
     },
@@ -1113,7 +1113,7 @@
       "medRemoveFailed": "No se ha podido eliminar el medicamento. Inténtelo de nuevo.",
       "reportedLost": "{{name}} se ha publicado en el tablón de la comunidad",
       "reportLostFailed": "No se ha podido avisar de la pérdida de {{name}}. Compruebe su conexión e inténtelo de nuevo.",
-      "welcomeHome": "¡Bienvenido a casa!",
+      "welcomeHome": "¡Bienvenida a casa!",
       "markFoundFailed": "No se ha podido marcar como encontrada. Inténtelo de nuevo.",
       "weightLogged": "Peso registrado",
       "weightLogFailed": "No se ha podido registrar el peso. Inténtelo de nuevo.",
@@ -1141,7 +1141,7 @@
       "removeMedTitle": "¿Eliminar medicamento?",
       "removeMedMessage": "{{med}} dejará de aparecer en el horario de {{name}}.",
       "markFoundTitle": "¿Marcar como encontrada?",
-      "markFoundMessage": "¿Ha aparecido {{name}} sano y salvo?",
+      "markFoundMessage": "¿Ha aparecido {{name}} a salvo?",
       "markFoundConfirm": "¡Encontrada!",
       "deleteEntryTitle": "¿Eliminar registro?",
       "deleteEntryMessage": "¿Eliminar el registro de {{value}} {{unit}}?",
@@ -1175,7 +1175,7 @@
       "youPlus_one": "Usted + {{count}} copropietario",
       "youPlus_many": "Usted + {{count}} copropietarios",
       "youPlus_other": "Usted + {{count}} copropietarios",
-      "justYou": "Solo usted — invite a su familia a compartirla",
+      "justYou": "Solo usted: invite a su familia a compartirla",
       "sharedWithYou": "Compartida con usted",
       "sharedWithYouBy": "Compartida con usted por {{owner}}"
     },
@@ -1214,7 +1214,7 @@
       "tileA11y": "{{title}}: {{value}}",
       "weightLabel": "PESO",
       "weightLabelValue": "PESO — {{value}} {{unit}}",
-      "notable": "Cambio notable — conviene consultar al veterinario.",
+      "notable": "Cambio notable: conviene consultar al veterinario.",
       "deleteWeightA11y": "Eliminar el peso del {{date}}",
       "noWeights": "Aún no hay pesos registrados.",
       "logWeight": "Registrar peso",
@@ -1225,7 +1225,7 @@
       "notSet": "Sin definir",
       "favoriteFoods": "Comidas favoritas",
       "noneYet": "Ninguna todavía",
-      "careTeam": "Equipo de cuidado",
+      "careTeam": "Equipo de cuidados",
       "shareWithVet": "Compartir con el veterinario",
       "shareWithVetSub": "Enlace de solo lectura al resumen de salud de {{name}}",
       "caretakerHandoff": "Traspaso al cuidador",
@@ -1237,7 +1237,7 @@
     },
     "health": {
       "upcoming": "Próximas",
-      "nothingScheduled": "Nada programado — disfrute de la calma.",
+      "nothingScheduled": "Nada programado: disfrute de la calma.",
       "dueOn": "Vence el {{date}}",
       "vaccinationTracker": "Control de vacunas",
       "vaccinationTrackerSub": "Añada, complete o edite vacunas",
@@ -1261,7 +1261,7 @@
     "menu": {
       "editDetails": "Editar datos",
       "shareWithVet": "Compartir con el veterinario",
-      "careTeam": "Equipo de cuidado",
+      "careTeam": "Equipo de cuidados",
       "markFound": "Marcar a {{name}} como encontrada",
       "reportLost": "Avisar de que {{name}} se ha perdido",
       "leave": "Dejar esta mascota"
@@ -1301,7 +1301,7 @@
     "weight": {
       "title": "Registrar el peso de {{name}}",
       "placeholder": "p. ej. 22.5",
-      "hint": "Se registra en {{unit}} — cambie la unidad en Editar mascota.",
+      "hint": "Se registra en {{unit}}: cambie la unidad en Editar mascota.",
       "submit": "Registrar peso"
     },
     "expense": {
@@ -1312,11 +1312,11 @@
       "submit": "Añadir gasto"
     },
     "careTeam": {
-      "title": "Equipo de cuidado",
+      "title": "Equipo de cuidados",
       "memberYou": "{{name}} (usted)",
       "owner": "Propietario",
       "coOwner": "Copropietario",
-      "removeA11y": "Eliminar a {{member}} del equipo de cuidado",
+      "removeA11y": "Eliminar a {{member}} del equipo de cuidados",
       "invitePending": "Invitación pendiente",
       "cancelInviteA11y": "Cancelar la invitación enviada a {{email}}",
       "inviteHint": "Invite a alguien por correo electrónico a ser copropietario de {{name}}. Podrá ver y actualizar los registros, pero solo usted podrá eliminar la mascota.",
@@ -1343,14 +1343,14 @@
       "revokeFailed": "No se han podido revocar los enlaces."
     },
     "careNotes": {
-      "hint": "Notas para quien cuide de {{name}}, y un enlace de solo lectura que puede enviarle por mensaje — sin necesidad de la app.",
-      "loadFailed": "No se han podido cargar las notas guardadas — la edición está en pausa para que no se sobrescriban.",
+      "hint": "Notas para quien cuide de {{name}} y un enlace de solo lectura que puede enviarle por mensaje: no necesita la app.",
+      "loadFailed": "No se han podido cargar las notas guardadas: la edición está en pausa para que no se sobrescriban.",
       "tryAgain": "Reintentar",
       "feeding": "Alimentación",
       "feedingPlaceholder": "p. ej. 1 taza de pienso a las 8:00 y a las 18:00, agua fresca a diario",
       "instructions": "Instrucciones",
       "instructionsPlaceholder": "Arenero, paseos, medicamentos, manías…",
-      "warning": "Cualquiera con el enlace puede leer esto — no incluya códigos de puertas ni PIN de alarmas, o elija una caducidad corta.",
+      "warning": "Cualquiera con el enlace puede leer esto: no incluya códigos de puertas ni PIN de alarmas, o elija una caducidad corta.",
       "emergencyContact": "Contacto de emergencia",
       "emergencyNamePlaceholder": "Nombre (p. ej. Dra. Miau, clínica Patitas Felices)",
       "phonePlaceholder": "Teléfono",
@@ -1362,16 +1362,16 @@
       "working": "Procesando…",
       "createShare": "Crear y compartir",
       "revokeAll": "Revocar todos los enlaces activos",
-      "shareMessage": "Cuidado de {{name}} — todo lo que necesita (el enlace caduca pronto):\n{{url}}",
-      "reshareMessage": "Cuidado de {{name}}:\n{{url}}",
+      "shareMessage": "Todo lo necesario para cuidar de {{name}} (el enlace caduca pronto):\n{{url}}",
+      "reshareMessage": "Cuidados de {{name}}:\n{{url}}",
       "saveFailed": "No se han podido guardar las notas.",
       "createFailed": "No se ha podido crear el enlace.",
       "revokeFailed": "No se han podido revocar los enlaces."
     },
     "weightInsight": {
       "stable": "Estable durante {{span}}",
-      "up": "Ha subido {{amount}} {{unit}} ({{pct}} %) en {{span}}",
-      "down": "Ha bajado {{amount}} {{unit}} ({{pct}} %) en {{span}}",
+      "up": "Ha subido {{amount}} {{unit}} ({{pct}} %) en {{span}}",
+      "down": "Ha bajado {{amount}} {{unit}} ({{pct}} %) en {{span}}",
       "days_one": "{{count}} día",
       "days_many": "{{count}} días",
       "days_other": "{{count}} días",
@@ -1385,7 +1385,7 @@
   },
   "addPet": {
     "photoPermission": "Permita el acceso a las fotos para poner una foto a su mascota",
-    "uploadFailed": "No se ha podido subir esa imagen — inténtelo de nuevo",
+    "uploadFailed": "No se ha podido subir esa imagen. Inténtelo de nuevo.",
     "nameRequired": "Primero ponga un nombre a su mascota",
     "addFailed": "No se ha podido añadir a {{name}}. Compruebe su conexión e inténtelo de nuevo.",
     "changePhoto": "Cambiar foto",
@@ -1459,7 +1459,7 @@
   "editPet": {
     "notFound": "Mascota no encontrada.",
     "photoPermission": "Permita el acceso a las fotos para poner una foto a su mascota",
-    "uploadFailed": "No se ha podido subir esa imagen — inténtelo de nuevo",
+    "uploadFailed": "No se ha podido subir esa imagen. Inténtelo de nuevo.",
     "nameRequired": "Primero ponga un nombre a su mascota",
     "saveFailed": "No se han podido guardar los cambios. Inténtelo de nuevo.",
     "saved": "Guardado",
@@ -1500,7 +1500,7 @@
     "groupLeft": "Ha salido de {{name}}",
     "groupJoined": "Se ha unido a {{name}}",
     "leaveFailed": "No se ha podido salir de {{name}}. Inténtelo de nuevo.",
-    "joinFailed": "No se ha podido unir a {{name}}. Inténtelo de nuevo.",
+    "joinFailed": "No ha podido unirse a {{name}}. Inténtelo de nuevo.",
     "seeAllLost_one": "Ver {{count}} mascota perdida",
     "seeAllLost_many": "Ver las {{count}} mascotas perdidas",
     "seeAllLost_other": "Ver las {{count}} mascotas perdidas",
@@ -1509,7 +1509,7 @@
     "composerPlaceholder": "¿Qué hacen sus mascotas?",
     "newPost": "Nueva publicación",
     "removePhoto": "Quitar foto",
-    "attachFailed": "Error al subir la imagen — toque para reintentar",
+    "attachFailed": "Error al subir la imagen: toque para reintentar",
     "addPhoto": "Añadir una foto",
     "post": "Publicar",
     "emptyFeedTitle": "Aún no hay publicaciones",
@@ -1527,7 +1527,7 @@
     "emptyGroupsBody": "Los grupos aparecerán aquí a medida que crezca la comunidad.",
     "reportMissing": "Avisar de una mascota desaparecida",
     "card": {
-      "hidden": "Publicación oculta — gracias por el aviso. Nuestro equipo la revisa en un plazo de 24 horas.",
+      "hidden": "Publicación oculta: gracias por la denuncia. Nuestro equipo la revisa en un plazo de 24 horas.",
       "undoReport": "Deshacer denuncia",
       "commentsLoadFailed": "No se han podido cargar los comentarios",
       "deleteCommentFailed": "No se ha podido eliminar el comentario. Inténtelo de nuevo.",
@@ -1547,7 +1547,7 @@
       "commentsShow": "Muestra los comentarios",
       "loadFailedRetry": "No se han podido cargar los comentarios. Toque para reintentar.",
       "loadingComments": "Cargando comentarios…",
-      "noComments": "Aún no hay comentarios — ¡escriba algo bonito!",
+      "noComments": "Aún no hay comentarios: ¡escriba algo bonito!",
       "deleteCommentA11y": "Eliminar el comentario de {{name}}",
       "deleteThisComment": "Eliminar este comentario",
       "addCommentPlaceholder": "Añadir un comentario…",
@@ -1562,10 +1562,10 @@
   },
   "lostPets": {
     "title": "Avisar de mascota desaparecida",
-    "intro": "Su aviso se comparte con los dueños cercanos. La mayoría de las mascotas vuelven a casa en menos de 48 horas.",
+    "intro": "Su aviso se comparte con los propietarios cercanos. La mayoría de las mascotas vuelven a casa en menos de 48 horas.",
     "alreadyOnBoard": "{{name}} ya está en el tablón",
-    "postFailed": "No se ha podido publicar a {{name}}. Compruebe su conexión e inténtelo de nuevo.",
-    "postFailedNoName": "No se ha podido publicar a su mascota. Compruebe su conexión e inténtelo de nuevo.",
+    "postFailed": "No se ha podido publicar el aviso de {{name}}. Compruebe su conexión e inténtelo de nuevo.",
+    "postFailedNoName": "No se ha podido publicar el aviso de su mascota. Compruebe su conexión e inténtelo de nuevo.",
     "posted": "{{name}} se ha publicado en el tablón",
     "postedNoName": "Su mascota se ha publicado en el tablón",
     "whichPet": "¿Qué mascota?",
@@ -1581,11 +1581,11 @@
     "yourReports": "Sus avisos activos",
     "nearby": "Avisos cercanos",
     "emptyTitle": "No hay mascotas desaparecidas",
-    "emptyBody": "Buenas noticias — todas las mascotas de la comunidad están a salvo en casa.",
-    "contactOwner": "Contactar con el dueño",
+    "emptyBody": "Buenas noticias: todas las mascotas de la comunidad están a salvo en casa.",
+    "contactOwner": "Contactar con el propietario",
     "markFound": {
       "title": "¿Marcar como encontrada?",
-      "message": "¿Ha aparecido {{name}} sano y salvo?",
+      "message": "¿Ha aparecido {{name}} a salvo?",
       "confirm": "¡Encontrada!",
       "success": "¡Bienvenida a casa!",
       "failed": "No se ha podido marcar como encontrada. Inténtelo de nuevo."
@@ -1610,12 +1610,12 @@
   },
   "moderation": {
     "title": "Moderación",
-    "loadFailed": "No se han podido cargar las denuncias — inténtelo de nuevo",
-    "loadMoreFailed": "No se han podido cargar más — inténtelo de nuevo",
-    "dismissed": "Denuncias descartadas — publicación restaurada",
-    "dismissFailed": "No se han podido descartar — inténtelo de nuevo",
+    "loadFailed": "No se han podido cargar las denuncias. Inténtelo de nuevo.",
+    "loadMoreFailed": "No se han podido cargar más. Inténtelo de nuevo.",
+    "dismissed": "Denuncias descartadas: publicación restaurada",
+    "dismissFailed": "No se han podido descartar las denuncias. Inténtelo de nuevo.",
     "removed": "Publicación eliminada",
-    "removeFailed": "No se ha podido eliminar — inténtelo de nuevo",
+    "removeFailed": "No se ha podido eliminar la publicación. Inténtelo de nuevo.",
     "emptyTitle": "Todo en orden",
     "emptyBody": "No hay denuncias abiertas en este momento.",
     "unknownAuthor": "Desconocido",
