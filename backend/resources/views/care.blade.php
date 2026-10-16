@@ -1,10 +1,11 @@
+@php($L = \App\Support\PublicPageLocale::class)
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ app()->getLocale() }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Caring for {{ $pet->name }}</title>
+<title>{{ __('care.title', ['name' => $pet->name]) }}</title>
 <style>
   :root { --ink:#27211b; --sub:#7a7066; --line:#eee7de; --card:#fffdf9; --bg:#f6f1ea;
           --accent:#c4663a; --rose:#b3324c; --rose-bg:#fbe9ec; }
@@ -39,47 +40,47 @@
 <div class="wrap">
 
   <div class="hero">
-    <div class="eyebrow">Caretaker notes</div>
-    <h1>Caring for {{ $pet->name }}</h1>
+    <div class="eyebrow">{{ __('care.eyebrow') }}</div>
+    <h1>{{ __('care.title', ['name' => $pet->name]) }}</h1>
     <div class="meta">
-      {{ ucfirst($pet->type) }}{{ $pet->breed ? ' · '.$pet->breed : '' }}{{ $pet->weight ? ' · '.$pet->weight.' '.$pet->weight_unit : '' }}
+      {{ $L::label('types', $pet->type, ucfirst($pet->type)) }}{{ $pet->breed ? ' · '.$pet->breed : '' }}{{ $pet->weight ? ' · '.$L::decimal($pet->weight).' '.$pet->weight_unit : '' }}
     </div>
   </div>
 
   @if ($profile?->feeding)
-    <h2>Feeding</h2>
+    <h2>{{ __('care.feeding') }}</h2>
     <div class="card"><div class="pad prewrap">{{ $profile->feeding }}</div></div>
   @endif
 
   @if ($profile?->instructions)
-    <h2>Instructions</h2>
+    <h2>{{ __('care.instructions') }}</h2>
     <div class="card"><div class="pad prewrap">{{ $profile->instructions }}</div></div>
   @endif
 
-  <h2>Medications</h2>
+  <h2>{{ __('care.medications') }}</h2>
   <div class="card">
     @forelse ($pet->medications as $med)
       <div class="row">
         <div>
           <div class="name">{{ $med->name }}</div>
-          <div class="sub">{{ collect([$med->dosage, str_replace('_', ' ', $med->frequency)])->filter()->implode(' · ') }}</div>
+          <div class="sub">{{ collect([$med->dosage, $L::label('frequencies', $med->frequency, str_replace('_', ' ', (string) $med->frequency))])->filter()->implode(' · ') }}</div>
         </div>
         @if (is_array($med->times) && count($med->times))
           <div class="right">{{ implode(', ', $med->times) }}</div>
         @endif
       </div>
     @empty
-      <div class="empty">No active medications.</div>
+      <div class="empty">{{ __('care.no_medications') }}</div>
     @endforelse
   </div>
 
   @if ($profile?->emergency_name || $profile?->emergency_phone || $pet->clinics->isNotEmpty())
-    <h2>Emergency</h2>
+    <h2>{{ __('care.emergency') }}</h2>
     @if ($profile?->emergency_name || $profile?->emergency_phone)
       <div class="card sos pad" style="margin-bottom:10px;">
-        <div class="label">If something's wrong</div>
+        <div class="label">{!! htmlspecialchars(__('care.sos'), ENT_NOQUOTES) !!}</div>{{-- text node: escape <>& but keep the apostrophe, so English stays byte-identical --}}
         @if ($profile->emergency_name)<div class="who">{{ $profile->emergency_name }}</div>@endif
-        @if ($profile->emergency_phone)<a class="call" href="tel:{{ $profile->emergency_phone }}">Call {{ $profile->emergency_phone }}</a>@endif
+        @if ($profile->emergency_phone)<a class="call" href="tel:{{ $profile->emergency_phone }}">{{ __('care.call', ['phone' => $profile->emergency_phone]) }}</a>@endif
       </div>
     @endif
     @foreach ($pet->clinics as $clinic)
@@ -87,7 +88,7 @@
         <div class="row">
           <div>
             <div class="name">{{ $clinic->name }}</div>
-            <div class="sub">{{ collect([$clinic->vet_name, $clinic->address])->filter()->implode(' · ') ?: 'Vet clinic' }}</div>
+            <div class="sub">{{ collect([$clinic->vet_name, $clinic->address])->filter()->implode(' · ') ?: __('care.vet_clinic') }}</div>
           </div>
           @if ($clinic->phone)<div class="right"><a class="tel" href="tel:{{ $clinic->phone }}">{{ $clinic->phone }}</a></div>@endif
         </div>
@@ -96,7 +97,7 @@
   @endif
 
   <div class="foot">
-    Shared via PawPawCare · read-only · link expires {{ $expiresAt->format('M j, Y g:i A T') }}
+    {{ __('care.footer', ['expires' => $L::expiry($expiresAt, 'care.expires_format')]) }}
   </div>
 
 </div>

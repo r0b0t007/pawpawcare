@@ -12,6 +12,10 @@ use Illuminate\Support\Carbon;
  * The app mirrors this logic client-side for an instant render; this server
  * copy is the tested source of truth and powers the vet share page. Keep the
  * STABLE/NOTABLE thresholds in sync with the frontend's weightInsight().
+ *
+ * The summary sentence comes from lang/{locale}/weight.php in the given
+ * locale (default: the request's), so the share page can render it in the
+ * link's language. The English strings reproduce the original output exactly.
  */
 class WeightInsight
 {
@@ -26,9 +30,10 @@ class WeightInsight
     /**
      * @param  iterable  $logs  WeightLog-like rows (->weight, ->unit, ->logged_at Carbon)
      * @param  string  $unit  the pet's current display unit; logs are converted to it
+     * @param  string|null  $locale  language of 'summary'; null = the current app locale
      * @return array<string, mixed>|null null when there are fewer than two logs
      */
-    public static function for(iterable $logs, string $unit): ?array
+    public static function for(iterable $logs, string $unit, ?string $locale = null): ?array
     {
         $points = collect($logs)
             ->map(fn ($l) => [
@@ -59,39 +64,47 @@ class WeightInsight
             'period_days' => $days,
             'points' => $points->count(),
             'notable' => abs($changePct) >= self::NOTABLE_PCT,
-            'summary' => self::summary($direction, $changeAbs, $changePct, $days, $unit),
+            'summary' => self::summary($direction, $changeAbs, $changePct, $days, $unit, $locale),
         ];
     }
 
-    private static function summary(string $dir, float $abs, float $pct, int $days, string $unit): string
+    private static function summary(string $dir, float $abs, float $pct, int $days, string $unit, ?string $locale): string
     {
-        $span = self::humanizeSpan($days);
+        $span = self::humanizeSpan($days, $locale);
 
         if ($dir === 'stable') {
-            return "Stable over the last {$span}";
+            return __('weight.stable', ['span' => $span], $locale);
         }
 
-        $word = $dir === 'up' ? 'Up' : 'Down';
-        $mag = rtrim(rtrim(number_format(abs($abs), 1), '0'), '.');
-        // "Down" already conveys the sign — show the magnitude unsigned.
-        $pctMag = rtrim(rtrim(number_format(abs($pct), 1), '0'), '.');
-
-        return "{$word} {$mag} {$unit} ({$pctMag}%) over the last {$span}";
+        // "Down" already conveys the sign — show the magnitudes unsigned.
+        return __("weight.{$dir}", [
+            'amount' => self::number(abs($abs), $locale),
+            'unit' => $unit,
+            'percent' => self::number(abs($pct), $locale),
+            'span' => $span,
+        ], $locale);
     }
 
-    private static function humanizeSpan(int $days): string
+    /** One decimal, trailing zeros trimmed (0.8, 20), in the locale's marks. */
+    private static function number(float $value, ?string $locale): string
+    {
+        $point = __('weight.decimal_point', [], $locale);
+        $formatted = number_format($value, 1, $point, __('weight.thousands_separator', [], $locale));
+
+        return rtrim(rtrim($formatted, '0'), $point);
+    }
+
+    private static function humanizeSpan(int $days, ?string $locale): string
     {
         if ($days < 14) {
-            return max($days, 1).' day'.($days === 1 ? '' : 's');
+            // Two logs on the same day (0 days) read as "1 day".
+            return trans_choice('weight.days', $days, ['count' => max($days, 1)], $locale);
         }
         if ($days < 60) {
-            $w = (int) round($days / 7);
-
-            return "{$w} weeks";
+            return trans_choice('weight.weeks', (int) round($days / 7), [], $locale);
         }
-        $m = (int) round($days / 30);
 
-        return "{$m} months";
+        return trans_choice('weight.months', (int) round($days / 30), [], $locale);
     }
 
     private static function toUnit(float $value, ?string $from, string $to): float

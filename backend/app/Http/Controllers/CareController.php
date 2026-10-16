@@ -6,6 +6,7 @@ use App\Models\CareProfile;
 use App\Models\Pet;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\Subscriptions\Entitlements;
+use App\Support\PublicPageLocale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -77,10 +78,11 @@ class CareController extends Controller
 
         $expiresIn = $data['expires_in'] ?? '7d';
         $expiresAt = now()->addMinutes(self::EXPIRIES[$expiresIn]);
+        // Signed-in creator's language, inside the signature (none for English).
         $url = URL::temporarySignedRoute('pets.care', $expiresAt, [
             'pet' => $pet->id,
             't' => $pet->care_token,
-        ]);
+        ] + PublicPageLocale::linkParams());
 
         $analytics->capture($request->user(), 'server_care_link_created', ['expires_in' => $expiresIn]);
 
@@ -118,6 +120,10 @@ class CareController extends Controller
         if (! $pet->care_token || ! hash_equals($pet->care_token, (string) $request->query('t'))) {
             abort(410, __('This caretaker link has been revoked.'));
         }
+
+        // The page takes the link's signed `lang` (English when absent or
+        // unsupported); the 404/410 above keep the browser language.
+        PublicPageLocale::apply($request);
 
         return response()
             ->view('care', [

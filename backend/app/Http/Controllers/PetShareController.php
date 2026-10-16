@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Document;
 use App\Models\Pet;
 use App\Services\Analytics\ProductAnalytics;
+use App\Support\PublicPageLocale;
 use App\Support\WeightInsight;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,10 +46,12 @@ class PetShareController extends Controller
 
         $expiresIn = $data['expires_in'] ?? '24h';
         $expiresAt = now()->addMinutes(self::EXPIRIES[$expiresIn]);
+        // The creator's language rides inside the signed part of the URL
+        // (none for English), so the page opens in it for a signed-out vet.
         $url = URL::temporarySignedRoute('pets.share', $expiresAt, [
             'pet' => $pet->id,
             't' => $pet->share_token,
-        ]);
+        ] + PublicPageLocale::linkParams());
 
         $analytics->capture($request->user(), 'server_share_link_created', ['expires_in' => $expiresIn]);
 
@@ -96,6 +99,12 @@ class PetShareController extends Controller
             abort(410, __('This share link has been revoked.'));
         }
 
+        // Only the page itself takes the link's language: the signed `lang`,
+        // or the viewer's unsigned `hl` display override (ignored by the
+        // route's signature check; language only). The 404/410 above keep
+        // SetLocale's browser-language pick, like the signed middleware's 403.
+        $locale = PublicPageLocale::apply($request, allowDisplayOverride: true);
+
         // Document links piggyback on this page's own expiry (the `expires`
         // query param the signature covers), so they die with the share link.
         $expiresAt = Carbon::createFromTimestamp((int) $request->query('expires'));
@@ -114,7 +123,7 @@ class PetShareController extends Controller
                 // Trend over the FULL history (the eager-loaded relation is capped
                 // at 12 for the sparkline/list); a separate unbounded query keeps
                 // this consistent with the app's full-history insight.
-                'weightInsight' => WeightInsight::for($pet->weightLogs()->get(), $pet->weight_unit ?: 'kg'),
+                'weightInsight' => WeightInsight::for($pet->weightLogs()->get(), $pet->weight_unit ?: 'kg', $locale),
                 'expiresAt' => $expiresAt,
             ])
             // Medical data behind a capability URL — keep crawlers away.

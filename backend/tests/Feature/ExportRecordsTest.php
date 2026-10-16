@@ -75,6 +75,9 @@ class ExportRecordsTest extends TestCase
         );
 
         $csv = $response->getContent();
+        // No byte-order mark: the English file keeps its exact bytes (only
+        // the French and Spanish exports carry one, see ExportRecordsLocaleTest).
+        $this->assertStringStartsWith('"PawPawCare — Health records export"', $csv);
         $this->assertStringContainsString('=== PET: Rex ===', $csv);
         $this->assertStringContainsString('Rabies', $csv);
         $this->assertStringContainsString('Distemper', $csv);  // upcoming too — all statuses

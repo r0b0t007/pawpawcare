@@ -12,6 +12,7 @@ use App\Services\JwtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class CareTest extends TestCase
@@ -187,6 +188,19 @@ class CareTest extends TestCase
         $this->get($url)->assertStatus(410);
     }
 
+    public function test_a_revoked_link_says_so_in_the_viewers_browser_language(): void
+    {
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+
+        $url = $this->mintUrl($token, $pet);
+        $this->withToken($token)->deleteJson("/pets/{$pet->id}/care-link")->assertNoContent();
+
+        $this->withHeader('Accept-Language', 'es')->get($url)
+            ->assertStatus(410)
+            ->assertJsonPath('detail', 'Este enlace de cuidador se ha revocado.');
+    }
+
     public function test_care_and_vet_links_revoke_independently(): void
     {
         [$owner, $token] = $this->user();
@@ -212,5 +226,129 @@ class CareTest extends TestCase
 
         $this->assertNotSame('hacked', $pet->fresh()->care_token);
         $this->get($url)->assertOk();
+    }
+
+    // ── Page language (the creator's locale rides in the signed URL) ─────────
+
+    /** @return array{0: User, 1: string} */
+    private function userIn(string $locale): array
+    {
+        [$u, $token] = $this->user();
+        $u->forceFill(['locale' => $locale])->save();
+
+        return [$u, $token];
+    }
+
+    private function seedHandoff(Pet $pet, string $token): void
+    {
+        $this->withToken($token)->putJson("/pets/{$pet->id}/care", $this->profileData())->assertOk();
+        Medication::create(['pet_id' => $pet->id, 'name' => 'Simparica', 'dosage' => '40mg', 'frequency' => 'monthly', 'times' => ['08:00']]);
+        Clinic::create(['pet_id' => $pet->id, 'name' => 'Happy Paws', 'phone' => '555-1234']);
+    }
+
+    public function test_a_link_minted_by_a_french_user_opens_in_french(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $this->seedHandoff($pet, $token);
+
+        $url = $this->mintUrl($token, $pet, '3d');
+        $this->assertStringContainsString('lang=fr', $url);
+        parse_str(parse_url($url, PHP_URL_QUERY), $q);
+        $at = Carbon::createFromTimestamp((int) $q['expires']);
+
+        $res = $this->get($url)->assertOk();
+        $res->assertSee('<html lang="fr">', false);
+        $res->assertSee('Prendre soin de Luna');
+        $res->assertSee('Consignes de garde');
+        $res->assertSee('40mg · mensuel');
+        $res->assertSee('Appeler le 555-9000');
+        $res->assertSee('le lien expire le '.$at->copy()->locale('fr')->isoFormat('D MMM YYYY [à] HH:mm').' '.$at->format('T'));
+        // Owner-written notes and names are shown as entered, never translated.
+        $res->assertSee('1 cup kibble at 8am and 6pm.', false);
+        $res->assertSee('Simparica');
+        $res->assertSee('Dr. Meow');
+        $res->assertDontSee('Caring for');
+    }
+
+    public function test_a_link_minted_by_a_spanish_user_opens_in_spanish(): void
+    {
+        [$owner, $token] = $this->userIn('es');
+        $pet = $this->pet($owner);
+        $this->seedHandoff($pet, $token);
+
+        $res = $this->get($this->mintUrl($token, $pet))->assertOk();
+        $res->assertSee('<html lang="es">', false);
+        $res->assertSee('Cuidar de Luna');
+        $res->assertSee('Si algo va mal');
+        $res->assertSee('Llamar al 555-9000');
+        $res->assertSee('el enlace caduca el');
+        $res->assertSee('1 cup kibble', false);
+    }
+
+    public function test_an_old_link_without_lang_still_renders_english(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $this->mintUrl($token, $pet);
+
+        $old = URL::temporarySignedRoute('pets.care', now()->addDay(), ['pet' => $pet->id, 't' => $pet->fresh()->care_token]);
+
+        $res = $this->get($old)->assertOk();
+        $res->assertSee('<html lang="en">', false);
+        $res->assertSee('Caring for Luna');
+        $res->assertSee('Shared via PawPawCare · read-only · link expires');
+    }
+
+    public function test_english_links_carry_no_lang_param(): void
+    {
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+
+        // English links keep exactly the pre-i18n shape.
+        $url = $this->mintUrl($token, $pet);
+        $this->assertStringNotContainsString('lang=', $url);
+        $this->get($url)->assertOk()->assertSee('<html lang="en">', false)->assertSee('Caring for Luna');
+    }
+
+    public function test_a_tampered_lang_param_fails_the_signature(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $url = $this->mintUrl($token, $pet);
+
+        $this->get(str_replace('lang=fr', 'lang=en', $url))->assertStatus(403);
+        // The caretaker page has no language switch: an extra hl is tampering too.
+        $this->get($url.'&hl=en')->assertStatus(403);
+    }
+
+    public function test_an_unsupported_lang_value_falls_back_to_english(): void
+    {
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+        $this->mintUrl($token, $pet);
+
+        $url = URL::temporarySignedRoute('pets.care', now()->addDay(), [
+            'pet' => $pet->id, 't' => $pet->fresh()->care_token, 'lang' => 'xx',
+        ]);
+
+        $this->get($url)->assertOk()->assertSee('<html lang="en">', false)->assertSee('Caring for Luna');
+    }
+
+    public function test_revocation_and_expiry_apply_to_localized_links(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+
+        $url = $this->mintUrl($token, $pet, '1d');
+        $this->get($url)->assertOk();
+
+        $this->travel(25)->hours();
+        $this->get($url)->assertStatus(403);
+        $this->travelBack();
+
+        $live = $this->mintUrl($token, $pet);
+        $this->withToken($token)->deleteJson("/pets/{$pet->id}/care-link")->assertNoContent();
+        $this->get($live)->assertStatus(410);
     }
 }

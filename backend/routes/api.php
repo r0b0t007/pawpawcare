@@ -25,6 +25,7 @@ use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SupportController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UserController;
+use App\Support\PublicPageLocale;
 use Illuminate\Support\Facades\Route;
 
 // ── Health ──────────────────────────────────────────────────────────────────
@@ -46,7 +47,9 @@ Route::get('/documents/{document}/raw', [DocumentController::class, 'raw'])
 // A read-only medical summary a vet opens in a browser. Minted only by users
 // with pet access via POST /pets/{pet}/share-link, expiring in hours/days.
 Route::get('/share/{pet}', [PetShareController::class, 'show'])
-    ->middleware(['signed', 'throttle:60,1,pet-share:'])
+    // `hl` (viewer display language) is left out of the signature check:
+    // PetShareController only feeds it to App::setLocale, never to the data.
+    ->middleware(['signed:'.PublicPageLocale::DISPLAY_PARAM, 'throttle:60,1,pet-share:'])
     ->name('pets.share');
 
 // ── Caretaker page (no JWT — signed-URL trust model, independent care_token) ──

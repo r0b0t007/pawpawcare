@@ -44,7 +44,8 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
 }));
 
 import { AuthProvider, useAuth } from '../AuthContext';
-import { get, getTokens, clearTokens } from '../../services/api';
+import { get, patch, getTokens, clearTokens } from '../../services/api';
+import * as i18nModule from '../../i18n';
 
 const USER = { id: 'u1', name: 'E2E Tester', email: 'e2e@example.test', plan: 'free' };
 const offline = () => Object.assign(new Error('Network error: Failed to connect'), { isNetworkError: true });
@@ -57,6 +58,7 @@ function Probe() {
 }
 
 let tree;
+let localeSpy;
 async function launch() {
   await act(async () => {
     tree = TestRenderer.create(
@@ -87,6 +89,9 @@ describe('session restore at launch', () => {
     act(() => tree?.unmount());
     tree = undefined;
     jest.useRealTimers();
+    localeSpy?.mockRestore();
+    localeSpy = undefined;
+    patch.mockImplementation(() => Promise.resolve());
   });
 
   it('restores the user when /users/me answers', async () => {
@@ -96,6 +101,47 @@ describe('session restore at launch', () => {
     expect(auth.user).toEqual(USER);
     expect(auth.isLoading).toBe(false);
     expect(auth.restoreFailed).toBe(false);
+  });
+
+  // The account was saved in English, the app shows French: the sign-in
+  // sync saves 'fr', and the user must carry it so DataContext refetches the
+  // server-translated groups (they may have been fetched in English meanwhile).
+  it('stores the locale the sign-in sync saved on the restored user', async () => {
+    localeSpy = jest.spyOn(i18nModule, 'currentLocale').mockReturnValue('fr');
+    get.mockResolvedValue({ ...USER, locale: 'en' });
+    patch.mockImplementation((path, body) => Promise.resolve({ ...USER, ...body }));
+    await launch();
+
+    expect(patch).toHaveBeenCalledWith('/users/me', expect.objectContaining({ locale: 'fr' }));
+    expect(auth.user.locale).toBe('fr');
+    expect(auth.user.plan).toBe('free');
+  });
+
+  it('ignores a sync answer for a different account', async () => {
+    localeSpy = jest.spyOn(i18nModule, 'currentLocale').mockReturnValue('fr');
+    get.mockResolvedValue({ ...USER, locale: 'en' });
+    patch.mockResolvedValue({ ...USER, id: 'someone-else', locale: 'fr' });
+    await launch();
+
+    expect(patch).toHaveBeenCalled();
+    expect(auth.user.locale).toBe('en');
+  });
+
+  // The user picked Spanish in Profile while the sign-in sync's 'fr' PATCH
+  // was still in flight: its late answer must not put 'fr' back.
+  it('ignores a sync answer once the app has switched language', async () => {
+    localeSpy = jest.spyOn(i18nModule, 'currentLocale').mockReturnValue('fr');
+    get.mockResolvedValue({ ...USER, locale: 'en' });
+    let answerSync;
+    patch.mockImplementation(() => new Promise((resolve) => { answerSync = resolve; }));
+    await launch();
+
+    localeSpy.mockReturnValue('es');
+    await act(async () => {
+      answerSync({ ...USER, locale: 'fr' });
+    });
+
+    expect(auth.user.locale).toBe('en');
   });
 
   // Seen on the emulator: a slow server made /users/me time out at launch and

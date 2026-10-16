@@ -388,6 +388,37 @@ export function DataProvider({ children }) {
     }
   }, [user?.id]);
 
+  // The seeded groups' names and descriptions come back in the account's
+  // saved language (the server prefers users.locale over Accept-Language),
+  // so a language switch refetches them — once updateUser has saved the new
+  // locale and handed back the user. Refetching on i18n's languageChanged
+  // instead would race that save and get the old language back.
+  // Newest response wins: the full load's fetch, sent before the sign-in
+  // locale sync landed, must not overwrite the refetch that followed it. It
+  // still applies if it lands first, so a refetch that then fails leaves the
+  // groups in the old language rather than empty.
+  const groupsRequest = useRef(0);
+  const groupsApplied = useRef(0);
+  const refreshGroups = async () => {
+    const request = ++groupsRequest.current;
+    const apiGroups = await get('/community/groups');
+    if (request < groupsApplied.current) return;
+    groupsApplied.current = request;
+    dispatch({ type: 'SET_GROUPS', payload: apiGroups.map(toGroup) });
+  };
+  const groupsLocale = useRef(null);
+  useEffect(() => {
+    const previous = groupsLocale.current;
+    const current = user?.locale ? { userId: user.id, locale: user.locale } : null;
+    groupsLocale.current = current;
+    // First sight of this account's locale: the full load fetches the groups.
+    if (!previous || !current || previous.userId !== current.userId) return;
+    if (previous.locale === current.locale) return;
+    refreshGroups().catch(handleApiError);
+    // refreshGroups/handleApiError are recreated each render; the locale is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.locale]);
+
   // Mutation contract: every add/update/delete/toggle below resolves a truthy
   // value on success (the saved entity, or true) and false on failure. Errors
   // are handled here (session expiry logs out), never thrown, so a screen
@@ -475,10 +506,7 @@ export function DataProvider({ children }) {
         if (failures.length) throw new Error(`${failures.length} pet request(s) failed`);
       },
       () => refreshPosts({ rethrow: true }),
-      async () => {
-        const apiGroups = await get('/community/groups');
-        dispatch({ type: 'SET_GROUPS', payload: apiGroups.map(toGroup) });
-      },
+      () => refreshGroups(),
       () => refreshReminders({ rethrow: true }),
       () => refreshNotifications({ rethrow: true }),
       () => refreshInvites({ rethrow: true }),
