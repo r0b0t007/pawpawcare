@@ -39,6 +39,8 @@ export default {
   privacy: "Privacy policy",
   // Plain-text version only.
   textTitle: "You're on the list. Thank you for joining PawPawCare!",
+  // Label-to-text separator in the plain-text version.
+  colon: ": ",
   textDone: "(done)",
   textShare: "Share PawPawCare with a friend. They can join the waitlist in seconds:",
   textNotYou: "Not you, or changed your mind? Email {email} and we'll delete it.",

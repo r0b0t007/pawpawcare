@@ -225,10 +225,10 @@ function render(t) {
 ${t.intro}
 
 ${t.whereYouAre.toUpperCase()}
-${steps.map((s, i) => `${i + 1}. ${s.title}${s.state === "done" ? ` ${t.textDone}` : ""}: ${s.text}`).join("\n")}
+${steps.map((s, i) => `${i + 1}. ${s.title}${s.state === "done" ? ` ${t.textDone}` : ""}${t.colon}${s.text}`).join("\n")}
 
 ${t.whatsComing.toUpperCase()}
-${t.features.map((f) => `- ${f.title}: ${f.text}`).join("\n")}
+${t.features.map((f) => `- ${f.title}${t.colon}${f.text}`).join("\n")}
 
 ${t.shareTitle.toUpperCase()}
 ${t.textShare}
@@ -240,7 +240,7 @@ ${t.team}
 --
 ${t.footerWhy}
 ${t.textNotYou.replace("{email}", CONTACT_EMAIL)}
-${t.privacy}: ${PRIVACY_URL}
+${t.privacy}${t.colon}${PRIVACY_URL}
 `);
 
   return { subject: plain(t.subject), html, text };
