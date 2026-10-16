@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Pressable } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { ui, radii, motion } from '../theme';
 import { EASE_IN_OUT } from './motion';
+import FitText from './FitText';
 
 // Tint track + white raised thumb. `segments` is [{ value, label }].
 // The thumb is one absolutely-positioned childless pill that slides between
@@ -74,6 +75,7 @@ export default function SegmentedControl({ segments, value, onChange, style, rol
           <Pressable
             key={seg.value}
             accessibilityRole={radio ? 'radio' : 'tab'}
+            accessibilityLabel={seg.label}
             accessibilityState={radio ? { checked: on } : { selected: on }}
             onLayout={(e) => {
               const { x: lx, width } = e.nativeEvent.layout;
@@ -90,24 +92,24 @@ export default function SegmentedControl({ segments, value, onChange, style, rol
             style={{
               flex: 1,
               alignItems: 'center',
+              justifyContent: 'center',
               paddingVertical: 9,
               borderRadius: radii.thumb,
             }}
           >
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
+            {/* One line, shrinking if a translation runs long; wraps instead at
+                large system font sizes so the label is never cut off. */}
+            <FitText
+              wrapAtLargeFont
               style={{
                 fontFamily: 'PlusJakartaSans_700Bold',
                 fontSize: 13,
-                textAlign: 'center',
                 // sub, not subtle: unselected labels sit on the track (AA).
                 color: on ? ui.ink : ui.sub,
               }}
             >
               {seg.label}
-            </Text>
+            </FitText>
           </Pressable>
         );
       })}

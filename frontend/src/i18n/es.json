@@ -710,7 +710,7 @@
     },
     "form": {
       "title": "Nuevo recordatorio",
-      "placeholder": "p. ej. antiparasitario de Rex",
+      "placeholder": "p. ej. dar a Rex su pastilla contra el gusano del corazón",
       "add": "Añadir recordatorio"
     },
     "listTitle": "Sus recordatorios",
@@ -1643,7 +1643,8 @@
       "pets": "Mascotas",
       "health": "Salud",
       "community": "Comunidad",
-      "profile": "Perfil"
+      "profile": "Perfil",
+      "a11yPosition": "{{label}}, pestaña, {{index}} de {{count}}"
     }
   },
   "common": {

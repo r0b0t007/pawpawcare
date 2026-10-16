@@ -710,7 +710,7 @@
     },
     "form": {
       "title": "Nouveau rappel",
-      "placeholder": "ex. antiparasitaire de Rex",
+      "placeholder": "ex. donner à Rex son comprimé contre la dirofilariose",
       "add": "Ajouter un rappel"
     },
     "listTitle": "Vos rappels",
@@ -1643,7 +1643,8 @@
       "pets": "Animaux",
       "health": "Santé",
       "community": "Communauté",
-      "profile": "Profil"
+      "profile": "Profil",
+      "a11yPosition": "{{label}}, onglet, {{index}} sur {{count}}"
     }
   },
   "common": {

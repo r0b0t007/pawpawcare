@@ -100,7 +100,10 @@ export default function RemindersScreen({ navigation }) {
             placeholder={t('reminders.form.placeholder')}
             placeholderTextColor={ui.placeholder}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(v) => setTitle(v.replace(/\n/g, ' '))}
+            multiline
+            submitBehavior="blurAndSubmit"
+            returnKeyType="done"
           />
           <Pressable accessibilityRole="button"
             style={({ pressed }) => [styles.whenRow, pressed && { backgroundColor: ui.surface }]}

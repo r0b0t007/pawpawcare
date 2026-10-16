@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
 import { ui } from '../theme';
+import FitText from '../components/FitText';
 import { useTranslation } from '../i18n';
 
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
@@ -109,16 +110,32 @@ function ProfileStack() {
 }
 
 // Tab labels shrink (down to 80%) rather than truncate: "Communauté" is too
-// wide for a five-tab bar at 11px. No tabBarAccessibilityLabel: React Navigation's
-// default ("Home, tab, 1 of 5" on iOS) must stay.
-const TAB_LABEL_STYLE = { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, lineHeight: 14, marginTop: 2, textAlign: 'center' };
-const tabLabel = (text) => ({
-  tabBarLabel: ({ color }) => (
-    <Text style={[TAB_LABEL_STYLE, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-      {text}
-    </Text>
-  ),
-});
+// wide for a five-tab bar at 11px. A label function skips React Navigation's
+// own label styling and its iOS VoiceOver label, so both are restored here:
+// the beside-icon layout of wide screens (tablets) and "Home, tab, 1 of 5"
+// (translated) on iOS. Android announces the tab role itself.
+const TAB_FONT = 'PlusJakartaSans_700Bold';
+const TAB_COUNT = 5;
+const tabLabel = (t, key, index) => {
+  const text = t(key);
+  return {
+    tabBarAccessibilityLabel: Platform.OS === 'ios'
+      ? t('nav.tabs.a11yPosition', { label: text, index: index + 1, count: TAB_COUNT })
+      : undefined,
+    tabBarLabel: ({ color, position }) => (
+      <FitText
+        style={[
+          position === 'beside-icon'
+            ? { fontSize: 13, lineHeight: 24, marginStart: 5, marginEnd: 12 }
+            : { fontSize: 11, lineHeight: 14, marginTop: 2 },
+          { fontFamily: TAB_FONT, color },
+        ]}
+      >
+        {text}
+      </FitText>
+    ),
+  };
+};
 
 const TAB_ICONS = {
   Dashboard: { active: 'home', inactive: 'home-outline' },
@@ -158,11 +175,11 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardStack} options={tabLabel(t('nav.tabs.home'))} />
-      <Tab.Screen name="Pets" component={PetsStack} options={tabLabel(t('nav.tabs.pets'))} />
-      <Tab.Screen name="Health" component={HealthStack} options={tabLabel(t('nav.tabs.health'))} />
-      <Tab.Screen name="Community" component={CommunityStack} options={tabLabel(t('nav.tabs.community'))} />
-      <Tab.Screen name="Profile" component={ProfileStack} options={tabLabel(t('nav.tabs.profile'))} />
+      <Tab.Screen name="Dashboard" component={DashboardStack} options={tabLabel(t, 'nav.tabs.home', 0)} />
+      <Tab.Screen name="Pets" component={PetsStack} options={tabLabel(t, 'nav.tabs.pets', 1)} />
+      <Tab.Screen name="Health" component={HealthStack} options={tabLabel(t, 'nav.tabs.health', 2)} />
+      <Tab.Screen name="Community" component={CommunityStack} options={tabLabel(t, 'nav.tabs.community', 3)} />
+      <Tab.Screen name="Profile" component={ProfileStack} options={tabLabel(t, 'nav.tabs.profile', 4)} />
     </Tab.Navigator>
   );
 }

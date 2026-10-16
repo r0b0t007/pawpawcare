@@ -596,11 +596,11 @@ export default function DashboardScreen({ navigation }) {
                       </Text>
                       <Text style={styles.rowSub} numberOfLines={2}>
                         {[
-                          row.times.map(fmtTime).filter(Boolean).join(', ') || t('home.today.anyTime'),
-                          row.med.dosage,
                           row.expected > 1 && !row.done
                             ? t('home.today.givenOf', { taken: row.taken, expected: row.expected })
                             : null,
+                          row.times.map(fmtTime).filter(Boolean).join(', ') || t('home.today.anyTime'),
+                          row.med.dosage,
                         ].filter(Boolean).join(' · ')}
                       </Text>
                     </View>
