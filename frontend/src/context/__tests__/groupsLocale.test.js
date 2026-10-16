@@ -116,6 +116,38 @@ describe('DataContext groups follow the saved language', () => {
     expect(data.groups[0].name).toBe('Amoureux des chiens');
   });
 
+  // Same race, other order: the earlier fetch answers first and the
+  // refetch then fails. The old-language groups stay rather than none.
+  it('keeps the earlier fetch when it answers first and the refetch fails', async () => {
+    let answerFirst;
+    let failRefetch;
+    get.mockImplementation((path) => {
+      if (path === '/community/groups') {
+        if (!answerFirst) return new Promise((resolve) => { answerFirst = resolve; });
+        return new Promise((_, reject) => { failRefetch = reject; });
+      }
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    await act(async () => {
+      tree = TestRenderer.create(element());
+    });
+    mockUser = { ...mockUser, locale: 'fr' };
+    await act(async () => {
+      tree.update(element());
+    });
+
+    await act(async () => {
+      answerFirst(group('Dog Lovers'));
+    });
+    await act(async () => {
+      failRefetch(new Error('Network error'));
+    });
+
+    expect(groupCalls()).toBe(2);
+    expect(data.groups[0].name).toBe('Dog Lovers');
+  });
+
   it('does not refetch on a re-render with the same locale', async () => {
     await act(async () => {
       tree = TestRenderer.create(element());

@@ -103,9 +103,6 @@ describe('session restore at launch', () => {
     expect(auth.restoreFailed).toBe(false);
   });
 
-  // Seen on the emulator: a slow server made /users/me time out at launch and
-  // the app showed the Welcome screen, as if signed out, with the session
-  // still saved.
   // The account was saved in English, the app shows French: the sign-in
   // sync saves 'fr', and the user must carry it so DataContext refetches the
   // server-translated groups (they may have been fetched in English meanwhile).
@@ -130,6 +127,26 @@ describe('session restore at launch', () => {
     expect(auth.user.locale).toBe('en');
   });
 
+  // The user picked Spanish in Profile while the sign-in sync's 'fr' PATCH
+  // was still in flight: its late answer must not put 'fr' back.
+  it('ignores a sync answer once the app has switched language', async () => {
+    localeSpy = jest.spyOn(i18nModule, 'currentLocale').mockReturnValue('fr');
+    get.mockResolvedValue({ ...USER, locale: 'en' });
+    let answerSync;
+    patch.mockImplementation(() => new Promise((resolve) => { answerSync = resolve; }));
+    await launch();
+
+    localeSpy.mockReturnValue('es');
+    await act(async () => {
+      answerSync({ ...USER, locale: 'fr' });
+    });
+
+    expect(auth.user.locale).toBe('en');
+  });
+
+  // Seen on the emulator: a slow server made /users/me time out at launch and
+  // the app showed the Welcome screen, as if signed out, with the session
+  // still saved.
   it('offers a retry instead of the Welcome screen when the server is unreachable', async () => {
     get.mockRejectedValue(offline());
     await launch();

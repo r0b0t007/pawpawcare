@@ -80,10 +80,6 @@ class PetShareController extends Controller
      */
     public function show(Request $request, string $petId)
     {
-        // The signed `lang`, or the viewer's unsigned `hl` display override
-        // (ignored by the route's signature check; language only).
-        $locale = PublicPageLocale::apply($request, allowDisplayOverride: true);
-
         $pet = Pet::with([
             'vaccinations' => fn ($q) => $q->orderByDesc('due_date'),
             'medications' => fn ($q) => $q->where('active', true)->orderBy('name'),
@@ -102,6 +98,12 @@ class PetShareController extends Controller
         if (! $pet->share_token || ! hash_equals($pet->share_token, (string) $request->query('t'))) {
             abort(410, __('This share link has been revoked.'));
         }
+
+        // Only the page itself takes the link's language: the signed `lang`,
+        // or the viewer's unsigned `hl` display override (ignored by the
+        // route's signature check; language only). The 404/410 above keep
+        // SetLocale's browser-language pick, like the signed middleware's 403.
+        $locale = PublicPageLocale::apply($request, allowDisplayOverride: true);
 
         // Document links piggyback on this page's own expiry (the `expires`
         // query param the signature covers), so they die with the share link.

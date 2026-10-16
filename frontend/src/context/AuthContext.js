@@ -160,13 +160,18 @@ export function AuthProvider({ children }) {
     // The saved locale goes back on the user: content the server translates
     // (the seeded community groups) may have been fetched in the old language
     // meanwhile, and DataContext refetches it when user.locale changes. Only
-    // the locale is taken, so a plan applied meanwhile is never undone.
+    // the locale is taken, so a plan applied meanwhile is never undone; and
+    // only while the app still shows it, so a language picked in Profile
+    // since this PATCH went out wins. Not via applyUser: this is no account
+    // refresh, so the refresh clock and identity stay as they are.
     patch('/users/me', { timezone: tz, locale: currentLocale() })
       .then((saved) => {
         const current = userRef.current;
         if (session !== sessionRef.current || !current || current.id !== saved?.id) return;
-        if (!saved.locale || saved.locale === current.locale) return;
-        applyUser({ ...current, locale: saved.locale });
+        if (!saved.locale || saved.locale === current.locale || saved.locale !== currentLocale()) return;
+        const next = { ...current, locale: saved.locale };
+        userRef.current = next;
+        dispatch({ type: 'SET_USER', payload: next });
       })
       .catch(() => {});
     try {

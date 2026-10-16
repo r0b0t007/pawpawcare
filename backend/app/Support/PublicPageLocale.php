@@ -108,14 +108,24 @@ final class PublicPageLocale
      */
     public static function label(string $group, mixed $value, string $fallback): string
     {
-        if (is_string($value) && preg_match('/^[a-z_]{1,40}$/', $value)) {
-            $key = "share.{$group}.{$value}";
-            if (Lang::has($key)) {
-                return __($key);
-            }
+        return self::lookup("share.{$group}", $value) ?? $fallback;
+    }
+
+    /**
+     * The translation of a stored id under $prefix, or null. Only a plain id
+     * is looked up: a co-owner's free-text value with dots or '::' must never
+     * steer the lang key.
+     */
+    public static function lookup(string $prefix, mixed $value): ?string
+    {
+        if (! is_string($value) || ! preg_match('/^[a-z_]{1,40}z/', $value)) {
+            return null;
         }
 
-        return $fallback;
+        $key = "{$prefix}.{$value}";
+        $translated = Lang::has($key) ? __($key) : null;
+
+        return is_string($translated) ? $translated : null;
     }
 
     /**

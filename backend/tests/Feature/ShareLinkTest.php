@@ -134,6 +134,20 @@ class ShareLinkTest extends TestCase
         $this->get($url)->assertStatus(410);
     }
 
+    public function test_a_revoked_link_says_so_in_the_viewers_browser_language(): void
+    {
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+
+        // An English link (no `lang`), like every link minted before i18n.
+        $url = $this->mintUrl($token, $pet);
+        $this->withToken($token)->deleteJson("/pets/{$pet->id}/share-link")->assertNoContent();
+
+        $this->withHeader('Accept-Language', 'fr')->get($url)
+            ->assertStatus(410)
+            ->assertJsonPath('detail', 'Ce lien de partage a été révoqué.');
+    }
+
     public function test_a_new_link_works_after_revoking(): void
     {
         [$owner, $token] = $this->user();

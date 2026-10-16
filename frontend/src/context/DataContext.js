@@ -393,13 +393,17 @@ export function DataProvider({ children }) {
   // so a language switch refetches them — once updateUser has saved the new
   // locale and handed back the user. Refetching on i18n's languageChanged
   // instead would race that save and get the old language back.
-  // Latest request wins: the full load's fetch, sent before the sign-in
-  // locale sync landed, must not overwrite the refetch that followed it.
+  // Newest response wins: the full load's fetch, sent before the sign-in
+  // locale sync landed, must not overwrite the refetch that followed it. It
+  // still applies if it lands first, so a refetch that then fails leaves the
+  // groups in the old language rather than empty.
   const groupsRequest = useRef(0);
+  const groupsApplied = useRef(0);
   const refreshGroups = async () => {
     const request = ++groupsRequest.current;
     const apiGroups = await get('/community/groups');
-    if (request !== groupsRequest.current) return;
+    if (request < groupsApplied.current) return;
+    groupsApplied.current = request;
     dispatch({ type: 'SET_GROUPS', payload: apiGroups.map(toGroup) });
   };
   const groupsLocale = useRef(null);

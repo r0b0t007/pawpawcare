@@ -188,6 +188,19 @@ class CareTest extends TestCase
         $this->get($url)->assertStatus(410);
     }
 
+    public function test_a_revoked_link_says_so_in_the_viewers_browser_language(): void
+    {
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+
+        $url = $this->mintUrl($token, $pet);
+        $this->withToken($token)->deleteJson("/pets/{$pet->id}/care-link")->assertNoContent();
+
+        $this->withHeader('Accept-Language', 'es')->get($url)
+            ->assertStatus(410)
+            ->assertJsonPath('detail', 'Este enlace de cuidador se ha revocado.');
+    }
+
     public function test_care_and_vet_links_revoke_independently(): void
     {
         [$owner, $token] = $this->user();

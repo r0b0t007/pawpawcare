@@ -12,7 +12,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Lang;
 
 /**
  * Health-records export center. Every record a user (or their co-owned pets)
@@ -30,9 +29,8 @@ class ExportController extends Controller
 
         $user = $request->user();
 
-        // The export speaks the account's saved language (users.locale) —
-        // the same one its emails and pushes use — whatever the device sent.
-        App::setLocale($user->preferredLocale());
+        // The export speaks the account's saved language (users.locale), the
+        // one its emails and pushes use: SetLocale applied it after JwtAuth.
 
         // Same scoping as every pet route: own pets + pets shared with me.
         // An id outside that set 404s exactly like a nonexistent one, so the
@@ -241,21 +239,12 @@ class ExportController extends Controller
     /** A date in the current locale, with that locale's export.formats pattern. */
     private static function formatDate(CarbonInterface $value, string $pattern): string
     {
-        return $value->copy()->locale(App::getLocale())->isoFormat(__('export.formats.'.$pattern));
+        return PublicPageLocale::date($value, 'export.formats.'.$pattern);
     }
 
+    /** A stored id's export.values label; anything else prints as stored. */
     private static function label(string $group, ?string $value): ?string
     {
-        // Only a plain stored id is looked up (same check as
-        // PublicPageLocale::label): a co-owner's free-text value with dots
-        // or '::' must never steer the lang key. Anything else prints as stored.
-        if ($value === null || ! preg_match('/^[a-z_]{1,40}$/', $value)) {
-            return $value;
-        }
-
-        $key = 'export.values.'.$group.'.'.$value;
-        $translated = Lang::has($key) ? __($key) : null;
-
-        return is_string($translated) ? $translated : $value;
+        return PublicPageLocale::lookup('export.values.'.$group, $value) ?? $value;
     }
 }

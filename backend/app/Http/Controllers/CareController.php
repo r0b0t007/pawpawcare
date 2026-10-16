@@ -106,9 +106,6 @@ class CareController extends Controller
      */
     public function page(Request $request, string $petId)
     {
-        // The link's signed `lang` (English when absent or unsupported).
-        PublicPageLocale::apply($request);
-
         $pet = Pet::with([
             'careProfile',
             'medications' => fn ($q) => $q->where('active', true)->orderBy('name'),
@@ -123,6 +120,10 @@ class CareController extends Controller
         if (! $pet->care_token || ! hash_equals($pet->care_token, (string) $request->query('t'))) {
             abort(410, __('This caretaker link has been revoked.'));
         }
+
+        // The page takes the link's signed `lang` (English when absent or
+        // unsupported); the 404/410 above keep the browser language.
+        PublicPageLocale::apply($request);
 
         return response()
             ->view('care', [
