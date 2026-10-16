@@ -236,7 +236,8 @@
       "tooShort": "Utilice al menos {{min}} caracteres para su contraseña.",
       "submit": "Crear cuenta",
       "submitting": "Creando cuenta…",
-      "toLogin": "¿Ya tiene una cuenta? Inicie sesión"
+      "toLogin": "¿Ya tiene una cuenta? Inicie sesión",
+      "passwordsToggle": "las contraseñas"
     },
     "forgot": {
       "title": "Restablecer su contraseña",
@@ -1362,6 +1363,20 @@
       "saveFailed": "No se han podido guardar las notas.",
       "createFailed": "No se ha podido crear el enlace.",
       "revokeFailed": "No se han podido revocar los enlaces."
+    },
+    "weightInsight": {
+      "stable": "Estable durante {{span}}",
+      "up": "Ha subido {{amount}} {{unit}} ({{pct}} %) en {{span}}",
+      "down": "Ha bajado {{amount}} {{unit}} ({{pct}} %) en {{span}}",
+      "days_one": "{{count}} día",
+      "days_many": "{{count}} días",
+      "days_other": "{{count}} días",
+      "weeks_one": "{{count}} semana",
+      "weeks_many": "{{count}} semanas",
+      "weeks_other": "{{count}} semanas",
+      "months_one": "{{count}} mes",
+      "months_many": "{{count}} meses",
+      "months_other": "{{count}} meses"
     }
   },
   "addPet": {

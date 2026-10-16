@@ -236,7 +236,8 @@
       "tooShort": "Utilisez au moins {{min}} caractères pour votre mot de passe.",
       "submit": "Créer un compte",
       "submitting": "Création du compte…",
-      "toLogin": "Vous avez déjà un compte ? Connectez-vous"
+      "toLogin": "Vous avez déjà un compte ? Connectez-vous",
+      "passwordsToggle": "les mots de passe"
     },
     "forgot": {
       "title": "Réinitialiser votre mot de passe",
@@ -1362,6 +1363,20 @@
       "saveFailed": "Impossible d'enregistrer les notes.",
       "createFailed": "Impossible de créer le lien.",
       "revokeFailed": "Impossible de révoquer les liens."
+    },
+    "weightInsight": {
+      "stable": "Stable sur {{span}}",
+      "up": "En hausse de {{amount}} {{unit}} ({{pct}} %) sur {{span}}",
+      "down": "En baisse de {{amount}} {{unit}} ({{pct}} %) sur {{span}}",
+      "days_one": "{{count}} jour",
+      "days_many": "{{count}} jours",
+      "days_other": "{{count}} jours",
+      "weeks_one": "{{count}} semaine",
+      "weeks_many": "{{count}} semaines",
+      "weeks_other": "{{count}} semaines",
+      "months_one": "{{count}} mois",
+      "months_many": "{{count}} mois",
+      "months_other": "{{count}} mois"
     }
   },
   "addPet": {

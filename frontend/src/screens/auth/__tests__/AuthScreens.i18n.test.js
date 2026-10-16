@@ -65,6 +65,8 @@ describe('in English', () => {
     await render(SignupScreen);
     expect(texts(tree)).toEqual(expect.arrayContaining(['Create your account', '6+ characters', 'Passwords match']));
     expect(button(tree, 'Create account')).toBeTruthy();
+    // One toggle reveals both password fields.
+    expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'Show passwords').length).toBeGreaterThan(0);
   });
 });
 
@@ -92,5 +94,6 @@ describe('in French', () => {
     await render(SignupScreen);
     expect(texts(tree)).toContain('6 caractères minimum');
     expect(button(tree, 'Créer un compte')).toBeTruthy();
+    expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'Afficher les mots de passe').length).toBeGreaterThan(0);
   });
 });

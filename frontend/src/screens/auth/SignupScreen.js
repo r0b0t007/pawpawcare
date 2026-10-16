@@ -136,7 +136,7 @@ export default function SignupScreen({ navigation }) {
             secure
             revealed={showPwd}
             onToggleReveal={() => setShowPwd((v) => !v)}
-            toggleLabel="passwords"
+            toggleLabel={t('auth.signup.passwordsToggle')}
             placeholder={minChars}
             value={password}
             onChangeText={onChange(setPassword)}

@@ -221,7 +221,8 @@
       "tooShort": "Use at least {{min}} characters for your password.",
       "submit": "Create account",
       "submitting": "Creating account…",
-      "toLogin": "Already have an account? Log in"
+      "toLogin": "Already have an account? Log in",
+      "passwordsToggle": "passwords"
     },
     "forgot": {
       "title": "Reset your password",
@@ -1315,6 +1316,17 @@
       "saveFailed": "Could not save notes.",
       "createFailed": "Could not create the link.",
       "revokeFailed": "Could not revoke links."
+    },
+    "weightInsight": {
+      "stable": "Stable over the last {{span}}",
+      "up": "Up {{amount}} {{unit}} ({{pct}}%) over the last {{span}}",
+      "down": "Down {{amount}} {{unit}} ({{pct}}%) over the last {{span}}",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "weeks_one": "{{count}} week",
+      "weeks_other": "{{count}} weeks",
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months"
     }
   },
   "addPet": {

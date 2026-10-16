@@ -84,7 +84,7 @@ const NO_WEIGHTS = [];
 export default function PetProfileScreen({ navigation, route }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
-  useLocale();
+  const locale = useLocale();
   const { t } = useTranslation();
   const { petId } = route.params;
   const {
@@ -182,7 +182,8 @@ export default function PetProfileScreen({ navigation, route }) {
     () => weights.map((w) => ({ id: w.id, loggedAt: w.loggedAt, value: convertWeight(w.weight, w.unit, wUnit) })),
     [weights, wUnit],
   );
-  const wInsight = useMemo(() => weightInsight(normWeights, wUnit), [normWeights, wUnit]);
+  // The summary sentence is built in the app language: rebuild it on a switch.
+  const wInsight = useMemo(() => weightInsight(normWeights, wUnit), [normWeights, wUnit, locale]);
 
   if (!pet) {
     return (
