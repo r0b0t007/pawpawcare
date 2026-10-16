@@ -11,6 +11,7 @@ import { getPref } from '../../services/prefs';
 import { fmtShort, fmtDay, fmtDate, fmtClock, fmtWeekday, dayDiff, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
 import i18n, { useLocale, useTranslation } from '../../i18n';
 import { petById } from '../../utils/pets';
+import { reminderKind } from '../../utils/reminders';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
 import { useTickAt } from '../../hooks/useTickAt';
@@ -45,15 +46,6 @@ const fmtDelivery = (date) => `${fmtWeekday(date)} ${fmtClock(date)}`;
 
 // Record type ids; their labels live under health.types.
 const RECORD_TYPES = ['vaccine', 'vetVisit', 'medication', 'weight'];
-
-// "Weekly reminder" — recurrence is daily | weekly | monthly (server enum).
-const reminderKind = (r) => {
-  if (r.schedule_type !== 'recurring') return i18n.t('health.reminderKind.once');
-  const rec = r.recurrence || 'daily';
-  return i18n.t(`health.reminderKind.${rec}`, {
-    defaultValue: i18n.t('health.reminderKind.other', { recurrence: rec.replace(/^\w/, (c) => c.toUpperCase()) }),
-  });
-};
 
 const defaultDueDate = () => {
   const d = new Date();

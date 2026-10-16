@@ -570,7 +570,7 @@
       "daily": "Recordatorio diario",
       "weekly": "Recordatorio semanal",
       "monthly": "Recordatorio mensual",
-      "other": "Recordatorio ({{recurrence}})"
+      "other": "Recordatorio periódico"
     },
     "wasDue": "{{pet}} · vencía el {{date}}",
     "sections": {
@@ -693,12 +693,15 @@
   "reminders": {
     "title": "Recordatorios",
     "schedule": {
-      "daily": "Cada día a las {{time}}",
-      "weekly": "Cada semana a las {{time}}",
-      "monthly": "Cada mes a las {{time}}",
-      "other": "{{recurrence}} a las {{time}}",
+      "daily": "Cada día {{at}}",
+      "weekly": "Cada semana {{at}}",
+      "monthly": "Cada mes {{at}}",
+      "other": "Periódicamente {{at}}",
       "oneTime": "Una sola vez"
     },
+    "atTime_one": "a la {{time}}",
+    "atTime_many": "a las {{time}}",
+    "atTime_other": "a las {{time}}",
     "toast": {
       "addFailed": "No se ha podido añadir el recordatorio. Inténtelo de nuevo.",
       "added": "Recordatorio añadido",
@@ -1032,9 +1035,9 @@
       "male": "Macho",
       "female": "Hembra"
     },
-    "ageShort_one": "{{count}} año",
-    "ageShort_many": "{{count}} años",
-    "ageShort_other": "{{count}} años",
+    "ageShort_one": "{{age}} año",
+    "ageShort_many": "{{age}} años",
+    "ageShort_other": "{{age}} años",
     "colors": {
       "peach": "Melocotón",
       "skyBlue": "Azul cielo",
@@ -1162,9 +1165,9 @@
     },
     "hero": {
       "pet": "Mascota",
-      "age_one": "{{count}} año",
-      "age_many": "{{count}} años",
-      "age_other": "{{count}} años",
+      "age_one": "{{age}} año",
+      "age_many": "{{age}} años",
+      "age_other": "{{age}} años",
       "microchipped": "Con microchip",
       "photoA11y": "Foto de {{name}}",
       "back": "Atrás",
@@ -1300,14 +1303,14 @@
     },
     "weight": {
       "title": "Registrar el peso de {{name}}",
-      "placeholder": "p. ej. 22.5",
+      "placeholder": "p. ej. 22,5",
       "hint": "Se registra en {{unit}}: cambie la unidad en Editar mascota.",
       "submit": "Registrar peso"
     },
     "expense": {
       "title": "Añadir gasto para {{name}}",
       "category": "Categoría",
-      "amountPlaceholder": "Importe (p. ej. 45.00)",
+      "amountPlaceholder": "Importe (p. ej. 45,00)",
       "notePlaceholder": "Nota (opcional)",
       "submit": "Añadir gasto"
     },

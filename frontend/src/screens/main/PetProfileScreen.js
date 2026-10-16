@@ -22,6 +22,7 @@ import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamificat
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
+import { formatDecimal, parseDecimal, pluralCount } from '../../utils/numbers';
 import { track } from '../../services/analytics';
 import { ui, type, radii, motion, petPair, scrim } from '../../theme';
 import {
@@ -63,11 +64,14 @@ const SEGMENT_IDS = ['overview', 'health', 'notes'];
 // Medication frequency ids -> i18n keys under petProfile.frequency.
 const freqKey = (f) => (f === 'as_needed' ? 'asNeeded' : f);
 
+// Pet type and gender are free text server-side: an unknown one is the
+// owner's own words, shown as stored (capitalised), never translated.
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
+
 // '' for a missing date (callers supply their own fallback text).
 const shortDate = (iso) => (iso ? fmtShort(parseDay(iso)) : '');
 const fullDate = (iso) => (iso ? fmtFull(parseDay(iso)) : '');
 const monthLabel = (iso) => (iso ? fmtMonth(parseDay(iso)) : '');
-const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
 const HERO_HEIGHT = 400;
 
@@ -324,7 +328,7 @@ export default function PetProfileScreen({ navigation, route }) {
   };
 
   const handleAddWeight = () => {
-    const v = parseFloat(newWeight.value);
+    const v = parseDecimal(newWeight.value);
     if (!v || v <= 0) return undefined;
     // Unit is locked to the pet's unit server-side.
     return save('weight', () => addWeight(petId, { weight: v }), {
@@ -340,7 +344,7 @@ export default function PetProfileScreen({ navigation, route }) {
 
   const handleDeleteWeight = (w) => askConfirm({
     title: t('petProfile.confirm.deleteEntryTitle'),
-    message: t('petProfile.confirm.deleteEntryMessage', { value: w.value.toFixed(1), unit: wUnit }),
+    message: t('petProfile.confirm.deleteEntryMessage', { value: formatDecimal(w.value, 1), unit: wUnit }),
     confirmLabel: t('petProfile.confirm.delete'),
     destructive: true,
     action: () => save(`weight-del-${w.id}`, () => deleteWeight(petId, w.id), {
@@ -350,7 +354,7 @@ export default function PetProfileScreen({ navigation, route }) {
   });
 
   const handleAddExpense = () => {
-    const amt = parseFloat(newExpense.amount);
+    const amt = parseDecimal(newExpense.amount);
     if (!amt || amt <= 0) return undefined;
     return save('expense', () => addExpense(petId, { category: newExpense.category, amount: amt, notes: newExpense.notes.trim() || null }), {
       ok: t('petProfile.toast.expenseAdded'),
@@ -472,7 +476,7 @@ export default function PetProfileScreen({ navigation, route }) {
     pet.breed ? breedLabel(pet.breed) : null,
   ].filter(Boolean).join(' · ');
   const heroMeta = [
-    pet.age ? t('petProfile.hero.age', { count: pet.age }) : null,
+    pet.age ? t('petProfile.hero.age', { count: pluralCount(Number(pet.age)), age: formatDecimal(pet.age, { min: 0, max: 1 }) }) : null,
     pet.gender ? t(`pets.genders.${pet.gender}`, { defaultValue: cap(pet.gender) }) : null,
     pet.microchipped ? t('petProfile.hero.microchipped') : null,
   ].filter(Boolean).join(' · ');
@@ -502,7 +506,7 @@ export default function PetProfileScreen({ navigation, route }) {
     ? wInsight.direction === 'stable'
       ? t('petProfile.trend.steady')
       : t(wInsight.direction === 'up' ? 'petProfile.trend.up' : 'petProfile.trend.down', {
-        value: Math.abs(wInsight.changeAbs).toFixed(1), unit: wUnit,
+        value: formatDecimal(Math.abs(wInsight.changeAbs), 1), unit: wUnit,
       })
     : null;
   const trendColor = wInsight && wInsight.direction === 'up' ? ui.subtle : ui.success;
@@ -609,7 +613,7 @@ export default function PetProfileScreen({ navigation, route }) {
             {
               icon: 'scale-bathroom', title: t('petProfile.overview.tileWeight'),
               value: latestWeight
-                ? `${latestWeight.value.toFixed(1)} ${wUnit}${trendText ? ` · ${trendText.toLowerCase()}` : ''}`
+                ? `${formatDecimal(latestWeight.value, 1)} ${wUnit}${trendText ? ` · ${trendText.toLowerCase()}` : ''}`
                 : t('petProfile.overview.logFirstWeight'),
               onPress: () => setWeightSheet(true),
             },
@@ -651,7 +655,7 @@ export default function PetProfileScreen({ navigation, route }) {
         <View style={styles.rowBetween}>
           <Text style={styles.cardLabel}>
             {latestWeight
-              ? t('petProfile.overview.weightLabelValue', { value: latestWeight.value.toFixed(1), unit: wUnit.toUpperCase() })
+              ? t('petProfile.overview.weightLabelValue', { value: formatDecimal(latestWeight.value, 1), unit: wUnit.toUpperCase() })
               : t('petProfile.overview.weightLabel')}
           </Text>
           {trendText && <Text style={[styles.trendText, { color: trendColor }]}>{trendText}</Text>}
@@ -669,7 +673,7 @@ export default function PetProfileScreen({ navigation, route }) {
             <View>
               {[...normWeights].reverse().slice(0, 4).map((w, i, arr) => (
                 <View key={w.id} style={[styles.weightRow, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
-                  <Text style={styles.weightRowVal}>{w.value.toFixed(1)} {wUnit}</Text>
+                  <Text style={styles.weightRowVal}>{formatDecimal(w.value, 1)} {wUnit}</Text>
                   <Text style={styles.weightRowDate}>{fullDate(w.loggedAt)}</Text>
                   <Pressable
                     onPress={() => handleDeleteWeight(w)}
@@ -742,7 +746,7 @@ export default function PetProfileScreen({ navigation, route }) {
       <Card style={styles.block}>
         <View style={styles.spendRow}>
           <Text style={[type.rowTitle, { color: ui.ink, flex: 1 }]}>{t('petProfile.overview.thisMonth')}</Text>
-          <Text style={styles.spendValue}>{thisMonthSpend.toFixed(2)}</Text>
+          <Text style={styles.spendValue}>{formatDecimal(thisMonthSpend, 2)}</Text>
         </View>
         {expenses.slice(0, 5).map((e) => {
           const m = catMeta(e.category);
@@ -755,7 +759,7 @@ export default function PetProfileScreen({ navigation, route }) {
                 </Text>
                 <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>{fullDate(e.incurredOn)}</Text>
               </View>
-              <Text style={styles.expenseAmount}>{Number(e.amount).toFixed(2)}</Text>
+              <Text style={styles.expenseAmount}>{formatDecimal(e.amount, 2)}</Text>
               <Pressable
                 onPress={() => handleDeleteExpense(e)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1181,7 +1185,7 @@ export default function PetProfileScreen({ navigation, route }) {
           </View>
         </View>
         <Text style={styles.sheetHint}>{t('petProfile.weight.hint', { unit: wUnit })}</Text>
-        <Button label={t('petProfile.weight.submit')} onPress={handleAddWeight} disabled={!parseFloat(newWeight.value) || isBusy('weight')} />
+        <Button label={t('petProfile.weight.submit')} onPress={handleAddWeight} disabled={!(parseDecimal(newWeight.value) > 0) || isBusy('weight')} />
       </Sheet>
 
       {/* Add expense */}
@@ -1215,7 +1219,7 @@ export default function PetProfileScreen({ navigation, route }) {
           value={newExpense.notes}
           onChangeText={(v) => setNewExpense({ ...newExpense, notes: v })}
         />
-        <Button label={t('petProfile.expense.submit')} onPress={handleAddExpense} disabled={!parseFloat(newExpense.amount) || isBusy('expense')} />
+        <Button label={t('petProfile.expense.submit')} onPress={handleAddExpense} disabled={!(parseDecimal(newExpense.amount) > 0) || isBusy('expense')} />
       </Sheet>
 
       {/* Care team (owner list + invite / leave) */}
@@ -1387,10 +1391,10 @@ function WeightSparkline({ weights }) {
 
 function MedicationRow({ med, pair, streakLabel, onLog, onDelete }) {
   const { t } = useTranslation();
-  const freqName = t(`petProfile.frequency.${freqKey(med.frequency)}`, { defaultValue: cap(med.frequency) });
-  const freqLabel = med.frequency === 'as_needed'
-    ? freqName
-    : `${freqName}${med.times?.length ? ` · ${med.times.join(', ')}` : ''}`;
+  // Frequency is a server enum: an unknown value is left out, never shown raw.
+  const freqName = t(`petProfile.frequency.${freqKey(med.frequency)}`, { defaultValue: '' });
+  const times = med.frequency === 'as_needed' ? [] : (med.times || []).map((time) => fmtTime(time) || time);
+  const freqLabel = [freqName, times.join(', ')].filter(Boolean).join(' · ');
   const lastGiven = med.lastAdministeredAt
     ? fmtDate(new Date(med.lastAdministeredAt), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     : null;

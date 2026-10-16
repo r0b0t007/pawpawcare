@@ -120,7 +120,7 @@ test('renders its chrome in the app language, never translating the pet name', a
       await i18n.changeLanguage('fr');
     });
     expect(texts(tree)).toEqual(expect.arrayContaining([
-      'Luna', "Rien à donner aujourd'hui", 'POIDS — 4.2 KG', '3 ans · Mâle · Pucé', 'Chat',
+      'Luna', "Rien à donner aujourd'hui", 'POIDS — 4,2 KG', '3 ans · Mâle · Pucé', 'Chat',
     ]));
   } finally {
     await act(async () => {

@@ -570,7 +570,7 @@
       "daily": "Rappel quotidien",
       "weekly": "Rappel hebdomadaire",
       "monthly": "Rappel mensuel",
-      "other": "Rappel ({{recurrence}})"
+      "other": "Rappel récurrent"
     },
     "wasDue": "{{pet}} · était prévu le {{date}}",
     "sections": {
@@ -693,12 +693,15 @@
   "reminders": {
     "title": "Rappels",
     "schedule": {
-      "daily": "Tous les jours à {{time}}",
-      "weekly": "Toutes les semaines à {{time}}",
-      "monthly": "Tous les mois à {{time}}",
-      "other": "{{recurrence}} à {{time}}",
+      "daily": "Tous les jours {{at}}",
+      "weekly": "Toutes les semaines {{at}}",
+      "monthly": "Tous les mois {{at}}",
+      "other": "Régulièrement {{at}}",
       "oneTime": "Ponctuel"
     },
+    "atTime_one": "à {{time}}",
+    "atTime_many": "à {{time}}",
+    "atTime_other": "à {{time}}",
     "toast": {
       "addFailed": "Impossible d'ajouter le rappel. Veuillez réessayer.",
       "added": "Rappel ajouté",
@@ -1032,9 +1035,9 @@
       "male": "Mâle",
       "female": "Femelle"
     },
-    "ageShort_one": "{{count}} an",
-    "ageShort_many": "{{count}} ans",
-    "ageShort_other": "{{count}} ans",
+    "ageShort_one": "{{age}} an",
+    "ageShort_many": "{{age}} ans",
+    "ageShort_other": "{{age}} ans",
     "colors": {
       "peach": "Pêche",
       "skyBlue": "Bleu ciel",
@@ -1162,9 +1165,9 @@
     },
     "hero": {
       "pet": "Animal",
-      "age_one": "{{count}} an",
-      "age_many": "{{count}} ans",
-      "age_other": "{{count}} ans",
+      "age_one": "{{age}} an",
+      "age_many": "{{age}} ans",
+      "age_other": "{{age}} ans",
       "microchipped": "Pucé",
       "photoA11y": "Photo de {{name}}",
       "back": "Retour",
@@ -1300,14 +1303,14 @@
     },
     "weight": {
       "title": "Enregistrer le poids de {{name}}",
-      "placeholder": "ex. 22.5",
+      "placeholder": "ex. 22,5",
       "hint": "Enregistré en {{unit}} : modifiez l'unité dans « Modifier les informations ».",
       "submit": "Enregistrer le poids"
     },
     "expense": {
       "title": "Ajouter une dépense pour {{name}}",
       "category": "Catégorie",
-      "amountPlaceholder": "Montant (ex. 45.00)",
+      "amountPlaceholder": "Montant (ex. 45,00)",
       "notePlaceholder": "Note (facultatif)",
       "submit": "Ajouter la dépense"
     },

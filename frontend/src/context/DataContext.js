@@ -13,6 +13,7 @@ import { noteGoodMoment } from '../services/storeReview';
 import { addDoseDay, dayKey } from '../utils/streaks';
 import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
+import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
 import { petsKeys, gamificationKeys } from '../hooks/queryKeys';
 import i18n from '../i18n';
@@ -640,10 +641,10 @@ export function DataProvider({ children }) {
         name: petData.name,
         type: petData.type || 'dog',
         breed: petData.breed || null,
-        age: petData.age ? parseFloat(petData.age) : null,
+        age: petData.age ? parseDecimal(petData.age) : null,
         birthday: petData.birthday || null,
         adopted_on: petData.adoptedOn || null,
-        weight: petData.weight ? parseFloat(petData.weight) : null,
+        weight: petData.weight ? parseDecimal(petData.weight) : null,
         weight_unit: petData.weightUnit || 'kg',
         gender: petData.gender || null,
         microchipped: petData.microchipped || false,
@@ -669,10 +670,10 @@ export function DataProvider({ children }) {
       if (updates.name !== undefined)        apiUpdate.name = updates.name;
       if (updates.type !== undefined)        apiUpdate.type = updates.type;
       if (updates.breed !== undefined)       apiUpdate.breed = updates.breed;
-      if (updates.age !== undefined)         apiUpdate.age = updates.age ? parseFloat(updates.age) : null;
+      if (updates.age !== undefined)         apiUpdate.age = updates.age ? parseDecimal(updates.age) : null;
       if (updates.birthday !== undefined)    apiUpdate.birthday = updates.birthday || null;
       if (updates.adoptedOn !== undefined)   apiUpdate.adopted_on = updates.adoptedOn || null;
-      if (updates.weight !== undefined)      apiUpdate.weight = updates.weight ? parseFloat(updates.weight) : null;
+      if (updates.weight !== undefined)      apiUpdate.weight = updates.weight ? parseDecimal(updates.weight) : null;
       if (updates.weightUnit !== undefined)  apiUpdate.weight_unit = updates.weightUnit;
       if (updates.gender !== undefined)      apiUpdate.gender = updates.gender;
       if (updates.microchipped !== undefined) apiUpdate.microchipped = updates.microchipped;
@@ -858,7 +859,7 @@ export function DataProvider({ children }) {
   const addWeight = async (petId, entry) => {
     try {
       const apiW = await post(`/pets/${petId}/weights`, {
-        weight: parseFloat(entry.weight),
+        weight: parseDecimal(entry.weight),
         logged_at: entry.loggedAt || undefined,
       });
       const newW = toWeight(apiW);
@@ -902,7 +903,7 @@ export function DataProvider({ children }) {
     try {
       const apiE = await post(`/pets/${petId}/expenses`, {
         category: entry.category || 'other',
-        amount: parseFloat(entry.amount),
+        amount: parseDecimal(entry.amount),
         incurred_on: entry.incurredOn || undefined,
         notes: entry.notes || undefined,
       });

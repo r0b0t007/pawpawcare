@@ -4,6 +4,7 @@
 // The summary is built in the current app language (petProfile.weightInsight).
 
 import i18n from '../i18n';
+import { formatDecimal } from './numbers';
 
 const KG_PER_LB = 0.45359237;
 
@@ -36,10 +37,10 @@ export const weightInsight = (points, unit) => {
   const span = days < 14 ? t('days', { count: days })
     : days < 60 ? t('weeks', { count: Math.round(days / 7) })
       : t('months', { count: Math.round(days / 30) });
-  const mag = Math.abs(changeAbs).toFixed(1).replace(/\.0$/, '');
+  const mag = formatDecimal(Math.abs(changeAbs), { min: 0, max: 1 });
   // "Down" already conveys the sign — show the percent unsigned.
   const summary = direction === 'stable'
     ? t('stable', { span })
-    : t(direction, { amount: mag, unit, pct: Math.abs(changePct), span });
+    : t(direction, { amount: mag, unit, pct: formatDecimal(Math.abs(changePct), { min: 0, max: 1 }), span });
   return { current: last.value, changeAbs, changePct, days, direction, notable: Math.abs(changePct) >= WEIGHT_NOTABLE_PCT, summary };
 };
