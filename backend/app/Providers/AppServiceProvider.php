@@ -6,6 +6,7 @@ use App\Services\Analytics\ProductAnalytics;
 use App\Services\Extraction\AnthropicDriver;
 use App\Services\Extraction\ExtractionClient;
 use App\Services\Extraction\OpenAiCompatibleDriver;
+use App\Services\JwtService;
 use App\Support\Backups;
 use App\Support\MailDelivery;
 use App\Support\ReportOnce;
@@ -130,16 +131,45 @@ class AppServiceProvider extends ServiceProvider
         // keying on the full address would hand them 2^64 separate budgets.
         // (The per-account failure budget lives in AuthController::login.)
         RateLimiter::for('login', function (Request $request) {
-            $ip = (string) $request->ip();
-            // IPv4-mapped (::ffff:a.b.c.d, from some dual-stack sockets) is
-            // plain IPv4 — its /64 would lump every IPv4 client together.
-            if (str_starts_with(strtolower($ip), '::ffff:') && filter_var(substr($ip, 7), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                $ip = substr($ip, 7);
-            } elseif (str_contains($ip, ':') && ($bin = @inet_pton($ip)) !== false) {
-                $ip = inet_ntop(substr($bin, 0, 8).str_repeat("\0", 8));
-            }
+            return Limit::perMinute(20)->by('login-ip|'.self::network($request));
+        });
 
-            return Limit::perMinute(20)->by('login-ip|'.$ip);
+        // Token refresh (CHW-184): a per-IP cap would make every app behind
+        // one carrier NAT address share 20 refreshes a minute (each user
+        // refreshes about hourly). So a genuine refresh token — its signature
+        // checked first, which is cheap (HS256) — gets its own small bucket,
+        // keyed by its jti. Anything else shares ONE small bucket per network:
+        // keying made-up strings would let a client mint unlimited cache
+        // entries, which the file cache never cleans up. The per-network
+        // ceiling bounds the total, generous enough for a large CGNAT pool.
+        RateLimiter::for('refresh', function (Request $request) {
+            $token = $request->input('refresh_token');
+            $payload = is_string($token) && strlen($token) <= 512 ? JwtService::decode($token) : null;
+            $genuine = ($payload['type'] ?? null) === 'refresh' && is_string($payload['jti'] ?? null);
+
+            return [
+                $genuine
+                    ? Limit::perMinute(10)->by('refresh-token|'.$payload['jti'])
+                    : Limit::perMinute(20)->by('refresh-bad|'.self::network($request)),
+                Limit::perMinute(600)->by('refresh-net|'.self::network($request)),
+            ];
+        });
+
+        // Costly authenticated routes (CHW-185): each keeps its per-user
+        // budget, plus a per-network ceiling so one person with many free
+        // accounts can't multiply it. The ceilings sit well above what a
+        // carrier-NAT pool of real users sends.
+        RateLimiter::for('doc-extract', function (Request $request) {
+            return [
+                Limit::perMinute(10)->by('doc-extract|'.($request->user()?->id ?? $request->ip())),
+                Limit::perMinute(60)->by('doc-extract-net|'.self::network($request)),
+            ];
+        });
+        RateLimiter::for('invite', function (Request $request) {
+            return [
+                Limit::perMinute(20)->by('invite|'.($request->user()?->id ?? $request->ip())),
+                Limit::perMinute(60)->by('invite-net|'.self::network($request)),
+            ];
         });
 
         // Support inbox: 5/hour per authenticated user, with feedback and ideas
@@ -166,7 +196,30 @@ class AppServiceProvider extends ServiceProvider
         // Post reporting: capped per user so one account can't mass-flag the
         // feed (three distinct reporters hide a post for everyone else).
         RateLimiter::for('post-report', function (Request $request) {
-            return Limit::perHour(10)->by('post-report|'.($request->user()?->id ?? $request->ip()));
+            return [
+                Limit::perHour(10)->by('post-report|'.($request->user()?->id ?? $request->ip())),
+                Limit::perHour(50)->by('post-report-net|'.self::network($request)),
+            ];
         });
+    }
+
+    /**
+     * The caller's network for per-IP limits: the IPv4 address, or the /64
+     * of an IPv6 one — a single IPv6 subscriber holds a whole /64, so keying
+     * on the full address would hand them 2^64 separate budgets.
+     */
+    public static function network(Request $request): string
+    {
+        $ip = (string) $request->ip();
+        // IPv4-mapped (::ffff:a.b.c.d, from some dual-stack sockets) is
+        // plain IPv4 — its /64 would lump every IPv4 client together.
+        if (str_starts_with(strtolower($ip), '::ffff:') && filter_var(substr($ip, 7), FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return substr($ip, 7);
+        }
+        if (str_contains($ip, ':') && ($bin = @inet_pton($ip)) !== false) {
+            return inet_ntop(substr($bin, 0, 8).str_repeat("\0", 8));
+        }
+
+        return $ip;
     }
 }

@@ -184,7 +184,7 @@ class AuthController extends Controller
         JwtSecretGuard::enforce(); // before any side effect: no half-made accounts on a bad key
 
         $data = $request->validate([
-            'refresh_token' => 'required|string',
+            'refresh_token' => 'required|string|max:512',
         ]);
 
         $payload = JwtService::decode($data['refresh_token']);

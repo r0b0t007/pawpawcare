@@ -210,14 +210,15 @@ class RateLimitScopeTest extends TestCase
         // are rejected with 401 without consuming any budget. See the trade-off
         // in the JwtAuth docblock.
         //
-        // /auth/refresh carries only the group's `throttle:20,1,auth:`, so the
-        // rate-limit headers are that bucket's (login adds a second limiter).
+        // /auth/signup carries only the group's `throttle:20,1,auth:`, so the
+        // rate-limit headers are that bucket's (login adds a second limiter;
+        // refresh has its own per-token limiter, see RateLimitOuterTest).
         $refresh = fn (string $ip) => $this->withServerVariables(['REMOTE_ADDR' => $ip])
-            ->postJson('/auth/refresh', ['refresh_token' => 'not-a-token']);
+            ->postJson('/auth/signup', []);
 
-        $first = $refresh('198.51.100.7')->assertStatus(401);
-        $second = $refresh('198.51.100.7')->assertStatus(401);
-        $otherIp = $refresh('198.51.100.8')->assertStatus(401);
+        $first = $refresh('198.51.100.7')->assertStatus(422);
+        $second = $refresh('198.51.100.7')->assertStatus(422);
+        $otherIp = $refresh('198.51.100.8')->assertStatus(422);
 
         $this->assertSame(20, (int) $first->headers->get('X-RateLimit-Limit'));
         $this->assertSame(

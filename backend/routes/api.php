@@ -72,9 +72,12 @@ Route::middleware('throttle:20,1,auth:')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('/auth/google', [AuthController::class, 'google']);
     Route::post('/auth/apple', [AuthController::class, 'apple']);
-    Route::post('/auth/refresh', [AuthController::class, 'refresh']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
 });
+
+// Refresh has its own limiter, per refresh token rather than per IP, so many
+// apps behind one carrier NAT address never share a budget (CHW-184).
+Route::post('/auth/refresh', [AuthController::class, 'refresh'])->middleware('throttle:refresh');
 
 // ── Password reset (public; named limiters — see AppServiceProvider) ─────────
 // forgot-password always answers 200 so it can't enumerate accounts;
@@ -163,7 +166,7 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
 
     // Pet sharing (co-owners)
     Route::get('/pets/{pet}/members', [PetSharingController::class, 'members']);
-    Route::post('/pets/{pet}/invites', [PetSharingController::class, 'invite'])->middleware('throttle:20,1,invite:');
+    Route::post('/pets/{pet}/invites', [PetSharingController::class, 'invite'])->middleware('throttle:invite');
     Route::delete('/pets/{pet}/invites/{invite}', [PetSharingController::class, 'cancelInvite']);
     Route::delete('/pets/{pet}/members/{member}', [PetSharingController::class, 'removeMember']);
     Route::post('/pets/{pet}/leave', [PetSharingController::class, 'leave']);
@@ -188,7 +191,7 @@ Route::middleware(['auth.jwt', 'throttle:api'])->group(function () {
     Route::post('/pets/{pet}/documents', [DocumentController::class, 'store'])->middleware('throttle:30,1,doc-upload:');
     Route::get('/pets/{pet}/documents/{document}/url', [DocumentController::class, 'url']);
     // AI intake — expensive model call, so throttled tighter than other routes.
-    Route::post('/pets/{pet}/documents/{document}/extract', [DocumentController::class, 'extract'])->middleware('throttle:10,1,doc-extract:');
+    Route::post('/pets/{pet}/documents/{document}/extract', [DocumentController::class, 'extract'])->middleware('throttle:doc-extract');
     Route::post('/pets/{pet}/documents/{document}/apply', [DocumentController::class, 'applyExtraction']);
     Route::delete('/pets/{pet}/documents/{document}', [DocumentController::class, 'destroy']);
 
