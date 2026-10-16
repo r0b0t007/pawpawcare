@@ -8,7 +8,10 @@ return [
     'language' => 'Langue',
 
     'age' => 'Âge',
-    'age_value' => ':age an|:age ans',
+    // French keeps the singular below 2 (« 1,5 an »), unlike Laravel's fr
+    // rule (singular only for 0 and 1). The count is the age as displayed
+    // (one decimal), so « 2 ans » never reads « 2 an ».
+    'age_value' => '[*,1.9] :age an|[2,*] :age ans',
     'born' => 'Naissance',
     'weight' => 'Poids',
     'microchipped' => 'Pucé',

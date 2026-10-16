@@ -323,6 +323,26 @@ class ShareLinkTest extends TestCase
         $res->assertDontSee('Active medications');
     }
 
+    // French keeps the singular below 2 ("1,5 an"); Laravel's fr rule alone
+    // would say "1,5 ans". Spanish uses the plural for anything but 1.
+    public function test_the_age_agrees_in_number_in_each_language(): void
+    {
+        $cases = [
+            ['fr', 0.5, '0,5 an'], ['fr', 1, '1 an'], ['fr', 1.5, '1,5 an'],
+            ['fr', 1.96, '2 ans'], ['fr', 2, '2 ans'], ['fr', 7.5, '7,5 ans'],
+            ['es', 1, '1 año'], ['es', 1.5, '1,5 años'], ['es', 3, '3 años'],
+            ['en', 1.5, '1.5 yr'],
+        ];
+        foreach ($cases as [$locale, $age, $expected]) {
+            [$owner, $token] = $this->userIn($locale);
+            $pet = $this->pet($owner);
+            $pet->forceFill(['age' => $age])->save();
+
+            $this->get($this->mintUrl($token, $pet))->assertOk()
+                ->assertSee('</b> '.$expected.'</span>', false);
+        }
+    }
+
     public function test_a_link_minted_by_a_spanish_user_opens_in_spanish(): void
     {
         [$owner, $token] = $this->userIn('es');

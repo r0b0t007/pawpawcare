@@ -195,7 +195,11 @@ class ExportController extends Controller
         $csv = stream_get_contents($out);
         fclose($out);
 
-        return $csv;
+        // Excel opens a CSV without a byte-order mark as the ANSI code page,
+        // which garbles every accented header ("PropriÃ©taire"). The French
+        // and Spanish headers always have some, so those files carry the
+        // UTF-8 BOM; English keeps the exact bytes it always had.
+        return App::getLocale() === 'en' ? $csv : "\u{FEFF}".$csv;
     }
 
     // ── PDF ────────────────────────────────────────────────────────────────
@@ -242,7 +246,10 @@ class ExportController extends Controller
 
     private static function label(string $group, ?string $value): ?string
     {
-        if ($value === null || $value === '') {
+        // Only a plain stored id is looked up (same check as
+        // PublicPageLocale::label): a co-owner's free-text value with dots
+        // or '::' must never steer the lang key. Anything else prints as stored.
+        if ($value === null || ! preg_match('/^[a-z_]{1,40}$/', $value)) {
             return $value;
         }
 

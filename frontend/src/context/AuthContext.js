@@ -150,13 +150,25 @@ export function AuthProvider({ children }) {
   // Register this device's push token + timezone with the backend so reminders
   // fire at the right local time. Safe to call repeatedly (idempotent upsert).
   const syncDevice = async () => {
+    const session = sessionRef.current;
     // An earlier sign-out still unregisters this phone first, so it can't
     // remove the registration made below.
     await flushPendingLogout();
     const tz = deviceTimezone();
     // Always tell the server the timezone and the app language — needed even
     // when push is unavailable (reminder times, server-sent pushes and email).
-    patch('/users/me', { timezone: tz, locale: currentLocale() }).catch(() => {});
+    // The saved locale goes back on the user: content the server translates
+    // (the seeded community groups) may have been fetched in the old language
+    // meanwhile, and DataContext refetches it when user.locale changes. Only
+    // the locale is taken, so a plan applied meanwhile is never undone.
+    patch('/users/me', { timezone: tz, locale: currentLocale() })
+      .then((saved) => {
+        const current = userRef.current;
+        if (session !== sessionRef.current || !current || current.id !== saved?.id) return;
+        if (!saved.locale || saved.locale === current.locale) return;
+        applyUser({ ...current, locale: saved.locale });
+      })
+      .catch(() => {});
     try {
       const reg = await registerForPushNotificationsAsync();
       if (reg?.token) {

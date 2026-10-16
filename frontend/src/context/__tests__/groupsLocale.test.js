@@ -87,6 +87,35 @@ describe('DataContext groups follow the saved language', () => {
     expect(data.groups[0].name).toBe('Amoureux des chiens');
   });
 
+  // The full load's GET went out before the sign-in sync saved the new
+  // locale, and answers after the refetch that sync triggered.
+  it('keeps the refetched groups when the earlier fetch answers last', async () => {
+    let answerFirst;
+    get.mockImplementation((path) => {
+      if (path === '/community/groups') {
+        if (!answerFirst) return new Promise((resolve) => { answerFirst = resolve; });
+        return Promise.resolve(group('Amoureux des chiens'));
+      }
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    await act(async () => {
+      tree = TestRenderer.create(element());
+    });
+    mockUser = { ...mockUser, locale: 'fr' };
+    await act(async () => {
+      tree.update(element());
+    });
+    expect(data.groups[0].name).toBe('Amoureux des chiens');
+
+    await act(async () => {
+      answerFirst(group('Dog Lovers'));
+    });
+
+    expect(groupCalls()).toBe(2);
+    expect(data.groups[0].name).toBe('Amoureux des chiens');
+  });
+
   it('does not refetch on a re-render with the same locale', async () => {
     await act(async () => {
       tree = TestRenderer.create(element());

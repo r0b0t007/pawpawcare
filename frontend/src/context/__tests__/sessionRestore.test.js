@@ -44,7 +44,8 @@ jest.mock('@react-native-google-signin/google-signin', () => ({
 }));
 
 import { AuthProvider, useAuth } from '../AuthContext';
-import { get, getTokens, clearTokens } from '../../services/api';
+import { get, patch, getTokens, clearTokens } from '../../services/api';
+import * as i18nModule from '../../i18n';
 
 const USER = { id: 'u1', name: 'E2E Tester', email: 'e2e@example.test', plan: 'free' };
 const offline = () => Object.assign(new Error('Network error: Failed to connect'), { isNetworkError: true });
@@ -57,6 +58,7 @@ function Probe() {
 }
 
 let tree;
+let localeSpy;
 async function launch() {
   await act(async () => {
     tree = TestRenderer.create(
@@ -87,6 +89,9 @@ describe('session restore at launch', () => {
     act(() => tree?.unmount());
     tree = undefined;
     jest.useRealTimers();
+    localeSpy?.mockRestore();
+    localeSpy = undefined;
+    patch.mockImplementation(() => Promise.resolve());
   });
 
   it('restores the user when /users/me answers', async () => {
@@ -101,6 +106,30 @@ describe('session restore at launch', () => {
   // Seen on the emulator: a slow server made /users/me time out at launch and
   // the app showed the Welcome screen, as if signed out, with the session
   // still saved.
+  // The account was saved in English, the app shows French: the sign-in
+  // sync saves 'fr', and the user must carry it so DataContext refetches the
+  // server-translated groups (they may have been fetched in English meanwhile).
+  it('stores the locale the sign-in sync saved on the restored user', async () => {
+    localeSpy = jest.spyOn(i18nModule, 'currentLocale').mockReturnValue('fr');
+    get.mockResolvedValue({ ...USER, locale: 'en' });
+    patch.mockImplementation((path, body) => Promise.resolve({ ...USER, ...body }));
+    await launch();
+
+    expect(patch).toHaveBeenCalledWith('/users/me', expect.objectContaining({ locale: 'fr' }));
+    expect(auth.user.locale).toBe('fr');
+    expect(auth.user.plan).toBe('free');
+  });
+
+  it('ignores a sync answer for a different account', async () => {
+    localeSpy = jest.spyOn(i18nModule, 'currentLocale').mockReturnValue('fr');
+    get.mockResolvedValue({ ...USER, locale: 'en' });
+    patch.mockResolvedValue({ ...USER, id: 'someone-else', locale: 'fr' });
+    await launch();
+
+    expect(patch).toHaveBeenCalled();
+    expect(auth.user.locale).toBe('en');
+  });
+
   it('offers a retry instead of the Welcome screen when the server is unreachable', async () => {
     get.mockRejectedValue(offline());
     await launch();

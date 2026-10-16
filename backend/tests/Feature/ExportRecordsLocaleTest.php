@@ -101,6 +101,9 @@ class ExportRecordsLocaleTest extends TestCase
 
         $csv = $this->withToken($token)->get('/users/me/export?format=csv')->assertOk()->getContent();
 
+        // UTF-8 BOM, so Excel doesn't read the accented headers as ANSI.
+        $this->assertStringStartsWith("\u{FEFF}\"PawPawCare — Export des dossiers de santé\"\n", $csv);
+        $this->assertSame(1, substr_count($csv, "\u{FEFF}"));
         $this->assertStringContainsString('PawPawCare — Export des dossiers de santé', $csv);
         $this->assertStringContainsString('Propriétaire,"Zoé Núñez"', $csv);
         $this->assertStringContainsString('=== ANIMAL : ¿Toño? ===', $csv);
@@ -127,6 +130,7 @@ class ExportRecordsLocaleTest extends TestCase
 
         $csv = $this->withToken($token)->get('/users/me/export?format=csv')->assertOk()->getContent();
 
+        $this->assertStringStartsWith("\u{FEFF}\"PawPawCare — Exportación del historial de salud\"\n", $csv);
         $this->assertStringContainsString('=== MASCOTA: ¿Toño? ===', $csv);
         $this->assertStringContainsString("Nombre,Especie,Raza,Sexo,\"Fecha de nacimiento\",Edad,Peso,Microchip\n", $csv);
         $this->assertStringContainsString("Título,Clínica,\"Programada para\",Estado,Notas\n", $csv);

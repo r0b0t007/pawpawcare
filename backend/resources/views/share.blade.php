@@ -60,7 +60,7 @@
       {{ $L::label('types', $pet->type, ucfirst($pet->type)) }}{{ $pet->breed ? ' · '.$pet->breed : '' }}{{ $pet->gender ? ' · '.$L::label('genders', $pet->gender, ucfirst($pet->gender)) : '' }}
     </div>
     <div class="facts">
-      @if ($pet->age !== null)<span class="fact"><b>{{ __('share.age') }}</b> {{ trans_choice('share.age_value', $pet->age, ['age' => $L::decimal(rtrim(rtrim(number_format($pet->age, 1), '0'), '.'))]) }}</span>@endif
+      @if ($pet->age !== null)<span class="fact"><b>{{ __('share.age') }}</b> {{ trans_choice('share.age_value', round($pet->age, 1), ['age' => $L::decimal(rtrim(rtrim(number_format($pet->age, 1), '0'), '.'))]) }}</span>@endif
       @if ($pet->birthday)<span class="fact"><b>{{ __('share.born') }}</b> {{ $L::date($pet->birthday, 'share.date_format') }}</span>@endif
       @if ($pet->weight)<span class="fact"><b>{{ __('share.weight') }}</b> {{ $L::decimal($pet->weight) }} {{ $pet->weight_unit }}</span>@endif
       <span class="fact"><b>{{ __('share.microchipped') }}</b> {{ $pet->microchipped ? __('share.yes') : __('share.no') }}</span>
