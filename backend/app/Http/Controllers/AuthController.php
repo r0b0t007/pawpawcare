@@ -282,9 +282,10 @@ class AuthController extends Controller
             // the terminating phase keeps the plaintext code out of any queue
             // store while removing delivery time from the response.
             $email = $user->email;
-            dispatch(function () use ($email, $code) {
+            $locale = $user->preferredLocale(); // written in the user's language
+            dispatch(function () use ($email, $locale, $code) {
                 try {
-                    Mail::to($email)->send(new PasswordResetCodeMail($code));
+                    Mail::to($email)->locale($locale)->send(new PasswordResetCodeMail($code));
                 } catch (\Throwable $e) {
                     Log::error('Password reset email failed', ['error' => $e->getMessage()]);
                 }

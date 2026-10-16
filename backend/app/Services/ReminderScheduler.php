@@ -7,6 +7,7 @@ use App\Models\Pet;
 use App\Models\Reminder;
 use App\Models\User;
 use App\Models\Vaccination;
+use App\Support\ReminderText;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -84,13 +85,20 @@ class ReminderScheduler
         $tz = $user->timezone ?: 'UTC';
         $fireAt = self::eventFireAt($vax->due_date->format('Y-m-d'), '09:00', $tz);
 
+        $params = ReminderText::vaccinationParams($vax, $pet);
+        [, $body] = ReminderText::body(ReminderText::VACCINATION_DUE, $params, 'en');
+
         $reminder = Reminder::updateOrCreate(
             ['related_type' => 'vaccination', 'related_id' => $vax->id, 'user_id' => $user->id],
             [
                 'pet_id' => $pet->id,
                 'type' => 'vaccination',
-                'title' => 'Vaccination due: '.$vax->name,
-                'body' => $pet->name.' — '.$vax->name.' is due '.$vax->due_date->format('M j, Y'),
+                // Rendered per reader at read time (Reminder::localizedTitle);
+                // title/body keep the English text as a fallback.
+                'template' => ReminderText::VACCINATION_DUE,
+                'template_params' => $params,
+                'title' => ReminderText::title(ReminderText::VACCINATION_DUE, $params, 'en'),
+                'body' => $body,
                 'schedule_type' => 'one_time',
                 'fire_at' => $fireAt,
                 'lead_time_days' => 7,
@@ -156,6 +164,10 @@ class ReminderScheduler
         $times = (is_array($med->times) && count($med->times)) ? $med->times : ['09:00'];
         $recurrence = in_array($med->frequency, ['daily', 'weekly', 'monthly'], true) ? $med->frequency : 'daily';
 
+        $params = ReminderText::medicationParams($med, $pet);
+        $title = ReminderText::title(ReminderText::MEDICATION_DOSE, $params, 'en');
+        [, $body] = ReminderText::body(ReminderText::MEDICATION_DOSE, $params, 'en');
+
         foreach ($times as $time) {
             $reminder = Reminder::create([
                 'user_id' => $user->id,
@@ -163,8 +175,10 @@ class ReminderScheduler
                 'type' => 'medication',
                 'related_type' => 'medication',
                 'related_id' => $med->id,
-                'title' => 'Medication: '.$med->name,
-                'body' => $pet->name.($med->dosage ? ' — '.$med->dosage : ''),
+                'template' => ReminderText::MEDICATION_DOSE,
+                'template_params' => $params,
+                'title' => $title,
+                'body' => $body,
                 'schedule_type' => 'recurring',
                 'recurrence' => $recurrence,
                 'time_of_day' => $time,

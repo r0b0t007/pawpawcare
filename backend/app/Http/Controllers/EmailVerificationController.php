@@ -56,9 +56,10 @@ class EmailVerificationController extends Controller
         // After the response, like password reset: keeps SMTP latency out of
         // the request and the plaintext code out of any queue store.
         $email = $user->email;
-        dispatch(function () use ($email, $code) {
+        $locale = $user->preferredLocale(); // written in the user's language
+        dispatch(function () use ($email, $locale, $code) {
             try {
-                Mail::to($email)->send(new EmailVerificationCodeMail($code));
+                Mail::to($email)->locale($locale)->send(new EmailVerificationCodeMail($code));
             } catch (\Throwable $e) {
                 Log::error('Email verification email failed', ['error' => $e->getMessage()]);
             }

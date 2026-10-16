@@ -26,6 +26,7 @@ class SendDueReminders extends Command
         $due = Reminder::where('enabled', true)
             ->whereNotNull('next_fire_at')
             ->where('next_fire_at', '<=', $now)
+            ->with('user:id,locale')
             ->get();
 
         $delivered = 0;
@@ -59,10 +60,15 @@ class SendDueReminders extends Command
 
                     if ($pastGrace || ! $hasLocalDevice) {
                         $tokens = $devices->pluck('token');
+                        // In the recipient's language: auto-generated reminders
+                        // render their template, user-typed ones stay as typed.
+                        $locale = $reminder->user?->preferredLocale();
+                        $title = $reminder->localizedTitle($locale);
+                        $body = $reminder->localizedBody($locale) ?? '';
                         $push->send($tokens->map(fn ($t) => [
                             'to' => $t,
-                            'title' => $reminder->title,
-                            'body' => $reminder->body ?? '',
+                            'title' => $title,
+                            'body' => $body,
                             'sound' => 'default',
                             'channelId' => 'reminders',
                             'data' => [

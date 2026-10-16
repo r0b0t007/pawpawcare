@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\ReminderText;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,7 +20,7 @@ class Reminder extends Model
         'user_id', 'pet_id', 'type', 'related_type', 'related_id',
         'title', 'body', 'schedule_type', 'fire_at', 'recurrence',
         'time_of_day', 'lead_time_days', 'timezone', 'enabled',
-        'last_fired_at', 'next_fire_at',
+        'last_fired_at', 'next_fire_at', 'template', 'template_params',
     ];
 
     protected $casts = [
@@ -28,6 +29,7 @@ class Reminder extends Model
         'next_fire_at' => 'datetime',
         'lead_time_days' => 'integer',
         'enabled' => 'boolean',
+        'template_params' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -45,15 +47,34 @@ class Reminder extends Model
         return $this->hasMany(ReminderDelivery::class);
     }
 
-    /** Serialize to the public reminder shape. */
+    /**
+     * The title in a language (default: the current app locale, which
+     * SetLocale sets to the request user's). Auto-generated reminders render
+     * their template; user-created ones (no template) return their own text
+     * untouched, as does any row whose template can't be rendered.
+     */
+    public function localizedTitle(?string $locale = null): string
+    {
+        return ReminderText::title($this->template, $this->template_params, $locale) ?? $this->title;
+    }
+
+    /** The body in a language; see localizedTitle(). */
+    public function localizedBody(?string $locale = null): ?string
+    {
+        [$rendered, $body] = ReminderText::body($this->template, $this->template_params, $locale);
+
+        return $rendered ? $body : $this->body;
+    }
+
+    /** Serialize to the public reminder shape, in the current app locale. */
     public function toApi(): array
     {
         return [
             'id' => $this->id,
             'pet_id' => $this->pet_id,
             'type' => $this->type,
-            'title' => $this->title,
-            'body' => $this->body,
+            'title' => $this->localizedTitle(),
+            'body' => $this->localizedBody(),
             'schedule_type' => $this->schedule_type,
             'fire_at' => $this->fire_at?->toISOString(),
             'recurrence' => $this->recurrence,
