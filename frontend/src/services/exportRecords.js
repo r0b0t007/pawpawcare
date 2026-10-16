@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { API_URL } from '../config';
 import { getTokens, refreshAccessToken, netFetch, networkError, languageHeaders } from './api';
+import i18n from '../i18n';
 
 // Export center: download the user's full health-record history (CSV/PDF)
 // and hand it to the OS share sheet — or a plain download on web. Kept out
@@ -44,7 +45,7 @@ export async function exportRecords(format, petIds = []) {
     if (res.status === 401) {
       res = await netFetch(url, { headers: authHeaders(format, await refreshAccessToken()) });
     }
-    if (!res.ok) throw new Error(`Export failed (${res.status})`);
+    if (!res.ok) throw new Error(i18n.t('records.export.failed', { status: res.status }));
 
     const blob = await res.blob();
     const href = URL.createObjectURL(blob);
@@ -80,7 +81,7 @@ export async function exportRecords(format, petIds = []) {
     // `detail` if we can read it (e.g. a throttle or "Pet not found" message),
     // then bin the file so no broken export lingers. Both steps are best-effort
     // so they can't mask the real failure.
-    let message = `Export failed (${result.status})`;
+    let message = i18n.t('records.export.failed', { status: result.status });
     try {
       const detail = JSON.parse(await FileSystem.readAsStringAsync(fileUri))?.detail;
       if (detail) message = detail;
@@ -94,7 +95,7 @@ export async function exportRecords(format, petIds = []) {
   try {
     await Sharing.shareAsync(result.uri, {
       mimeType: MIME[format],
-      dialogTitle: 'Export health records',
+      dialogTitle: i18n.t('records.export.dialogTitle'),
       UTI: format === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text',
     });
   } finally {

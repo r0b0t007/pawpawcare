@@ -1,4 +1,5 @@
 // Pure medication-streak helpers, unit-tested like utils/weight.js.
+import i18n from '../i18n';
 //
 // A streak is only meaningful for genuinely-daily behavior, so it exists ONLY
 // for medications with active === true and frequency === 'daily' — pets
@@ -78,8 +79,10 @@ export const medicationStreak = (doseDays, medication, today = new Date()) => {
 // render (non-daily meds, or a 0-day streak with no history worth mentioning).
 export const medicationStreakLabel = (streak) => {
   if (!streak) return null;
-  if (streak.current >= 2) return `${streak.current}-day streak`;
-  if (streak.current === 1) return streak.coveredToday ? 'Streak started' : 'Dose logged yesterday';
-  if (streak.longest >= 2) return 'Pick up where you left off';
+  if (streak.current >= 2) return i18n.t('gamification.streak.days', { days: streak.current });
+  if (streak.current === 1) {
+    return streak.coveredToday ? i18n.t('gamification.streak.started') : i18n.t('gamification.streak.loggedYesterday');
+  }
+  if (streak.longest >= 2) return i18n.t('gamification.streak.pickUp');
   return null;
 };

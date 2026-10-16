@@ -12,7 +12,7 @@ import { Card, Button, Sheet, ConfirmDialog, EmptyState, PetFace, StatusPill, sh
 import { useInFlight } from '../../hooks/useInFlight';
 import { useToday } from '../../hooks/useToday';
 import { fmtFull, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
-import { useLocale } from '../../i18n';
+import { useLocale, useTranslation } from '../../i18n';
 
 // "Lively & Light" vaccine tracker: the pet's face on its identity tint, one
 // plain sentence about where things stand, then the records grouped the way
@@ -29,21 +29,22 @@ const formatDisplay = (iso) => (iso ? fmtFull(parseDay(iso)) : null);
 const byDue = (a, b) => (a.dueDate || '').localeCompare(b.dueDate || '');
 
 // Where things stand, in one sentence — never alarming, never shaming.
-function summaryLine(needs, upcoming, done, today) {
-  if (needs.length === 1) return `${needs[0].name} needs booking`;
-  if (needs.length > 1) return `${needs.length} vaccines need booking`;
+function summaryLine(t, needs, upcoming, done, today) {
+  if (needs.length === 1) return t('vaccines.summary.oneNeedsBooking', { name: needs[0].name });
+  if (needs.length > 1) return t('vaccines.summary.needBooking', { count: needs.length });
   if (upcoming.length) {
     const next = upcoming[0];
-    return `Next: ${next.name} ${relativeDay(parseDay(next.dueDate), today)}`;
+    return t('vaccines.summary.next', { name: next.name, when: relativeDay(parseDay(next.dueDate), today) });
   }
-  if (done.length) return 'Everything is up to date';
-  return 'No vaccine records yet';
+  if (done.length) return t('vaccines.summary.upToDate');
+  return t('vaccines.summary.none');
 }
 
 export default function VaccinationTrackerScreen({ navigation, route }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
+  const { t } = useTranslation();
   const { petId } = route.params;
   const { pets, addVaccination, markVaccinationComplete, deleteVaccination } = useData();
   const pet = pets.find((p) => p.id === petId);
@@ -99,35 +100,35 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
         administeredDate: null,
       });
       if (!saved) {
-        showToast("Couldn't schedule the vaccination. Try again.");
+        showToast(t('vaccines.toast.scheduleFailed'));
         return;
       }
       closeSheet();
-      showToast('Vaccination scheduled');
+      showToast(t('vaccines.toast.scheduled'));
     });
   };
 
   const confirmComplete = (vax) =>
     setConfirm({
-      title: 'Mark as administered',
-      message: `Mark "${vax.name}" as administered today?`,
-      confirmLabel: 'Mark done',
+      title: t('vaccines.confirmDone.title'),
+      message: t('vaccines.confirmDone.message', { name: vax.name }),
+      confirmLabel: t('vaccines.confirmDone.confirm'),
       action: async () => {
         const saved = await markVaccinationComplete(petId, vax.id);
-        if (saved) showToast(`${vax.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
-        else showToast(`Couldn't mark ${vax.name} done. Try again.`);
+        if (saved) showToast(t('vaccines.toast.done', { name: vax.name }), { celebrate: true, actionType: 'vaccination_done' });
+        else showToast(t('vaccines.toast.doneFailed', { name: vax.name }));
       },
     });
 
   const confirmDelete = (vax) =>
     setConfirm({
-      title: 'Delete record',
-      message: `Delete "${vax.name}" record?`,
-      confirmLabel: 'Delete',
+      title: t('vaccines.confirmDelete.title'),
+      message: t('vaccines.confirmDelete.message', { name: vax.name }),
+      confirmLabel: t('vaccines.confirmDelete.confirm'),
       destructive: true,
       action: async () => {
-        if (await deleteVaccination(petId, vax.id)) showToast('Record deleted');
-        else showToast("Couldn't delete the record. Try again.");
+        if (await deleteVaccination(petId, vax.id)) showToast(t('vaccines.toast.deleted'));
+        else showToast(t('vaccines.toast.deleteFailed'));
       },
     });
 
@@ -140,21 +141,22 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       vax.status === 'overdue'
         ? <StatusPill status="overdue" label={overdueLabel(vax.dueDate, today)} style={styles.rowPill} />
         : vax.status === 'due_soon'
-          ? <StatusPill status="due" label={`Due ${relativeDay(date, today)}`} style={styles.rowPill} />
+          ? <StatusPill status="due" label={t('vaccines.dueWhen', { when: relativeDay(date, today) })} style={styles.rowPill} />
           : null;
     return (
       <View key={vax.id} style={[styles.row, i < list.length - 1 && styles.rowDivider]}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.rowTitle} numberOfLines={2}>{vax.name}</Text>
           <Text style={styles.rowSub}>
-            {vax.status === 'overdue' ? 'Was due ' : 'Due '}
-            {formatDisplay(vax.dueDate) || vax.dueDate}
+            {t(vax.status === 'overdue' ? 'vaccines.wasDueOn' : 'vaccines.dueOn', {
+              date: formatDisplay(vax.dueDate) || vax.dueDate,
+            })}
           </Text>
           {pill}
         </View>
         {!pill && <Text style={styles.rowWhen}>{relativeDay(date, today)}</Text>}
-        <Button small variant="soft" icon="check" label="Done" accessibilityLabel={`Mark ${vax.name} done`} onPress={() => confirmComplete(vax)} />
-        <DeleteButton label={`Delete ${vax.name}`} onPress={() => confirmDelete(vax)} size={18} />
+        <Button small variant="soft" icon="check" label={t('vaccines.done')} accessibilityLabel={t('vaccines.markDoneA11y', { name: vax.name })} onPress={() => confirmComplete(vax)} />
+        <DeleteButton label={t('vaccines.deleteA11y', { name: vax.name })} onPress={() => confirmDelete(vax)} size={18} />
       </View>
     );
   };
@@ -164,9 +166,9 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       <MaterialCommunityIcons name="check-circle" size={18} color={ui.success} />
       <Text style={styles.doneTitle} numberOfLines={1}>{vax.name}</Text>
       <Text style={styles.doneDate}>
-        {formatDisplay(vax.administeredDate?.split('T')[0]) || 'Done'}
+        {formatDisplay(vax.administeredDate?.split('T')[0]) || t('vaccines.done')}
       </Text>
-      <DeleteButton label={`Delete ${vax.name}`} onPress={() => confirmDelete(vax)} size={16} />
+      <DeleteButton label={t('vaccines.deleteA11y', { name: vax.name })} onPress={() => confirmDelete(vax)} size={16} />
     </View>
   );
 
@@ -181,7 +183,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <ScreenHeader title="Vaccines" onBack={() => navigation.goBack()} />
+        <ScreenHeader title={t('vaccines.title')} onBack={() => navigation.goBack()} />
 
         {/* The pet, recognised by face and tint, and one sentence on where
             things stand — the detail is in the groups below. */}
@@ -189,18 +191,18 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
           <PetFace pet={pet} size={56} ring={false} glyph />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[styles.petName, { color: pair.fg }]} numberOfLines={1}>{pet.name}</Text>
-            <Text style={styles.petSummary}>{summaryLine(needs, upcoming, done, today)}</Text>
+            <Text style={styles.petSummary}>{summaryLine(t, needs, upcoming, done, today)}</Text>
           </View>
         </View>
 
         {hasAny ? (
           <>
-            {section('Needs attention', needs, renderOpen)}
-            {section('Upcoming', upcoming, renderOpen)}
-            {section('Done', done, renderDone)}
+            {section(t('vaccines.sections.needs'), needs, renderOpen)}
+            {section(t('vaccines.sections.upcoming'), upcoming, renderOpen)}
+            {section(t('vaccines.sections.done'), done, renderDone)}
             <Button
               icon="plus"
-              label="Add vaccine"
+              label={t('vaccines.add')}
               onPress={() => setModal(true)}
               style={styles.addBtn}
             />
@@ -208,9 +210,9 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
         ) : (
           <EmptyState
             photo={emptyPhotoFor(pet, photos.emptyKitten)}
-            title="No vaccines yet"
-            body={`Add ${pet.name}'s vaccines and we'll remind you before each one is due.`}
-            actionLabel="Add vaccine"
+            title={t('vaccines.empty.title')}
+            body={t('vaccines.empty.body', { name: pet.name })}
+            actionLabel={t('vaccines.add')}
             actionIcon="plus"
             onAction={() => setModal(true)}
             style={styles.empty}
@@ -219,36 +221,36 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       </ScrollView>
 
       {/* Add vaccine sheet */}
-      <Sheet visible={modal} onClose={closeSheet} title="New vaccine">
+      <Sheet visible={modal} onClose={closeSheet} title={t('vaccines.sheet.title')}>
         <View>
-          <Text style={[type.sectionLabel, styles.fieldLabel]}>Vaccine name</Text>
+          <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('vaccines.sheet.name')}</Text>
           <TextField
-            placeholder="e.g. Rabies booster"
+            placeholder={t('vaccines.sheet.namePlaceholder')}
             value={form.name}
             onChangeText={(v) => setForm((f) => ({ ...f, name: v }))}
             autoFocus
-            accessibilityLabel="Vaccine name"
+            accessibilityLabel={t('vaccines.sheet.name')}
           />
         </View>
 
         <View>
-          <Text style={[type.sectionLabel, styles.fieldLabel]}>Due date</Text>
+          <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('vaccines.sheet.dueDate')}</Text>
           <Pressable
             style={({ pressed }) => [styles.dateBtn, pressed && { backgroundColor: ui.pressTint }]}
             onPress={() => setShowDatePicker(true)}
             accessibilityRole="button"
-            accessibilityLabel={`Due date, ${form.dueDate ? formatDisplay(form.dueDate) : 'not set'}`}
+            accessibilityLabel={t('vaccines.sheet.dueDateA11y', { date: form.dueDate ? formatDisplay(form.dueDate) : t('vaccines.sheet.notSet') })}
           >
             <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={ui.accent} />
             <Text style={[styles.dateText, !form.dueDate && { color: ui.subtle }]}>
-              {form.dueDate ? formatDisplay(form.dueDate) : 'Select due date'}
+              {form.dueDate ? formatDisplay(form.dueDate) : t('vaccines.sheet.selectDueDate')}
             </Text>
             <MaterialCommunityIcons name="pencil-outline" size={16} color={ui.faint} />
           </Pressable>
         </View>
 
         <Button
-          label="Schedule"
+          label={t('vaccines.sheet.schedule')}
           onPress={handleAdd}
           disabled={!form.name.trim() || !form.dueDate || isBusy('add')}
         />
@@ -270,11 +272,11 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
               <View style={styles.iosHandle} />
               <View style={styles.iosHeader}>
                 <Pressable accessibilityRole="button" onPress={() => setShowDatePicker(false)} hitSlop={hit}>
-                  <Text style={styles.iosCancel}>Cancel</Text>
+                  <Text style={styles.iosCancel}>{t('vaccines.picker.cancel')}</Text>
                 </Pressable>
-                <Text style={styles.iosTitle}>Due date</Text>
+                <Text style={styles.iosTitle}>{t('vaccines.sheet.dueDate')}</Text>
                 <Pressable accessibilityRole="button" onPress={() => setShowDatePicker(false)} hitSlop={hit}>
-                  <Text style={styles.iosDone}>Done</Text>
+                  <Text style={styles.iosDone}>{t('vaccines.picker.done')}</Text>
                 </Pressable>
               </View>
               <DateTimePicker

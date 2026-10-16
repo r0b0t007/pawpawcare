@@ -425,5 +425,546 @@
       "body": "The app hit an unexpected error. Your pets and records are safe — try again, and if it keeps happening, email {{email}}.",
       "retry": "Try again"
     }
+  },
+  "home": {
+    "greeting": {
+      "morning": "Good morning, {{name}}",
+      "afternoon": "Good afternoon, {{name}}",
+      "evening": "Good evening, {{name}}"
+    },
+    "welcome": "Welcome to PawPawCare, {{name}}",
+    "friend": "Friend",
+    "meetYourPets": "Let's meet your pets",
+    "status": {
+      "overdue_one": "One thing needs\nyou today",
+      "overdue_other": "{{count}} things need\nyou today",
+      "dueSoon_one": "One thing is\ndue soon",
+      "dueSoon_other": "{{count}} things are\ndue soon",
+      "unknown": "Some records\ndidn't load",
+      "oneOk": "{{name}} is\nall good",
+      "twoOk": "{{first}} and {{second}}\nare all good",
+      "allOk": "All {{total}} pets\nare all good"
+    },
+    "vaccinesFailedOne": "{{name}}'s vaccines couldn't be loaded. Check your connection.",
+    "vaccinesFailedSome": "Some vaccines couldn't be loaded. Check your connection.",
+    "okPets_one": "{{count}} of your {{total}} pets is all good.",
+    "okPets_other": "{{count}} of your {{total}} pets are all good.",
+    "notificationsA11y": "Notifications",
+    "notificationsUnreadA11y_one": "Notifications, {{count}} unread",
+    "notificationsUnreadA11y_other": "Notifications, {{count}} unread",
+    "loadingSummaryA11y": "Loading your pets' care summary",
+    "loadingPetsA11y": "Loading your pets",
+    "milestoneToast": "{{pet}}: {{label}}",
+    "benefits": {
+      "reminders": "Reminders before anything is due",
+      "records": "Every record in one safe place",
+      "family": "Share care with your family"
+    },
+    "empty": {
+      "title": "Add your first pet",
+      "body": "A cat, a dog or any companion. It takes less than a minute.",
+      "action": "Add your first pet",
+      "benefitsTitle": "What you'll get"
+    },
+    "celebration": {
+      "birthday": "Happy birthday, {{name}}!",
+      "gotchaDay_one": "Gotcha day — {{count}} year with {{name}}",
+      "gotchaDay_other": "Gotcha day — {{count}} years with {{name}}",
+      "turns_one": "{{name}} turns {{count}} today",
+      "turns_other": "{{name}} turns {{count}} today",
+      "dismiss": "Dismiss"
+    },
+    "upNext": {
+      "caughtUpTitle": "All caught up",
+      "caughtUpBody": "Nothing needs attention right now",
+      "markDone": "Mark done",
+      "reschedule": "Reschedule",
+      "subtitle": "{{pet}} · due {{date}}",
+      "dueOn": "Due {{date}}",
+      "note": "Let's get {{pet}}'s {{vaccine}} booked."
+    },
+    "toast": {
+      "doseLogged": "{{pet}}'s {{med}} logged",
+      "doseFailed": "Couldn't log {{pet}}'s {{med}}. Try again.",
+      "vaccineDone": "{{name}} marked done",
+      "vaccineFailed": "Couldn't mark {{name}} done. Try again."
+    },
+    "more": {
+      "overdue_one": "{{count}} more overdue",
+      "overdue_other": "{{count}} more overdue",
+      "dueSoon_one": "{{count}} due soon",
+      "dueSoon_other": "{{count}} due soon",
+      "moreDueSoon_one": "{{count}} more due soon",
+      "moreDueSoon_other": "{{count}} more due soon",
+      "separator": ", ",
+      "seeAllInHealth": "{{items}} · see all in Health"
+    },
+    "today": {
+      "title": "Today",
+      "allDone": "All done",
+      "doneOf": "{{done}} of {{total}} done",
+      "medTitle": "{{pet}}'s {{med}}",
+      "anyTime": "Today",
+      "givenOf": "{{taken}} of {{expected}} given",
+      "done": "Done",
+      "log": "Log",
+      "showLess": "Show less",
+      "showMore_one": "Show {{count}} more",
+      "showMore_other": "Show {{count}} more"
+    },
+    "pets": {
+      "title": "Your pets",
+      "seeAll": "See all",
+      "addA11y": "Add a pet",
+      "add": "Add"
+    },
+    "comingUp": {
+      "title": "Coming up",
+      "healthLink": "Health",
+      "empty": "Nothing scheduled this week. Enjoy the calm."
+    },
+    "community": {
+      "recentPosts_one": "{{count}} recent post",
+      "recentPosts_other": "{{count}} recent posts",
+      "inCommunity": " in the community",
+      "sayHi": "Say hi to the community"
+    }
+  },
+  "health": {
+    "title": "Health",
+    "synced": {
+      "justNow": "Synced just now",
+      "minutes": "Synced {{n}}m ago",
+      "hours": "Synced {{n}}h ago",
+      "days": "Synced {{n}}d ago"
+    },
+    "reminderKind": {
+      "once": "Reminder",
+      "daily": "Daily reminder",
+      "weekly": "Weekly reminder",
+      "monthly": "Monthly reminder",
+      "other": "{{recurrence}} reminder"
+    },
+    "wasDue": "{{pet}} · was due {{date}}",
+    "sections": {
+      "today": "Today",
+      "week": "This week",
+      "later": "Later"
+    },
+    "toast": {
+      "addPetFirst": "Add a pet first",
+      "saveFailed": "Couldn't save the record. Try again.",
+      "saved": "Record saved",
+      "vaccineDone": "{{name}} marked done",
+      "vaccineFailed": "Couldn't mark {{name}} done. Try again."
+    },
+    "dueWhen": "Due {{when}}",
+    "scheduledAt": "Scheduled · {{time}}",
+    "notificationsOff": "Notifications off",
+    "done": "Done",
+    "filterAll": "All",
+    "empty": {
+      "title": "All quiet on the health front",
+      "body": "Nothing scheduled. Add a vaccine or vet visit and we'll nudge you before it's due.",
+      "bodyPet": "Nothing scheduled for {{name}}. Add a vaccine or vet visit and we'll nudge you before it's due."
+    },
+    "noPets": {
+      "title": "No pets yet",
+      "body": "Add your first pet and their vaccines, meds and vet visits will line up here.",
+      "action": "Add a pet"
+    },
+    "scheduledOnDevice": "Scheduled on this device",
+    "vault": {
+      "title": "Medical vault",
+      "petTitle": "{{name}}'s medical vault",
+      "subtitle": "Vet records, lab results & documents",
+      "pickPet": "Pick a pet to open their records"
+    },
+    "history": "History",
+    "addRecord": "Add record",
+    "types": {
+      "vaccine": "Vaccine",
+      "vetVisit": "Vet visit",
+      "medication": "Medication",
+      "weight": "Weight"
+    },
+    "sheet": {
+      "title": "New record",
+      "type": "Type",
+      "pet": "Pet",
+      "name": "Name",
+      "namePlaceholder": "e.g. Rabies booster",
+      "dueDate": "Due {{date}}",
+      "saveOn": "Save · {{date}}",
+      "thePet": "the pet",
+      "vetVisitHint": "Vet visits and documents are logged in {{name}}'s medical records.",
+      "medicationHint": "Medications are logged on {{name}}'s profile.",
+      "weightHint": "Weights are logged on {{name}}'s profile.",
+      "continue": "Continue"
+    }
+  },
+  "vaccines": {
+    "title": "Vaccines",
+    "summary": {
+      "oneNeedsBooking": "{{name}} needs booking",
+      "needBooking_one": "{{count}} vaccine needs booking",
+      "needBooking_other": "{{count}} vaccines need booking",
+      "next": "Next: {{name}} {{when}}",
+      "upToDate": "Everything is up to date",
+      "none": "No vaccine records yet"
+    },
+    "toast": {
+      "scheduleFailed": "Couldn't schedule the vaccination. Try again.",
+      "scheduled": "Vaccination scheduled",
+      "done": "{{name}} marked done",
+      "doneFailed": "Couldn't mark {{name}} done. Try again.",
+      "deleted": "Record deleted",
+      "deleteFailed": "Couldn't delete the record. Try again."
+    },
+    "confirmDone": {
+      "title": "Mark as administered",
+      "message": "Mark \"{{name}}\" as administered today?",
+      "confirm": "Mark done"
+    },
+    "confirmDelete": {
+      "title": "Delete record",
+      "message": "Delete \"{{name}}\" record?",
+      "confirm": "Delete"
+    },
+    "dueWhen": "Due {{when}}",
+    "wasDueOn": "Was due {{date}}",
+    "dueOn": "Due {{date}}",
+    "done": "Done",
+    "markDoneA11y": "Mark {{name}} done",
+    "deleteA11y": "Delete {{name}}",
+    "sections": {
+      "needs": "Needs attention",
+      "upcoming": "Upcoming",
+      "done": "Done"
+    },
+    "add": "Add vaccine",
+    "empty": {
+      "title": "No vaccines yet",
+      "body": "Add {{name}}'s vaccines and we'll remind you before each one is due."
+    },
+    "sheet": {
+      "title": "New vaccine",
+      "name": "Vaccine name",
+      "namePlaceholder": "e.g. Rabies booster",
+      "dueDate": "Due date",
+      "dueDateA11y": "Due date, {{date}}",
+      "notSet": "not set",
+      "selectDueDate": "Select due date",
+      "schedule": "Schedule"
+    },
+    "picker": {
+      "cancel": "Cancel",
+      "done": "Done"
+    }
+  },
+  "reminders": {
+    "title": "Reminders",
+    "schedule": {
+      "daily": "Daily at {{time}}",
+      "weekly": "Weekly at {{time}}",
+      "monthly": "Monthly at {{time}}",
+      "other": "{{recurrence}} at {{time}}",
+      "oneTime": "One-time"
+    },
+    "toast": {
+      "addFailed": "Couldn't add the reminder. Try again.",
+      "added": "Reminder added",
+      "deleted": "Reminder deleted",
+      "deleteFailed": "Couldn't delete the reminder. Try again."
+    },
+    "form": {
+      "title": "New reminder",
+      "placeholder": "e.g. Give Rex his heartworm pill",
+      "add": "Add reminder"
+    },
+    "listTitle": "Your reminders",
+    "empty": {
+      "title": "No reminders yet",
+      "body": "Vaccination reminders are added automatically. Add your own above for anything else."
+    },
+    "petSummary": "{{pet}} · {{schedule}}",
+    "toggleA11y": "{{title}} reminder",
+    "deleteA11y": "Delete {{title}}",
+    "confirmDelete": {
+      "title": "Delete reminder?",
+      "message": "\"{{title}}\" will no longer fire. This can't be undone.",
+      "confirm": "Delete"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "when": {
+      "snoozed": "Snoozed",
+      "snoozeEnded": "Snooze ended",
+      "snoozedUntil": "Snoozed until {{time}}",
+      "scheduled": "Scheduled"
+    },
+    "sections": {
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "earlier": "Earlier"
+    },
+    "rowA11y": "{{title}}. {{when}}",
+    "rowA11yBody": "{{title}}. {{body}}. {{when}}",
+    "newA11y": "New. {{content}}",
+    "actions": {
+      "markRead": "Mark as read",
+      "snoozeHour": "Snooze 1 hour",
+      "dismiss": "Dismiss"
+    },
+    "new": "New",
+    "snoozeA11y": "Snooze {{title}} for an hour",
+    "snoozeShort": "Snooze 1h",
+    "dismissA11y": "Dismiss {{title}}",
+    "allRead": "All read",
+    "newCount_one": "{{count}} new",
+    "newCount_other": "{{count}} new",
+    "manage": "Manage",
+    "empty": {
+      "title": "You're all caught up",
+      "body": "Reminders for vaccines, meds and care tasks will show up here.",
+      "action": "Add a reminder"
+    }
+  },
+  "records": {
+    "title": "Medical vault",
+    "titlePet": "{{name}}'s vault",
+    "subtitle": "Vet records, lab results & documents",
+    "opening": "Opening the vault…",
+    "openFailed": "Couldn't open the vault",
+    "loadingA11y": "Loading records",
+    "thisPet": "this pet",
+    "yourPet": "your pet",
+    "categories": {
+      "lab": "Lab",
+      "vaccination": "Vaccine",
+      "prescription": "Rx",
+      "invoice": "Invoice",
+      "imaging": "Imaging",
+      "insurance": "Insurance",
+      "other": "Other"
+    },
+    "apptStatus": {
+      "scheduled": "Scheduled",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "size": {
+      "bytes": "{{n}} B",
+      "kb": "{{n}} KB",
+      "mb": "{{n}} MB"
+    },
+    "summary": {
+      "documents_one": "{{count}} document",
+      "documents_other": "{{count}} documents",
+      "visits_one": "{{count}} visit",
+      "visits_other": "{{count}} visits",
+      "clinics_one": "{{count}} clinic",
+      "clinics_other": "{{count}} clinics"
+    },
+    "toast": {
+      "refreshFailed": "Couldn't refresh the vault. Showing what was already here.",
+      "openFailed": "Could not open this file",
+      "stillReading": "Still reading another record. Try again in a moment.",
+      "readFailed": "Could not read the document"
+    },
+    "delete": {
+      "confirm": "Delete",
+      "document": {
+        "title": "Delete document?",
+        "message": "Remove this document from {{name}}'s vault?",
+        "removed": "Document removed",
+        "failed": "Couldn't remove the document. Try again."
+      },
+      "appointment": {
+        "title": "Delete appointment?",
+        "message": "Remove this appointment from {{name}}'s vault?",
+        "removed": "Appointment removed",
+        "failed": "Couldn't remove the appointment. Try again."
+      },
+      "clinic": {
+        "title": "Delete clinic?",
+        "message": "Remove this clinic from {{name}}'s vault?",
+        "removed": "Clinic removed",
+        "failed": "Couldn't remove the clinic. Try again."
+      }
+    },
+    "deleteA11y": "Delete {{name}}",
+    "loadFailed": {
+      "title": "We couldn't open the vault",
+      "body": "Check your connection, then try again. Nothing in it has changed.",
+      "action": "Try again"
+    },
+    "empty": {
+      "title": "Start the vault",
+      "titlePet": "Start {{name}}'s vault",
+      "body": "Snap a vaccine certificate, a lab result or an invoice. We can read it and add the records for you."
+    },
+    "upload": "Upload a record",
+    "uploadPhoto": "Upload a photo of a record",
+    "addClinic": "Add a vet clinic",
+    "addPetClinic": "Add {{name}}'s vet clinic",
+    "logVisit": "Log a vet visit",
+    "hero": {
+      "title": "Everything a vet might ask for",
+      "nextVisit": "Next visit {{when}}: {{title}}",
+      "private": "Private to you and your care team"
+    },
+    "sections": {
+      "documents": "Documents",
+      "visits": "Vet visits",
+      "clinics": "Clinics"
+    },
+    "add": "Add",
+    "showLess": "Show less",
+    "showMore_one": "Show {{count}} more",
+    "showMore_other": "Show {{count}} more",
+    "form": {
+      "cancel": "Cancel",
+      "saving": "Saving…"
+    },
+    "doc": {
+      "openHint": "Opens the file",
+      "open": "Open",
+      "review": "Review what was read",
+      "readWithAi": "Read with AI",
+      "reviewA11y": "Review what was read from {{title}}",
+      "readA11y": "Read {{title}} with AI",
+      "read": "Read",
+      "permission": "Photo permission is required.",
+      "pickFailed": "Could not pick the file.",
+      "defaultTitle": "{{category}} record",
+      "uploaded": "Document uploaded",
+      "retry": "Retry upload",
+      "uploadAction": "Upload",
+      "uploading": "Uploading…",
+      "uploadFailed": "Upload failed — nothing was lost.",
+      "chosenA11y": "Chosen file {{name}}, tap to change",
+      "choose": "Choose a photo of the record",
+      "title": "Title",
+      "titlePlaceholder": "e.g. Rabies certificate",
+      "titleA11y": "Document title",
+      "category": "Category"
+    },
+    "clinic": {
+      "fallback": "Vet clinic",
+      "callA11y": "Call {{name}}",
+      "added": "Clinic added",
+      "saveFailed": "Could not save the clinic.",
+      "sheetTitle": "Add vet clinic",
+      "save": "Add clinic",
+      "name": "Clinic name",
+      "namePlaceholder": "e.g. Riverside Vet",
+      "vetName": "Vet name (optional)",
+      "phone": "Phone",
+      "email": "Email",
+      "address": "Address"
+    },
+    "visit": {
+      "logged": "Appointment logged",
+      "saveFailed": "Could not save the appointment.",
+      "save": "Save",
+      "reason": "Reason",
+      "reasonPlaceholder": "e.g. Annual checkup",
+      "reasonA11y": "Reason for the visit",
+      "whenA11y": "Date and time, {{when}}",
+      "clinic": "Clinic (optional)",
+      "status": "Status"
+    },
+    "extract": {
+      "added_one": "{{count}} record added",
+      "added_other": "{{count}} records added",
+      "withSkipped_one": "{{added}} · {{count}} skipped",
+      "withSkipped_other": "{{added}} · {{count}} skipped",
+      "applyFailed": "Could not apply the records.",
+      "title": "Review what we read",
+      "apply": "Apply",
+      "applyCount_one": "Apply {{count}}",
+      "applyCount_other": "Apply {{count}}",
+      "otherPet": "This document may belong to a different pet than {{name}}. Double-check before applying.",
+      "thisOne": "this one",
+      "nothingFound": "No medical data was found in this document.",
+      "vaccinations": "Vaccinations",
+      "includeVaccine": "Include vaccine {{name}}",
+      "vaccineName": "Vaccine name",
+      "given": "Given",
+      "nextDue": "Next due",
+      "medications": "Medications",
+      "includeMedication": "Include medication {{name}}",
+      "medicationName": "Medication name",
+      "dosage": "Dosage",
+      "frequency": {
+        "daily": "daily",
+        "weekly": "weekly",
+        "monthly": "monthly",
+        "as_needed": "as needed"
+      },
+      "weight": "Weight",
+      "includeWeight": "Include weight",
+      "on": "On",
+      "expense": "Expense",
+      "includeExpense": "Include expense",
+      "clinic": "Clinic",
+      "includeClinic": "Include clinic",
+      "renameA11y": "Rename document to {{title}}",
+      "rename": "Rename document to “{{title}}”",
+      "setCategory": "Set category to {{category}}",
+      "datePlaceholder": "YYYY-MM-DD"
+    },
+    "export": {
+      "failed": "Export failed ({{status}})",
+      "dialogTitle": "Export health records"
+    }
+  },
+  "gamification": {
+    "milestones": {
+      "firstRecord": "First health record",
+      "records10": "10 health records",
+      "records25": "25 health records",
+      "records100": "100 health records",
+      "weights5": "5 weight entries",
+      "weights20": "20 weight entries",
+      "weights50": "50 weight entries",
+      "vaxComplete": "Vaccinations all caught up",
+      "anniversary_one": "{{count}} year together",
+      "anniversary_other": "{{count}} years together"
+    },
+    "streak": {
+      "days": "{{days}}-day streak",
+      "started": "Streak started",
+      "loggedYesterday": "Dose logged yesterday",
+      "pickUp": "Pick up where you left off"
+    },
+    "careStreaks": {
+      "title": "Care streaks",
+      "weeks_one": "{{count}} week of consistent care",
+      "weeks_other": "{{count}} weeks of consistent care",
+      "freshStart": "New week, fresh start",
+      "firstEntry": "Starts with one entry"
+    },
+    "recap": {
+      "title": "Your week in care",
+      "doses_one": "{{count}} dose",
+      "doses_other": "{{count}} doses",
+      "weights_one": "{{count}} weight entry",
+      "weights_other": "{{count}} weight entries",
+      "activities_one": "{{count}} activity",
+      "activities_other": "{{count}} activities",
+      "separator": ", ",
+      "vaccinesNeedLook": "vaccinations could use a look"
+    }
+  },
+  "status": {
+    "overdue": "Overdue",
+    "dueSoon": "Due soon",
+    "allGood": "All good",
+    "vaccineOverdue": "Vaccine overdue",
+    "overdueCount_one": "{{count}} overdue",
+    "overdueCount_other": "{{count}} overdue"
   }
 }

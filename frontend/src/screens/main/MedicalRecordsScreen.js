@@ -11,7 +11,7 @@ import { pickRecordImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
 import { buildExtractionPayload, extractionCount } from '../../utils/extraction';
 import { fmtClock, fmtDay, fmtFull, relativeDay } from '../../utils/dates';
-import { useLocale } from '../../i18n';
+import i18n, { useLocale, useTranslation } from '../../i18n';
 import { petById, emptyPhotoFor } from '../../utils/pets';
 import { useInFlight } from '../../hooks/useInFlight';
 import { ui, type, radii, motion, photos, vaultColors } from '../../theme';
@@ -29,14 +29,16 @@ import {
 const VAULT = vaultColors; // shared with the Health hub's vault card
 const PREVIEW_ROWS = 3;
 
+// `label` is a getter so it reads the app language at render time.
+const category = (id, icon) => ({ id, icon, get label() { return i18n.t(`records.categories.${id}`); } });
 const DOC_CATEGORIES = [
-  { id: 'lab', label: 'Lab', icon: 'test-tube' },
-  { id: 'vaccination', label: 'Vaccine', icon: 'needle' },
-  { id: 'prescription', label: 'Rx', icon: 'pill' },
-  { id: 'invoice', label: 'Invoice', icon: 'receipt' },
-  { id: 'imaging', label: 'Imaging', icon: 'radiology-box-outline' },
-  { id: 'insurance', label: 'Insurance', icon: 'shield-check' },
-  { id: 'other', label: 'Other', icon: 'file-document-outline' },
+  category('lab', 'test-tube'),
+  category('vaccination', 'needle'),
+  category('prescription', 'pill'),
+  category('invoice', 'receipt'),
+  category('imaging', 'radiology-box-outline'),
+  category('insurance', 'shield-check'),
+  category('other', 'file-document-outline'),
 ];
 const docMeta = (id) => DOC_CATEGORIES.find((c) => c.id === id) || DOC_CATEGORIES[DOC_CATEGORIES.length - 1];
 
@@ -50,7 +52,8 @@ const APPT_STATUS_STYLE = {
 const apptStyle = (s) => APPT_STATUS_STYLE[s] || APPT_STATUS_STYLE.scheduled;
 
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+// 'Scheduled' / 'Completed' / 'Cancelled' (a newer server value reads as-is).
+const apptStatusLabel = (s) => (s ? i18n.t(`records.apptStatus.${s}`, { defaultValue: cap(s) }) : s);
 
 // "Fri 10 Oct · 9:30 AM" — plain-language day plus time, never an ISO date.
 const fmtWhen = (iso) => {
@@ -62,15 +65,16 @@ const fmtWhen = (iso) => {
 const fmtStamp = (iso) => (iso ? fmtFull(new Date(iso)) : '');
 const fmtSize = (bytes) => {
   if (!bytes) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
+  if (bytes < 1024) return i18n.t('records.size.bytes', { n: bytes });
+  if (bytes < 1024 * 1024) return i18n.t('records.size.kb', { n: Math.round(bytes / 1024) });
+  return i18n.t('records.size.mb', { n: (bytes / 1048576).toFixed(1) });
 };
 
 export default function MedicalRecordsScreen({ navigation, route }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
+  const { t } = useTranslation();
   const { petId, petName } = route.params;
   const {
     pets, getPetRecords, addClinic, deleteClinic,
@@ -114,10 +118,10 @@ export default function MedicalRecordsScreen({ navigation, route }) {
     setRefreshing(true);
     setLoadFailed(false);
     const ok = await load();
-    if (!ok && records) showToast("Couldn't refresh the vault. Showing what was already here.");
+    if (!ok && records) showToast(t('records.toast.refreshFailed'));
     refreshBusy.current = false;
     setRefreshing(false);
-  }, [load, records]);
+  }, [load, records, t]);
 
   const clinics = records?.clinics || [];
   const appointments = records?.appointments || [];
@@ -133,33 +137,34 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   }, [appointments]);
 
   const summary = [
-    documents.length && plural(documents.length, 'document'),
-    appointments.length && plural(appointments.length, 'visit'),
-    clinics.length && plural(clinics.length, 'clinic'),
+    documents.length && t('records.summary.documents', { count: documents.length }),
+    appointments.length && t('records.summary.visits', { count: appointments.length }),
+    clinics.length && t('records.summary.clinics', { count: clinics.length }),
   ].filter(Boolean).join(' · ');
 
   const openDocument = async (doc) => {
     // Files live on a private disk — fetch a short-lived signed URL to view.
     const url = await getDocumentUrl(petId, doc.id);
-    if (!url) { showToast('Could not open this file'); return; }
-    Linking.openURL(url).catch(() => showToast('Could not open this file'));
+    if (!url) { showToast(t('records.toast.openFailed')); return; }
+    Linking.openURL(url).catch(() => showToast(t('records.toast.openFailed')));
   };
 
   // Deletes resolve true/false (DataContext contract): only a removal the
   // server confirmed says so, and only that row leaves the list (no refetch
   // of the whole vault); a failure keeps the row and offers a retry.
-  const confirmDelete = (label, remove, key, id) =>
+  // `kind` is 'document' | 'appointment' | 'clinic' (records.delete.<kind>).
+  const confirmDelete = (kind, remove, key, id) =>
     setConfirm({
-      title: `Delete ${label}?`,
-      message: `Remove this ${label} from ${name || 'this pet'}'s vault?`,
-      confirmLabel: 'Delete',
+      title: t(`records.delete.${kind}.title`),
+      message: t(`records.delete.${kind}.message`, { name: name || t('records.thisPet') }),
+      confirmLabel: t('records.delete.confirm'),
       destructive: true,
       action: async () => {
         if (await remove()) {
-          showToast(`${cap(label)} removed`);
+          showToast(t(`records.delete.${kind}.removed`));
           setRecords((r) => (r ? { ...r, [key]: (r[key] || []).filter((x) => x.id !== id) } : r));
         } else {
-          showToast(`Couldn't remove the ${label}. Try again.`);
+          showToast(t(`records.delete.${kind}.failed`));
         }
       },
     });
@@ -169,7 +174,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const startExtraction = (doc) => {
     if (doc.extractionStatus === 'done' && doc.extraction) { setReviewDoc(doc); return undefined; }
     if (isExtractBusy('extract')) {
-      showToast('Still reading another record. Try again in a moment.');
+      showToast(t('records.toast.stillReading'));
       return undefined;
     }
     return runExtract('extract', async () => {
@@ -179,7 +184,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         setReviewDoc(updated);
         load();
       } catch (e) {
-        showToast(e.message || 'Could not read the document');
+        showToast(e.message || t('records.toast.readFailed'));
       } finally {
         setExtractingId(null);
       }
@@ -192,10 +197,8 @@ export default function MedicalRecordsScreen({ navigation, route }) {
       (result.vaccinations?.length || 0) + (result.medications?.length || 0) +
       (result.weight ? 1 : 0) + (result.expense ? 1 : 0) + (result.clinic ? 1 : 0);
     const skipped = result.skipped?.length || 0;
-    showToast(
-      `${added} record${added === 1 ? '' : 's'} added` +
-        (skipped ? ` · ${skipped} skipped` : ''),
-    );
+    const addedText = t('records.extract.added', { count: added });
+    showToast(skipped ? t('records.extract.withSkipped', { added: addedText, count: skipped }) : addedText);
     load();
   };
 
@@ -209,13 +212,13 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         onPress={() => openDocument(d)}
         accessibilityRole="button"
         accessibilityLabel={`${d.title}. ${[m.label, fmtStamp(d.createdAt)].filter(Boolean).join(', ')}`}
-        accessibilityHint="Opens the file"
+        accessibilityHint={t('records.doc.openHint')}
         // One element for screen readers, so the Read and Delete buttons
         // inside can't be focused on their own — expose them as actions.
         accessibilityActions={[
-          { name: 'activate', label: 'Open' },
-          { name: 'read', label: applied ? 'Review what was read' : 'Read with AI' },
-          { name: 'delete', label: 'Delete' },
+          { name: 'activate', label: t('records.doc.open') },
+          { name: 'read', label: applied ? t('records.doc.review') : t('records.doc.readWithAi') },
+          { name: 'delete', label: t('records.delete.confirm') },
         ]}
         onAccessibilityAction={({ nativeEvent }) => {
           if (nativeEvent.actionName === 'activate') openDocument(d);
@@ -240,7 +243,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
             hitSlop={hit}
             style={styles.rowAction}
             accessibilityRole="button"
-            accessibilityLabel={`Review what was read from ${d.title}`}
+            accessibilityLabel={t('records.doc.reviewA11y', { title: d.title })}
           >
             <MaterialCommunityIcons name="check-decagram" size={20} color={ui.success} />
           </Pressable>
@@ -250,13 +253,13 @@ export default function MedicalRecordsScreen({ navigation, route }) {
             hitSlop={hit}
             style={({ pressed }) => [styles.readPill, pressed && { opacity: motion.pressOpacitySoft }]}
             accessibilityRole="button"
-            accessibilityLabel={`Read ${d.title} with AI`}
+            accessibilityLabel={t('records.doc.readA11y', { title: d.title })}
           >
             <MaterialCommunityIcons name="creation" size={14} color={ui.accent} />
-            <Text style={styles.readPillText}>Read</Text>
+            <Text style={styles.readPillText}>{t('records.doc.read')}</Text>
           </Pressable>
         )}
-        <DeleteButton label={`Delete ${d.title}`} onPress={() => confirmDelete('document', () => deleteDocument(petId, d.id), 'documents', d.id)} />
+        <DeleteButton label={t('records.deleteA11y', { name: d.title })} onPress={() => confirmDelete('document', () => deleteDocument(petId, d.id), 'documents', d.id)} />
       </Pressable>
     );
   };
@@ -274,11 +277,11 @@ export default function MedicalRecordsScreen({ navigation, route }) {
             {fmtWhen(a.scheduledAt)}{a.clinicName ? ` · ${a.clinicName}` : ''}
           </Text>
         </View>
-        <View style={[styles.statusTag, { backgroundColor: s.bg }]} accessible accessibilityLabel={cap(a.status)}>
+        <View style={[styles.statusTag, { backgroundColor: s.bg }]} accessible accessibilityLabel={apptStatusLabel(a.status)}>
           <MaterialCommunityIcons name={s.icon} size={12} color={s.fg} />
-          <Text style={[styles.statusText, { color: s.fg }]}>{cap(a.status)}</Text>
+          <Text style={[styles.statusText, { color: s.fg }]}>{apptStatusLabel(a.status)}</Text>
         </View>
-        <DeleteButton label={`Delete ${a.title}`} onPress={() => confirmDelete('appointment', () => deleteAppointment(petId, a.id), 'appointments', a.id)} />
+        <DeleteButton label={t('records.deleteA11y', { name: a.title })} onPress={() => confirmDelete('appointment', () => deleteAppointment(petId, a.id), 'appointments', a.id)} />
       </View>
     );
   };
@@ -291,7 +294,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={styles.rowTitle} numberOfLines={1}>{c.name}</Text>
         <Text style={styles.rowSub} numberOfLines={1}>
-          {[c.vetName, c.phone].filter(Boolean).join(' · ') || c.email || c.address || 'Vet clinic'}
+          {[c.vetName, c.phone].filter(Boolean).join(' · ') || c.email || c.address || t('records.clinic.fallback')}
         </Text>
       </View>
       {!!c.phone && (
@@ -300,22 +303,22 @@ export default function MedicalRecordsScreen({ navigation, route }) {
           hitSlop={hit}
           style={styles.callBtn}
           accessibilityRole="button"
-          accessibilityLabel={`Call ${c.name}`}
+          accessibilityLabel={t('records.clinic.callA11y', { name: c.name })}
         >
           <MaterialCommunityIcons name="phone" size={17} color={ui.accent} />
         </Pressable>
       )}
-      <DeleteButton label={`Delete ${c.name}`} onPress={() => confirmDelete('clinic', () => deleteClinic(petId, c.id), 'clinics', c.id)} />
+      <DeleteButton label={t('records.deleteA11y', { name: c.name })} onPress={() => confirmDelete('clinic', () => deleteClinic(petId, c.id), 'clinics', c.id)} />
     </View>
   );
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScreenHeader
-        title={name ? `${name}'s vault` : 'Medical vault'}
+        title={name ? t('records.titlePet', { name }) : t('records.title')}
         subtitle={!records
-          ? (loadFailed ? "Couldn't open the vault" : 'Opening the vault…')
-          : summary || 'Vet records, lab results & documents'}
+          ? (loadFailed ? t('records.openFailed') : t('records.opening'))
+          : summary || t('records.subtitle')}
         onBack={() => navigation.goBack()}
         avatar={pet ? <PetFace pet={pet} size={44} /> : null}
         style={styles.header}
@@ -328,16 +331,16 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         >
           <EmptyState
             photo={emptyPhotoFor(pet, photos.emptyBlanket)}
-            title="We couldn't open the vault"
-            body="Check your connection, then try again. Nothing in it has changed."
-            actionLabel="Try again"
+            title={t('records.loadFailed.title')}
+            body={t('records.loadFailed.body')}
+            actionLabel={t('records.loadFailed.action')}
             actionIcon="refresh"
             onAction={onRefresh}
           />
         </ScrollView>
       ) : !records ? (
         // Placeholders where the cards land — no spinner-only screen.
-        <View style={styles.loading} accessibilityLabel="Loading records">
+        <View style={styles.loading} accessibilityLabel={t('records.loadingA11y')}>
           <Skeleton width="100%" height={150} radius={20} />
           <Skeleton width={120} height={11} style={{ marginTop: 24 }} />
           <Skeleton width="100%" height={64} radius={16} style={{ marginTop: 10 }} />
@@ -350,15 +353,15 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         >
           <EmptyState
             photo={emptyPhotoFor(pet, photos.emptyBlanket)}
-            title={`Start ${name ? `${name}'s` : 'the'} vault`}
-            body="Snap a vaccine certificate, a lab result or an invoice. We can read it and add the records for you."
-            actionLabel="Upload a record"
+            title={name ? t('records.empty.titlePet', { name }) : t('records.empty.title')}
+            body={t('records.empty.body')}
+            actionLabel={t('records.upload')}
             actionIcon="camera-plus-outline"
             onAction={() => setDocModal(true)}
           />
           <View style={styles.quietLinks}>
-            <QuietLink icon="hospital-building" label="Add a vet clinic" onPress={() => setClinicModal(true)} />
-            <QuietLink icon="calendar-clock" label="Log a vet visit" onPress={() => setApptModal(true)} />
+            <QuietLink icon="hospital-building" label={t('records.addClinic')} onPress={() => setClinicModal(true)} />
+            <QuietLink icon="calendar-clock" label={t('records.logVisit')} onPress={() => setApptModal(true)} />
           </View>
         </ScrollView>
       ) : (
@@ -375,38 +378,38 @@ export default function MedicalRecordsScreen({ navigation, route }) {
                 <MaterialCommunityIcons name="shield-check" size={22} color={VAULT.fg} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.heroTitle}>Everything a vet might ask for</Text>
+                <Text style={styles.heroTitle}>{t('records.hero.title')}</Text>
                 <Text style={styles.heroSub}>
                   {nextVisit
-                    ? `Next visit ${relativeDay(new Date(nextVisit.scheduledAt))}: ${nextVisit.title}`
-                    : 'Private to you and your care team'}
+                    ? t('records.hero.nextVisit', { when: relativeDay(new Date(nextVisit.scheduledAt)), title: nextVisit.title })
+                    : t('records.hero.private')}
                 </Text>
               </View>
             </View>
-            <Button label="Upload a record" icon="camera-plus-outline" onPress={() => setDocModal(true)} />
+            <Button label={t('records.upload')} icon="camera-plus-outline" onPress={() => setDocModal(true)} />
           </Card>
 
           <Section
-            title="Documents"
+            title={t('records.sections.documents')}
             items={documents}
             renderItem={renderDocument}
-            empty={<QuietLink icon="folder-multiple-outline" label="Upload a photo of a record" onPress={() => setDocModal(true)} />}
+            empty={<QuietLink icon="folder-multiple-outline" label={t('records.uploadPhoto')} onPress={() => setDocModal(true)} />}
           />
           <Section
-            title="Vet visits"
+            title={t('records.sections.visits')}
             onAdd={() => setApptModal(true)}
-            addLabel="Log a vet visit"
+            addLabel={t('records.logVisit')}
             items={appointments}
             renderItem={renderAppointment}
-            empty={<QuietLink icon="calendar-clock" label="Log a vet visit" onPress={() => setApptModal(true)} />}
+            empty={<QuietLink icon="calendar-clock" label={t('records.logVisit')} onPress={() => setApptModal(true)} />}
           />
           <Section
-            title="Clinics"
+            title={t('records.sections.clinics')}
             onAdd={() => setClinicModal(true)}
-            addLabel="Add a vet clinic"
+            addLabel={t('records.addClinic')}
             items={clinics}
             renderItem={renderClinic}
-            empty={<QuietLink icon="hospital-building" label={`Add ${name || 'your pet'}'s vet clinic`} onPress={() => setClinicModal(true)} />}
+            empty={<QuietLink icon="hospital-building" label={t('records.addPetClinic', { name: name || t('records.yourPet') })} onPress={() => setClinicModal(true)} />}
           />
         </ScrollView>
       )}
@@ -456,6 +459,7 @@ const hit = { top: 8, bottom: 8, left: 8, right: 8 };
 
 // A section shows its first PREVIEW_ROWS rows; the rest are one tap away.
 function Section({ title, onAdd, addLabel, items, renderItem, empty }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const shown = expanded ? items : items.slice(0, PREVIEW_ROWS);
   const hidden = items.length - PREVIEW_ROWS;
@@ -472,7 +476,7 @@ function Section({ title, onAdd, addLabel, items, renderItem, empty }) {
             accessibilityLabel={addLabel}
           >
             <MaterialCommunityIcons name="plus" size={14} color={ui.accent} />
-            <Text style={styles.addLinkText}>Add</Text>
+            <Text style={styles.addLinkText}>{t('records.add')}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -487,7 +491,7 @@ function Section({ title, onAdd, addLabel, items, renderItem, empty }) {
             accessibilityRole="button"
             accessibilityState={{ expanded }}
           >
-            <Text style={styles.moreText}>{expanded ? 'Show less' : `Show ${hidden} more`}</Text>
+            <Text style={styles.moreText}>{expanded ? t('records.showLess') : t('records.showMore', { count: hidden })}</Text>
             <MaterialCommunityIcons name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={ui.accent} />
           </Pressable>
         )}
@@ -512,7 +516,8 @@ function QuietLink({ icon, label, onPress }) {
 
 // Shared form scaffold on top of the design-system Sheet: scrollable body,
 // inline error, Cancel/Save footer.
-function FormSheet({ visible, title, onClose, onSave, busy, saveLabel, busyLabel = 'Saving…', error, saveDisabled, children }) {
+function FormSheet({ visible, title, onClose, onSave, busy, saveLabel, busyLabel, error, saveDisabled, children }) {
+  const { t } = useTranslation();
   return (
     <Sheet visible={visible} onClose={onClose} title={title} style={{ maxHeight: '88%' }}>
       <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -520,9 +525,9 @@ function FormSheet({ visible, title, onClose, onSave, busy, saveLabel, busyLabel
         {!!error && <Text style={styles.error} selectable>{error}</Text>}
       </ScrollView>
       <View style={styles.sheetActions}>
-        <Button variant="soft" label="Cancel" onPress={onClose} style={{ flex: 1 }} />
+        <Button variant="soft" label={t('records.form.cancel')} onPress={onClose} style={{ flex: 1 }} />
         <Button
-          label={busy ? busyLabel : saveLabel}
+          label={busy ? busyLabel ?? t('records.form.saving') : saveLabel}
           onPress={onSave}
           disabled={busy || saveDisabled}
           style={{ flex: 1 }}
@@ -536,6 +541,7 @@ function FormSheet({ visible, title, onClose, onSave, busy, saveLabel, busyLabel
 // validation message). Each save runs through useInFlight so a double tap
 // never creates the record twice.
 function ClinicModal({ visible, onClose, onSave, onDone }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({ name: '', vet_name: '', phone: '', email: '', address: '', notes: '' });
   const [error, setError] = useState(null);
   const { run, isBusy } = useInFlight();
@@ -558,8 +564,8 @@ function ClinicModal({ visible, onClose, onSave, onDone }) {
           notes: form.notes.trim() || null,
         });
         reset(); onClose(); await onDone();
-        showToast('Clinic added');
-      } catch (e) { setError(e.message || 'Could not save the clinic.'); }
+        showToast(t('records.clinic.added'));
+      } catch (e) { setError(e.message || t('records.clinic.saveFailed')); }
     });
   };
 
@@ -574,23 +580,24 @@ function ClinicModal({ visible, onClose, onSave, onDone }) {
   );
 
   return (
-    <FormSheet visible={visible} title="Add vet clinic" onClose={close} onSave={save} busy={busy} saveLabel="Add clinic" error={error} saveDisabled={!form.name.trim()}>
+    <FormSheet visible={visible} title={t('records.clinic.sheetTitle')} onClose={close} onSave={save} busy={busy} saveLabel={t('records.clinic.save')} error={error} saveDisabled={!form.name.trim()}>
       <TextField
-        label="Clinic name"
-        placeholder="e.g. Riverside Vet"
+        label={t('records.clinic.name')}
+        placeholder={t('records.clinic.namePlaceholder')}
         value={form.name}
         onChangeText={(v) => { setForm({ ...form, name: v }); setError(null); }}
         autoFocus
       />
-      {field('vet_name', 'Vet name (optional)')}
-      {field('phone', 'Phone', { keyboardType: 'phone-pad' })}
-      {field('email', 'Email', { keyboardType: 'email-address', autoCapitalize: 'none' })}
-      {field('address', 'Address')}
+      {field('vet_name', t('records.clinic.vetName'))}
+      {field('phone', t('records.clinic.phone'), { keyboardType: 'phone-pad' })}
+      {field('email', t('records.clinic.email'), { keyboardType: 'email-address', autoCapitalize: 'none' })}
+      {field('address', t('records.clinic.address'))}
     </FormSheet>
   );
 }
 
 function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [when, setWhen] = useState(new Date());
   const [clinicId, setClinicId] = useState(null);
@@ -618,26 +625,26 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
           notes: notes.trim() || null,
         });
         reset(); onClose(); await onDone();
-        showToast('Appointment logged', { celebrate: true, actionType: 'appointment_logged' });
-      } catch (e) { setError(e.message || 'Could not save the appointment.'); }
+        showToast(t('records.visit.logged'), { celebrate: true, actionType: 'appointment_logged' });
+      } catch (e) { setError(e.message || t('records.visit.saveFailed')); }
     });
   };
 
   return (
-    <FormSheet visible={visible} title="Log a vet visit" onClose={close} onSave={save} busy={busy} saveLabel="Save" error={error} saveDisabled={!title.trim()}>
+    <FormSheet visible={visible} title={t('records.logVisit')} onClose={close} onSave={save} busy={busy} saveLabel={t('records.visit.save')} error={error} saveDisabled={!title.trim()}>
       <TextField
-        label="Reason"
-        placeholder="e.g. Annual checkup"
+        label={t('records.visit.reason')}
+        placeholder={t('records.visit.reasonPlaceholder')}
         value={title}
         onChangeText={(v) => { setTitle(v); setError(null); }}
         autoFocus
-        accessibilityLabel="Reason for the visit"
+        accessibilityLabel={t('records.visit.reasonA11y')}
       />
       <Pressable
         style={({ pressed }) => [styles.pickerBtn, pressed && { backgroundColor: ui.pressTint }]}
         onPress={() => setShowDate(true)}
         accessibilityRole="button"
-        accessibilityLabel={`Date and time, ${fmtWhen(when.toISOString())}`}
+        accessibilityLabel={t('records.visit.whenA11y', { when: fmtWhen(when.toISOString()) })}
       >
         <MaterialCommunityIcons name="calendar-blank-outline" size={16} color={ui.accent} />
         <Text style={styles.pickerText}>{fmtWhen(when.toISOString())}</Text>
@@ -646,7 +653,7 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
 
       {clinics.length > 0 && (
         <>
-          <Text style={[type.sectionLabel, styles.fieldLabel]}>Clinic (optional)</Text>
+          <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('records.visit.clinic')}</Text>
           <View style={styles.chipWrap}>
             {clinics.map((c) => (
               <Chip accessibilityRole="radio" key={c.id} label={c.name} active={clinicId === c.id} onPress={() => setClinicId(clinicId === c.id ? null : c.id)} />
@@ -655,10 +662,10 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
         </>
       )}
 
-      <Text style={[type.sectionLabel, styles.fieldLabel]}>Status</Text>
+      <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('records.visit.status')}</Text>
       <View style={styles.chipWrap}>
         {APPT_STATUS.map((s) => (
-          <Chip accessibilityRole="radio" key={s} label={cap(s)} active={status === s} onPress={() => setStatus(s)} />
+          <Chip accessibilityRole="radio" key={s} label={apptStatusLabel(s)} active={status === s} onPress={() => setStatus(s)} />
         ))}
       </View>
 
@@ -696,6 +703,7 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
 }
 
 function DocumentModal({ visible, onClose, onSave, onDone }) {
+  const { t } = useTranslation();
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('lab');
@@ -713,11 +721,11 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
   const pick = async () => {
     setError(null);
     const res = await pickRecordImage();
-    if (res.error) { setError(res.error === 'permission' ? 'Photo permission is required.' : 'Could not pick the file.'); return; }
+    if (res.error) { setError(res.error === 'permission' ? t('records.doc.permission') : t('records.doc.pickFailed')); return; }
     if (res.canceled) return;
     setFile(res);
     setFailed(false); // a new file is a fresh attempt, not a retry
-    if (!title) setTitle(docMeta(category).label + ' record');
+    if (!title) setTitle(t('records.doc.defaultTitle', { category: docMeta(category).label }));
   };
 
   const save = () => {
@@ -728,7 +736,7 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
       try {
         await onSave(file, { title: title.trim(), category });
         reset(); onClose(); await onDone();
-        showToast('Document uploaded');
+        showToast(t('records.doc.uploaded'));
       } catch (e) {
         // Keep the ENTIRE form + picked file; the banner + retry button take
         // over from here.
@@ -741,36 +749,36 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
   return (
     <FormSheet
       visible={visible}
-      title="Upload a record"
+      title={t('records.upload')}
       onClose={close}
       onSave={save}
       busy={busy}
-      saveLabel={failed ? 'Retry upload' : 'Upload'}
-      busyLabel="Uploading…"
+      saveLabel={failed ? t('records.doc.retry') : t('records.doc.uploadAction')}
+      busyLabel={t('records.doc.uploading')}
       error={error}
       saveDisabled={!file || !title.trim()}
     >
       {failed && !busy && (
-        <Banner icon="alert-circle-outline" tone="danger" text="Upload failed — nothing was lost." />
+        <Banner icon="alert-circle-outline" tone="danger" text={t('records.doc.uploadFailed')} />
       )}
       <Pressable
         style={({ pressed }) => [styles.fileBtn, file && styles.fileBtnPicked, pressed && { backgroundColor: ui.pressTint }]}
         onPress={pick}
         accessibilityRole="button"
-        accessibilityLabel={file ? `Chosen file ${file.name}, tap to change` : 'Choose a photo of the record'}
+        accessibilityLabel={file ? t('records.doc.chosenA11y', { name: file.name }) : t('records.doc.choose')}
       >
         <MaterialCommunityIcons name={file ? 'check-circle' : 'image-plus'} size={22} color={file ? ui.success : ui.accent} />
-        <Text style={styles.fileBtnText} numberOfLines={1}>{file ? file.name : 'Choose a photo of the record'}</Text>
+        <Text style={styles.fileBtnText} numberOfLines={1}>{file ? file.name : t('records.doc.choose')}</Text>
       </Pressable>
       <TextField
-        label="Title"
+        label={t('records.doc.title')}
         style={{ marginTop: 12 }}
-        placeholder="e.g. Rabies certificate"
+        placeholder={t('records.doc.titlePlaceholder')}
         value={title}
         onChangeText={(v) => { setTitle(v); setError(null); }}
-        accessibilityLabel="Document title"
+        accessibilityLabel={t('records.doc.titleA11y')}
       />
-      <Text style={[type.sectionLabel, styles.fieldLabel]}>Category</Text>
+      <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('records.doc.category')}</Text>
       <View style={styles.chipWrap}>
         {DOC_CATEGORIES.map((c) => (
           <Chip accessibilityRole="radio" key={c.id} label={c.label} active={category === c.id} onPress={() => setCategory(c.id)} />
@@ -786,6 +794,7 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
 // as YYYY-MM-DD strings — anything else is sent as null (fill in later).
 
 function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
+  const { t } = useTranslation();
   const ex = doc?.extraction;
   const [sel, setSel] = useState(null);
   const [error, setError] = useState(null);
@@ -838,59 +847,63 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
       try {
         const result = await onApply(buildExtractionPayload(sel));
         onDone(result);
-      } catch (e) { setError(e.message || 'Could not apply the records.'); }
+      } catch (e) { setError(e.message || t('records.extract.applyFailed')); }
     });
 
   return (
     <FormSheet
       visible={visible}
-      title="Review what we read"
+      title={t('records.extract.title')}
       onClose={onClose}
       onSave={apply}
       busy={busy}
-      saveLabel={count > 0 ? `Apply ${count}` : 'Apply'}
+      saveLabel={count > 0 ? t('records.extract.applyCount', { count }) : t('records.extract.apply')}
       saveDisabled={count === 0 && !sel.setTitle && !sel.setCategory}
       error={error}
     >
       {ex.matches_pet === false && (
-        <Banner icon="alert" tone="danger" text={`This document may belong to a different pet than ${petName || 'this one'}. Double-check before applying.`} />
+        <Banner icon="alert" tone="danger" text={t('records.extract.otherPet', { name: petName || t('records.extract.thisOne') })} />
       )}
       {!!ex.notes_for_owner && <Banner icon="information" tone="info" text={ex.notes_for_owner} />}
 
       {nothingFound ? (
-        <Text style={styles.exEmpty}>No medical data was found in this document.</Text>
+        <Text style={styles.exEmpty}>{t('records.extract.nothingFound')}</Text>
       ) : (
         <>
-          {sel.vaccinations.length > 0 && <ExGroup icon="needle" label="Vaccinations" />}
+          {sel.vaccinations.length > 0 && <ExGroup icon="needle" label={t('records.extract.vaccinations')} />}
           {sel.vaccinations.map((v, i) => (
-            <PickRow key={`vax-${i}`} label={`Include vaccine ${v.name || i + 1}`} included={v.included} onToggle={() => setVax(i, { included: !v.included })}>
-              <TextInput style={styles.exInput} value={v.name} placeholder="Vaccine name" placeholderTextColor={ui.placeholder} onChangeText={(t) => setVax(i, { name: t })} />
+            <PickRow key={`vax-${i}`} label={t('records.extract.includeVaccine', { name: v.name || i + 1 })} included={v.included} onToggle={() => setVax(i, { included: !v.included })}>
+              <TextInput style={styles.exInput} value={v.name} placeholder={t('records.extract.vaccineName')} placeholderTextColor={ui.placeholder} onChangeText={(text) => setVax(i, { name: text })} />
               <View style={styles.exDates}>
-                <ExDate label="Given" value={v.administered} onChange={(t) => setVax(i, { administered: t })} />
-                <ExDate label="Next due" value={v.due} onChange={(t) => setVax(i, { due: t })} />
+                <ExDate label={t('records.extract.given')} value={v.administered} onChange={(text) => setVax(i, { administered: text })} />
+                <ExDate label={t('records.extract.nextDue')} value={v.due} onChange={(text) => setVax(i, { due: text })} />
               </View>
             </PickRow>
           ))}
 
-          {sel.medications.length > 0 && <ExGroup icon="pill" label="Medications" />}
+          {sel.medications.length > 0 && <ExGroup icon="pill" label={t('records.extract.medications')} />}
           {sel.medications.map((m, i) => (
-            <PickRow key={`med-${i}`} label={`Include medication ${m.name || i + 1}`} included={m.included} onToggle={() => setMed(i, { included: !m.included })}>
-              <TextInput style={styles.exInput} value={m.name} placeholder="Medication name" placeholderTextColor={ui.placeholder} onChangeText={(t) => setMed(i, { name: t })} />
+            <PickRow key={`med-${i}`} label={t('records.extract.includeMedication', { name: m.name || i + 1 })} included={m.included} onToggle={() => setMed(i, { included: !m.included })}>
+              <TextInput style={styles.exInput} value={m.name} placeholder={t('records.extract.medicationName')} placeholderTextColor={ui.placeholder} onChangeText={(text) => setMed(i, { name: text })} />
               <View style={styles.exDates}>
-                <TextInput style={[styles.exInput, { flex: 1 }]} value={m.dosage} placeholder="Dosage" placeholderTextColor={ui.placeholder} onChangeText={(t) => setMed(i, { dosage: t })} />
-                {!!m.frequency && <Text style={styles.exHint}>{m.frequency.replace('_', ' ')}</Text>}
+                <TextInput style={[styles.exInput, { flex: 1 }]} value={m.dosage} placeholder={t('records.extract.dosage')} placeholderTextColor={ui.placeholder} onChangeText={(text) => setMed(i, { dosage: text })} />
+                {!!m.frequency && (
+                  <Text style={styles.exHint}>
+                    {t(`records.extract.frequency.${m.frequency}`, { defaultValue: m.frequency.replace('_', ' ') })}
+                  </Text>
+                )}
               </View>
             </PickRow>
           ))}
 
           {sel.weight && (
             <>
-              <ExGroup icon="scale-bathroom" label="Weight" />
-              <PickRow label="Include weight" included={sel.weight.included} onToggle={() => setSel({ ...sel, weight: { ...sel.weight, included: !sel.weight.included } })}>
+              <ExGroup icon="scale-bathroom" label={t('records.extract.weight')} />
+              <PickRow label={t('records.extract.includeWeight')} included={sel.weight.included} onToggle={() => setSel({ ...sel, weight: { ...sel.weight, included: !sel.weight.included } })}>
                 <View style={styles.exDates}>
-                  <TextInput style={[styles.exInput, { flex: 1 }]} value={sel.weight.value} keyboardType="decimal-pad" onChangeText={(t) => setSel({ ...sel, weight: { ...sel.weight, value: t } })} />
+                  <TextInput style={[styles.exInput, { flex: 1 }]} value={sel.weight.value} keyboardType="decimal-pad" onChangeText={(text) => setSel({ ...sel, weight: { ...sel.weight, value: text } })} />
                   <Text style={styles.exHint}>{sel.weight.unit}</Text>
-                  <ExDate label="On" value={sel.weight.date} onChange={(t) => setSel({ ...sel, weight: { ...sel.weight, date: t } })} />
+                  <ExDate label={t('records.extract.on')} value={sel.weight.date} onChange={(text) => setSel({ ...sel, weight: { ...sel.weight, date: text } })} />
                 </View>
               </PickRow>
             </>
@@ -898,11 +911,11 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
 
           {sel.expense && (
             <>
-              <ExGroup icon="cash" label="Expense" />
-              <PickRow label="Include expense" included={sel.expense.included} onToggle={() => setSel({ ...sel, expense: { ...sel.expense, included: !sel.expense.included } })}>
+              <ExGroup icon="cash" label={t('records.extract.expense')} />
+              <PickRow label={t('records.extract.includeExpense')} included={sel.expense.included} onToggle={() => setSel({ ...sel, expense: { ...sel.expense, included: !sel.expense.included } })}>
                 <View style={styles.exDates}>
-                  <TextInput style={[styles.exInput, { flex: 1 }]} value={sel.expense.amount} keyboardType="decimal-pad" onChangeText={(t) => setSel({ ...sel, expense: { ...sel.expense, amount: t } })} />
-                  <ExDate label="On" value={sel.expense.date} onChange={(t) => setSel({ ...sel, expense: { ...sel.expense, date: t } })} />
+                  <TextInput style={[styles.exInput, { flex: 1 }]} value={sel.expense.amount} keyboardType="decimal-pad" onChangeText={(text) => setSel({ ...sel, expense: { ...sel.expense, amount: text } })} />
+                  <ExDate label={t('records.extract.on')} value={sel.expense.date} onChange={(text) => setSel({ ...sel, expense: { ...sel.expense, date: text } })} />
                 </View>
               </PickRow>
             </>
@@ -910,9 +923,9 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
 
           {sel.clinic && (
             <>
-              <ExGroup icon="hospital-building" label="Clinic" />
-              <PickRow label="Include clinic" included={sel.clinic.included} onToggle={() => setSel({ ...sel, clinic: { ...sel.clinic, included: !sel.clinic.included } })}>
-                <TextInput style={styles.exInput} value={sel.clinic.name} placeholder="Clinic name" placeholderTextColor={ui.placeholder} onChangeText={(t) => setSel({ ...sel, clinic: { ...sel.clinic, name: t } })} />
+              <ExGroup icon="hospital-building" label={t('records.extract.clinic')} />
+              <PickRow label={t('records.extract.includeClinic')} included={sel.clinic.included} onToggle={() => setSel({ ...sel, clinic: { ...sel.clinic, included: !sel.clinic.included } })}>
+                <TextInput style={styles.exInput} value={sel.clinic.name} placeholder={t('records.clinic.name')} placeholderTextColor={ui.placeholder} onChangeText={(text) => setSel({ ...sel, clinic: { ...sel.clinic, name: text } })} />
               </PickRow>
             </>
           )}
@@ -920,13 +933,13 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
       )}
 
       {!!ex.suggested_title && (
-        <PickRow label={`Rename document to ${ex.suggested_title}`} included={sel.setTitle} onToggle={() => setSel({ ...sel, setTitle: !sel.setTitle })}>
-          <Text style={styles.exToggleText} numberOfLines={2}>Rename document to “{ex.suggested_title}”</Text>
+        <PickRow label={t('records.extract.renameA11y', { title: ex.suggested_title })} included={sel.setTitle} onToggle={() => setSel({ ...sel, setTitle: !sel.setTitle })}>
+          <Text style={styles.exToggleText} numberOfLines={2}>{t('records.extract.rename', { title: ex.suggested_title })}</Text>
         </PickRow>
       )}
       {!!ex.document_type && ex.document_type !== 'other' && (
-        <PickRow label={`Set category to ${docMeta(ex.document_type).label}`} included={sel.setCategory} onToggle={() => setSel({ ...sel, setCategory: !sel.setCategory })}>
-          <Text style={styles.exToggleText}>Set category to {docMeta(ex.document_type).label}</Text>
+        <PickRow label={t('records.extract.setCategory', { category: docMeta(ex.document_type).label })} included={sel.setCategory} onToggle={() => setSel({ ...sel, setCategory: !sel.setCategory })}>
+          <Text style={styles.exToggleText}>{t('records.extract.setCategory', { category: docMeta(ex.document_type).label })}</Text>
         </PickRow>
       )}
     </FormSheet>
@@ -940,11 +953,11 @@ const BANNER_TONES = {
 };
 
 function Banner({ icon, tone = 'info', text }) {
-  const t = BANNER_TONES[tone] || BANNER_TONES.info;
+  const colors = BANNER_TONES[tone] || BANNER_TONES.info;
   return (
-    <View style={[styles.exBanner, { backgroundColor: t.bg }]} accessibilityRole={tone === 'danger' ? 'alert' : undefined}>
-      <MaterialCommunityIcons name={icon} size={16} color={t.fg} />
-      <Text style={[styles.exBannerText, { color: t.fg }]}>{text}</Text>
+    <View style={[styles.exBanner, { backgroundColor: colors.bg }]} accessibilityRole={tone === 'danger' ? 'alert' : undefined}>
+      <MaterialCommunityIcons name={icon} size={16} color={colors.fg} />
+      <Text style={[styles.exBannerText, { color: colors.fg }]}>{text}</Text>
     </View>
   );
 }
@@ -985,13 +998,14 @@ function PickRow({ included, onToggle, label, children }) {
 }
 
 function ExDate({ label, value, onChange }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.exDateWrap}>
       <Text style={styles.exHint}>{label}</Text>
       <TextInput
         style={[styles.exInput, styles.exDateInput]}
         value={value}
-        placeholder="YYYY-MM-DD"
+        placeholder={t('records.extract.datePlaceholder')}
         placeholderTextColor={ui.placeholder}
         onChangeText={onChange}
         autoCapitalize="none"

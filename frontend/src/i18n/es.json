@@ -440,5 +440,572 @@
       "body": "La app ha encontrado un error inesperado. Sus mascotas e historiales están a salvo: inténtelo de nuevo y, si sigue ocurriendo, escriba a {{email}}.",
       "retry": "Intentar de nuevo"
     }
+  },
+  "home": {
+    "greeting": {
+      "morning": "Buenos días, {{name}}",
+      "afternoon": "Buenas tardes, {{name}}",
+      "evening": "Buenas noches, {{name}}"
+    },
+    "welcome": "Bienvenido a PawPawCare, {{name}}",
+    "friend": "amigo",
+    "meetYourPets": "Conozcamos a sus mascotas",
+    "status": {
+      "overdue_one": "{{count}} cosa requiere\nsu atención",
+      "overdue_many": "{{count}} cosas requieren\nsu atención",
+      "overdue_other": "{{count}} cosas requieren\nsu atención",
+      "dueSoon_one": "{{count}} cosa vence\npronto",
+      "dueSoon_many": "{{count}} cosas vencen\npronto",
+      "dueSoon_other": "{{count}} cosas vencen\npronto",
+      "unknown": "Algunos registros\nno se cargaron",
+      "oneOk": "{{name}} está\nperfectamente",
+      "twoOk": "{{first}} y {{second}}\nestán perfectamente",
+      "allOk": "Sus {{total}} mascotas\nestán perfectamente"
+    },
+    "vaccinesFailedOne": "No se pudieron cargar las vacunas de {{name}}. Compruebe su conexión.",
+    "vaccinesFailedSome": "No se pudieron cargar algunas vacunas. Compruebe su conexión.",
+    "okPets_one": "{{count}} de sus {{total}} mascotas está perfectamente.",
+    "okPets_many": "{{count}} de sus {{total}} mascotas están perfectamente.",
+    "okPets_other": "{{count}} de sus {{total}} mascotas están perfectamente.",
+    "notificationsA11y": "Notificaciones",
+    "notificationsUnreadA11y_one": "Notificaciones, {{count}} sin leer",
+    "notificationsUnreadA11y_many": "Notificaciones, {{count}} sin leer",
+    "notificationsUnreadA11y_other": "Notificaciones, {{count}} sin leer",
+    "loadingSummaryA11y": "Cargando el resumen de cuidados de sus mascotas",
+    "loadingPetsA11y": "Cargando sus mascotas",
+    "milestoneToast": "{{pet}}: {{label}}",
+    "benefits": {
+      "reminders": "Recordatorios antes de cada vencimiento",
+      "records": "Todos los registros en un lugar seguro",
+      "family": "Comparta los cuidados con su familia"
+    },
+    "empty": {
+      "title": "Añada su primera mascota",
+      "body": "Un gato, un perro o cualquier compañero. Se tarda menos de un minuto.",
+      "action": "Añada su primera mascota",
+      "benefitsTitle": "Lo que obtendrá"
+    },
+    "celebration": {
+      "birthday": "¡Feliz cumpleaños, {{name}}!",
+      "gotchaDay_one": "Día de adopción: {{count}} año con {{name}}",
+      "gotchaDay_many": "Día de adopción: {{count}} años con {{name}}",
+      "gotchaDay_other": "Día de adopción: {{count}} años con {{name}}",
+      "turns_one": "{{name}} cumple {{count}} año hoy",
+      "turns_many": "{{name}} cumple {{count}} años hoy",
+      "turns_other": "{{name}} cumple {{count}} años hoy",
+      "dismiss": "Descartar"
+    },
+    "upNext": {
+      "caughtUpTitle": "Todo al día",
+      "caughtUpBody": "Nada requiere su atención ahora mismo",
+      "markDone": "Marcar como hecho",
+      "reschedule": "Reprogramar",
+      "subtitle": "{{pet}} · vence el {{date}}",
+      "dueOn": "Vence el {{date}}",
+      "note": "Pida cita para la vacuna {{vaccine}} de {{pet}}."
+    },
+    "toast": {
+      "doseLogged": "{{med}} de {{pet}} registrado",
+      "doseFailed": "No se pudo registrar {{med}} de {{pet}}. Inténtelo de nuevo.",
+      "vaccineDone": "{{name}} marcado como hecho",
+      "vaccineFailed": "No se pudo marcar {{name}} como hecho. Inténtelo de nuevo."
+    },
+    "more": {
+      "overdue_one": "{{count}} más atrasado",
+      "overdue_many": "{{count}} más atrasados",
+      "overdue_other": "{{count}} más atrasados",
+      "dueSoon_one": "{{count}} vence pronto",
+      "dueSoon_many": "{{count}} vencen pronto",
+      "dueSoon_other": "{{count}} vencen pronto",
+      "moreDueSoon_one": "{{count}} más vence pronto",
+      "moreDueSoon_many": "{{count}} más vencen pronto",
+      "moreDueSoon_other": "{{count}} más vencen pronto",
+      "separator": ", ",
+      "seeAllInHealth": "{{items}} · ver todo en Salud"
+    },
+    "today": {
+      "title": "Hoy",
+      "allDone": "Todo hecho",
+      "doneOf": "{{done}} de {{total}} hechos",
+      "medTitle": "{{med}} de {{pet}}",
+      "anyTime": "Hoy",
+      "givenOf": "{{taken}} de {{expected}} administradas",
+      "done": "Hecho",
+      "log": "Registrar",
+      "showLess": "Mostrar menos",
+      "showMore_one": "Mostrar {{count}} más",
+      "showMore_many": "Mostrar {{count}} más",
+      "showMore_other": "Mostrar {{count}} más"
+    },
+    "pets": {
+      "title": "Sus mascotas",
+      "seeAll": "Ver todo",
+      "addA11y": "Añadir una mascota",
+      "add": "Añadir"
+    },
+    "comingUp": {
+      "title": "Próximamente",
+      "healthLink": "Salud",
+      "empty": "Nada programado esta semana. Disfrute de la calma."
+    },
+    "community": {
+      "recentPosts_one": "{{count}} publicación reciente",
+      "recentPosts_many": "{{count}} publicaciones recientes",
+      "recentPosts_other": "{{count}} publicaciones recientes",
+      "inCommunity": " en la comunidad",
+      "sayHi": "Salude a la comunidad"
+    }
+  },
+  "health": {
+    "title": "Salud",
+    "synced": {
+      "justNow": "Sincronizado ahora mismo",
+      "minutes": "Sincronizado hace {{n}} min",
+      "hours": "Sincronizado hace {{n}} h",
+      "days": "Sincronizado hace {{n}} d"
+    },
+    "reminderKind": {
+      "once": "Recordatorio",
+      "daily": "Recordatorio diario",
+      "weekly": "Recordatorio semanal",
+      "monthly": "Recordatorio mensual",
+      "other": "Recordatorio ({{recurrence}})"
+    },
+    "wasDue": "{{pet}} · vencía el {{date}}",
+    "sections": {
+      "today": "Hoy",
+      "week": "Esta semana",
+      "later": "Más adelante"
+    },
+    "toast": {
+      "addPetFirst": "Añada primero una mascota",
+      "saveFailed": "No se pudo guardar el registro. Inténtelo de nuevo.",
+      "saved": "Registro guardado",
+      "vaccineDone": "{{name}} marcado como hecho",
+      "vaccineFailed": "No se pudo marcar {{name}} como hecho. Inténtelo de nuevo."
+    },
+    "dueWhen": "Vence {{when}}",
+    "scheduledAt": "Programado · {{time}}",
+    "notificationsOff": "Notificaciones desactivadas",
+    "done": "Hecho",
+    "filterAll": "Todas",
+    "empty": {
+      "title": "Todo tranquilo en cuanto a salud",
+      "body": "Nada programado. Añada una vacuna o una visita al veterinario y le avisaremos antes del vencimiento.",
+      "bodyPet": "Nada programado para {{name}}. Añada una vacuna o una visita al veterinario y le avisaremos antes del vencimiento."
+    },
+    "noPets": {
+      "title": "Aún no hay mascotas",
+      "body": "Añada su primera mascota y sus vacunas, medicamentos y visitas al veterinario aparecerán aquí.",
+      "action": "Añadir una mascota"
+    },
+    "scheduledOnDevice": "Programado en este dispositivo",
+    "vault": {
+      "title": "Archivo médico",
+      "petTitle": "Archivo médico de {{name}}",
+      "subtitle": "Historiales veterinarios, análisis y documentos",
+      "pickPet": "Elija una mascota para abrir sus registros"
+    },
+    "history": "Historial",
+    "addRecord": "Añadir registro",
+    "types": {
+      "vaccine": "Vacuna",
+      "vetVisit": "Visita al veterinario",
+      "medication": "Medicamento",
+      "weight": "Peso"
+    },
+    "sheet": {
+      "title": "Nuevo registro",
+      "type": "Tipo",
+      "pet": "Mascota",
+      "name": "Nombre",
+      "namePlaceholder": "p. ej., refuerzo de la rabia",
+      "dueDate": "Vence el {{date}}",
+      "saveOn": "Guardar · {{date}}",
+      "thePet": "la mascota",
+      "vetVisitHint": "Las visitas al veterinario y los documentos se registran en el historial médico de {{name}}.",
+      "medicationHint": "Los medicamentos se registran en el perfil de {{name}}.",
+      "weightHint": "Los pesos se registran en el perfil de {{name}}.",
+      "continue": "Continuar"
+    }
+  },
+  "vaccines": {
+    "title": "Vacunas",
+    "summary": {
+      "oneNeedsBooking": "Hay que pedir cita para {{name}}",
+      "needBooking_one": "{{count}} vacuna pendiente de cita",
+      "needBooking_many": "{{count}} vacunas pendientes de cita",
+      "needBooking_other": "{{count}} vacunas pendientes de cita",
+      "next": "Próxima: {{name}} {{when}}",
+      "upToDate": "Todo está al día",
+      "none": "Aún no hay registros de vacunas"
+    },
+    "toast": {
+      "scheduleFailed": "No se pudo programar la vacunación. Inténtelo de nuevo.",
+      "scheduled": "Vacunación programada",
+      "done": "{{name}} marcado como hecho",
+      "doneFailed": "No se pudo marcar {{name}} como hecho. Inténtelo de nuevo.",
+      "deleted": "Registro eliminado",
+      "deleteFailed": "No se pudo eliminar el registro. Inténtelo de nuevo."
+    },
+    "confirmDone": {
+      "title": "Marcar como administrada",
+      "message": "¿Marcar «{{name}}» como administrada hoy?",
+      "confirm": "Marcar como hecho"
+    },
+    "confirmDelete": {
+      "title": "Eliminar registro",
+      "message": "¿Eliminar el registro «{{name}}»?",
+      "confirm": "Eliminar"
+    },
+    "dueWhen": "Vence {{when}}",
+    "wasDueOn": "Vencía el {{date}}",
+    "dueOn": "Vence el {{date}}",
+    "done": "Hecho",
+    "markDoneA11y": "Marcar {{name}} como hecho",
+    "deleteA11y": "Eliminar {{name}}",
+    "sections": {
+      "needs": "Requiere atención",
+      "upcoming": "Próximas",
+      "done": "Hechas"
+    },
+    "add": "Añadir vacuna",
+    "empty": {
+      "title": "Aún no hay vacunas",
+      "body": "Añada las vacunas de {{name}} y le avisaremos antes de cada vencimiento."
+    },
+    "sheet": {
+      "title": "Nueva vacuna",
+      "name": "Nombre de la vacuna",
+      "namePlaceholder": "p. ej., refuerzo de la rabia",
+      "dueDate": "Fecha de vencimiento",
+      "dueDateA11y": "Fecha de vencimiento, {{date}}",
+      "notSet": "sin definir",
+      "selectDueDate": "Seleccionar fecha de vencimiento",
+      "schedule": "Programar"
+    },
+    "picker": {
+      "cancel": "Cancelar",
+      "done": "Listo"
+    }
+  },
+  "reminders": {
+    "title": "Recordatorios",
+    "schedule": {
+      "daily": "Cada día a las {{time}}",
+      "weekly": "Cada semana a las {{time}}",
+      "monthly": "Cada mes a las {{time}}",
+      "other": "{{recurrence}} a las {{time}}",
+      "oneTime": "Una sola vez"
+    },
+    "toast": {
+      "addFailed": "No se pudo añadir el recordatorio. Inténtelo de nuevo.",
+      "added": "Recordatorio añadido",
+      "deleted": "Recordatorio eliminado",
+      "deleteFailed": "No se pudo eliminar el recordatorio. Inténtelo de nuevo."
+    },
+    "form": {
+      "title": "Nuevo recordatorio",
+      "placeholder": "p. ej., dar a Rex su pastilla contra el gusano del corazón",
+      "add": "Añadir recordatorio"
+    },
+    "listTitle": "Sus recordatorios",
+    "empty": {
+      "title": "Aún no hay recordatorios",
+      "body": "Los recordatorios de vacunación se añaden automáticamente. Añada los suyos arriba para todo lo demás."
+    },
+    "petSummary": "{{pet}} · {{schedule}}",
+    "toggleA11y": "Recordatorio {{title}}",
+    "deleteA11y": "Eliminar {{title}}",
+    "confirmDelete": {
+      "title": "¿Eliminar el recordatorio?",
+      "message": "«{{title}}» ya no se activará. Esta acción no se puede deshacer.",
+      "confirm": "Eliminar"
+    }
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "when": {
+      "snoozed": "Pospuesta",
+      "snoozeEnded": "Aplazamiento terminado",
+      "snoozedUntil": "Pospuesta hasta {{time}}",
+      "scheduled": "Programada"
+    },
+    "sections": {
+      "today": "Hoy",
+      "upcoming": "Próximas",
+      "earlier": "Anteriores"
+    },
+    "rowA11y": "{{title}}. {{when}}",
+    "rowA11yBody": "{{title}}. {{body}}. {{when}}",
+    "newA11y": "Nueva. {{content}}",
+    "actions": {
+      "markRead": "Marcar como leída",
+      "snoozeHour": "Posponer 1 hora",
+      "dismiss": "Descartar"
+    },
+    "new": "Nueva",
+    "snoozeA11y": "Posponer {{title}} una hora",
+    "snoozeShort": "Posponer 1 h",
+    "dismissA11y": "Descartar {{title}}",
+    "allRead": "Todo leído",
+    "newCount_one": "{{count}} nueva",
+    "newCount_many": "{{count}} nuevas",
+    "newCount_other": "{{count}} nuevas",
+    "manage": "Gestionar",
+    "empty": {
+      "title": "Está todo al día",
+      "body": "Aquí aparecerán los recordatorios de vacunas, medicamentos y cuidados.",
+      "action": "Añadir un recordatorio"
+    }
+  },
+  "records": {
+    "title": "Archivo médico",
+    "titlePet": "Archivo de {{name}}",
+    "subtitle": "Historiales veterinarios, análisis y documentos",
+    "opening": "Abriendo el archivo…",
+    "openFailed": "No se pudo abrir el archivo",
+    "loadingA11y": "Cargando registros",
+    "thisPet": "esta mascota",
+    "yourPet": "su mascota",
+    "categories": {
+      "lab": "Análisis",
+      "vaccination": "Vacuna",
+      "prescription": "Receta",
+      "invoice": "Factura",
+      "imaging": "Imagen",
+      "insurance": "Seguro",
+      "other": "Otro"
+    },
+    "apptStatus": {
+      "scheduled": "Programada",
+      "completed": "Realizada",
+      "cancelled": "Cancelada"
+    },
+    "size": {
+      "bytes": "{{n}} B",
+      "kb": "{{n}} KB",
+      "mb": "{{n}} MB"
+    },
+    "summary": {
+      "documents_one": "{{count}} documento",
+      "documents_many": "{{count}} documentos",
+      "documents_other": "{{count}} documentos",
+      "visits_one": "{{count}} visita",
+      "visits_many": "{{count}} visitas",
+      "visits_other": "{{count}} visitas",
+      "clinics_one": "{{count}} clínica",
+      "clinics_many": "{{count}} clínicas",
+      "clinics_other": "{{count}} clínicas"
+    },
+    "toast": {
+      "refreshFailed": "No se pudo actualizar el archivo. Se muestra lo que ya había.",
+      "openFailed": "No se pudo abrir este archivo",
+      "stillReading": "Todavía se está leyendo otro registro. Inténtelo de nuevo en un momento.",
+      "readFailed": "No se pudo leer el documento"
+    },
+    "delete": {
+      "confirm": "Eliminar",
+      "document": {
+        "title": "¿Eliminar el documento?",
+        "message": "¿Quitar este documento del archivo de {{name}}?",
+        "removed": "Documento eliminado",
+        "failed": "No se pudo eliminar el documento. Inténtelo de nuevo."
+      },
+      "appointment": {
+        "title": "¿Eliminar la cita?",
+        "message": "¿Quitar esta cita del archivo de {{name}}?",
+        "removed": "Cita eliminada",
+        "failed": "No se pudo eliminar la cita. Inténtelo de nuevo."
+      },
+      "clinic": {
+        "title": "¿Eliminar la clínica?",
+        "message": "¿Quitar esta clínica del archivo de {{name}}?",
+        "removed": "Clínica eliminada",
+        "failed": "No se pudo eliminar la clínica. Inténtelo de nuevo."
+      }
+    },
+    "deleteA11y": "Eliminar {{name}}",
+    "loadFailed": {
+      "title": "No hemos podido abrir el archivo",
+      "body": "Compruebe su conexión y vuelva a intentarlo. Su contenido no ha cambiado.",
+      "action": "Reintentar"
+    },
+    "empty": {
+      "title": "Empiece el archivo",
+      "titlePet": "Empiece el archivo de {{name}}",
+      "body": "Haga una foto de un certificado de vacunación, un análisis o una factura. Podemos leerlo y añadir los registros por usted."
+    },
+    "upload": "Subir un registro",
+    "uploadPhoto": "Subir la foto de un registro",
+    "addClinic": "Añadir una clínica veterinaria",
+    "addPetClinic": "Añadir la clínica veterinaria de {{name}}",
+    "logVisit": "Registrar una visita al veterinario",
+    "hero": {
+      "title": "Todo lo que el veterinario podría pedir",
+      "nextVisit": "Próxima visita {{when}}: {{title}}",
+      "private": "Privado para usted y su equipo de cuidado"
+    },
+    "sections": {
+      "documents": "Documentos",
+      "visits": "Visitas al veterinario",
+      "clinics": "Clínicas"
+    },
+    "add": "Añadir",
+    "showLess": "Mostrar menos",
+    "showMore_one": "Mostrar {{count}} más",
+    "showMore_many": "Mostrar {{count}} más",
+    "showMore_other": "Mostrar {{count}} más",
+    "form": {
+      "cancel": "Cancelar",
+      "saving": "Guardando…"
+    },
+    "doc": {
+      "openHint": "Abre el archivo",
+      "open": "Abrir",
+      "review": "Revisar lo que se leyó",
+      "readWithAi": "Leer con IA",
+      "reviewA11y": "Revisar lo que se leyó de {{title}}",
+      "readA11y": "Leer {{title}} con IA",
+      "read": "Leer",
+      "permission": "Se necesita permiso para acceder a las fotos.",
+      "pickFailed": "No se pudo seleccionar el archivo.",
+      "defaultTitle": "Registro: {{category}}",
+      "uploaded": "Documento subido",
+      "retry": "Reintentar la subida",
+      "uploadAction": "Subir",
+      "uploading": "Subiendo…",
+      "uploadFailed": "Error al subir: no se ha perdido nada.",
+      "chosenA11y": "Archivo elegido: {{name}}, toque para cambiarlo",
+      "choose": "Elegir una foto del registro",
+      "title": "Título",
+      "titlePlaceholder": "p. ej., certificado de la rabia",
+      "titleA11y": "Título del documento",
+      "category": "Categoría"
+    },
+    "clinic": {
+      "fallback": "Clínica veterinaria",
+      "callA11y": "Llamar a {{name}}",
+      "added": "Clínica añadida",
+      "saveFailed": "No se pudo guardar la clínica.",
+      "sheetTitle": "Añadir clínica veterinaria",
+      "save": "Añadir clínica",
+      "name": "Nombre de la clínica",
+      "namePlaceholder": "p. ej., Clínica Veterinaria del Río",
+      "vetName": "Nombre del veterinario (opcional)",
+      "phone": "Teléfono",
+      "email": "Correo electrónico",
+      "address": "Dirección"
+    },
+    "visit": {
+      "logged": "Cita registrada",
+      "saveFailed": "No se pudo guardar la cita.",
+      "save": "Guardar",
+      "reason": "Motivo",
+      "reasonPlaceholder": "p. ej., revisión anual",
+      "reasonA11y": "Motivo de la visita",
+      "whenA11y": "Fecha y hora, {{when}}",
+      "clinic": "Clínica (opcional)",
+      "status": "Estado"
+    },
+    "extract": {
+      "added_one": "{{count}} registro añadido",
+      "added_many": "{{count}} registros añadidos",
+      "added_other": "{{count}} registros añadidos",
+      "withSkipped_one": "{{added}} · {{count}} omitido",
+      "withSkipped_many": "{{added}} · {{count}} omitidos",
+      "withSkipped_other": "{{added}} · {{count}} omitidos",
+      "applyFailed": "No se pudieron aplicar los registros.",
+      "title": "Revise lo que hemos leído",
+      "apply": "Aplicar",
+      "applyCount_one": "Aplicar {{count}}",
+      "applyCount_many": "Aplicar {{count}}",
+      "applyCount_other": "Aplicar {{count}}",
+      "otherPet": "Puede que este documento sea de otra mascota distinta de {{name}}. Compruébelo antes de aplicar.",
+      "thisOne": "esta",
+      "nothingFound": "No se encontraron datos médicos en este documento.",
+      "vaccinations": "Vacunas",
+      "includeVaccine": "Incluir la vacuna {{name}}",
+      "vaccineName": "Nombre de la vacuna",
+      "given": "Administrada",
+      "nextDue": "Próximo vencimiento",
+      "medications": "Medicamentos",
+      "includeMedication": "Incluir el medicamento {{name}}",
+      "medicationName": "Nombre del medicamento",
+      "dosage": "Dosis",
+      "frequency": {
+        "daily": "diario",
+        "weekly": "semanal",
+        "monthly": "mensual",
+        "as_needed": "según necesidad"
+      },
+      "weight": "Peso",
+      "includeWeight": "Incluir el peso",
+      "on": "El",
+      "expense": "Gasto",
+      "includeExpense": "Incluir el gasto",
+      "clinic": "Clínica",
+      "includeClinic": "Incluir la clínica",
+      "renameA11y": "Renombrar el documento como {{title}}",
+      "rename": "Renombrar el documento como «{{title}}»",
+      "setCategory": "Establecer la categoría {{category}}",
+      "datePlaceholder": "AAAA-MM-DD"
+    },
+    "export": {
+      "failed": "Error al exportar ({{status}})",
+      "dialogTitle": "Exportar registros de salud"
+    }
+  },
+  "gamification": {
+    "milestones": {
+      "firstRecord": "Primer registro de salud",
+      "records10": "10 registros de salud",
+      "records25": "25 registros de salud",
+      "records100": "100 registros de salud",
+      "weights5": "5 registros de peso",
+      "weights20": "20 registros de peso",
+      "weights50": "50 registros de peso",
+      "vaxComplete": "Vacunas al día",
+      "anniversary_one": "{{count}} año juntos",
+      "anniversary_many": "{{count}} años juntos",
+      "anniversary_other": "{{count}} años juntos"
+    },
+    "streak": {
+      "days": "Racha de {{days}} días",
+      "started": "Racha iniciada",
+      "loggedYesterday": "Dosis registrada ayer",
+      "pickUp": "Retome donde lo dejó"
+    },
+    "careStreaks": {
+      "title": "Rachas de cuidado",
+      "weeks_one": "{{count}} semana de cuidado constante",
+      "weeks_many": "{{count}} semanas de cuidado constante",
+      "weeks_other": "{{count}} semanas de cuidado constante",
+      "freshStart": "Nueva semana, nuevo comienzo",
+      "firstEntry": "Empieza con un registro"
+    },
+    "recap": {
+      "title": "Su semana de cuidados",
+      "doses_one": "{{count}} dosis",
+      "doses_many": "{{count}} dosis",
+      "doses_other": "{{count}} dosis",
+      "weights_one": "{{count}} registro de peso",
+      "weights_many": "{{count}} registros de peso",
+      "weights_other": "{{count}} registros de peso",
+      "activities_one": "{{count}} actividad",
+      "activities_many": "{{count}} actividades",
+      "activities_other": "{{count}} actividades",
+      "separator": ", ",
+      "vaccinesNeedLook": "conviene revisar las vacunas"
+    }
+  },
+  "status": {
+    "overdue": "Atrasado",
+    "dueSoon": "Vence pronto",
+    "allGood": "Todo bien",
+    "vaccineOverdue": "Vacuna atrasada",
+    "overdueCount_one": "{{count}} atrasada",
+    "overdueCount_many": "{{count}} atrasadas",
+    "overdueCount_other": "{{count}} atrasadas"
   }
 }

@@ -9,7 +9,7 @@ import { ui, type, motion, photos } from '../../theme';
 import { Card, EmptyState, PetFace, ScreenHeader, reminderIcon } from '../../components';
 import { useToday } from '../../hooks/useToday';
 import { dayDiff, fmtClock, fmtDayTime, timeAgo } from '../../utils/dates';
-import { useLocale } from '../../i18n';
+import i18n, { useLocale, useTranslation } from '../../i18n';
 import { petById } from '../../utils/pets';
 
 // "Lively & Light" notifications: a calm list grouped by when (Today /
@@ -27,13 +27,15 @@ const actionHit = { top: 10, bottom: 10, left: 8, right: 8 };
 function whenLabel(n, today) {
   if (n.status === 'snoozed') {
     const until = n.snoozed_until ? new Date(n.snoozed_until) : null;
-    if (!until || Number.isNaN(until.getTime())) return 'Snoozed';
-    if (until.getTime() <= Date.now()) return 'Snooze ended';
-    return `Snoozed until ${dayDiff(until, today) === 0 ? fmtClock(until) : fmtDayTime(until, today)}`;
+    if (!until || Number.isNaN(until.getTime())) return i18n.t('notifications.when.snoozed');
+    if (until.getTime() <= Date.now()) return i18n.t('notifications.when.snoozeEnded');
+    return i18n.t('notifications.when.snoozedUntil', {
+      time: dayDiff(until, today) === 0 ? fmtClock(until) : fmtDayTime(until, today),
+    });
   }
   const at = new Date(n.occurrence_at);
   if (!n.occurrence_at || Number.isNaN(at.getTime())) return '';
-  if (at.getTime() > Date.now()) return 'Scheduled';
+  if (at.getTime() > Date.now()) return i18n.t('notifications.when.scheduled');
   return timeAgo(n.occurrence_at);
 }
 
@@ -41,6 +43,7 @@ export default function NotificationsScreen({ navigation }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
+  const { t } = useTranslation();
   const {
     pets, notifications, unreadCount, refreshNotifications,
     markNotificationRead, snoozeNotification, dismissNotification,
@@ -66,15 +69,19 @@ export default function NotificationsScreen({ navigation }) {
     };
     const upcoming = notifications.filter((n) => when(n) > 0).sort((a, b) => at(a) - at(b));
     return [
-      { label: 'Today', items: notifications.filter((n) => when(n) === 0) },
-      { label: 'Upcoming', items: upcoming },
-      { label: 'Earlier', items: notifications.filter((n) => when(n) < 0) },
+      { id: 'today', label: t('notifications.sections.today'), items: notifications.filter((n) => when(n) === 0) },
+      { id: 'upcoming', label: t('notifications.sections.upcoming'), items: upcoming },
+      { id: 'earlier', label: t('notifications.sections.earlier'), items: notifications.filter((n) => when(n) < 0) },
     ].filter((s) => s.items.length > 0);
-  }, [notifications, today]);
+  }, [notifications, today, t]);
 
   const renderRow = (n, i) => {
     const unread = !n.read_at;
     const pet = petById(pets, n.pet_id);
+    const when = whenLabel(n, today);
+    const content = n.body
+      ? t('notifications.rowA11yBody', { title: n.title, body: n.body, when })
+      : t('notifications.rowA11y', { title: n.title, when });
     return (
       <Pressable
         key={n.id}
@@ -85,13 +92,13 @@ export default function NotificationsScreen({ navigation }) {
         ]}
         onPress={() => unread && markNotificationRead(n.id)}
         accessibilityRole="button"
-        accessibilityLabel={`${unread ? 'New. ' : ''}${n.title}${n.body ? `. ${n.body}` : ''}. ${whenLabel(n, today)}`}
+        accessibilityLabel={unread ? t('notifications.newA11y', { content }) : content}
         // The row is one element for screen readers, so the inline buttons
         // below can't be focused on their own — expose them as actions.
         accessibilityActions={[
-          ...(unread ? [{ name: 'activate', label: 'Mark as read' }] : []),
-          { name: 'snooze', label: 'Snooze 1 hour' },
-          { name: 'dismiss', label: 'Dismiss' },
+          ...(unread ? [{ name: 'activate', label: t('notifications.actions.markRead') }] : []),
+          { name: 'snooze', label: t('notifications.actions.snoozeHour') },
+          { name: 'dismiss', label: t('notifications.actions.dismiss') },
         ]}
         onAccessibilityAction={({ nativeEvent }) => {
           if (nativeEvent.actionName === 'activate' && unread) markNotificationRead(n.id);
@@ -110,9 +117,9 @@ export default function NotificationsScreen({ navigation }) {
           <Text style={styles.rowTitle}>{n.title}</Text>
           {n.body ? <Text style={styles.rowBody}>{n.body}</Text> : null}
           <View style={styles.metaRow}>
-            {unread && <Text style={styles.newTag}>New</Text>}
+            {unread && <Text style={styles.newTag}>{t('notifications.new')}</Text>}
             <Text style={styles.rowTime}>
-              {[pet?.name, whenLabel(n, today)].filter(Boolean).join(' · ')}
+              {[pet?.name, when].filter(Boolean).join(' · ')}
             </Text>
           </View>
           <View style={styles.rowActions}>
@@ -121,20 +128,20 @@ export default function NotificationsScreen({ navigation }) {
               onPress={() => snoozeNotification(n.id, 60)}
               hitSlop={actionHit}
               accessibilityRole="button"
-              accessibilityLabel={`Snooze ${n.title} for an hour`}
+              accessibilityLabel={t('notifications.snoozeA11y', { title: n.title })}
             >
               <MaterialCommunityIcons name="alarm-snooze" size={15} color={ui.accent} />
-              <Text style={[styles.actionText, { color: ui.accent }]}>Snooze 1h</Text>
+              <Text style={[styles.actionText, { color: ui.accent }]}>{t('notifications.snoozeShort')}</Text>
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.actionBtn, pressed && { opacity: motion.pressOpacity }]}
               onPress={() => dismissNotification(n.id)}
               hitSlop={actionHit}
               accessibilityRole="button"
-              accessibilityLabel={`Dismiss ${n.title}`}
+              accessibilityLabel={t('notifications.dismissA11y', { title: n.title })}
             >
               <MaterialCommunityIcons name="check" size={15} color={ui.sub} />
-              <Text style={[styles.actionText, { color: ui.sub }]}>Dismiss</Text>
+              <Text style={[styles.actionText, { color: ui.sub }]}>{t('notifications.actions.dismiss')}</Text>
             </Pressable>
           </View>
         </View>
@@ -145,8 +152,10 @@ export default function NotificationsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScreenHeader
-        title="Notifications"
-        subtitle={notifications.length > 0 ? (unreadCount === 0 ? 'All read' : `${unreadCount} new`) : null}
+        title={t('notifications.title')}
+        subtitle={notifications.length > 0
+          ? (unreadCount === 0 ? t('notifications.allRead') : t('notifications.newCount', { count: unreadCount }))
+          : null}
         onBack={() => navigation.goBack()}
         right={(
           <Pressable
@@ -154,7 +163,7 @@ export default function NotificationsScreen({ navigation }) {
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             accessibilityRole="link"
           >
-            <Text style={styles.manageLink}>Manage</Text>
+            <Text style={styles.manageLink}>{t('notifications.manage')}</Text>
           </Pressable>
         )}
       />
@@ -167,16 +176,16 @@ export default function NotificationsScreen({ navigation }) {
         {notifications.length === 0 ? (
           <EmptyState
             photo={photos.emptyBlanket}
-            title="You're all caught up"
-            body="Reminders for vaccines, meds and care tasks will show up here."
-            actionLabel="Add a reminder"
+            title={t('notifications.empty.title')}
+            body={t('notifications.empty.body')}
+            actionLabel={t('notifications.empty.action')}
             actionIcon="plus"
             onAction={() => navigation.navigate('Reminders')}
             style={styles.empty}
           />
         ) : (
           sections.map((section) => (
-            <View key={section.label}>
+            <View key={section.id}>
               <Text style={[type.sectionLabel, styles.sectionLabel]}>{section.label}</Text>
               <Card style={styles.sectionCard}>{section.items.map(renderRow)}</Card>
             </View>
