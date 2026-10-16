@@ -151,7 +151,7 @@ See [Dates and units](#dates-and-units). In short: use a decimal comma, 24-hour 
 | feed | fil | muro | none | |
 | comment | commentaire | comentario | none | |
 | paw (like) | patte | patita | none | |
-| report (moderation) | signalement / signaler | denuncia / denunciar | es: *aviso* (`backend/lang/es.json` "Report already resolved", "Report not found") | |
+| report (moderation) | signalement / signaler | denuncia / denunciar | none | "Report already resolved" / "Report not found" in `backend/lang/es.json` come from the lost-pet board, so they keep *aviso*. |
 | lost pet / found pet | animal perdu / retrouvé | mascota perdida / encontrada | es: *¡Bienvenido a casa!* (`petProfile.toast.welcomeHome`), which should be *¡Bienvenida a casa!* | The English "Missing" status (card) stays fr *Disparu* / es *Desaparecida*, as in the English source. The board is fr "tableau" (Animaux perdus) / es "tablón" (Mascotas perdidas). A lost-pet report is fr *signalement* / es *aviso*. |
 | streak | série | racha | none | "Care streaks" is fr "Séries de soins" / es "Rachas de cuidados". |
 | milestone | étape | logro | none | |
@@ -256,7 +256,7 @@ The vet share page (`share.php`) and the PDF/CSV export (`export.php` `values.*`
 | pet type, sex | identical | identical | none |
 | medications heading | Médicaments en cours | Medicamentos activos | fr `share.php`/`care.php`: *Traitements (en cours)* becomes *Médicaments (en cours)*. es `share.php`/`care.php`: *Medicación (activa)* becomes *Medicamentos (activos)*. |
 | dosage column | Posologie | Dosis | fr `export.php` pdf.col.dosage and csv.col.dosage: *Dosage* becomes *Posologie*. |
-| due (with a date) | Prévue le :date | Vence el :date | es `share.php` due: *Prevista el :date* becomes *Vence el :date*. |
+| due (with a date) | Prévu le :date | Vence el :date | es `share.php` due: *Prevista el :date* becomes *Vence el :date*. |
 
 ---
 
@@ -295,7 +295,7 @@ Fix these in one PR per language, after native review. Change values only. Some 
 
 **`backend/lang/fr.json`**
 - "Gotcha day!" *Anniversaire d'adoption !* becomes **Jour d'adoption !**
-- ":pet — :vaccine is due :date" and "Vaccination due: :vaccine": *à faire* becomes **prévu (le)**.
+- "Vaccination due: :vaccine" *à faire* becomes **Vaccin prévu : :vaccine**. ":pet — :vaccine is due :date" becomes **:pet — :vaccine, échéance le :date**: the vaccine name is user-typed, so nothing may agree with its gender.
 - "Weight entry not found" *Mesure de poids* becomes **Pesée**.
 
 **`backend/lang/es.json`**
@@ -304,8 +304,7 @@ Fix these in one PR per language, after native review. Change values only. Some 
 - "Medication: :medication" *Medicación* becomes **Medicamento**.
 - "This caretaker link has been revoked." *enlace de cuidador* becomes **enlace para cuidadores**.
 - "This share link has been revoked." *enlace para compartir* becomes **enlace compartido**.
-- "Report already resolved" and "Report not found" *aviso* become **denuncia**.
-- ":pet — :vaccine is due :date" and "Vaccination due: :vaccine": *fecha prevista* / *pendiente* become **vence el** wording.
+- ":pet — :vaccine is due :date": *fecha prevista* becomes **:vaccine vence el :date**. "Vaccination due: :vaccine" stays **Vacuna pendiente: :vaccine** (*Vencimiento de vacuna* reads as "vaccine expiry").
 
 **`backend/lang/fr/*.php`**
 - `share.php`: categories.lab *Analyses* becomes **Analyse**, categories.vaccination *Vaccination* becomes **Vaccin**, and medications/no_medications *Traitement(s)* become **Médicament(s)**.

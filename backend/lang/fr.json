@@ -4,7 +4,7 @@
     ":count pet|:count pets": ":count animal|:count animaux",
     ":pet turns :count today.": ":pet a :count an aujourd'hui.|:pet a :count ans aujourd'hui.",
     ":pet — :dosage": ":pet — :dosage",
-    ":pet — :vaccine is due :date": ":pet — :vaccine prévu le :date",
+    ":pet — :vaccine is due :date": ":pet — :vaccine, échéance le :date",
     "Account is disabled": "Ce compte est désactivé",
     "Activity not found": "Activité introuvable",
     "Appointment not found": "Rendez-vous introuvable",

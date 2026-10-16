@@ -352,7 +352,7 @@
     "annual": "Annuel",
     "monthly": "Mensuel",
     "oneTimePrice": "{{price}} · paiement unique",
-    "save": "-{{percent}} %",
+    "save": "Économisez {{percent}} %",
     "introThen": "{{intro}}, puis {{price}}",
     "processing": "Traitement…",
     "buy": "Acheter",
@@ -655,7 +655,7 @@
       "confirm": "Marquer comme fait"
     },
     "confirmDelete": {
-      "title": "Supprimer le vaccin",
+      "title": "Supprimer le vaccin ?",
       "message": "Supprimer le vaccin « {{name}} » ?",
       "confirm": "Supprimer"
     },
@@ -1175,7 +1175,7 @@
       "youPlus_one": "Vous + {{count}} copropriétaire",
       "youPlus_many": "Vous + {{count}} copropriétaires",
       "youPlus_other": "Vous + {{count}} copropriétaires",
-      "justYou": "Vous seul — invitez votre famille à devenir copropriétaire",
+      "justYou": "Vous seul : invitez votre famille à devenir copropriétaire",
       "sharedWithYou": "Partagé avec vous",
       "sharedWithYouBy": "Partagé avec vous par {{owner}}"
     },
@@ -1362,7 +1362,7 @@
       "working": "En cours…",
       "createShare": "Créer et partager",
       "revokeAll": "Révoquer tous les liens actifs",
-      "shareMessage": "Garde de {{name}} — tout ce qu'il vous faut (le lien expire bientôt) :\n{{url}}",
+      "shareMessage": "Garde de {{name}} : tout ce qu'il vous faut (le lien expire bientôt) :\n{{url}}",
       "reshareMessage": "Garde de {{name}} :\n{{url}}",
       "saveFailed": "Impossible d'enregistrer les notes.",
       "createFailed": "Impossible de créer le lien.",
