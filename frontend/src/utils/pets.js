@@ -1,6 +1,6 @@
 import { resolveAsset } from '../config';
 import i18n from '../i18n';
-import { formatDecimal } from './numbers';
+import { formatDecimal, pluralCount } from './numbers';
 import { photos } from '../theme';
 
 // The user's own photo for a pet, resolved to a full URL — undefined when
@@ -63,7 +63,7 @@ export const speciesLabel = (type) =>
 export const petMeta = (pet) =>
   [
     pet.breed ? breedLabel(pet.breed) : speciesLabel(pet.type),
-    pet.age ? i18n.t('pets.ageShort', { count: Number(pet.age), age: formatDecimal(pet.age, { min: 0, max: 1 }) }) : null,
+    pet.age ? i18n.t('pets.ageShort', { count: pluralCount(Number(pet.age)), age: formatDecimal(pet.age, { min: 0, max: 1 }) }) : null,
   ]
     .filter(Boolean)
     .join(' · ');

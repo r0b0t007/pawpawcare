@@ -10,11 +10,21 @@ import { parseDecimal } from './numbers';
 export const dateOrNull = (s) => (/^\d{4}-\d{2}-\d{2}$/.test((s || '').trim()) ? s.trim() : null);
 
 // How many records the current selection would create — drives the Apply count.
+// The typed weight / cost as numbers, or null when not included or not > 0.
+const weightValue = (sel) => {
+  const v = sel.weight?.included ? parseDecimal(sel.weight.value) : NaN;
+  return v > 0 ? v : null;
+};
+const expenseAmount = (sel) => {
+  const v = sel.expense?.included ? parseDecimal(sel.expense.amount) : NaN;
+  return v > 0 ? v : null;
+};
+
 export const extractionCount = (sel) =>
   sel.vaccinations.filter((v) => v.included && v.name.trim()).length +
   sel.medications.filter((m) => m.included && m.name.trim()).length +
-  (sel.weight?.included && parseDecimal(sel.weight.value) > 0 ? 1 : 0) +
-  (sel.expense?.included && parseDecimal(sel.expense.amount) > 0 ? 1 : 0) +
+  (weightValue(sel) !== null ? 1 : 0) +
+  (expenseAmount(sel) !== null ? 1 : 0) +
   (sel.clinic?.included && sel.clinic.name.trim() ? 1 : 0);
 
 // Build the apply request from the user's edited, approved subset. Only
@@ -45,11 +55,13 @@ export const buildExtractionPayload = (sel) => {
     }));
   }
 
-  if (sel.weight?.included && parseDecimal(sel.weight.value) > 0) {
-    p.weight = { value: parseDecimal(sel.weight.value), unit: sel.weight.unit, date: dateOrNull(sel.weight.date) };
+  const weight = weightValue(sel);
+  if (weight !== null) {
+    p.weight = { value: weight, unit: sel.weight.unit, date: dateOrNull(sel.weight.date) };
   }
-  if (sel.expense?.included && parseDecimal(sel.expense.amount) > 0) {
-    p.expense = { amount: parseDecimal(sel.expense.amount), date: dateOrNull(sel.expense.date) };
+  const amount = expenseAmount(sel);
+  if (amount !== null) {
+    p.expense = { amount, date: dateOrNull(sel.expense.date) };
   }
   if (sel.clinic?.included && sel.clinic.name.trim()) {
     p.clinic = { name: sel.clinic.name.trim(), phone: sel.clinic.phone.trim() || null };

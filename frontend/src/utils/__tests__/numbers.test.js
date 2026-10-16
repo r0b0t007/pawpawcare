@@ -1,5 +1,5 @@
 import i18n from '../../i18n';
-import { formatDecimal, parseDecimal } from '../numbers';
+import { formatDecimal, parseDecimal, pluralCount } from '../numbers';
 import { buildExtractionPayload, extractionCount } from '../extraction';
 import { petMeta } from '../pets';
 
@@ -15,25 +15,33 @@ describe('parseDecimal', () => {
     expect(parseDecimal('12')).toBe(12);
   });
 
-  it('reads English thousands separators', () => {
-    expect(parseDecimal('1,250', 'en')).toBe(1250);
-    expect(parseDecimal('1,250.50', 'en')).toBe(1250.5);
-    expect(parseDecimal('12,345,678', 'en')).toBe(12345678);
-    expect(parseDecimal('1,25', 'en')).toBe(1.25); // not a 3-digit group: a decimal comma
+  it.each(['en', 'fr', 'es'])('reads a single mark as the decimal mark in %s, three decimals included', async (lng) => {
+    await i18n.changeLanguage(lng);
+    expect(parseDecimal('1.250')).toBe(1.25); // a kitten, not 1250 kg
+    expect(parseDecimal('1,250')).toBe(1.25);
+    expect(parseDecimal('1.000')).toBe(1);
   });
 
-  it.each(['fr', 'es'])('reads %s thousands separators', (lng) => {
-    expect(parseDecimal('1.250,50', lng)).toBe(1250.5);
-    expect(parseDecimal('1 250,50', lng)).toBe(1250.5);
-    expect(parseDecimal('1 250', lng)).toBe(1250);
-    expect(parseDecimal('1.250', lng)).toBe(1250);
-    expect(parseDecimal('1,250', lng)).toBe(1.25); // the comma is the decimal mark
-    expect(parseDecimal('22.5', lng)).toBe(22.5); // a dot typed "the English way"
+  it('groups thousands only when both marks, or full 3-digit groups, are present', () => {
+    expect(parseDecimal('1,250.50')).toBe(1250.5);
+    expect(parseDecimal('1.250,50')).toBe(1250.5);
+    expect(parseDecimal('12,345,678')).toBe(12345678);
+    expect(parseDecimal('1.250.000')).toBe(1250000);
+  });
+
+  it('refuses typos instead of saving a value 10 or 1000 times off', () => {
+    expect(parseDecimal('22,,5')).toBeNaN();
+    expect(parseDecimal('22..5')).toBeNaN();
+    expect(parseDecimal('1.2.5')).toBeNaN();
+    expect(parseDecimal('1,25.5')).toBeNaN();
+    expect(parseDecimal('1.2,5')).toBeNaN();
   });
 
   it('reads the leading number like parseFloat', () => {
     expect(parseDecimal('22,5 kg')).toBe(22.5);
+    expect(parseDecimal('22 5')).toBe(22); // a space ends the number
     expect(parseDecimal('-1.5')).toBe(-1.5);
+    expect(parseDecimal('+2,5')).toBe(2.5);
   });
 
   it('is NaN without a number, and passes numbers through', () => {
@@ -132,4 +140,27 @@ describe('pet age', () => {
     expect(petMeta(pet(1))).toBe('Gato · 1 año');
   });
 
+});
+
+// Hermes has no Intl.PluralRules, so i18next only knows "1 is one, the rest
+// is other" there. pluralCount hands it a count that picks the same form
+// on every engine.
+describe('pluralCount', () => {
+  it('passes whole numbers through', () => {
+    expect(pluralCount(1, 'fr')).toBe(1);
+    expect(pluralCount(3, 'es')).toBe(3);
+  });
+
+  it('makes a French fraction below 2 singular, every other fraction plural', () => {
+    expect(pluralCount(1.5, 'fr')).toBe(1);
+    expect(pluralCount(2.5, 'fr')).toBe(2);
+    expect(pluralCount(1.5, 'es')).toBe(2);
+    expect(pluralCount(1.5, 'en')).toBe(2);
+  });
+
+  it('gives "1,5 an" in French even with the one/other fallback rule', async () => {
+    await i18n.changeLanguage('fr');
+    // The count i18next sees is exactly 1, which every engine maps to "one".
+    expect(i18n.t('pets.ageShort', { count: pluralCount(1.5), age: '1,5' })).toBe('1,5 an');
+  });
 });

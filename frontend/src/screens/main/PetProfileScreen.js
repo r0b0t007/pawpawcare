@@ -22,7 +22,7 @@ import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamificat
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
-import { formatDecimal, parseDecimal } from '../../utils/numbers';
+import { formatDecimal, parseDecimal, pluralCount } from '../../utils/numbers';
 import { track } from '../../services/analytics';
 import { ui, type, radii, motion, petPair, scrim } from '../../theme';
 import {
@@ -476,7 +476,7 @@ export default function PetProfileScreen({ navigation, route }) {
     pet.breed ? breedLabel(pet.breed) : null,
   ].filter(Boolean).join(' · ');
   const heroMeta = [
-    pet.age ? t('petProfile.hero.age', { count: Number(pet.age), age: formatDecimal(pet.age, { min: 0, max: 1 }) }) : null,
+    pet.age ? t('petProfile.hero.age', { count: pluralCount(Number(pet.age)), age: formatDecimal(pet.age, { min: 0, max: 1 }) }) : null,
     pet.gender ? t(`pets.genders.${pet.gender}`, { defaultValue: cap(pet.gender) }) : null,
     pet.microchipped ? t('petProfile.hero.microchipped') : null,
   ].filter(Boolean).join(' · ');
