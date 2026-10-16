@@ -508,8 +508,8 @@
     "toast": {
       "doseLogged": "{{med}} de {{pet}} registrado",
       "doseFailed": "No se ha podido registrar {{med}} de {{pet}}. Inténtelo de nuevo.",
-      "vaccineDone": "Vacuna {{name}} marcada como administrada",
-      "vaccineFailed": "No se ha podido marcar la vacuna {{name}} como administrada. Inténtelo de nuevo."
+      "vaccineDone": "Marcada como administrada: {{name}}",
+      "vaccineFailed": "No se ha podido marcar como administrada: {{name}}. Inténtelo de nuevo."
     },
     "more": {
       "overdue_one": "{{count}} más atrasado",
@@ -582,8 +582,8 @@
       "addPetFirst": "Añada primero una mascota",
       "saveFailed": "No se ha podido guardar el registro. Inténtelo de nuevo.",
       "saved": "Registro guardado",
-      "vaccineDone": "Vacuna {{name}} marcada como administrada",
-      "vaccineFailed": "No se ha podido marcar la vacuna {{name}} como administrada. Inténtelo de nuevo."
+      "vaccineDone": "Marcada como administrada: {{name}}",
+      "vaccineFailed": "No se ha podido marcar como administrada: {{name}}. Inténtelo de nuevo."
     },
     "dueWhen": "Vence {{when}}",
     "scheduledAt": "Programado · {{time}}",
@@ -644,8 +644,8 @@
     "toast": {
       "scheduleFailed": "No se ha podido programar la vacunación. Inténtelo de nuevo.",
       "scheduled": "Vacunación programada",
-      "done": "Vacuna {{name}} marcada como administrada",
-      "doneFailed": "No se ha podido marcar la vacuna {{name}} como administrada. Inténtelo de nuevo.",
+      "done": "Marcada como administrada: {{name}}",
+      "doneFailed": "No se ha podido marcar como administrada: {{name}}. Inténtelo de nuevo.",
       "deleted": "Registro eliminado",
       "deleteFailed": "No se ha podido eliminar el registro. Inténtelo de nuevo."
     },
@@ -663,7 +663,7 @@
     "wasDueOn": "Vencía el {{date}}",
     "dueOn": "Vence el {{date}}",
     "done": "Hecho",
-    "markDoneA11y": "Marcar la vacuna {{name}} como administrada",
+    "markDoneA11y": "Hecho: marcar como administrada, {{name}}",
     "deleteA11y": "Eliminar {{name}}",
     "sections": {
       "needs": "Requiere atención",

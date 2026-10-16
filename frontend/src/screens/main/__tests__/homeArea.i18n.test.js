@@ -102,7 +102,7 @@ test('Vaccines', async () => {
   expect(shown).toContain('Rabies needs booking');
   expect(shown).toContain('Was due Oct 1, 2026');
   await inFrench(async () => {
-    expect(texts(tree)).toContain('Rendez-vous à prendre pour le vaccin Rabies');
+    expect(texts(tree)).toContain('Rendez-vous à prendre : Rabies');
   });
 });
 

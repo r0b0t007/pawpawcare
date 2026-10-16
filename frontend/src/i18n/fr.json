@@ -506,10 +506,10 @@
       "note": "Pensez à prendre rendez-vous pour le vaccin {{vaccine}} de {{pet}}."
     },
     "toast": {
-      "doseLogged": "Prise de {{med}} enregistrée pour {{pet}}",
-      "doseFailed": "Impossible d'enregistrer la prise de {{med}} pour {{pet}}. Veuillez réessayer.",
-      "vaccineDone": "{{name}} marqué comme fait",
-      "vaccineFailed": "Impossible de marquer {{name}} comme fait. Veuillez réessayer."
+      "doseLogged": "{{med}} : prise enregistrée pour {{pet}}",
+      "doseFailed": "Impossible d'enregistrer la prise pour {{pet}} ({{med}}). Veuillez réessayer.",
+      "vaccineDone": "Marqué comme administré : {{name}}",
+      "vaccineFailed": "Impossible de marquer comme administré : {{name}}. Veuillez réessayer."
     },
     "more": {
       "overdue_one": "{{count}} autre en retard",
@@ -582,8 +582,8 @@
       "addPetFirst": "Ajoutez d'abord un animal",
       "saveFailed": "Impossible d'enregistrer l'entrée. Veuillez réessayer.",
       "saved": "Entrée enregistrée",
-      "vaccineDone": "{{name}} marqué comme fait",
-      "vaccineFailed": "Impossible de marquer {{name}} comme fait. Veuillez réessayer."
+      "vaccineDone": "Marqué comme administré : {{name}}",
+      "vaccineFailed": "Impossible de marquer comme administré : {{name}}. Veuillez réessayer."
     },
     "dueWhen": "Prévu {{when}}",
     "scheduledAt": "Programmé · {{time}}",
@@ -633,7 +633,7 @@
   "vaccines": {
     "title": "Vaccins",
     "summary": {
-      "oneNeedsBooking": "Rendez-vous à prendre pour le vaccin {{name}}",
+      "oneNeedsBooking": "Rendez-vous à prendre : {{name}}",
       "needBooking_one": "{{count}} vaccin à programmer",
       "needBooking_many": "{{count}} vaccins à programmer",
       "needBooking_other": "{{count}} vaccins à programmer",
@@ -644,15 +644,15 @@
     "toast": {
       "scheduleFailed": "Impossible de programmer la vaccination. Veuillez réessayer.",
       "scheduled": "Vaccination programmée",
-      "done": "{{name}} marqué comme fait",
-      "doneFailed": "Impossible de marquer {{name}} comme fait. Veuillez réessayer.",
+      "done": "Marqué comme administré : {{name}}",
+      "doneFailed": "Impossible de marquer comme administré : {{name}}. Veuillez réessayer.",
       "deleted": "Vaccin supprimé",
       "deleteFailed": "Impossible de supprimer le vaccin. Veuillez réessayer."
     },
     "confirmDone": {
       "title": "Marquer comme administré",
       "message": "Marquer « {{name}} » comme administré aujourd'hui ?",
-      "confirm": "Marquer comme fait"
+      "confirm": "Marquer comme administré"
     },
     "confirmDelete": {
       "title": "Supprimer le vaccin ?",
@@ -663,7 +663,7 @@
     "wasDueOn": "Était prévu le {{date}}",
     "dueOn": "Prévu le {{date}}",
     "done": "Fait",
-    "markDoneA11y": "Marquer {{name}} comme fait",
+    "markDoneA11y": "Fait : marquer comme administré, {{name}}",
     "deleteA11y": "Supprimer {{name}}",
     "sections": {
       "needs": "À traiter",
@@ -1362,7 +1362,7 @@
       "working": "En cours…",
       "createShare": "Créer et partager",
       "revokeAll": "Révoquer tous les liens actifs",
-      "shareMessage": "Garde de {{name}} : tout ce qu'il vous faut (le lien expire bientôt) :\n{{url}}",
+      "shareMessage": "Tout ce qu'il faut pour garder {{name}} (le lien expire bientôt) :\n{{url}}",
       "reshareMessage": "Garde de {{name}} :\n{{url}}",
       "saveFailed": "Impossible d'enregistrer les notes.",
       "createFailed": "Impossible de créer le lien.",
