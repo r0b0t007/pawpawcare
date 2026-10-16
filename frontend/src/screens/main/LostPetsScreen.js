@@ -9,12 +9,16 @@ import { ui, type, photos } from '../../theme';
 import { Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, FormScrollView } from '../../components';
 import LostPetCard from './LostPetCard';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useLocale } from '../../i18n';
 
 // Redesign: this pushed screen is now the report/manage surface — the board
 // itself lives inline in Community's "Lost pets" section. Report form on top,
 // then your active reports (mark as found), then everyone else's.
 
 export default function LostPetsScreen({ navigation }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const {
     pets, lostPets, myReports, refreshLostPets, reportPetLost, resolveLostPet,
   } = useData();

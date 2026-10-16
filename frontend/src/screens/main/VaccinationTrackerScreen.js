@@ -12,6 +12,7 @@ import { Card, Button, Sheet, ConfirmDialog, EmptyState, PetFace, StatusPill, sh
 import { useInFlight } from '../../hooks/useInFlight';
 import { useToday } from '../../hooks/useToday';
 import { fmtFull, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 
 // "Lively & Light" vaccine tracker: the pet's face on its identity tint, one
 // plain sentence about where things stand, then the records grouped the way
@@ -40,6 +41,9 @@ function summaryLine(needs, upcoming, done, today) {
 }
 
 export default function VaccinationTrackerScreen({ navigation, route }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const { petId } = route.params;
   const { pets, addVaccination, markVaccinationComplete, deleteVaccination } = useData();
   const pet = pets.find((p) => p.id === petId);

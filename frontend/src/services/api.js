@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { File as FileSystemFile } from 'expo-file-system';
 import { API_URL } from '../config';
+import { currentLocale } from '../i18n';
 import {
   getTokens, storeTokens, clearTokens, storePendingLogout, getPendingLogout, clearPendingLogout,
 } from './tokenStorage';
@@ -9,6 +10,12 @@ import {
 export { getTokens, storeTokens, clearTokens, storePendingLogout, getPendingLogout, clearPendingLogout };
 
 // ── Transport ────────────────────────────────────────────────────────────────
+
+/**
+ * Sent on every API call (JSON, uploads, export, token refresh) so the server
+ * answers — errors, emails, pushes — in the language the app is showing.
+ */
+export const languageHeaders = () => ({ 'Accept-Language': currentLocale() });
 
 /**
  * A transport failure (offline, DNS, TLS) as an Error tagged isNetworkError,
@@ -51,7 +58,7 @@ export async function refreshAccessToken() {
 
     const res = await netFetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
+      headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true', ...languageHeaders() },
       body: JSON.stringify({ refresh_token: refresh }),
     });
 
@@ -85,6 +92,7 @@ export async function request(method, path, body, { skipAuth = false } = {}) {
   const headers = {
     'Content-Type': 'application/json',
     'bypass-tunnel-reminder': 'true',
+    ...languageHeaders(),
   };
   if (!skipAuth && access) headers['Authorization'] = `Bearer ${access}`;
 
@@ -163,6 +171,7 @@ export async function uploadImage(localUri) {
       headers: {
         Accept: 'application/json',
         'bypass-tunnel-reminder': 'true',
+        ...languageHeaders(),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: form,
@@ -204,6 +213,7 @@ export async function uploadDocument(petId, file, fields = {}) {
       headers: {
         Accept: 'application/json',
         'bypass-tunnel-reminder': 'true',
+        ...languageHeaders(),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: form,

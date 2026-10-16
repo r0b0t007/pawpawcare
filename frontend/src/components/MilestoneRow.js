@@ -2,14 +2,13 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ui, type } from '../theme';
+import { fmtFull } from '../utils/dates';
 
 // One earned milestone badge in a PetProfile list — permanent, quiet, 1px
 // design language (no medal artwork). `label` comes from milestoneLabel();
 // `earnedAt` is an ISO string.
 export default function MilestoneRow({ label, earnedAt, last }) {
-  const dateLabel = earnedAt
-    ? new Date(earnedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : null;
+  const dateLabel = earnedAt ? fmtFull(new Date(earnedAt)) : null;
 
   return (
     <View

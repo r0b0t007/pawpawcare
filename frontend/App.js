@@ -1,5 +1,5 @@
 import 'react-native-url-polyfill/auto';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { useNavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -25,10 +25,17 @@ import { track, trackScreen } from './src/services/analytics';
 import { addNotificationResponseListener } from './src/services/notifications';
 import AppNavigator from './src/navigation/AppNavigator';
 import { GOOGLE_WEB_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from './src/config';
+import { initI18n } from './src/i18n';
 
 // Must run at module scope, before any screen mounts.
 initSentry();
 configureObserve({ integrations: { 'react-navigation': true } });
+
+// i18n: importing src/i18n already initialised it in the device language;
+// this loads the saved Language setting. Started here so the pref read
+// overlaps font loading, and awaited before the first real render so a user
+// who picked another language never sees a flash of the device one.
+const i18nReady = initI18n();
 
 // Configure Google Sign-In once. webClientId is the audience the backend
 // verifies the ID token against; iosClientId wires the native iOS flow. Skip
@@ -76,6 +83,17 @@ function App() {
     return () => sub.remove();
   }, [navRef]);
 
+  const [languageReady, setLanguageReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    i18nReady.finally(() => {
+      if (alive) setLanguageReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const [fontsLoaded] = useFonts({
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
@@ -84,7 +102,7 @@ function App() {
     PlusJakartaSans_800ExtraBold,
   });
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !languageReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fffaf6' }}>
         <ActivityIndicator size="large" color="#8a5300" />

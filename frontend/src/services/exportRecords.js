@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { API_URL } from '../config';
-import { getTokens, refreshAccessToken, netFetch, networkError } from './api';
+import { getTokens, refreshAccessToken, netFetch, networkError, languageHeaders } from './api';
 
 // Export center: download the user's full health-record history (CSV/PDF)
 // and hand it to the OS share sheet — or a plain download on web. Kept out
@@ -23,6 +23,7 @@ function authHeaders(format, token) {
   return {
     Accept: MIME[format],
     'bypass-tunnel-reminder': 'true',
+    ...languageHeaders(),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }

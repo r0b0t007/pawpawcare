@@ -8,7 +8,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { getPref } from '../../services/prefs';
-import { fmtShort, fmtDay, dayDiff, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
+import { fmtShort, fmtDay, fmtDate, fmtClock, fmtWeekday, dayDiff, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 import { petById } from '../../utils/pets';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
@@ -40,8 +41,7 @@ const syncedLabel = (ts) => {
 };
 
 // "Tue 9:00 AM" — when the local notification for a reminder will fire.
-const fmtDelivery = (date) =>
-  `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+const fmtDelivery = (date) => `${fmtWeekday(date)} ${fmtClock(date)}`;
 
 const RECORD_TYPES = ['Vaccine', 'Vet visit', 'Medication', 'Weight'];
 
@@ -73,6 +73,9 @@ function PetFilterChip({ pet, active, onPress }) {
 }
 
 export default function HealthHubScreen({ navigation }) {
+  // The app language: tabs stay mounted, so a language switch must re-render
+  // (and re-run the memos below that build date strings).
+  const locale = useLocale();
   const { pets, reminders, lastSyncedAt, addVaccination, markVaccinationComplete } = useData();
 
   const [filter, setFilter] = useState('all');
@@ -204,7 +207,7 @@ export default function HealthHubScreen({ navigation }) {
       ].filter((sec) => sec.items.length > 0),
       history: done,
     };
-  }, [shownPets, pets, listedReminders, filter, navigation, today, reminderTick]);
+  }, [shownPets, pets, listedReminders, filter, navigation, today, reminderTick, locale]);
 
   // The "Scheduled on this device" caption sits on the first section holding
   // a reminder, and stays hidden when there are none (findIndex → -1).
@@ -536,7 +539,7 @@ export default function HealthHubScreen({ navigation }) {
             <Pressable accessibilityRole="button" style={styles.dateRow} onPress={() => setShowDatePicker(true)}>
               <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={ui.accent} />
               <Text style={styles.dateText}>
-                Due {recDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                Due {fmtDate(recDate, { weekday: 'short', month: 'short', day: 'numeric' })}
               </Text>
               <MaterialCommunityIcons name="pencil-outline" size={16} color={ui.faint} />
             </Pressable>

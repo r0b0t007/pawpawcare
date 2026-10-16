@@ -9,6 +9,7 @@ import { ui, type, motion, photos } from '../../theme';
 import { Card, EmptyState, PetFace, ScreenHeader, reminderIcon } from '../../components';
 import { useToday } from '../../hooks/useToday';
 import { dayDiff, fmtClock, fmtDayTime, timeAgo } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 import { petById } from '../../utils/pets';
 
 // "Lively & Light" notifications: a calm list grouped by when (Today /
@@ -37,6 +38,9 @@ function whenLabel(n, today) {
 }
 
 export default function NotificationsScreen({ navigation }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const {
     pets, notifications, unreadCount, refreshNotifications,
     markNotificationRead, snoozeNotification, dismissNotification,

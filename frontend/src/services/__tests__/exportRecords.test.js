@@ -17,6 +17,7 @@ jest.mock('../api', () => ({
   refreshAccessToken: jest.fn(),
   netFetch: jest.fn(),
   networkError: (cause) => Object.assign(new Error(`Network error: ${cause?.message}`), { isNetworkError: true }),
+  languageHeaders: () => ({ 'Accept-Language': 'fr' }),
 }));
 
 import { exportRecords } from '../exportRecords';
@@ -44,6 +45,7 @@ describe('exportRecords (native)', () => {
     expect(fileUri).toMatch(/^file:\/\/\/cache\/pawpawcare-records-.*\.pdf$/);
     expect(opts.headers.Authorization).toBe('Bearer access-1');
     expect(opts.headers.Accept).toBe('application/pdf');
+    expect(opts.headers['Accept-Language']).toBe('fr');
     expect(Sharing.shareAsync).toHaveBeenCalledWith(
       'file:///cache/out.pdf',
       expect.objectContaining({ mimeType: 'application/pdf' }),

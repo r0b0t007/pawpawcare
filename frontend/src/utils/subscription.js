@@ -1,5 +1,12 @@
 // Pure helpers for subscription copy: periods, savings, intro offers and the
 // one status a plan shows. Kept free of React so they're easy to test.
+//
+// planTitle/planStatus are on i18n keys (`subscription.*`, CHW-188) because
+// Profile shows them; the paywall copy below is still English until the
+// paywall screens migrate.
+import { getLocales } from 'expo-localization';
+import i18n, { currentLocale } from '../i18n';
+import { fmtDate } from './dates';
 
 const UNIT_WORDS = { D: 'day', W: 'week', M: 'month', Y: 'year' };
 const RC_UNITS = { DAY: 'D', WEEK: 'W', MONTH: 'M', YEAR: 'Y' };
@@ -65,8 +72,8 @@ export const isRenewingStoreSubscription = (plan) => isStoreBilled(plan) && !!pl
 
 /** The plan's name for titles: Plus, included Plus features (early members), or free. */
 export function planTitle(plan, included) {
-  if (plan?.active) return 'PawPawCare Plus';
-  return included ? 'Plus features included' : 'Free plan';
+  if (plan?.active) return i18n.t('subscription.plan.plus');
+  return i18n.t(included ? 'subscription.plan.included' : 'subscription.plan.free');
 }
 
 /**
@@ -83,11 +90,25 @@ export function restoreOutcome(result) {
 /** Where the subscription is billed, for copy ("the App Store"). */
 export const storeName = (store) => STORE_NAMES[store] ?? 'your app store';
 
+// In English the renewal date keeps the device's English region, as it did
+// before i18n ('1 Dec 2026' on en-GB, 'Dec 1, 2026' on en-US); a non-English
+// device gets en-US rather than a date in a language the app isn't showing.
+// French and Spanish use the app language (fr-FR, es-ES).
+function englishTag() {
+  try {
+    const tag = getLocales()?.[0]?.languageTag;
+    return tag && /^en(-|$)/i.test(tag) ? tag : 'en-US';
+  } catch {
+    return 'en-US';
+  }
+}
+
 function formatDate(iso) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const locale = currentLocale() === 'en' ? englishTag() : undefined;
+  return fmtDate(d, { day: 'numeric', month: 'short', year: 'numeric' }, locale);
 }
 
 /**
@@ -96,9 +117,10 @@ function formatDate(iso) {
  */
 export function planStatus(plan) {
   if (!plan?.active) return null;
-  if (plan.is_lifetime) return { status: 'ok', label: 'Lifetime' };
-  if (plan.billing_issue) return { status: 'overdue', label: 'Payment issue' };
+  const t = (key, options) => i18n.t(`subscription.status.${key}`, options);
+  if (plan.is_lifetime) return { status: 'ok', label: t('lifetime') };
+  if (plan.billing_issue) return { status: 'overdue', label: t('paymentIssue') };
   const date = formatDate(plan.expires_at);
-  if (plan.will_renew) return { status: 'ok', label: date ? `Renews ${date}` : 'Active' };
-  return { status: 'due', label: date ? `Ends ${date}` : 'Ends soon' };
+  if (plan.will_renew) return { status: 'ok', label: date ? t('renews', { date }) : t('active') };
+  return { status: 'due', label: date ? t('ends', { date }) : t('endsSoon') };
 }

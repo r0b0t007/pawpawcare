@@ -11,6 +11,7 @@ import { pickRecordImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
 import { buildExtractionPayload, extractionCount } from '../../utils/extraction';
 import { fmtClock, fmtDay, fmtFull, relativeDay } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 import { petById, emptyPhotoFor } from '../../utils/pets';
 import { useInFlight } from '../../hooks/useInFlight';
 import { ui, type, radii, motion, photos, vaultColors } from '../../theme';
@@ -67,6 +68,9 @@ const fmtSize = (bytes) => {
 };
 
 export default function MedicalRecordsScreen({ navigation, route }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const { petId, petName } = route.params;
   const {
     pets, getPetRecords, addClinic, deleteClinic,

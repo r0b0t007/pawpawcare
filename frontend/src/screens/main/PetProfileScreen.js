@@ -16,7 +16,8 @@ import { petPhoto } from '../../utils/pets';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
-import { fmtFull, fmtMonth, fmtShort, fmtTime, parseDay } from '../../utils/dates';
+import { fmtDate, fmtFull, fmtMonth, fmtShort, fmtTime, parseDay } from '../../utils/dates';
+import { useLocale } from '../../i18n';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
@@ -77,6 +78,9 @@ const vaxPill = (v) => (v.status === 'overdue'
 const NO_WEIGHTS = [];
 
 export default function PetProfileScreen({ navigation, route }) {
+  // Re-render dates and times when the app language changes: this screen
+  // can stay mounted under another tab while the language is switched.
+  useLocale();
   const { petId } = route.params;
   const {
     pets, myReports, medDoseDays, medDoseCounts, addFavoriteFood, removeFavoriteFood, addActivity,
@@ -1362,7 +1366,7 @@ function MedicationRow({ med, pair, streakLabel, onLog, onDelete }) {
     ? 'As needed'
     : `${cap(med.frequency)}${med.times?.length ? ` · ${med.times.join(', ')}` : ''}`;
   const lastGiven = med.lastAdministeredAt
-    ? new Date(med.lastAdministeredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    ? fmtDate(new Date(med.lastAdministeredAt), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     : null;
 
   return (
@@ -1478,7 +1482,7 @@ function VetShareSheet({ visible, petName, onClose, onCreate, onRevoke }) {
 
   const expiry = (iso) => {
     if (!iso) return '';
-    return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    return fmtDate(new Date(iso), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   };
 
   return (
@@ -1610,7 +1614,7 @@ function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
     catch (e) { setError(e.message || 'Could not revoke links.'); } finally { setBusy(false); }
   };
 
-  const expiry = (iso) => (iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
+  const expiry = (iso) => (iso ? fmtDate(new Date(iso), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
 
   return (
     <Card padded style={[styles.block, { padding: 18, gap: 14 }]}>
