@@ -815,11 +815,11 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
         frequency: m.frequency || null, start: m.start_date || '', end: m.end_date || '', notes: m.notes || '',
       })),
       weight: ex.weight
-        ? { included: true, value: formatDecimal(ex.weight.value, { min: 0, max: 2 }), unit: ex.weight.unit || 'kg', date: ex.weight.date || '' }
+        ? { included: true, value: formatDecimal(ex.weight.value, { min: 0, max: 10 }), unit: ex.weight.unit || 'kg', date: ex.weight.date || '' }
         : null,
       // Costs are opt-in — not everyone tracks expenses.
       expense: ex.total_cost
-        ? { included: false, amount: formatDecimal(ex.total_cost, { min: 0, max: 2 }), date: ex.document_date || '' }
+        ? { included: false, amount: formatDecimal(ex.total_cost, { min: 0, max: 10 }), date: ex.document_date || '' }
         : null,
       clinic: ex.clinic?.name
         ? { included: true, name: ex.clinic.name, phone: ex.clinic.phone || '' }

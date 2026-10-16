@@ -666,16 +666,14 @@
   "reminders": {
     "title": "Reminders",
     "schedule": {
-      "daily_one": "Daily at {{time}}",
-      "daily_other": "Daily at {{time}}",
-      "weekly_one": "Weekly at {{time}}",
-      "weekly_other": "Weekly at {{time}}",
-      "monthly_one": "Monthly at {{time}}",
-      "monthly_other": "Monthly at {{time}}",
-      "other_one": "Repeats at {{time}}",
-      "other_other": "Repeats at {{time}}",
+      "daily": "Daily {{at}}",
+      "weekly": "Weekly {{at}}",
+      "monthly": "Monthly {{at}}",
+      "other": "Repeats {{at}}",
       "oneTime": "One-time"
     },
+    "atTime_one": "at {{time}}",
+    "atTime_other": "at {{time}}",
     "toast": {
       "addFailed": "Couldn't add the reminder. Try again.",
       "added": "Reminder added",
@@ -994,8 +992,8 @@
       "male": "Male",
       "female": "Female"
     },
-    "ageShort_one": "{{count}} y",
-    "ageShort_other": "{{count}} y",
+    "ageShort_one": "{{age}} y",
+    "ageShort_other": "{{age}} y",
     "colors": {
       "peach": "Peach",
       "skyBlue": "Sky blue",
@@ -1123,8 +1121,8 @@
     },
     "hero": {
       "pet": "Pet",
-      "age_one": "{{count}} yr",
-      "age_other": "{{count}} yrs",
+      "age_one": "{{age}} yr",
+      "age_other": "{{age}} yrs",
       "microchipped": "Microchipped",
       "photoA11y": "Photo of {{name}}",
       "back": "Back",

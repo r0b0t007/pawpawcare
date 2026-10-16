@@ -47,7 +47,6 @@ const fmtDelivery = (date) => `${fmtWeekday(date)} ${fmtClock(date)}`;
 // Record type ids; their labels live under health.types.
 const RECORD_TYPES = ['vaccine', 'vetVisit', 'medication', 'weight'];
 
-
 const defaultDueDate = () => {
   const d = new Date();
   d.setDate(d.getDate() + 14);

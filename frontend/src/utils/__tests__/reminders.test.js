@@ -40,6 +40,11 @@ describe('recurringSummary', () => {
   it('keeps an unparseable time as stored', () => {
     expect(recurringSummary(rem('daily', 'soon'))).toBe('Daily at soon');
   });
+
+  it('keeps an out-of-range time as stored, with the plain article', async () => {
+    await i18n.changeLanguage('es');
+    expect(recurringSummary(rem('daily', '25:00'))).toBe('Cada día a las 25:00');
+  });
 });
 
 describe('reminderKind', () => {

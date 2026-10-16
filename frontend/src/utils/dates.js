@@ -60,15 +60,21 @@ export const fmtClock = (date) => fmtDate(date, { hour: 'numeric', minute: '2-di
 // 'Tue' — the short weekday name ('' if invalid).
 export const fmtWeekday = weekday;
 
-// '08:00' / '18:30' -> '8:00 AM' / '6:30 PM' (in English). Null for anything
-// unparseable, so callers decide the fallback.
-export const fmtTime = (hhmm) => {
+// '08:00' -> { h: 8, m: 0 }; null for anything that isn't a valid time of day.
+export const parseHHmm = (hhmm) => {
   const match = /^(\d{1,2}):(\d{2})/.exec(String(hhmm ?? ''));
   if (!match) return null;
   const h = Number(match[1]);
   const m = Number(match[2]);
-  if (h > 23 || m > 59) return null;
-  return fmtClock(new Date(2000, 0, 1, h, m));
+  return h > 23 || m > 59 ? null : { h, m };
+};
+
+// '08:00' / '18:30' -> '8:00 AM' / '6:30 PM' (in English). Null for anything
+// unparseable, so callers decide the fallback.
+export const fmtTime = (hhmm) => {
+  const parsed = parseHHmm(hhmm);
+  if (!parsed) return null;
+  return fmtClock(new Date(2000, 0, 1, parsed.h, parsed.m));
 };
 
 export const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());

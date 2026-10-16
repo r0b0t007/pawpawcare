@@ -64,11 +64,14 @@ const SEGMENT_IDS = ['overview', 'health', 'notes'];
 // Medication frequency ids -> i18n keys under petProfile.frequency.
 const freqKey = (f) => (f === 'as_needed' ? 'asNeeded' : f);
 
+// Pet type and gender are free text server-side: an unknown one is the
+// owner's own words, shown as stored (capitalised), never translated.
+const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
+
 // '' for a missing date (callers supply their own fallback text).
 const shortDate = (iso) => (iso ? fmtShort(parseDay(iso)) : '');
 const fullDate = (iso) => (iso ? fmtFull(parseDay(iso)) : '');
 const monthLabel = (iso) => (iso ? fmtMonth(parseDay(iso)) : '');
-const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
 const HERO_HEIGHT = 400;
 
@@ -473,7 +476,7 @@ export default function PetProfileScreen({ navigation, route }) {
     pet.breed ? breedLabel(pet.breed) : null,
   ].filter(Boolean).join(' · ');
   const heroMeta = [
-    pet.age ? t('petProfile.hero.age', { count: pet.age }) : null,
+    pet.age ? t('petProfile.hero.age', { count: Number(pet.age), age: formatDecimal(pet.age, { min: 0, max: 1 }) }) : null,
     pet.gender ? t(`pets.genders.${pet.gender}`, { defaultValue: cap(pet.gender) }) : null,
     pet.microchipped ? t('petProfile.hero.microchipped') : null,
   ].filter(Boolean).join(' · ');
@@ -756,7 +759,7 @@ export default function PetProfileScreen({ navigation, route }) {
                 </Text>
                 <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>{fullDate(e.incurredOn)}</Text>
               </View>
-              <Text style={styles.expenseAmount}>{formatDecimal(Number(e.amount), 2)}</Text>
+              <Text style={styles.expenseAmount}>{formatDecimal(e.amount, 2)}</Text>
               <Pressable
                 onPress={() => handleDeleteExpense(e)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1388,10 +1391,10 @@ function WeightSparkline({ weights }) {
 
 function MedicationRow({ med, pair, streakLabel, onLog, onDelete }) {
   const { t } = useTranslation();
-  const freqName = t(`petProfile.frequency.${freqKey(med.frequency)}`, { defaultValue: cap(med.frequency) });
-  const freqLabel = med.frequency === 'as_needed'
-    ? freqName
-    : `${freqName}${med.times?.length ? ` · ${med.times.join(', ')}` : ''}`;
+  // Frequency is a server enum: an unknown value is left out, never shown raw.
+  const freqName = t(`petProfile.frequency.${freqKey(med.frequency)}`, { defaultValue: '' });
+  const times = med.frequency === 'as_needed' ? [] : (med.times || []).map((time) => fmtTime(time) || time);
+  const freqLabel = [freqName, times.join(', ')].filter(Boolean).join(' · ');
   const lastGiven = med.lastAdministeredAt
     ? fmtDate(new Date(med.lastAdministeredAt), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     : null;

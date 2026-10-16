@@ -693,20 +693,15 @@
   "reminders": {
     "title": "Rappels",
     "schedule": {
-      "daily_one": "Tous les jours à {{time}}",
-      "daily_many": "Tous les jours à {{time}}",
-      "daily_other": "Tous les jours à {{time}}",
-      "weekly_one": "Toutes les semaines à {{time}}",
-      "weekly_many": "Toutes les semaines à {{time}}",
-      "weekly_other": "Toutes les semaines à {{time}}",
-      "monthly_one": "Tous les mois à {{time}}",
-      "monthly_many": "Tous les mois à {{time}}",
-      "monthly_other": "Tous les mois à {{time}}",
-      "other_one": "Régulièrement à {{time}}",
-      "other_many": "Régulièrement à {{time}}",
-      "other_other": "Régulièrement à {{time}}",
+      "daily": "Tous les jours {{at}}",
+      "weekly": "Toutes les semaines {{at}}",
+      "monthly": "Tous les mois {{at}}",
+      "other": "Régulièrement {{at}}",
       "oneTime": "Ponctuel"
     },
+    "atTime_one": "à {{time}}",
+    "atTime_many": "à {{time}}",
+    "atTime_other": "à {{time}}",
     "toast": {
       "addFailed": "Impossible d'ajouter le rappel. Veuillez réessayer.",
       "added": "Rappel ajouté",
@@ -1040,9 +1035,9 @@
       "male": "Mâle",
       "female": "Femelle"
     },
-    "ageShort_one": "{{count}} an",
-    "ageShort_many": "{{count}} ans",
-    "ageShort_other": "{{count}} ans",
+    "ageShort_one": "{{age}} an",
+    "ageShort_many": "{{age}} ans",
+    "ageShort_other": "{{age}} ans",
     "colors": {
       "peach": "Pêche",
       "skyBlue": "Bleu ciel",
@@ -1170,9 +1165,9 @@
     },
     "hero": {
       "pet": "Animal",
-      "age_one": "{{count}} an",
-      "age_many": "{{count}} ans",
-      "age_other": "{{count}} ans",
+      "age_one": "{{age}} an",
+      "age_many": "{{age}} ans",
+      "age_other": "{{age}} ans",
       "microchipped": "Pucé",
       "photoA11y": "Photo de {{name}}",
       "back": "Retour",

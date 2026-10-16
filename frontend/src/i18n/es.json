@@ -693,20 +693,15 @@
   "reminders": {
     "title": "Recordatorios",
     "schedule": {
-      "daily_one": "Cada día a la {{time}}",
-      "daily_many": "Cada día a las {{time}}",
-      "daily_other": "Cada día a las {{time}}",
-      "weekly_one": "Cada semana a la {{time}}",
-      "weekly_many": "Cada semana a las {{time}}",
-      "weekly_other": "Cada semana a las {{time}}",
-      "monthly_one": "Cada mes a la {{time}}",
-      "monthly_many": "Cada mes a las {{time}}",
-      "monthly_other": "Cada mes a las {{time}}",
-      "other_one": "Periódicamente a la {{time}}",
-      "other_many": "Periódicamente a las {{time}}",
-      "other_other": "Periódicamente a las {{time}}",
+      "daily": "Cada día {{at}}",
+      "weekly": "Cada semana {{at}}",
+      "monthly": "Cada mes {{at}}",
+      "other": "Periódicamente {{at}}",
       "oneTime": "Una sola vez"
     },
+    "atTime_one": "a la {{time}}",
+    "atTime_many": "a las {{time}}",
+    "atTime_other": "a las {{time}}",
     "toast": {
       "addFailed": "No se ha podido añadir el recordatorio. Inténtelo de nuevo.",
       "added": "Recordatorio añadido",
@@ -1040,9 +1035,9 @@
       "male": "Macho",
       "female": "Hembra"
     },
-    "ageShort_one": "{{count}} año",
-    "ageShort_many": "{{count}} años",
-    "ageShort_other": "{{count}} años",
+    "ageShort_one": "{{age}} año",
+    "ageShort_many": "{{age}} años",
+    "ageShort_other": "{{age}} años",
     "colors": {
       "peach": "Melocotón",
       "skyBlue": "Azul cielo",
@@ -1170,9 +1165,9 @@
     },
     "hero": {
       "pet": "Mascota",
-      "age_one": "{{count}} año",
-      "age_many": "{{count}} años",
-      "age_other": "{{count}} años",
+      "age_one": "{{age}} año",
+      "age_many": "{{age}} años",
+      "age_other": "{{age}} años",
       "microchipped": "Con microchip",
       "photoA11y": "Foto de {{name}}",
       "back": "Atrás",
