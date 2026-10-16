@@ -14,6 +14,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class ShareLinkTest extends TestCase
@@ -283,5 +284,232 @@ class ShareLinkTest extends TestCase
         $this->get($docUrl)->assertOk();
         $this->travel(31)->minutes(); // past the 1h share expiry
         $this->get($docUrl)->assertStatus(403);
+    }
+
+    // ── Page language (the creator's locale rides in the signed URL) ─────────
+
+    /** @return array{0: User, 1: string} */
+    private function userIn(string $locale): array
+    {
+        [$u, $token] = $this->user();
+        $u->forceFill(['locale' => $locale])->save();
+
+        return [$u, $token];
+    }
+
+    public function test_a_link_minted_by_a_french_user_opens_in_french(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $this->seedRecords($pet);
+
+        $url = $this->mintUrl($token, $pet);
+        $this->assertStringContainsString('lang=fr', $url);
+
+        $res = $this->get($url)->assertOk();
+        $this->assertStringStartsWith('<!DOCTYPE html>', $res->getContent());
+        $res->assertSee('<html lang="fr">', false);
+        $res->assertSee('Luna — Dossier médical');
+        $res->assertSee('Chat · Maine Coon'); // type translated, typed breed as entered
+        $res->assertSee('Administrée le '.Carbon::today()->subMonth()->locale('fr')->isoFormat('D MMM YYYY'));
+        $res->assertSee('Traitements en cours');
+        $res->assertSee("En hausse de 0,2 kg (4,3\u{00A0}%) sur les 2 derniers mois");
+        $res->assertSee('4,8 kg');
+        $res->assertSee('le lien expire le');
+        // User-entered record names are never translated.
+        $res->assertSee('Rabies');
+        $res->assertSee('Simparica');
+        $res->assertDontSee('Medical Summary');
+        $res->assertDontSee('Active medications');
+    }
+
+    public function test_a_link_minted_by_a_spanish_user_opens_in_spanish(): void
+    {
+        [$owner, $token] = $this->userIn('es');
+        $pet = $this->pet($owner);
+        $this->seedRecords($pet);
+
+        $res = $this->get($this->mintUrl($token, $pet))->assertOk();
+
+        $res->assertSee('<html lang="es">', false);
+        $res->assertSee('Luna — Resumen médico');
+        $res->assertSee('Gato · Maine Coon');
+        $res->assertSee('Administrada el '.Carbon::today()->subMonth()->locale('es')->isoFormat('D MMM YYYY'));
+        $res->assertSee("Sube 0,2 kg (4,3\u{00A0}%) en los últimos 2 meses");
+        $res->assertSee('el enlace caduca el');
+        $res->assertSee('Rabies');
+    }
+
+    public function test_the_expiry_footer_is_localized_and_keeps_the_timezone(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+
+        $url = $this->mintUrl($token, $pet, '7d');
+        parse_str(parse_url($url, PHP_URL_QUERY), $q);
+        $at = Carbon::createFromTimestamp((int) $q['expires']);
+
+        $this->get($url)->assertOk()->assertSee(
+            'le lien expire le '.$at->copy()->locale('fr')->isoFormat('D MMM YYYY [à] HH:mm').' '.$at->format('T')
+        );
+    }
+
+    public function test_english_links_carry_no_lang_param(): void
+    {
+        [$owner, $token] = $this->user(); // default locale: en
+        $pet = $this->pet($owner);
+
+        $url = $this->withToken($token)->withHeader('Accept-Language', 'fr')
+            ->postJson("/pets/{$pet->id}/share-link")->json('url');
+
+        // The saved preference (en) wins over the header, and English links
+        // look exactly like the ones minted before page languages existed.
+        $this->assertStringNotContainsString('lang=', $url);
+        $this->get($url)->assertOk()->assertSee('<html lang="en">', false)->assertSee('Luna — Medical Summary');
+    }
+
+    public function test_an_old_link_without_lang_still_renders_english(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $this->mintUrl($token, $pet); // gives the pet a share token
+
+        // Shaped like a link minted before this change (no lang), even though
+        // the owner now uses French and the viewer's browser asks for Spanish.
+        $old = URL::temporarySignedRoute('pets.share', now()->addDay(), ['pet' => $pet->id, 't' => $pet->fresh()->share_token]);
+
+        $res = $this->withHeader('Accept-Language', 'es')->get($old)->assertOk();
+        $res->assertSee('<html lang="en">', false);
+        $res->assertSee('No vaccinations on record.');
+        $res->assertSee('Shared via PawPawCare · read-only · link expires');
+    }
+
+    public function test_a_tampered_lang_param_fails_the_signature(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $url = $this->mintUrl($token, $pet);
+
+        $this->get(str_replace('lang=fr', 'lang=es', $url))->assertStatus(403);
+        $this->get(str_replace('lang=fr&', '', $url))->assertStatus(403);
+
+        [$enOwner, $enToken] = $this->user();
+        $enPet = $this->pet($enOwner);
+        $this->get($this->mintUrl($enToken, $enPet).'&lang=fr')->assertStatus(403);
+    }
+
+    public function test_an_unsupported_lang_value_falls_back_to_english(): void
+    {
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+        $this->mintUrl($token, $pet);
+
+        // Correctly signed, but not one of User::LOCALES.
+        $url = URL::temporarySignedRoute('pets.share', now()->addDay(), [
+            'pet' => $pet->id, 't' => $pet->fresh()->share_token, 'lang' => 'de',
+        ]);
+
+        $this->get($url)->assertOk()->assertSee('<html lang="en">', false)->assertSee('Luna — Medical Summary');
+    }
+
+    public function test_revocation_and_expiry_apply_to_localized_links(): void
+    {
+        [$owner, $token] = $this->userIn('es');
+        $pet = $this->pet($owner);
+
+        $url = $this->mintUrl($token, $pet, '1h');
+        $this->get($url)->assertOk();
+        $this->get($url.'&hl=fr')->assertOk();
+
+        $this->travel(2)->hours();
+        $this->get($url)->assertStatus(403);
+        $this->get($url.'&hl=en')->assertStatus(403); // hl never bypasses expiry
+        $this->travelBack();
+
+        $live = $this->mintUrl($token, $pet, '24h');
+        $this->withToken($token)->deleteJson("/pets/{$pet->id}/share-link")->assertNoContent();
+        $this->get($live)->assertStatus(410);
+        $this->get($live.'&hl=en')->assertStatus(410);
+    }
+
+    // ── Viewer language switch (unsigned hl, display only) ───────────────────
+
+    public function test_the_language_switch_changes_only_the_language(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $this->seedRecords($pet);
+        $url = $this->mintUrl($token, $pet);
+
+        $fr = $this->get($url)->assertOk();
+        // The switch links back to the same signed URL plus hl.
+        $this->assertSame(1, preg_match('/href="\?([^"]*hl=es)"/', $fr->getContent(), $m));
+        $esUrl = strtok($url, '?').'?'.html_entity_decode($m[1]);
+
+        $es = $this->get($esUrl)->assertOk();
+        $es->assertSee('<html lang="es">', false);
+        $es->assertSee('Luna — Resumen médico');
+
+        $en = $this->get($url.'&hl=en')->assertOk();
+        $en->assertSee('<html lang="en">', false);
+        $en->assertSee('Up 0.2 kg (4.3%)');
+
+        // Same records whatever the language.
+        foreach ([$fr, $es, $en] as $res) {
+            $res->assertSee('Rabies');
+            $res->assertSee('Simparica');
+            $res->assertDontSee('Old Med');
+        }
+    }
+
+    public function test_switch_links_replace_hl_instead_of_stacking_it(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $url = $this->mintUrl($token, $pet);
+        $path = parse_url($url, PHP_URL_PATH);
+
+        // Opened already switched, so the links must replace hl, not add a second one.
+        $page = $this->get($url.'&hl=en')->assertOk()->getContent();
+
+        $this->assertSame(1, preg_match('/<a href="([^"]+)" lang="es"/', $page, $m));
+        $href = html_entity_decode($m[1]);
+        $this->assertStringStartsWith('?', $href);
+        $this->assertSame(1, substr_count($href, 'hl='));
+        $this->assertSame(1, preg_match('/<a href="[^"]+" lang="en" hreflang="en" aria-current="true">English<\/a>/', $page));
+
+        $this->get($path.$href)->assertOk()->assertSee('Luna — Resumen médico');
+    }
+
+    public function test_hl_cannot_point_the_link_at_other_data(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $url = $this->mintUrl($token, $pet);
+
+        $other = Pet::create(['owner_id' => $owner->id, 'name' => 'Rex', 'type' => 'dog']);
+        $this->mintUrl($token, $other);
+
+        // Only an exact `hl` key is ignored by the signature check; anything
+        // else (other params, look-alike keys) still invalidates the link.
+        $this->get($url.'&hl=en&pet='.$other->id)->assertStatus(403);
+        $this->get($url.'&hl=en&t='.$other->fresh()->share_token)->assertStatus(403);
+        $this->get($url.'&hl[]=en')->assertStatus(403);
+        $this->get($url.'&h%6C=en')->assertStatus(403);
+
+        $res = $this->get($url.'&hl=en')->assertOk();
+        $res->assertSee('Luna');
+        $res->assertDontSee('Rex');
+    }
+
+    public function test_an_invalid_hl_falls_back_to_the_signed_language(): void
+    {
+        [$owner, $token] = $this->userIn('fr');
+        $pet = $this->pet($owner);
+        $url = $this->mintUrl($token, $pet);
+
+        $this->get($url.'&hl=de')->assertOk()->assertSee('<html lang="fr">', false);
+        $this->get($url.'&hl=')->assertOk()->assertSee('<html lang="fr">', false);
+        $this->get($url.'&hl=%3Cscript%3E')->assertOk()->assertSee('<html lang="fr">', false)->assertDontSee('<script>', false);
     }
 }

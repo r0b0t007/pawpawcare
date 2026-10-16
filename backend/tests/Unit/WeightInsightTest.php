@@ -4,7 +4,8 @@ namespace Tests\Unit;
 
 use App\Support\WeightInsight;
 use Illuminate\Support\Carbon;
-use PHPUnit\Framework\TestCase;
+use Illuminate\Support\Facades\App;
+use Tests\TestCase;
 
 class WeightInsightTest extends TestCase
 {
@@ -128,5 +129,91 @@ class WeightInsightTest extends TestCase
 
         $this->assertSame(5, $insight['period_days']);
         $this->assertStringContainsString('5 days', $insight['summary']);
+    }
+
+    // ── Localized summaries (vet share page in the link's language) ──────────
+
+    public function test_english_summaries_are_unchanged_including_one_day_spans(): void
+    {
+        $up = WeightInsight::for([$this->log(4.0, 'kg', '2026-01-01'), $this->log(4.8, 'kg', '2026-04-01')], 'kg', 'en');
+        $oneDay = WeightInsight::for([$this->log(4.0, 'kg', '2026-01-01'), $this->log(4.0, 'kg', '2026-01-02')], 'kg', 'en');
+        $sameDay = WeightInsight::for([$this->log(4.0, 'kg', '2026-01-01'), $this->log(4.0, 'kg', '2026-01-01')], 'kg', 'en');
+
+        $this->assertSame('Up 0.8 kg (20%) over the last 3 months', $up['summary']);
+        $this->assertSame('Stable over the last 1 day', $oneDay['summary']);
+        // Historical wording for same-day logs, kept byte-identical.
+        $this->assertSame('Stable over the last 1 days', $sameDay['summary']);
+    }
+
+    public function test_the_locale_argument_only_changes_the_wording(): void
+    {
+        $logs = [$this->log(4.0, 'kg', '2026-01-01'), $this->log(4.8, 'kg', '2026-04-01')];
+        $en = WeightInsight::for($logs, 'kg', 'en');
+
+        foreach (['fr', 'es'] as $locale) {
+            $other = WeightInsight::for($logs, 'kg', $locale);
+            unset($other['summary']);
+            $this->assertSame(array_diff_key($en, ['summary' => true]), $other);
+        }
+    }
+
+    public function test_french_summaries_use_french_plurals_and_decimals(): void
+    {
+        $up = WeightInsight::for([
+            $this->log(4.0, 'kg', '2026-01-01'),
+            $this->log(4.8, 'kg', '2026-04-01'),
+        ], 'kg', 'fr');
+        $down = WeightInsight::for([
+            $this->log(5.0, 'kg', '2026-01-01'),
+            $this->log(4.5, 'kg', '2026-01-29'),
+        ], 'kg', 'fr');
+        $stable = WeightInsight::for([
+            $this->log(4.0, 'kg', '2026-01-01'),
+            $this->log(4.0, 'kg', '2026-01-02'),
+        ], 'kg', 'fr');
+        $days = WeightInsight::for([
+            $this->log(4.0, 'kg', '2026-01-01'),
+            $this->log(4.0, 'kg', '2026-01-06'),
+        ], 'kg', 'fr');
+
+        $this->assertSame("En hausse de 0,8 kg (20\u{00A0}%) sur les 3 derniers mois", $up['summary']);
+        $this->assertSame("En baisse de 0,5 kg (10\u{00A0}%) sur les 4 dernières semaines", $down['summary']);
+        $this->assertSame('Stable sur le dernier jour', $stable['summary']);
+        $this->assertSame('Stable sur les 5 derniers jours', $days['summary']);
+    }
+
+    public function test_spanish_summaries_use_spanish_plurals_and_decimals(): void
+    {
+        $up = WeightInsight::for([
+            $this->log(4.0, 'kg', '2026-01-01'),
+            $this->log(4.3, 'kg', '2026-01-02'),
+        ], 'kg', 'es');
+        $down = WeightInsight::for([
+            $this->log(5.0, 'kg', '2026-01-01'),
+            $this->log(4.5, 'kg', '2026-03-02'),
+        ], 'kg', 'es');
+        $stable = WeightInsight::for([
+            $this->log(4.0, 'kg', '2026-01-01'),
+            $this->log(4.05, 'kg', '2026-02-12'),
+        ], 'kg', 'es');
+
+        $this->assertSame("Sube 0,3 kg (7,5\u{00A0}%) en el último día", $up['summary']);
+        $this->assertSame("Baja 0,5 kg (10\u{00A0}%) en los últimos 2 meses", $down['summary']);
+        $this->assertSame('Estable en las últimas 6 semanas', $stable['summary']);
+    }
+
+    public function test_the_summary_defaults_to_the_current_app_locale(): void
+    {
+        App::setLocale('es');
+
+        $insight = WeightInsight::for([
+            $this->log(4.0, 'kg', '2026-01-01'),
+            $this->log(4.5, 'kg', '2026-01-06'),
+        ], 'kg');
+
+        $this->assertSame("Sube 0,5 kg (12,5\u{00A0}%) en los últimos 5 días", $insight['summary']);
+        // Only the sentence is localized; the numbers stay machine-readable.
+        $this->assertSame(0.5, $insight['change_abs']);
+        $this->assertSame(12.5, $insight['change_pct']);
     }
 }
