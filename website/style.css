@@ -226,6 +226,19 @@ section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
   }
 }
 
+/* ---------- Language switcher ---------- */
+/* Each language in its own name; the page's own language is marked, not a
+   link elsewhere. In the header from tablet width up; always in the footer. */
+.lang-switch { display: flex; gap: 12px; font-size: 0.85rem; font-weight: 600; }
+.lang-switch a { color: var(--ink-soft); text-decoration: none; transition: color 150ms ease-in-out; }
+.lang-switch a:hover { color: var(--bark); }
+.lang-switch a[aria-current] { color: var(--bark); text-decoration: underline; text-underline-offset: 3px; }
+.header-actions .lang-switch { margin-right: 6px; }
+.lang-switch-footer { justify-content: center; margin: 10px 0 0; }
+@media (max-width: 900px) {
+  .header-actions .lang-switch { display: none; }
+}
+
 /* ---------- Buttons ---------- */
 
 .btn {

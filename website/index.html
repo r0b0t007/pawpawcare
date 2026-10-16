@@ -11,8 +11,15 @@
 
   <!-- Absolute URLs — swap the domain here when a custom domain lands -->
   <link rel="canonical" href="https://pawpawcare.app/">
+  <link rel="alternate" hreflang="en" href="https://pawpawcare.app/">
+  <link rel="alternate" hreflang="fr" href="https://pawpawcare.app/fr/">
+  <link rel="alternate" hreflang="es" href="https://pawpawcare.app/es/">
+  <link rel="alternate" hreflang="x-default" href="https://pawpawcare.app/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="PawPawCare">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="fr_FR">
+  <meta property="og:locale:alternate" content="es_ES">
   <meta property="og:title" content="PawPawCare — All your pet's health, in one calm place">
   <meta property="og:description" content="Vaccines, meds, weight trends, and vet records for the whole furry family. Join the free preview waitlist.">
   <meta property="og:url" content="https://pawpawcare.app/">
@@ -35,9 +42,9 @@
   <link rel="preload" href="/fonts/plus-jakarta-sans-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/fonts/baloo2-var-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/images/hero-puppy.webp" as="image" imagesrcset="/images/hero-puppy-560.webp 560w, /images/hero-puppy.webp 960w" imagesizes="320px" media="(min-width: 821px)" fetchpriority="high">
-  <link rel="stylesheet" href="/style.css?v=94781924ed">
-  <script src="/script.js?v=f810fdfa70" defer></script>
-  <script src="/analytics.js?v=8a8ffe942a" defer></script>
+  <link rel="stylesheet" href="/style.css?v=76659a278a">
+  <script src="/script.js?v=9acbec862d" defer></script>
+  <script src="/analytics.js?v=7250edbaf3" defer></script>
 
   <!-- Structured data. TODO(owner): once the brand's own LinkedIn / Product Hunt /
        Crunchbase pages exist (SEO task H3), add their URLs to Organization.sameAs. -->
@@ -149,6 +156,7 @@
         </ul>
       </nav>
       <div class="header-actions">
+        <nav class="lang-switch" aria-label="Language"><a href="/" lang="en" hreflang="en" aria-current="true">English</a><a href="/fr/" lang="fr" hreflang="fr">Français</a><a href="/es/" lang="es" hreflang="es">Español</a></nav>
         <a class="btn btn-primary btn-sm" href="#waitlist"><span class="cta-long">Get early access</span><span class="cta-short">Join</span></a>
         <button class="nav-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primary-nav">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
@@ -455,6 +463,7 @@
           <li><a href="#" data-cookie-settings>Cookie settings</a></li>
         </ul>
       </nav>
+      <nav class="lang-switch lang-switch-footer" aria-label="Language"><a href="/" lang="en" hreflang="en" aria-current="true">English</a><a href="/fr/" lang="fr" hreflang="fr">Français</a><a href="/es/" lang="es" hreflang="es">Español</a></nav>
       <p class="footer-legal">© 2026 PawPawCare · Built by <a href="https://ahmedchioua.com" rel="author">Ahmed Chioua</a></p>
     </div>
   </footer>

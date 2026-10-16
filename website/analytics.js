@@ -19,6 +19,27 @@
   var STORAGE_KEY = 'ppc:analytics-consent';
   var started = false; // gtag.js injected this page load?
 
+  // Banner text in the page's language (<html lang>). The privacy policy
+  // itself is English-only for now, so every language links /privacy/.
+  var TEXTS = {
+    en: {
+      label: 'Analytics cookies',
+      text: 'We use Google Analytics to see which pages help visitors — no ads, and we never sell your data.',
+      privacy: 'Privacy&nbsp;Policy', decline: 'Decline', accept: 'Accept',
+    },
+    fr: {
+      label: 'Cookies de mesure d\'audience',
+      text: 'Nous utilisons Google Analytics pour savoir quelles pages aident nos visiteurs, sans publicité, et nous ne vendons jamais vos données.',
+      privacy: 'Politique de confidentialité (en anglais)', decline: 'Refuser', accept: 'Accepter',
+    },
+    es: {
+      label: 'Cookies de analítica',
+      text: 'Usamos Google Analytics para saber qué páginas son útiles para nuestros visitantes, sin publicidad, y nunca vendemos sus datos.',
+      privacy: 'Política de privacidad (en inglés)', decline: 'Rechazar', accept: 'Aceptar',
+    },
+  };
+  var T = TEXTS[(document.documentElement.lang || 'en').slice(0, 2)] || TEXTS.en;
+
   // Not configured → do nothing (no banner, no cookie, no Google contact).
   if (!/^G-[A-Z0-9]{6,}$/.test(GA_ID)) return;
 
@@ -68,13 +89,12 @@
     var bar = document.createElement('div');
     bar.className = 'cookie-banner';
     bar.setAttribute('role', 'region');
-    bar.setAttribute('aria-label', 'Analytics cookies');
+    bar.setAttribute('aria-label', T.label);
     bar.innerHTML =
-      '<p class="cookie-text">We use Google Analytics to see which pages help visitors' +
-      ' — no ads, and we never sell your data. <a href="/privacy/">Privacy&nbsp;Policy</a></p>' +
+      '<p class="cookie-text">' + T.text + ' <a href="/privacy/">' + T.privacy + '</a></p>' +
       '<div class="cookie-actions">' +
-        '<button type="button" class="cookie-btn cookie-decline">Decline</button>' +
-        '<button type="button" class="cookie-btn cookie-accept">Accept</button>' +
+        '<button type="button" class="cookie-btn cookie-decline">' + T.decline + '</button>' +
+        '<button type="button" class="cookie-btn cookie-accept">' + T.accept + '</button>' +
       '</div>';
     document.body.appendChild(bar);
 

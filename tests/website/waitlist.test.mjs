@@ -11,10 +11,15 @@ import { afterEach, beforeEach, describe, test } from "node:test";
 import { onRequestPost } from "../../website/functions/api/waitlist.js";
 import {
   CONTACT_EMAIL,
+  LANGUAGES,
   WELCOME_HTML,
   WELCOME_SUBJECT,
   WELCOME_TEXT,
+  welcomeEmail,
 } from "../../website/functions/_lib/welcome-email.js";
+import enCopy from "../../website/functions/_lib/welcome-copy/en.js";
+import frCopy from "../../website/functions/_lib/welcome-copy/fr.js";
+import esCopy from "../../website/functions/_lib/welcome-copy/es.js";
 
 const env = {
   RESEND_API_KEY: "re_test",
@@ -188,4 +193,70 @@ describe("welcome email content", () => {
     assert.doesNotMatch(WELCOME_HTML + WELCOME_TEXT, /#unsubscribe|privacy@pawpawcare/);
     assert.ok(WELCOME_TEXT.includes("utm_source=waitlist_email"));
   });
+});
+
+// CHW-196: /fr/ and /es/ forms post a hidden `lang` field.
+describe("waitlist language", () => {
+  const welcomeTo = (email) => calls.find((c) => c.body.to === email);
+
+  test("a French signup lands on /fr/thanks.html and gets the French email", async () => {
+    const res = await post({ email: "chat@example.fr", lang: "fr" });
+    assert.equal(res.headers.get("location"), "https://pawpawcare.app/fr/thanks.html");
+    const fr = welcomeEmail("fr");
+    const sent = welcomeTo("chat@example.fr").body;
+    assert.equal(sent.subject, fr.subject);
+    assert.equal(sent.html, fr.html);
+    assert.equal(sent.text, fr.text);
+    assert.match(sent.html, /<html lang="fr"/);
+    assert.match(notificationCall().body.text, /\(language: fr\)/);
+  });
+
+  test("a Spanish typo goes back to the Spanish form", async () => {
+    const res = await post({ email: "not-an-email", lang: "es" });
+    assert.equal(res.headers.get("location"), "https://pawpawcare.app/es/#waitlist");
+    assert.equal(calls.length, 0);
+  });
+
+  test("an unknown or missing language is English", async () => {
+    const res = await post({ email: "pet@example.com", lang: "de\"><script>" });
+    assert.equal(res.headers.get("location"), "https://pawpawcare.app/thanks.html");
+    assert.equal(welcomeTo("pet@example.com").body.subject, WELCOME_SUBJECT);
+  });
+
+  test("each language has its own idempotency key for the same address", async () => {
+    await post({ email: "pet@example.com", lang: "fr" });
+    const fr = welcomeTo("pet@example.com").headers["Idempotency-Key"];
+    calls = [];
+    await post({ email: "pet@example.com" });
+    const en = welcomeTo("pet@example.com").headers["Idempotency-Key"];
+    assert.notEqual(fr, en);
+  });
+});
+
+describe("welcome email in every language", () => {
+  const copy = { en: enCopy, fr: frCopy, es: esCopy };
+
+  for (const lang of LANGUAGES) {
+    test(`${lang}: same keys as English, translated, nothing left unrendered`, () => {
+      const keys = (o) => JSON.stringify(Object.keys(o).sort());
+      assert.equal(keys(copy[lang]), keys(enCopy));
+      assert.equal(copy[lang].lang, lang);
+      assert.equal(copy[lang].steps.length, 3);
+      assert.equal(copy[lang].features.length, 3);
+      if (lang !== "en") {
+        assert.notEqual(copy[lang].subject, enCopy.subject, "not translated yet");
+        assert.notEqual(copy[lang].intro, enCopy.intro, "not translated yet");
+      }
+      const { subject, html, text } = welcomeEmail(lang);
+      assert.match(html, new RegExp(`<html lang="${lang}"`));
+      for (const s of [subject, html, text]) {
+        assert.doesNotMatch(s, /\{(url|email)\}|\$\{|undefined/);
+      }
+      // Copy is text, not markup: only entities, never tags.
+      for (const v of JSON.stringify(copy[lang]).match(/"[^"]*"/g)) assert.doesNotMatch(v, /<[a-z]/i);
+      // The invite link points at the home page in the same language.
+      const home = lang === "en" ? "https://pawpawcare.app/?" : `https://pawpawcare.app/${lang}/?`;
+      assert.ok(text.includes(home), `${lang} signup link`);
+    });
+  }
 });
