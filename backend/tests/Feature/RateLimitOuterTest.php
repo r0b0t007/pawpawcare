@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\RefreshToken;
 use App\Models\User;
-use App\Providers\AppServiceProvider;
 use App\Services\JwtService;
+use App\Support\ClientNetwork;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
@@ -13,8 +13,9 @@ use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 /**
- * CHW-184: /auth/refresh is limited per refresh token, not per IP, so many
- * apps behind one carrier NAT address can all refresh.
+ * CHW-184: /auth/refresh and /auth/logout are limited per user (by the
+ * refresh token they carry), not per IP, so many apps behind one carrier NAT
+ * address can all refresh and sign out.
  * CHW-185: costly authenticated routes add a per-network ceiling on top of
  * their per-user budget, so many free accounts can't multiply it.
  */
@@ -24,18 +25,21 @@ class RateLimitOuterTest extends TestCase
 
     private const NAT_IP = '203.0.113.9';
 
-    /** @return array{0: User, 1: string, 2: string} user, access token, refresh token */
-    private function user(): array
+    private function account(): User
     {
-        $u = User::create([
+        return User::create([
             'name' => 'U',
             'email' => 'u'.uniqid().'@example.com',
             'hashed_password' => Hash::make('secret123'),
         ]);
+    }
+
+    private function refreshTokenFor(User $u): string
+    {
         [$refresh, $expiresAt] = JwtService::createRefreshToken($u->id);
         RefreshToken::create(['user_id' => $u->id, 'token' => $refresh, 'expires_at' => $expiresAt, 'revoked' => false]);
 
-        return [$u, JwtService::createAccessToken($u->id), $refresh];
+        return $refresh;
     }
 
     private function refresh(string $token, string $ip = self::NAT_IP)
@@ -52,55 +56,69 @@ class RateLimitOuterTest extends TestCase
             ->postJson('/community/posts/missing-post/report');
     }
 
-    public function test_25_users_behind_one_ip_can_all_refresh_within_a_minute(): void
+    public function test_25_users_behind_one_ip_can_all_refresh_and_sign_out_within_a_minute(): void
     {
         for ($i = 0; $i < 25; $i++) {
-            [, , $refresh] = $this->user();
-            $this->refresh($refresh)->assertOk();
+            $user = $this->account();
+            $next = $this->refresh($this->refreshTokenFor($user))->assertOk()->json('refresh_token');
+            $this->withServerVariables(['REMOTE_ADDR' => self::NAT_IP])
+                ->postJson('/auth/logout', ['refresh_token' => $next])
+                ->assertSuccessful();
         }
     }
 
-    public function test_one_genuine_refresh_token_is_capped_on_its_own(): void
+    public function test_chained_refreshes_count_against_the_user(): void
     {
-        // Single-use: the first call rotates it, replays are 401 until its
-        // own bucket (10/min) runs out — without touching anyone else's.
-        [, , $replayed] = $this->user();
-        $this->refresh($replayed)->assertOk();
-        for ($i = 0; $i < 9; $i++) {
-            $this->refresh($replayed)->assertStatus(401);
+        // Every answer is a new token; the budget follows the user, so one
+        // account can't chain its way to the network ceiling (10/min each).
+        $user = $this->account();
+        $token = $this->refreshTokenFor($user);
+        for ($i = 0; $i < 10; $i++) {
+            $token = $this->refresh($token)->assertOk()->json('refresh_token');
         }
-        $this->refresh($replayed)->assertStatus(429);
+        $this->refresh($token)->assertStatus(429);
 
-        [, , $refresh] = $this->user();
-        $this->refresh($refresh)->assertOk();
+        // Someone else on the same network is unaffected.
+        $this->refresh($this->refreshTokenFor($this->account()))->assertOk();
     }
 
-    public function test_made_up_tokens_share_one_small_bucket_per_network(): void
+    public function test_an_expired_genuine_token_is_not_treated_as_made_up(): void
     {
-        // Each made-up string must NOT get its own bucket: keying attacker
-        // input would let one client mint unlimited cache entries. They all
-        // land in one 20/min bucket for the network …
+        // Fill the network's shared junk bucket (20/min) …
         for ($i = 0; $i < 20; $i++) {
             $this->refresh('junk-'.$i)->assertStatus(401);
         }
         $this->refresh('junk-new')->assertStatus(429);
 
-        // … which never blocks a genuine token from the same network,
-        [, , $refresh] = $this->user();
-        $this->refresh($refresh)->assertOk();
-        // and other networks keep their own junk budget.
+        // … a token we signed that has since expired still gets its user's
+        // own budget, so the app sees 401 (sign in again), not 429 (retry).
+        $user = $this->account();
+        $this->travel(-40)->days();
+        $expired = $this->refreshTokenFor($user);
+        $this->travelBack();
+        $this->refresh($expired)->assertStatus(401);
+
+        // A live token from the same network refreshes as usual.
+        $this->refresh($this->refreshTokenFor($this->account()))->assertOk();
+    }
+
+    public function test_made_up_tokens_share_one_bucket_per_network_and_long_ones_are_refused(): void
+    {
+        for ($i = 0; $i < 20; $i++) {
+            $this->refresh('junk-'.$i)->assertStatus(401);
+        }
+        $this->refresh('junk-new')->assertStatus(429);
+        // Other networks keep their own junk budget.
         $this->refresh('junk-x', '198.51.100.30')->assertStatus(401);
 
-        // A refresh token that is longer than any real one is refused (422).
-        [, , $ok] = $this->user();
-        $this->refresh(str_repeat('a', 600), '198.51.100.31')->assertStatus(422);
-        $this->refresh($ok, '198.51.100.31')->assertOk();
+        // Longer than any real token: refused outright (422).
+        $this->refresh(str_repeat('a', JwtService::MAX_TOKEN_LENGTH + 1), '198.51.100.31')->assertStatus(422);
     }
 
     public function test_accounts_on_one_network_share_the_report_ceiling_but_keep_their_own_budget(): void
     {
         // Per user: 10 an hour. Per network: 50 an hour.
-        $users = array_map(fn () => $this->user()[1], range(1, 6));
+        $users = array_map(fn () => JwtService::createAccessToken($this->account()->id), range(1, 6));
 
         // One account's own budget runs out at 10; another's is untouched.
         for ($i = 0; $i < 10; $i++) {
@@ -133,7 +151,7 @@ class RateLimitOuterTest extends TestCase
 
     public function test_ipv6_clients_are_grouped_by_their_64(): void
     {
-        $net = fn (string $ip) => AppServiceProvider::network(Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => $ip]));
+        $net = fn (string $ip) => ClientNetwork::of(Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => $ip]));
 
         $this->assertSame($net('2001:db8:1:2:aaaa::1'), $net('2001:db8:1:2:ffff::9'));
         $this->assertNotSame($net('2001:db8:1:2::1'), $net('2001:db8:1:3::1'));

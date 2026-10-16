@@ -213,12 +213,12 @@ class RateLimitScopeTest extends TestCase
         // /auth/signup carries only the group's `throttle:20,1,auth:`, so the
         // rate-limit headers are that bucket's (login adds a second limiter;
         // refresh has its own per-token limiter, see RateLimitOuterTest).
-        $refresh = fn (string $ip) => $this->withServerVariables(['REMOTE_ADDR' => $ip])
+        $signup = fn (string $ip) => $this->withServerVariables(['REMOTE_ADDR' => $ip])
             ->postJson('/auth/signup', []);
 
-        $first = $refresh('198.51.100.7')->assertStatus(422);
-        $second = $refresh('198.51.100.7')->assertStatus(422);
-        $otherIp = $refresh('198.51.100.8')->assertStatus(422);
+        $first = $signup('198.51.100.7')->assertStatus(422);
+        $second = $signup('198.51.100.7')->assertStatus(422);
+        $otherIp = $signup('198.51.100.8')->assertStatus(422);
 
         $this->assertSame(20, (int) $first->headers->get('X-RateLimit-Limit'));
         $this->assertSame(

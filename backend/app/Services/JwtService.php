@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\JwtSecretGuard;
+use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Illuminate\Support\Carbon;
@@ -66,6 +67,32 @@ class JwtService
         ], self::secret(), self::algo());
 
         return [$token, $exp];
+    }
+
+    /** Longest token the API accepts; real ones are well under it. */
+    public const MAX_TOKEN_LENGTH = 512;
+
+    /**
+     * The user a refresh token was signed for, or null when it isn't a
+     * refresh token we signed. Expiry is NOT checked: the rate limiter needs
+     * to tell "ours, but expired" (count it against its user, then 401) apart
+     * from "made up" (shared junk bucket). JWT::decode checks the signature
+     * before the expiry, so an ExpiredException payload is genuine.
+     */
+    public static function refreshSubject(string $token): ?string
+    {
+        if (mb_strlen($token) > self::MAX_TOKEN_LENGTH) {
+            return null;
+        }
+        try {
+            $claims = (array) JWT::decode($token, new Key(self::secret(), self::algo()));
+        } catch (ExpiredException $e) {
+            $claims = (array) $e->getPayload();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return ($claims['type'] ?? null) === 'refresh' && is_string($claims['sub'] ?? null) ? $claims['sub'] : null;
     }
 
     /**

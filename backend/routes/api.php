@@ -72,12 +72,13 @@ Route::middleware('throttle:20,1,auth:')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('/auth/google', [AuthController::class, 'google']);
     Route::post('/auth/apple', [AuthController::class, 'apple']);
-    Route::post('/auth/logout', [AuthController::class, 'logout']);
 });
 
-// Refresh has its own limiter, per refresh token rather than per IP, so many
-// apps behind one carrier NAT address never share a budget (CHW-184).
+// Refresh and logout carry a refresh token, so they are limited per user
+// rather than per IP: many apps behind one carrier NAT address never share a
+// budget (CHW-184). See the 'refresh' limiter in AppServiceProvider.
 Route::post('/auth/refresh', [AuthController::class, 'refresh'])->middleware('throttle:refresh');
+Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('throttle:refresh');
 
 // ── Password reset (public; named limiters — see AppServiceProvider) ─────────
 // forgot-password always answers 200 so it can't enumerate accounts;
