@@ -8,7 +8,7 @@ return [
     'formats' => [
         'date_long' => 'D [de] MMMM [de] YYYY',
         'date' => 'D MMM YYYY',
-        'datetime' => 'D MMM YYYY, HH:mm',
+        'datetime' => 'D MMM YYYY, H:mm',
     ],
 
     'yes' => 'sí',
@@ -19,7 +19,7 @@ return [
         'heading' => 'Historial de salud de PawPawCare',
         'prepared_for' => 'Preparado para :name',
         'exported_on' => 'Exportado el :date',
-        'promise' => 'Historial completo: nada recortado, nada detrás de un plan de pago.',
+        'promise' => 'Historial completo: sin recortes y sin nada reservado a un plan de pago.',
         'pet_fallback' => 'mascota',
         'born' => 'Nacido/a el :date',
         'microchipped' => 'Microchip: :answer',
@@ -35,7 +35,7 @@ return [
         'weights' => 'Historial de peso',
         'no_weights' => 'No hay registros de peso.',
         'documents' => 'Documentos archivados',
-        'no_documents' => 'No hay documentos en la caja fuerte.',
+        'no_documents' => 'No hay documentos en el archivo médico.',
         'no_pets' => 'Todavía no hay mascotas que exportar.',
 
         'col' => [
@@ -66,7 +66,7 @@ return [
         ],
 
         'footer_generated' => 'Generado por PawPawCare',
-        'footer_promise' => 'Sus registros le pertenecen: exporte todo, gratis, cuando quiera.',
+        'footer_promise' => 'Su historial le pertenece: expórtelo completo, gratis, cuando quiera.',
     ],
 
     // Display words for the ids the app stores (pet type, statuses...). An id
@@ -85,7 +85,7 @@ return [
         ],
         'vaccination_status' => [
             'upcoming' => 'próxima',
-            'overdue' => 'vencida',
+            'overdue' => 'atrasada',
             'completed' => 'administrada',
         ],
         'appointment_status' => [
@@ -122,7 +122,7 @@ return [
         'appointments' => 'CITAS',
         'clinics' => 'CLÍNICAS',
         'weights' => 'HISTORIAL DE PESO',
-        'documents' => 'DOCUMENTOS (índice: los archivos se quedan en su caja fuerte)',
+        'documents' => 'DOCUMENTOS (índice: los documentos permanecen en su archivo médico)',
 
         'col' => [
             'name' => 'Nombre',

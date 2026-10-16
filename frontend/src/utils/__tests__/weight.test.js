@@ -102,7 +102,7 @@ describe('weightInsight', () => {
     it('builds the Spanish summary', async () => {
       await i18n.changeLanguage('es');
       expect(weightInsight([pt(5.0, '2026-01-01'), pt(4.5, '2026-02-26')], 'kg').summary)
-        .toBe('Ha bajado 0.5 kg (10 %) en 8 semanas');
+        .toBe('Ha bajado 0.5 kg (10 %) en 8 semanas');
     });
   });
 });

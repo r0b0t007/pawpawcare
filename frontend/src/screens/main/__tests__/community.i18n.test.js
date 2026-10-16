@@ -86,7 +86,7 @@ test('English: a one-member group reads "1 member" (was "1 members" before CHW-1
 
 test('the lost-pet report screen speaks French', async () => {
   await render(<LostPetsScreen navigation={nav} />);
-  expect(texts()).toEqual(expect.arrayContaining(['Quel animal ?', 'Biscuit']));
+  expect(texts()).toEqual(expect.arrayContaining(['Quel animal ?', 'Biscuit']));
 });
 
 test('Moderation speaks French', async () => {

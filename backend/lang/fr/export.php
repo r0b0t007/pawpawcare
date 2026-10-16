@@ -8,7 +8,7 @@ return [
     'formats' => [
         'date_long' => 'D MMMM YYYY',
         'date' => 'D MMM YYYY',
-        'datetime' => 'D MMM YYYY HH:mm',
+        'datetime' => 'D MMM YYYY [à] HH:mm',
     ],
 
     'yes' => 'oui',
@@ -19,10 +19,10 @@ return [
         'heading' => 'Dossiers de santé PawPawCare',
         'prepared_for' => 'Préparé pour :name',
         'exported_on' => 'Exporté le :date',
-        'promise' => 'Historique complet — rien de coupé, rien derrière un abonnement.',
+        'promise' => "Historique complet\u{00A0}: rien d'omis, rien de réservé à un abonnement.",
         'pet_fallback' => 'animal',
         'born' => 'Né(e) le :date',
-        'microchipped' => 'Pucé : :answer',
+        'microchipped' => "Pucé\u{00A0}: :answer",
 
         'vaccinations' => 'Vaccinations',
         'no_vaccinations' => 'Aucune vaccination enregistrée.',
@@ -45,7 +45,7 @@ return [
             'administered' => 'Administré le',
             'notes' => 'Notes',
             'medication' => 'Médicament',
-            'dosage' => 'Dosage',
+            'dosage' => 'Posologie',
             'frequency' => 'Fréquence',
             'times' => 'Heures',
             'start' => 'Début',
@@ -66,7 +66,7 @@ return [
         ],
 
         'footer_generated' => 'Généré par PawPawCare',
-        'footer_promise' => 'Vos dossiers vous appartiennent — exportez tout, gratuitement, à tout moment.',
+        'footer_promise' => "Vos dossiers vous appartiennent\u{00A0}: exportez tout, gratuitement, à tout moment.",
     ],
 
     // Display words for the ids the app stores (pet type, statuses...). An id
@@ -94,9 +94,9 @@ return [
             'cancelled' => 'annulé',
         ],
         'frequency' => [
-            'daily' => 'quotidienne',
+            'daily' => 'quotidien',
             'weekly' => 'hebdomadaire',
-            'monthly' => 'mensuelle',
+            'monthly' => 'mensuel',
             'as_needed' => 'au besoin',
         ],
         'document_category' => [
@@ -114,7 +114,7 @@ return [
         'title' => 'PawPawCare — Export des dossiers de santé',
         'owner' => 'Propriétaire',
         'exported' => 'Exporté le',
-        'pet' => '=== ANIMAL : :name ===',
+        'pet' => "=== ANIMAL\u{00A0}: :name ===",
 
         'profile' => 'PROFIL',
         'vaccinations' => 'VACCINATIONS',
@@ -122,7 +122,7 @@ return [
         'appointments' => 'RENDEZ-VOUS',
         'clinics' => 'CLINIQUES',
         'weights' => 'HISTORIQUE DU POIDS',
-        'documents' => 'DOCUMENTS (index — les fichiers restent dans votre coffre)',
+        'documents' => "DOCUMENTS (index\u{00A0}: les fichiers restent dans votre coffre)",
 
         'col' => [
             'name' => 'Nom',
@@ -137,7 +137,7 @@ return [
             'due_date' => 'Échéance',
             'administered' => 'Administré le',
             'notes' => 'Notes',
-            'dosage' => 'Dosage',
+            'dosage' => 'Posologie',
             'frequency' => 'Fréquence',
             'times' => 'Heures',
             'start' => 'Début',

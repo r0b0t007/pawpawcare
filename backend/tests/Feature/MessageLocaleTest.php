@@ -204,7 +204,7 @@ class MessageLocaleTest extends TestCase
         $this->assertSame('Medication: Simparica', $medReminder->title);
         $this->assertSame('Luna — 40mg', $medReminder->body);
         $this->assertSame("Médicament\u{00A0}: Simparica", $medReminder->localizedTitle('fr'));
-        $this->assertSame('Medicación: Simparica', $medReminder->localizedTitle('es'));
+        $this->assertSame('Medicamento: Simparica', $medReminder->localizedTitle('es'));
     }
 
     public function test_reminder_push_is_in_the_recipients_language_with_a_localized_date(): void
@@ -213,8 +213,8 @@ class MessageLocaleTest extends TestCase
 
         $expected = [
             'en' => ['Vaccination due: Rabies', 'Luna — Rabies is due Jan 5, 2027'],
-            'fr' => ["Vaccin à faire\u{00A0}: Rabies", 'Luna — Rabies à faire le 5 janvier 2027'],
-            'es' => ['Vacuna pendiente: Rabies', 'Luna — fecha prevista de Rabies: 5 de enero de 2027'],
+            'fr' => ["Vaccin prévu\u{00A0}: Rabies", 'Luna — Rabies prévu le 5 janvier 2027'],
+            'es' => ['Vencimiento de vacuna: Rabies', 'Luna — Rabies vence el 5 de enero de 2027'],
         ];
 
         $tokens = [];
@@ -244,7 +244,7 @@ class MessageLocaleTest extends TestCase
 
         $this->artisan('reminders:send')->assertSuccessful();
 
-        $this->assertSame('Luna — Rabies à faire le 1er janvier 2027', $this->pushes()[0]['body']);
+        $this->assertSame('Luna — Rabies prévu le 1er janvier 2027', $this->pushes()[0]['body']);
 
         // Only the 1st takes the ordinal in French; Spanish and English never do.
         $this->assertSame('1er mars 2027', ReminderText::dueDate('2027-03-01', 'fr'));
@@ -266,7 +266,7 @@ class MessageLocaleTest extends TestCase
         $this->artisan('reminders:send')->assertSuccessful();
 
         $push = $this->pushes()[0];
-        $this->assertSame('Medicación: Apoquel', $push['title']);
+        $this->assertSame('Medicamento: Apoquel', $push['title']);
         $this->assertSame('Michi', $push['body']);
     }
 
@@ -308,20 +308,20 @@ class MessageLocaleTest extends TestCase
         ReminderScheduler::syncVaccinationReminder($vax);
 
         $this->withToken($ownerToken)->getJson('/reminders')->assertOk()
-            ->assertJsonPath('0.title', 'Vacuna pendiente: Moquillo')
-            ->assertJsonPath('0.body', 'Rex — fecha prevista de Moquillo: 5 de enero de 2027');
+            ->assertJsonPath('0.title', 'Vencimiento de vacuna: Moquillo')
+            ->assertJsonPath('0.body', 'Rex — Moquillo vence el 5 de enero de 2027');
 
         // Switching language re-renders the same row; nothing is stored per language.
         $this->withToken($ownerToken)->patchJson('/users/me', ['locale' => 'fr'])->assertOk();
         $this->withToken($ownerToken)->getJson('/reminders')->assertOk()
-            ->assertJsonPath('0.title', "Vaccin à faire\u{00A0}: Moquillo")
-            ->assertJsonPath('0.body', 'Rex — Moquillo à faire le 5 janvier 2027');
+            ->assertJsonPath('0.title', "Vaccin prévu\u{00A0}: Moquillo")
+            ->assertJsonPath('0.body', 'Rex — Moquillo prévu le 5 janvier 2027');
 
         // The notification inbox carries the same rendered text.
         $reminder = Reminder::where('related_id', $vax->id)->firstOrFail();
         ReminderDelivery::create(['reminder_id' => $reminder->id, 'occurrence_at' => now(), 'channel' => 'push', 'status' => 'sent', 'sent_at' => now()]);
         $this->withToken($ownerToken)->getJson('/notifications')->assertOk()
-            ->assertJsonPath('notifications.0.title', "Vaccin à faire\u{00A0}: Moquillo");
+            ->assertJsonPath('notifications.0.title', "Vaccin prévu\u{00A0}: Moquillo");
 
         // An English user gets the original strings, byte for byte.
         [, $enToken] = $this->actingUser('en');
@@ -340,19 +340,19 @@ class MessageLocaleTest extends TestCase
         $id = Reminder::where('related_id', $vax->id)->value('id');
 
         // Toggling, or sending the text back unchanged, keeps the template.
-        $this->withToken($token)->patchJson("/reminders/{$id}", ['enabled' => true, 'title' => "Vaccin à faire\u{00A0}: Rabies"])->assertOk();
+        $this->withToken($token)->patchJson("/reminders/{$id}", ['enabled' => true, 'title' => "Vaccin prévu\u{00A0}: Rabies"])->assertOk();
         $this->assertSame(ReminderText::VACCINATION_DUE, Reminder::find($id)->template);
         $this->assertSame('Vaccination due: Rabies', Reminder::find($id)->title);
 
         $this->withToken($token)->patchJson("/reminders/{$id}", ['title' => 'Vaccin de Luna'])
             ->assertOk()
             ->assertJsonPath('title', 'Vaccin de Luna')
-            ->assertJsonPath('body', 'Luna — Rabies à faire le 5 janvier 2027');
+            ->assertJsonPath('body', 'Luna — Rabies prévu le 5 janvier 2027');
 
         $reminder = Reminder::find($id);
         $this->assertNull($reminder->template);
         $this->assertSame('Vaccin de Luna', $reminder->localizedTitle('es'));
-        $this->assertSame('Luna — Rabies à faire le 5 janvier 2027', $reminder->localizedBody('en'));
+        $this->assertSame('Luna — Rabies prévu le 5 janvier 2027', $reminder->localizedBody('en'));
     }
 
     // ── Backfill of rows written before templates ───────────────────────────
@@ -406,7 +406,7 @@ class MessageLocaleTest extends TestCase
         }
 
         // Mapped rows read in French now; English is unchanged byte for byte.
-        $this->assertSame('Luna — Star — Rabies à faire le 5 janvier 2027', $r($vaxRow)->localizedBody('fr'));
+        $this->assertSame('Luna — Star — Rabies prévu le 5 janvier 2027', $r($vaxRow)->localizedBody('fr'));
         $this->assertSame('Luna — Star — Rabies is due Jan 5, 2027', $r($vaxRow)->localizedBody('en'));
         $this->assertSame('Luna — Star — 40mg', $r($medRow)->localizedBody('fr'));
         $this->assertSame('Rabies shot!', $r($edited)->localizedTitle('fr'));
@@ -461,7 +461,7 @@ class MessageLocaleTest extends TestCase
             $pushes = collect($this->pushes())->keyBy(fn ($p) => $p['data']['kind']);
             $this->assertSame($title, $pushes['birthday']['title'], $locale);
             $this->assertSame($body, $pushes['birthday']['body'], $locale);
-            $this->assertSame($locale === 'en' ? 'Gotcha day!' : ($locale === 'fr' ? "Anniversaire d'adoption\u{00A0}!" : '¡Aniversario de adopción!'), $pushes['gotcha_day']['title']);
+            $this->assertSame($locale === 'en' ? 'Gotcha day!' : ($locale === 'fr' ? "Jour d'adoption\u{00A0}!" : '¡Día de adopción!'), $pushes['gotcha_day']['title']);
             $this->assertSame($gotcha, $pushes['gotcha_day']['body'], $locale);
             $this->travelBack();
         }
@@ -473,7 +473,7 @@ class MessageLocaleTest extends TestCase
             ['en', 1, 'Your week in care', '1 care action across 1 pet this week.'],
             ['fr', 1, 'Votre semaine de soins', '1 soin effectué pour 1 animal cette semaine.'],
             ['fr', 3, 'Votre semaine de soins', '3 soins effectués pour 1 animal cette semaine.'],
-            ['es', 2, 'Su semana de cuidados', '2 acciones de cuidado para 1 mascota esta semana.'],
+            ['es', 2, 'Su semana de cuidados', '2 acciones de cuidados para 1 mascota esta semana.'],
         ];
 
         foreach ($cases as [$locale, $weights, $title, $body]) {

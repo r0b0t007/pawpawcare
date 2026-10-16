@@ -24,11 +24,11 @@ return [
     'due' => 'Prévue le :date',
     'no_vaccinations' => 'Aucune vaccination enregistrée.',
 
-    'medications' => 'Traitements en cours',
+    'medications' => 'Médicaments en cours',
     'since' => 'depuis le :date',
-    'no_medications' => 'Aucun traitement en cours.',
+    'no_medications' => 'Aucun médicament en cours.',
 
-    'notable' => 'Variation importante — à aborder lors de la consultation.',
+    'notable' => "Variation importante\u{00A0}: à aborder lors de la consultation.",
     'no_weight' => 'Aucun historique de poids.',
 
     'clinics' => 'Cliniques vétérinaires',
@@ -57,8 +57,8 @@ return [
         'as_needed' => 'au besoin',
     ],
     'categories' => [
-        'lab' => 'Analyses',
-        'vaccination' => 'Vaccination',
+        'lab' => 'Analyse',
+        'vaccination' => 'Vaccin',
         'prescription' => 'Ordonnance',
         'invoice' => 'Facture',
         'imaging' => 'Imagerie',

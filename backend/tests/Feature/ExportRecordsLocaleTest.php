@@ -106,7 +106,7 @@ class ExportRecordsLocaleTest extends TestCase
         $this->assertSame(1, substr_count($csv, "\u{FEFF}"));
         $this->assertStringContainsString('PawPawCare — Export des dossiers de santé', $csv);
         $this->assertStringContainsString('Propriétaire,"Zoé Núñez"', $csv);
-        $this->assertStringContainsString('=== ANIMAL : ¿Toño? ===', $csv);
+        $this->assertStringContainsString("=== ANIMAL\u{00A0}: ¿Toño? ===", $csv);
         $this->assertStringContainsString("Nom,Espèce,Race,Sexe,\"Date de naissance\",Âge,Poids,Pucé\n", $csv);
         $this->assertStringContainsString("Nom,Statut,Échéance,\"Administré le\",Notes\n", $csv);
         $this->assertStringContainsString('MÉDICAMENTS', $csv);
@@ -148,7 +148,7 @@ class ExportRecordsLocaleTest extends TestCase
             ->get('/users/me/export?format=csv', ['Accept-Language' => 'es-ES,es;q=0.9'])
             ->assertOk()
             ->getContent();
-        $this->assertStringContainsString('=== ANIMAL : ', $csv);
+        $this->assertStringContainsString("=== ANIMAL\u{00A0}: ", $csv);
 
         // An English account gets the English export whatever the device says.
         [$english, $englishToken] = $this->user('en');
@@ -177,7 +177,7 @@ class ExportRecordsLocaleTest extends TestCase
         $this->assertStringContainsString('Préparé pour Zoé Núñez · Exporté le '.$this->today('fr', 'D MMMM YYYY'), $text);
         $this->assertStringContainsString('¿Toño?', $text);
         $this->assertStringContainsString('Chien · Golden Retriever · Femelle · Né(e) le 3 sept. 2020', $text);
-        $this->assertStringContainsString('Pucé : oui', $text);
+        $this->assertStringContainsString("Pucé\u{00A0}: oui", $text);
         // Stored decimals take the language's decimal mark (pet and weight log).
         $this->assertSame(2, substr_count($text, '12,5 kg'));
         $this->assertStringNotContainsString('12.5', $text);
@@ -190,7 +190,7 @@ class ExportRecordsLocaleTest extends TestCase
         $this->assertStringContainsString('analyse', $text);     // document category
         $this->assertStringContainsString('1 mars 2024', $text);
         $this->assertStringContainsString('20 févr. 2024', $text);
-        $this->assertStringContainsString('10 mai 2025 10:00', $text);
+        $this->assertStringContainsString('10 mai 2025 à 10:00', $text);
         $this->assertStringContainsString('15 janv. 2025', $text);
         $this->assertStringContainsString('Vos dossiers vous appartiennent', $text);
         // Typed data is shown as entered.

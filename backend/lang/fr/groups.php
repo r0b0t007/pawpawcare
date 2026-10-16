@@ -7,7 +7,7 @@ return [
 
     'dog_lovers' => [
         'name' => 'Amoureux des chiens',
-        'description' => 'Tout sur les chiens — conseils d\'éducation, informations sur les races et jolies photos.',
+        'description' => "Tout sur les chiens\u{00A0}: conseils d'éducation, informations sur les races et jolies photos.",
     ],
     'cat_parents' => [
         'name' => 'Parents de chats',
@@ -23,7 +23,7 @@ return [
     ],
     'exotic_pets' => [
         'name' => 'Animaux exotiques',
-        'description' => 'Lapins, oiseaux, reptiles — du soutien pour ces compagnons uniques.',
+        'description' => "Lapins, oiseaux, reptiles\u{00A0}: du soutien pour ces compagnons uniques.",
     ],
 
 ];
