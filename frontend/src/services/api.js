@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { File as FileSystemFile } from 'expo-file-system';
 import { API_URL } from '../config';
-import { currentLocale } from '../i18n';
+import i18n, { currentLocale } from '../i18n';
 import {
   getTokens, storeTokens, clearTokens, storePendingLogout, getPendingLogout, clearPendingLogout,
 } from './tokenStorage';
@@ -24,7 +24,8 @@ export const languageHeaders = () => ({ 'Accept-Language': currentLocale() });
  */
 export function networkError(cause, url) {
   if (__DEV__) console.log('[API ERROR]', cause?.message, 'URL was:', url);
-  const err = new Error(`Network error: ${cause?.message || 'unknown'}${__DEV__ && url ? ` (${url})` : ''}`);
+  const reason = cause?.message || i18n.t('common.errors.networkUnknown');
+  const err = new Error(`${i18n.t('common.errors.network', { cause: reason })}${__DEV__ && url ? ` (${url})` : ''}`);
   err.isNetworkError = true;
   return err;
 }
@@ -67,7 +68,7 @@ export async function refreshAccessToken() {
       throw new Error('SESSION_EXPIRED');
     }
     if (!res.ok) {
-      const err = new Error(`Couldn't refresh your session (${res.status})`);
+      const err = new Error(i18n.t('common.errors.refreshFailed', { status: res.status }));
       err.status = res.status;
       throw err;
     }
@@ -121,8 +122,8 @@ export async function request(method, path, body, { skipAuth = false } = {}) {
   const data = await res.json().catch(() => null);
 
   if (!res.ok) {
-    const msg = data?.detail || `Request failed (${res.status})`;
-    const err = new Error(Array.isArray(msg) ? msg[0]?.msg ?? 'Validation error' : msg);
+    const msg = data?.detail || i18n.t('common.errors.requestFailed', { status: res.status });
+    const err = new Error(Array.isArray(msg) ? msg[0]?.msg ?? i18n.t('common.errors.validation') : msg);
     err.status = res.status;
     if (data?.code) err.code = data.code;
     if (data?.feature) err.feature = data.feature; // 402 upgrade_required
@@ -188,7 +189,7 @@ export async function uploadImage(localUri) {
 
   if (!res.ok) {
     const data = await res.json().catch(() => null);
-    throw new Error(data?.detail || `Image upload failed (${res.status})`);
+    throw new Error(data?.detail || i18n.t('common.errors.imageUploadFailed', { status: res.status }));
   }
   const data = await res.json();
   return data.url; // relative /storage/... path, resolved client-side
@@ -230,7 +231,7 @@ export async function uploadDocument(petId, file, fields = {}) {
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(data?.detail || `Document upload failed (${res.status})`);
+    throw new Error(data?.detail || i18n.t('common.errors.documentUploadFailed', { status: res.status }));
   }
   return data; // the created document record
 }

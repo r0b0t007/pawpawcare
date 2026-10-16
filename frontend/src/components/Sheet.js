@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ui, type, radii, motion } from '../theme';
 import { project, rubberband } from './motion';
 import AnimatedModal from './AnimatedModal';
+import { useTranslation } from '../i18n';
 
 // Bottom sheet: dim backdrop (tap to close), radius-28 top corners, and a drag
 // handle that actually drags — grab the handle/title zone to dismiss. Velocity
@@ -29,6 +30,7 @@ const KEYBOARD_HIDE = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidH
 const KEYBOARD_MAX_MS = 250;
 
 export default function Sheet({ visible, onClose, title, children, style }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const height = useSharedValue(0); // measured sheet height
@@ -187,7 +189,7 @@ export default function Sheet({ visible, onClose, title, children, style }) {
             style={StyleSheet.absoluteFill}
             onPress={onClose}
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={t('common.close')}
           />
         </Animated.View>
         <Animated.View

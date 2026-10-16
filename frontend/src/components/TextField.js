@@ -2,6 +2,7 @@ import React, { forwardRef, useState } from 'react';
 import { View, Text, TextInput, Pressable } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ui, radii } from '../theme';
+import { useTranslation } from '../i18n';
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
@@ -20,6 +21,7 @@ const TextField = forwardRef(function TextField(
   },
   ref,
 ) {
+  const { t } = useTranslation();
   const [focused, setFocused] = useState(false);
   const [ownShown, setOwnShown] = useState(false);
   const shown = revealed ?? ownShown;
@@ -79,7 +81,7 @@ const TextField = forwardRef(function TextField(
             onPress={toggle}
             hitSlop={HIT}
             accessibilityRole="button"
-            accessibilityLabel={`${shown ? 'Hide' : 'Show'} ${toggleLabel || 'password'}`}
+            accessibilityLabel={t(shown ? 'common.hideSecret' : 'common.showSecret', { label: toggleLabel || t('common.password') })}
           >
             <MaterialCommunityIcons name={shown ? 'eye-off-outline' : 'eye-outline'} size={20} color={ui.subtle} />
           </Pressable>

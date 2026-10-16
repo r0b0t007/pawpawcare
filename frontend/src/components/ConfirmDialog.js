@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { ui, radii } from '../theme';
 import Button from './Button';
 import AnimatedModal from './AnimatedModal';
+import { useTranslation } from '../i18n';
 
 // 280-wide centered dialog. Destructive confirms get the danger button —
 // every delete in the app goes through this, never a bare trash icon.
@@ -20,12 +21,13 @@ export default function ConfirmDialog({
   visible,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   destructive,
   onConfirm,
   onCancel,
 }) {
+  const { t } = useTranslation();
   // Opened from a screen that still has the keyboard up (taps pass through
   // FormScrollView): close it, or it covers the buttons and the toast after.
   useEffect(() => {
@@ -82,14 +84,14 @@ export default function ConfirmDialog({
                 <Button
                   small
                   variant="soft"
-                  label={cancelLabel}
+                  label={cancelLabel ?? t('common.cancel')}
                   onPress={onCancel}
                   style={{ flex: 1 }}
                 />
                 <Button
                   small
                   variant={destructive ? 'danger' : 'primary'}
-                  label={confirmLabel}
+                  label={confirmLabel ?? t('common.confirm')}
                   onPress={handleConfirm}
                   style={{ flex: 1 }}
                 />
