@@ -7,6 +7,7 @@ import { get, post, del } from '../../services/api';
 import { resolveAsset } from '../../config';
 import { ui, type, radii, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast, ScreenHeader, EmptyState } from '../../components';
+import i18n, { useTranslation } from '../../i18n';
 
 // Admin-only review queue (Profile → Moderation). Lists every community post
 // with open reports — including ones auto-hidden from the feed at 3+ reports —
@@ -16,12 +17,13 @@ import { Card, Button, ConfirmDialog, showToast, ScreenHeader, EmptyState } from
 
 function timeAgo(iso) {
   const diff = (Date.now() - new Date(iso)) / 1000;
-  if (diff < 3600) return `${Math.max(1, Math.floor(diff / 60))}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 3600) return i18n.t('moderation.minutesAgo', { count: Math.max(1, Math.floor(diff / 60)) });
+  if (diff < 86400) return i18n.t('moderation.hoursAgo', { count: Math.floor(diff / 3600) });
+  return i18n.t('moderation.daysAgo', { count: Math.floor(diff / 86400) });
 }
 
 export default function ModerationScreen({ navigation }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -39,7 +41,7 @@ export default function ModerationScreen({ navigation }) {
       setHasMore(!!data?.has_more);
       nextPageRef.current = 2;
     } catch (e) {
-      showToast(e?.message || 'Could not load reports — try again');
+      showToast(e?.message || i18n.t('moderation.loadFailed'));
     }
   }, []);
 
@@ -68,7 +70,7 @@ export default function ModerationScreen({ navigation }) {
       setHasMore(!!data?.has_more);
       nextPageRef.current += 1;
     } catch (e) {
-      showToast(e?.message || 'Could not load more — try again');
+      showToast(e?.message || t('moderation.loadMoreFailed'));
     } finally {
       setLoadingMore(false);
     }
@@ -82,9 +84,9 @@ export default function ModerationScreen({ navigation }) {
     try {
       await post(`/admin/posts/${postId}/dismiss-reports`);
       removeFromList(postId);
-      showToast('Reports dismissed — post restored');
+      showToast(t('moderation.dismissed'));
     } catch (e) {
-      showToast(e?.message || 'Could not dismiss — try again');
+      showToast(e?.message || t('moderation.dismissFailed'));
     } finally {
       setBusyId(null);
     }
@@ -96,9 +98,9 @@ export default function ModerationScreen({ navigation }) {
     try {
       await del(`/admin/posts/${postId}`);
       removeFromList(postId);
-      showToast('Post removed');
+      showToast(t('moderation.removed'));
     } catch (e) {
-      showToast(e?.message || 'Could not remove — try again');
+      showToast(e?.message || t('moderation.removeFailed'));
     } finally {
       setBusyId(null);
     }
@@ -113,7 +115,7 @@ export default function ModerationScreen({ navigation }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />
         }
       >
-        <ScreenHeader title="Moderation" onBack={() => navigation.goBack()} />
+        <ScreenHeader title={t('moderation.title')} onBack={() => navigation.goBack()} />
 
         {loading ? (
           <ActivityIndicator size="large" color={ui.accent} style={styles.spinner} />
@@ -122,8 +124,8 @@ export default function ModerationScreen({ navigation }) {
             compact
             style={styles.emptyState}
             photo={photos.communityPals}
-            title="All clear"
-            body="No open reports right now."
+            title={t('moderation.emptyTitle')}
+            body={t('moderation.emptyBody')}
           />
         ) : (
           <>
@@ -131,7 +133,7 @@ export default function ModerationScreen({ navigation }) {
             <Card key={p.id} style={styles.itemCard}>
               <View style={styles.itemHeader}>
                 <Text style={styles.author} numberOfLines={1}>
-                  {p.author_name || 'Unknown'}
+                  {p.author_name || t('moderation.unknownAuthor')}
                 </Text>
                 <Text style={styles.time}>{timeAgo(p.created_at)}</Text>
               </View>
@@ -147,9 +149,7 @@ export default function ModerationScreen({ navigation }) {
               <View style={styles.pillRow}>
                 <View style={[styles.pill, hidden ? styles.pillDanger : styles.pillWarn]}>
                   <Text style={[styles.pillText, { color: hidden ? ui.dangerText : ui.warnText }]}>
-                    {hidden
-                      ? `${count} reports · hidden from feed`
-                      : `${count} report${count === 1 ? '' : 's'}`}
+                    {t(hidden ? 'moderation.reportsHidden' : 'moderation.reports', { count })}
                   </Text>
                 </View>
               </View>
@@ -158,7 +158,7 @@ export default function ModerationScreen({ navigation }) {
                 <Button
                   small
                   variant="ghost"
-                  label="Dismiss reports"
+                  label={t('moderation.dismiss')}
                   onPress={() => handleDismiss(p.id)}
                   disabled={busyId === p.id}
                   style={{ flex: 1 }}
@@ -166,7 +166,7 @@ export default function ModerationScreen({ navigation }) {
                 <Button
                   small
                   variant="danger"
-                  label="Remove post"
+                  label={t('moderation.remove')}
                   onPress={() => setConfirmRemove(p.id)}
                   disabled={busyId === p.id}
                   style={{ flex: 1 }}
@@ -179,7 +179,7 @@ export default function ModerationScreen({ navigation }) {
                 <Button
                   small
                   variant="ghost"
-                  label={loadingMore ? 'Loading…' : 'Load more'}
+                  label={loadingMore ? t('common.loading') : t('common.loadMore')}
                   onPress={loadMore}
                   disabled={loadingMore}
                 />
@@ -191,9 +191,9 @@ export default function ModerationScreen({ navigation }) {
 
       <ConfirmDialog
         visible={!!confirmRemove}
-        title="Remove this post?"
-        message="It disappears for everyone. This can't be undone."
-        confirmLabel="Remove"
+        title={t('moderation.removeTitle')}
+        message={t('moderation.removeMessage')}
+        confirmLabel={t('moderation.removeConfirm')}
         destructive
         onConfirm={() => handleRemove(confirmRemove)}
         onCancel={() => setConfirmRemove(null)}

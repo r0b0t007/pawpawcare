@@ -3,9 +3,10 @@
 // device; on Android the device language is re-read on return to foreground
 // while the setting follows the device.
 //
-// Detection ships switched off (./rollout) until every CHW-187 screen is
-// translated: the app then starts in English and only an explicit choice
-// changes it. Both modes are covered; `follow` picks one per test.
+// Detection is switched on in ./rollout since CHW-191 (every screen is
+// translated). Off is the kill switch: the app then starts in English and only
+// an explicit choice changes it. Both modes are covered; `follow` picks one
+// per test (default: on, as shipped).
 let mockFollowDevice = true;
 jest.mock('../rollout', () => ({
   get FOLLOW_DEVICE_LANGUAGE() {
@@ -64,6 +65,18 @@ test.each([
   expect(i18n.t('languages.device')).toBeTruthy();
 });
 
+test('device-language detection ships switched on', () => {
+  expect(jest.requireActual('../rollout').FOLLOW_DEVICE_LANGUAGE).toBe(true);
+});
+
+test('with nothing saved, the setting is "Device default" and it is offered first', async () => {
+  const { initI18n, LANGUAGE_CHOICES, languageChoice, currentLocale } = load({ device: 'fr' });
+  expect(LANGUAGE_CHOICES).toEqual(['device', 'en', 'fr', 'es']);
+  expect(await initI18n()).toBe('fr');
+  expect(languageChoice()).toBe('device');
+  expect(currentLocale()).toBe('fr');
+});
+
 test('a saved language wins over the device language', async () => {
   const { initI18n, currentLocale, languageChoice } = load({ device: 'fr', saved: 'es' });
   expect(await initI18n()).toBe('es');
@@ -113,7 +126,7 @@ test('iOS restarts the app on a language change, so no listener there', async ()
   expect(appStateListener).toBeNull();
 });
 
-describe('before the device-language rollout (FOLLOW_DEVICE_LANGUAGE off)', () => {
+describe('with detection switched off (FOLLOW_DEVICE_LANGUAGE false, the kill switch)', () => {
   test.each(['fr', 'es', 'de'])('a %s device still starts in English', async (device) => {
     const { initI18n, currentLocale, intlLocale, languageChoice } = load({ device, follow: false });
     expect(currentLocale()).toBe('en');
@@ -143,4 +156,13 @@ describe('before the device-language rollout (FOLLOW_DEVICE_LANGUAGE off)', () =
     await initI18n();
     expect(appStateListener).toBeNull();
   });
+});
+
+// CHW-191 review: French birthday line ("fête ses 1 an" was ungrammatical).
+test.each([
+  [1, "Luna a 1 an aujourd'hui"],
+  [3, "Luna a 3 ans aujourd'hui"],
+])('French birthday line for %i', (count, expected) => {
+  const { default: i18n } = load({ device: 'fr' });
+  expect(i18n.t('home.celebration.turns', { name: 'Luna', count })).toBe(expected);
 });

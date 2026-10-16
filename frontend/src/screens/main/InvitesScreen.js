@@ -6,12 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { useTranslation } from '../../i18n';
 import { ui, type, radii, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast, FormScrollView, ScreenHeader, EmptyState } from '../../components';
 
 // Invites are addressed by email, and signup never proves the address — so
 // the server hides them until the account confirms it with an emailed code.
 function VerifyEmailCard({ email, onVerified }) {
+  const { t } = useTranslation();
   const { sendEmailVerification, confirmEmailVerification } = useAuth();
   const [step, setStep] = useState('intro'); // 'intro' | 'code'
   const [code, setCode] = useState('');
@@ -25,32 +27,32 @@ function VerifyEmailCard({ email, onVerified }) {
     try {
       if (await sendEmailVerification() === 'already_verified') {
         // Confirmed elsewhere; the refreshed user hides this card.
-        showToast('Your email is already confirmed');
+        showToast(t('invites.verify.alreadyConfirmed'));
         setBusy(false);
         await onVerified();
         return;
       }
       setStep('code');
-      showToast('Code sent — check your email');
+      showToast(t('invites.verify.codeSent'));
     } catch (e) {
-      setError(e?.message || 'Could not send the code — try again.');
+      setError(e?.message || t('invites.verify.sendFailed'));
     }
     setBusy(false);
   };
 
   const confirm = async () => {
     if (code.trim().length !== 6) {
-      setError('Enter the 6-digit code from your email.');
+      setError(t('invites.verify.badCode'));
       return;
     }
     setBusy(true);
     setError(null);
     try {
       await confirmEmailVerification(code.trim());
-      showToast('Email confirmed');
+      showToast(t('invites.verify.confirmed'));
       await onVerified();
     } catch (e) {
-      setError(e?.message || 'That code didn’t work — try again.');
+      setError(e?.message || t('invites.verify.codeFailed'));
       setBusy(false);
     }
   };
@@ -60,11 +62,11 @@ function VerifyEmailCard({ email, onVerified }) {
       <View style={styles.verifyIcon}>
         <MaterialCommunityIcons name="email-check-outline" size={34} color={ui.accent} />
       </View>
-      <Text style={styles.verifyTitle}>Confirm your email</Text>
+      <Text style={styles.verifyTitle}>{t('invites.verify.title')}</Text>
       <Text style={styles.verifySub}>
         {step === 'intro'
-          ? `Pets are shared by email. Confirm ${email} is yours and invitations sent to it will appear here.`
-          : `We sent a 6-digit code to ${email}. It's valid for 30 minutes.`}
+          ? t('invites.verify.intro', { email })
+          : t('invites.verify.codeSentBody', { email })}
       </Text>
 
       {step === 'code' && (
@@ -87,18 +89,36 @@ function VerifyEmailCard({ email, onVerified }) {
 
       <Button
         pill
-        label={step === 'intro' ? (busy ? 'Sending…' : 'Send code') : (busy ? 'Confirming…' : 'Confirm')}
+        label={
+          step === 'intro'
+            ? busy ? t('invites.verify.sending') : t('invites.verify.send')
+            : busy ? t('invites.verify.confirming') : t('invites.verify.confirm')
+        }
         disabled={busy}
         onPress={step === 'intro' ? send : confirm}
         style={styles.verifyBtn}
       />
       {step === 'code' && (
         <Pressable accessibilityRole="button" onPress={send} disabled={busy} style={styles.resendLink}>
-          <Text style={styles.resendLinkText}>Send a new code</Text>
+          <Text style={styles.resendLinkText}>{t('invites.verify.resend')}</Text>
         </Pressable>
       )}
     </Card>
   );
+}
+
+// "<b>Sam</b> invited you to co-own <b>Bella</b>": the names are user data,
+// so they're spliced in as bold Text nodes, never parsed out of the string.
+const INVITER = '\u0001';
+const PET = '\u0002';
+function invitedYou(t, inv) {
+  const names = { [INVITER]: inv.inviterName, [PET]: inv.petName };
+  return t('invites.invitedYou', { inviter: INVITER, pet: PET })
+    .split(/([\u0001\u0002])/)
+    .filter(Boolean)
+    .map((part, i) => (part in names
+      ? <Text key={i} style={styles.bold}>{names[part]}</Text>
+      : part));
 }
 
 const TYPE_ICON = {
@@ -108,6 +128,7 @@ const TYPE_ICON = {
 };
 
 export default function InvitesScreen({ navigation }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { invites, refreshInvites, acceptInvite, declineInvite } = useData();
   // Explicit false only: an older API without the flag never hides the list.
@@ -134,21 +155,21 @@ export default function InvitesScreen({ navigation }) {
   };
 
   const onAccept = async (inv) => {
-    if (await respond(inv.id, 'accept')) showToast(`You're now caring for ${inv.petName}`);
-    else showToast(`Couldn't accept the invite for ${inv.petName}. Try again.`);
+    if (await respond(inv.id, 'accept')) showToast(t('invites.accepted', { pet: inv.petName }));
+    else showToast(t('invites.acceptFailed', { pet: inv.petName }));
   };
 
   const confirmDecline = async () => {
     const inv = pendingDecline;
     setPendingDecline(null);
     if (!inv) return;
-    if (await respond(inv.id, 'decline')) showToast('Invitation declined');
-    else showToast("Couldn't decline the invitation. Try again.");
+    if (await respond(inv.id, 'decline')) showToast(t('invites.declined'));
+    else showToast(t('invites.declineFailed'));
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScreenHeader title="Invitations" onBack={() => navigation.goBack()} />
+      <ScreenHeader title={t('invites.title')} onBack={() => navigation.goBack()} />
 
       <FormScrollView
         contentContainerStyle={styles.scroll}
@@ -161,8 +182,8 @@ export default function InvitesScreen({ navigation }) {
             compact
             style={styles.emptyState}
             photo={photos.emptyKitten}
-            title="No pending invitations"
-            body="When someone shares a pet with you, the invite will appear here."
+            title={t('invites.emptyTitle')}
+            body={t('invites.emptyBody')}
           />
         ) : (
           invites.map((inv) => (
@@ -177,8 +198,7 @@ export default function InvitesScreen({ navigation }) {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.inviteText} numberOfLines={2}>
-                    <Text style={styles.bold}>{inv.inviterName}</Text> invited you to co-own{' '}
-                    <Text style={styles.bold}>{inv.petName}</Text>
+                    {invitedYou(t, inv)}
                   </Text>
                   {!!inv.inviterEmail && <Text style={styles.inviteSub}>{inv.inviterEmail}</Text>}
                 </View>
@@ -186,7 +206,7 @@ export default function InvitesScreen({ navigation }) {
               <View style={styles.inviteActions}>
                 <Button
                   pill
-                  label="Accept"
+                  label={t('invites.accept')}
                   icon="check"
                   disabled={busyId === inv.id}
                   onPress={() => onAccept(inv)}
@@ -195,7 +215,7 @@ export default function InvitesScreen({ navigation }) {
                 <Button
                   pill
                   variant="ghost"
-                  label="Decline"
+                  label={t('invites.decline')}
                   disabled={busyId === inv.id}
                   onPress={() => setPendingDecline(inv)}
                   style={{ flex: 1 }}
@@ -208,9 +228,9 @@ export default function InvitesScreen({ navigation }) {
 
       <ConfirmDialog
         visible={!!pendingDecline}
-        title="Decline invitation?"
-        message={pendingDecline ? `${pendingDecline.inviterName} will need to invite you again if you change your mind.` : ''}
-        confirmLabel="Decline"
+        title={t('invites.declineTitle')}
+        message={pendingDecline ? t('invites.declineMessage', { inviter: pendingDecline.inviterName }) : ''}
+        confirmLabel={t('invites.decline')}
         destructive
         onConfirm={confirmDecline}
         onCancel={() => setPendingDecline(null)}

@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useTranslation } from '../../i18n';
 import { ui, type, motion, photos } from '../../theme';
 import { Button, TextField, ScreenHeader, PhotoBand, FormError, FormScrollView } from '../../components';
 import SocialAuthButtons from '../../components/SocialAuthButtons';
@@ -22,8 +23,9 @@ const MIN_PASSWORD = 6;
 
 // A rule the password meets (or doesn't yet) — icon + word, never color alone.
 function Rule({ met, label }) {
+  const { t } = useTranslation();
   return (
-    <View style={styles.rule} accessible accessibilityRole="text" accessibilityLabel={`${label}${met ? ', done' : ''}`}>
+    <View style={styles.rule} accessible accessibilityRole="text" accessibilityLabel={met ? t('auth.signup.ruleDone', { rule: label }) : label}>
       <MaterialCommunityIcons
         importantForAccessibility="no"
         accessibilityElementsHidden
@@ -37,12 +39,14 @@ function Rule({ met, label }) {
 }
 
 export default function SignupScreen({ navigation }) {
+  const { t } = useTranslation();
   const { signup, error, isLoading, clearError } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [showPwd, setShowPwd] = useState(false);
+  // An i18n key, so the message follows a language change while shown.
   const [localError, setLocalError] = useState(null);
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
@@ -62,15 +66,15 @@ export default function SignupScreen({ navigation }) {
   const handleSignup = () =>
     !isLoading && run('signup', async () => {
       if (!name.trim() || !email.trim() || !password || !confirmPwd) {
-        setLocalError('Fill in each field to create your account.');
+        setLocalError('auth.signup.missingFields');
         return;
       }
       if (password !== confirmPwd) {
-        setLocalError("The two passwords don't match yet. Try typing them again.");
+        setLocalError('auth.signup.mismatch');
         return;
       }
       if (password.length < MIN_PASSWORD) {
-        setLocalError(`Use at least ${MIN_PASSWORD} characters for your password.`);
+        setLocalError('auth.signup.tooShort');
         return;
       }
       setLocalError(null);
@@ -78,7 +82,8 @@ export default function SignupScreen({ navigation }) {
       // On failure useAuth().error is set and rendered inline below.
     });
 
-  const displayError = localError || error;
+  const displayError = (localError && t(localError, { min: MIN_PASSWORD })) || error;
+  const minChars = t('auth.signup.minChars', { min: MIN_PASSWORD });
   const busy = isLoading || isBusy('signup');
   const longEnough = password.length >= MIN_PASSWORD;
   const matches = !!confirmPwd && password === confirmPwd;
@@ -90,13 +95,13 @@ export default function SignupScreen({ navigation }) {
 
         <PhotoBand source={photos.communityPals} height={104} />
 
-        <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Create your account</Text>
-        <Text style={styles.subtitle}>Your pack's records, safe in one place.</Text>
+        <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">{t('auth.signup.title')}</Text>
+        <Text style={styles.subtitle}>{t('auth.signup.subtitle')}</Text>
 
         <View style={styles.form}>
           <TextField
-            label="Your name"
-            placeholder="e.g. Ahmed"
+            label={t('auth.signup.nameLabel')}
+            placeholder={t('auth.signup.namePlaceholder')}
             value={name}
             onChangeText={onChange(setName)}
             autoCapitalize="words"
@@ -110,8 +115,8 @@ export default function SignupScreen({ navigation }) {
 
           <TextField
             ref={emailRef}
-            label="Email"
-            placeholder="you@example.com"
+            label={t('auth.emailLabel')}
+            placeholder={t('auth.emailPlaceholder')}
             value={email}
             onChangeText={onChange(setEmail)}
             keyboardType="email-address"
@@ -127,12 +132,12 @@ export default function SignupScreen({ navigation }) {
           {/* One toggle reveals both password fields. */}
           <TextField
             ref={passwordRef}
-            label="Password"
+            label={t('auth.passwordLabel')}
             secure
             revealed={showPwd}
             onToggleReveal={() => setShowPwd((v) => !v)}
-            toggleLabel="passwords"
-            placeholder={`${MIN_PASSWORD}+ characters`}
+            toggleLabel={t('auth.signup.passwordsToggle')}
+            placeholder={minChars}
             value={password}
             onChangeText={onChange(setPassword)}
             textContentType="newPassword"
@@ -144,11 +149,11 @@ export default function SignupScreen({ navigation }) {
 
           <TextField
             ref={confirmRef}
-            label="Confirm password"
+            label={t('auth.confirmPasswordLabel')}
             secure
             revealed={showPwd}
             showToggle={false}
-            placeholder="Repeat password"
+            placeholder={t('auth.signup.confirmPlaceholder')}
             value={confirmPwd}
             onChangeText={onChange(setConfirmPwd)}
             textContentType="newPassword"
@@ -156,8 +161,8 @@ export default function SignupScreen({ navigation }) {
             onSubmitEditing={handleSignup}
           >
             <View style={styles.rules}>
-              <Rule met={longEnough} label={`${MIN_PASSWORD}+ characters`} />
-              <Rule met={matches} label="Passwords match" />
+              <Rule met={longEnough} label={minChars} />
+              <Rule met={matches} label={t('auth.signup.rulesMatch')} />
             </View>
           </TextField>
         </View>
@@ -165,7 +170,7 @@ export default function SignupScreen({ navigation }) {
         <FormError message={displayError} style={styles.formError} />
 
         <Button
-          label={busy ? 'Creating account…' : 'Create account'}
+          label={busy ? t('auth.signup.submitting') : t('auth.signup.submit')}
           onPress={handleSignup}
           disabled={busy}
           style={styles.submitBtn}
@@ -182,7 +187,7 @@ export default function SignupScreen({ navigation }) {
           hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
           accessibilityRole="link"
         >
-          <Text style={styles.switchLinkText}>Already have an account? Log in</Text>
+          <Text style={styles.switchLinkText}>{t('auth.signup.toLogin')}</Text>
         </Pressable>
       </FormScrollView>
     </SafeAreaView>

@@ -174,3 +174,15 @@ test('a failure keeps the message and shows why', async () => {
   expect(input(tree).props.value).toBe('It crashed');
   expect(navigation.goBack).not.toHaveBeenCalled();
 });
+
+test('speaks French when the app does', async () => {
+  const i18n = require('../../../i18n').default;
+  await act(async () => { await i18n.changeLanguage('fr'); });
+  try {
+    const tree = await render();
+    expect(texts(tree)).toContain('Aide et commentaires');
+    expect(chip(tree, 'Problème')).toBeTruthy();
+  } finally {
+    await act(async () => { await i18n.changeLanguage('en'); });
+  }
+});

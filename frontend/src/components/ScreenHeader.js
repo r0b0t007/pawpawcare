@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ui, type, motion } from '../theme';
+import { useTranslation } from '../i18n';
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
@@ -14,6 +15,7 @@ const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 // `flush` drops the side and top padding for screens whose scroll view
 // already pads its content (form screens), instead of each overriding it.
 export default function ScreenHeader({ title, subtitle, onBack, avatar, right, flush, style }) {
+  const { t } = useTranslation();
   return (
     <View
       style={[
@@ -33,7 +35,7 @@ export default function ScreenHeader({ title, subtitle, onBack, avatar, right, f
           onPress={onBack}
           hitSlop={HIT}
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t('common.back')}
           style={({ pressed }) => [
             {
               width: 42,

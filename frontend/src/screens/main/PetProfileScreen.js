@@ -12,12 +12,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { petPhoto } from '../../utils/pets';
+import { breedLabel, petPhoto } from '../../utils/pets';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
 import { fmtDate, fmtFull, fmtMonth, fmtShort, fmtTime, parseDay } from '../../utils/dates';
-import { useLocale } from '../../i18n';
+import { useLocale, useTranslation } from '../../i18n';
 import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
@@ -43,22 +43,25 @@ const SEGMENT_IN = FadeIn.duration(150);
 const ROW_OUT = FadeOut.duration(150);
 const ROW_LAYOUT = LinearTransition.duration(200);
 
+// Every string on this screen comes from i18n (src/i18n/*.json,
+// `petProfile.*`, plus `pets.types` / `pets.genders`); pet names, med names,
+// notes and other user-entered data are interpolated as typed. Labels below
+// are i18n keys; the ids are what the API stores.
 const EXPENSE_CATEGORIES = [
-  { id: 'vet', label: 'Vet', icon: 'medical-bag' },
-  { id: 'food', label: 'Food', icon: 'food-drumstick' },
-  { id: 'grooming', label: 'Grooming', icon: 'content-cut' },
-  { id: 'medication', label: 'Meds', icon: 'pill' },
-  { id: 'supplies', label: 'Supplies', icon: 'package-variant' },
-  { id: 'insurance', label: 'Insurance', icon: 'shield-check' },
-  { id: 'other', label: 'Other', icon: 'tag-outline' },
+  { id: 'vet', icon: 'medical-bag' },
+  { id: 'food', icon: 'food-drumstick' },
+  { id: 'grooming', icon: 'content-cut' },
+  { id: 'medication', icon: 'pill' },
+  { id: 'supplies', icon: 'package-variant' },
+  { id: 'insurance', icon: 'shield-check' },
+  { id: 'other', icon: 'tag-outline' },
 ];
 const catMeta = (id) => EXPENSE_CATEGORIES.find((c) => c.id === id) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1];
 
-const SEGMENTS = [
-  { value: 'overview', label: 'Overview' },
-  { value: 'health', label: 'Health' },
-  { value: 'notes', label: 'Notes' },
-];
+const SEGMENT_IDS = ['overview', 'health', 'notes'];
+
+// Medication frequency ids -> i18n keys under petProfile.frequency.
+const freqKey = (f) => (f === 'as_needed' ? 'asNeeded' : f);
 
 // '' for a missing date (callers supply their own fallback text).
 const shortDate = (iso) => (iso ? fmtShort(parseDay(iso)) : '');
@@ -68,11 +71,12 @@ const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
 
 const HERO_HEIGHT = 400;
 
+// `key` is under petProfile.vaxStatus.
 const vaxPill = (v) => (v.status === 'overdue'
-  ? { status: 'overdue', label: 'Overdue' }
+  ? { status: 'overdue', key: 'overdue' }
   : v.status === 'due_soon'
-    ? { status: 'due', label: 'Due soon' }
-    : { status: 'ok', label: 'Scheduled' });
+    ? { status: 'due', key: 'dueSoon' }
+    : { status: 'ok', key: 'scheduled' });
 
 // Stable fallback so the weight memos don't recompute for pets with no entries.
 const NO_WEIGHTS = [];
@@ -80,7 +84,8 @@ const NO_WEIGHTS = [];
 export default function PetProfileScreen({ navigation, route }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
-  useLocale();
+  const locale = useLocale();
+  const { t } = useTranslation();
   const { petId } = route.params;
   const {
     pets, myReports, medDoseDays, medDoseCounts, addFavoriteFood, removeFavoriteFood, addActivity,
@@ -177,19 +182,23 @@ export default function PetProfileScreen({ navigation, route }) {
     () => weights.map((w) => ({ id: w.id, loggedAt: w.loggedAt, value: convertWeight(w.weight, w.unit, wUnit) })),
     [weights, wUnit],
   );
-  const wInsight = useMemo(() => weightInsight(normWeights, wUnit), [normWeights, wUnit]);
+  // The summary sentence is built in the app language: rebuild it on a switch.
+  const wInsight = useMemo(() => weightInsight(normWeights, wUnit), [normWeights, wUnit, locale]);
 
   if (!pet) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={[type.body, { color: ui.sub }]}>Pet not found.</Text>
+          <Text style={[type.body, { color: ui.sub }]}>{t('petProfile.notFound')}</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   // ── Handlers ──
+
+  const catLabel = (id) => t(`petProfile.expenseCategories.${catMeta(id).id}`);
+  const segments = SEGMENT_IDS.map((value) => ({ value, label: t(`petProfile.segments.${value}`) }));
 
   // Every save goes through here: one request per tap (useInFlight — a
   // double tap never saves twice), and the success copy (plus clearing the
@@ -208,21 +217,21 @@ export default function PetProfileScreen({ navigation, route }) {
   const handleAddFood = () => {
     if (!newFood.trim()) return undefined;
     return save('food', () => addFavoriteFood(petId, newFood.trim()), {
-      ok: 'Food added',
-      fail: "Couldn't add that food. Try again.",
+      ok: t('petProfile.toast.foodAdded'),
+      fail: t('petProfile.toast.foodAddFailed'),
       then: () => setNewFood(''),
     });
   };
 
   // Deletes only behind a confirm, like every other × on this screen.
   const handleRemoveFood = (food) => askConfirm({
-    title: 'Remove food?',
-    message: `Remove ${food.name} from ${pet.name}'s favorite foods?`,
-    confirmLabel: 'Remove',
+    title: t('petProfile.confirm.removeFoodTitle'),
+    message: t('petProfile.confirm.removeFoodMessage', { food: food.name, name: pet.name }),
+    confirmLabel: t('petProfile.confirm.remove'),
     destructive: true,
     action: () => save(`food-${food.id}`, () => removeFavoriteFood(petId, food.id), {
-      ok: 'Food removed',
-      fail: "Couldn't remove that food. Try again.",
+      ok: t('petProfile.toast.foodRemoved'),
+      fail: t('petProfile.toast.foodRemoveFailed'),
     }),
   });
 
@@ -234,8 +243,8 @@ export default function PetProfileScreen({ navigation, route }) {
       timeOfDay: newActivity.timeOfDay,
       icon: newActivity.icon,
     }), {
-      ok: 'Activity added',
-      fail: "Couldn't add the activity. Try again.",
+      ok: t('petProfile.toast.activityAdded'),
+      fail: t('petProfile.toast.activityAddFailed'),
       then: () => {
         setNewActivity({ name: '', duration: '', timeOfDay: 'morning', icon: 'run' });
         setActivitySheet(false);
@@ -253,8 +262,8 @@ export default function PetProfileScreen({ navigation, route }) {
       times: asNeeded ? [] : (newMed.times.length ? [...newMed.times].sort() : ['08:00']),
       notes: newMed.notes.trim() || null,
     }), {
-      ok: 'Medication added',
-      fail: "Couldn't add the medication. Try again.",
+      ok: t('petProfile.toast.medAdded'),
+      fail: t('petProfile.toast.medAddFailed'),
       then: () => {
         setNewMed({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
         setMedSheet(false);
@@ -262,10 +271,10 @@ export default function PetProfileScreen({ navigation, route }) {
     });
   };
 
-  const toggleMedTime = (t) => {
+  const toggleMedTime = (time) => {
     setNewMed((m) => ({
       ...m,
-      times: m.times.includes(t) ? m.times.filter((x) => x !== t) : [...m.times, t],
+      times: m.times.includes(time) ? m.times.filter((x) => x !== time) : [...m.times, time],
     }));
   };
 
@@ -274,26 +283,26 @@ export default function PetProfileScreen({ navigation, route }) {
   const handleLogDose = (med) =>
     run(med.id, async () => {
       const saved = await logMedicationDose(petId, med.id);
-      if (saved) showToast('Dose logged', { celebrate: true, actionType: 'dose_logged' });
-      else showToast(`Couldn't log ${med.name}. Try again.`);
+      if (saved) showToast(t('petProfile.toast.doseLogged'), { celebrate: true, actionType: 'dose_logged' });
+      else showToast(t('petProfile.toast.doseLogFailed', { med: med.name }));
     });
 
   const handleDeleteMedication = (med) => askConfirm({
-    title: 'Remove medication?',
-    message: `${med.name} will no longer appear on ${pet.name}'s schedule.`,
-    confirmLabel: 'Remove',
+    title: t('petProfile.confirm.removeMedTitle'),
+    message: t('petProfile.confirm.removeMedMessage', { med: med.name, name: pet.name }),
+    confirmLabel: t('petProfile.confirm.remove'),
     destructive: true,
     action: () => save(`med-del-${med.id}`, () => deleteMedication(petId, med.id), {
-      ok: 'Medication removed',
-      fail: "Couldn't remove the medication. Try again.",
+      ok: t('petProfile.toast.medRemoved'),
+      fail: t('petProfile.toast.medRemoveFailed'),
     }),
   });
 
   // A double tap here would post two public reports — the guard matters most.
   const handleReportLost = () =>
     save('report-lost', () => reportPetLost(petId, lostForm), {
-      ok: `${pet.name} reported to the community board`,
-      fail: `Couldn't report ${pet.name}. Check your connection and try again.`,
+      ok: t('petProfile.toast.reportedLost', { name: pet.name }),
+      fail: t('petProfile.toast.reportLostFailed', { name: pet.name }),
       then: () => {
         setLostForm({ lastSeenLocation: '', description: '', contactPhone: '' });
         setLostSheet(false);
@@ -303,13 +312,13 @@ export default function PetProfileScreen({ navigation, route }) {
   const handleMarkFound = () => {
     if (!activeReport) return;
     askConfirm({
-      title: 'Mark as found?',
-      message: `Has ${pet.name} been found safe?`,
-      confirmLabel: 'Found!',
+      title: t('petProfile.confirm.markFoundTitle'),
+      message: t('petProfile.confirm.markFoundMessage', { name: pet.name }),
+      confirmLabel: t('petProfile.confirm.markFoundConfirm'),
       action: () => save('found', () => resolveLostPet(activeReport.id), {
-        ok: 'Welcome home!',
+        ok: t('petProfile.toast.welcomeHome'),
         okOptions: { celebrate: true, actionType: 'lost_pet_found' },
-        fail: "Couldn't mark them found. Try again.",
+        fail: t('petProfile.toast.markFoundFailed'),
       }),
     });
   };
@@ -319,9 +328,9 @@ export default function PetProfileScreen({ navigation, route }) {
     if (!v || v <= 0) return undefined;
     // Unit is locked to the pet's unit server-side.
     return save('weight', () => addWeight(petId, { weight: v }), {
-      ok: 'Weight logged',
+      ok: t('petProfile.toast.weightLogged'),
       okOptions: { celebrate: true, actionType: 'weight_logged' },
-      fail: "Couldn't log the weight. Try again.",
+      fail: t('petProfile.toast.weightLogFailed'),
       then: () => {
         setNewWeight({ value: '' });
         setWeightSheet(false);
@@ -330,13 +339,13 @@ export default function PetProfileScreen({ navigation, route }) {
   };
 
   const handleDeleteWeight = (w) => askConfirm({
-    title: 'Delete entry?',
-    message: `Remove the ${w.value.toFixed(1)} ${wUnit} entry?`,
-    confirmLabel: 'Delete',
+    title: t('petProfile.confirm.deleteEntryTitle'),
+    message: t('petProfile.confirm.deleteEntryMessage', { value: w.value.toFixed(1), unit: wUnit }),
+    confirmLabel: t('petProfile.confirm.delete'),
     destructive: true,
     action: () => save(`weight-del-${w.id}`, () => deleteWeight(petId, w.id), {
-      ok: 'Entry deleted',
-      fail: "Couldn't delete the entry. Try again.",
+      ok: t('petProfile.toast.entryDeleted'),
+      fail: t('petProfile.toast.entryDeleteFailed'),
     }),
   });
 
@@ -344,8 +353,8 @@ export default function PetProfileScreen({ navigation, route }) {
     const amt = parseFloat(newExpense.amount);
     if (!amt || amt <= 0) return undefined;
     return save('expense', () => addExpense(petId, { category: newExpense.category, amount: amt, notes: newExpense.notes.trim() || null }), {
-      ok: 'Expense added',
-      fail: "Couldn't add the expense. Try again.",
+      ok: t('petProfile.toast.expenseAdded'),
+      fail: t('petProfile.toast.expenseAddFailed'),
       then: () => {
         setNewExpense({ category: 'vet', amount: '', notes: '' });
         setExpenseSheet(false);
@@ -354,13 +363,13 @@ export default function PetProfileScreen({ navigation, route }) {
   };
 
   const handleDeleteExpense = (e) => askConfirm({
-    title: 'Delete expense?',
-    message: `Remove this ${catMeta(e.category).label.toLowerCase()} expense?`,
-    confirmLabel: 'Delete',
+    title: t('petProfile.confirm.deleteExpenseTitle'),
+    message: t('petProfile.confirm.deleteExpenseMessage', { category: catLabel(e.category).toLowerCase() }),
+    confirmLabel: t('petProfile.confirm.delete'),
     destructive: true,
     action: () => save(`expense-del-${e.id}`, () => deleteExpense(petId, e.id), {
-      ok: 'Expense deleted',
-      fail: "Couldn't delete the expense. Try again.",
+      ok: t('petProfile.toast.expenseDeleted'),
+      fail: t('petProfile.toast.expenseDeleteFailed'),
     }),
   });
 
@@ -373,43 +382,43 @@ export default function PetProfileScreen({ navigation, route }) {
       await invitePetMember(petId, email);
       setInviteEmail('');
       await loadShare();
-      showToast('Invite sent');
+      showToast(t('petProfile.toast.inviteSent'));
     } catch (err) {
       // Surface the server message (already a member, invalid email, …).
-      setInviteError(err.message || 'Could not send the invitation.');
+      setInviteError(err.message || t('petProfile.toast.inviteFailed'));
     } finally {
       setInviteBusy(false);
     }
   };
 
   const handleRemoveMember = (member) => setTeamConfirm({
-    title: 'Remove co-owner?',
-    message: `Remove ${member.name} from ${pet.name}?`,
-    confirmLabel: 'Remove',
+    title: t('petProfile.confirm.removeMemberTitle'),
+    message: t('petProfile.confirm.removeMemberMessage', { member: member.name, name: pet.name }),
+    confirmLabel: t('petProfile.confirm.remove'),
     destructive: true,
     action: () => save(`member-${member.id}`, () => removePetMember(petId, member.id), {
-      ok: 'Co-owner removed',
-      fail: `Couldn't remove ${member.name}. Try again.`,
+      ok: t('petProfile.toast.memberRemoved'),
+      fail: t('petProfile.toast.memberRemoveFailed', { member: member.name }),
       then: loadShare,
     }),
   });
 
   const handleCancelInvite = (invite) => setTeamConfirm({
-    title: 'Cancel invitation?',
-    message: `Withdraw the invite to ${invite.email}?`,
-    confirmLabel: 'Withdraw',
+    title: t('petProfile.confirm.cancelInviteTitle'),
+    message: t('petProfile.confirm.cancelInviteMessage', { email: invite.email }),
+    confirmLabel: t('petProfile.confirm.withdraw'),
     destructive: true,
     action: () => save(`invite-${invite.id}`, () => cancelPetInvite(petId, invite.id), {
-      ok: 'Invite withdrawn',
-      fail: "Couldn't withdraw the invite. Try again.",
+      ok: t('petProfile.toast.inviteWithdrawn'),
+      fail: t('petProfile.toast.inviteWithdrawFailed'),
       then: loadShare,
     }),
   });
 
   const leaveConfig = () => ({
-    title: 'Leave pet?',
-    message: `Stop co-owning ${pet.name}? You'll lose access to its records.`,
-    confirmLabel: 'Leave',
+    title: t('petProfile.confirm.leaveTitle'),
+    message: t('petProfile.confirm.leaveMessage', { name: pet.name }),
+    confirmLabel: t('petProfile.confirm.leave'),
     destructive: true,
     // Navigate away first so the pet vanishing from state can't flash a
     // "Pet not found" frame; the detach then completes in the background.
@@ -439,12 +448,12 @@ export default function PetProfileScreen({ navigation, route }) {
     .filter((v) => v.dueDate)
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
   const healthTileValue = vaxUnknown
-    ? "Couldn't load vaccines"
+    ? t('petProfile.overview.couldntLoadVaccines')
     : nextVax
     ? `${nextVax.name} · ${fmtShort(parseDay(nextVax.dueDate))}`
     : completedVax.length
-      ? `${completedVax.length} ${completedVax.length === 1 ? 'vaccine' : 'vaccines'} on record`
-      : 'Add a first vaccine';
+      ? t('petProfile.overview.vaccinesOnRecord', { count: completedVax.length })
+      : t('petProfile.overview.addFirstVaccine');
 
   const latestWeight = normWeights[normWeights.length - 1];
 
@@ -458,11 +467,14 @@ export default function PetProfileScreen({ navigation, route }) {
   const pair = petPair(pet.color);
   const photoUri = petPhoto(pet) || null;
   const heroFg = photoUri ? ui.onAccent : ui.ink;
-  const speciesLabel = [pet.type ? cap(pet.type) : 'Pet', pet.breed || null].filter(Boolean).join(' · ');
+  const speciesLabel = [
+    pet.type ? t(`pets.types.${pet.type}`, { defaultValue: cap(pet.type) }) : t('petProfile.hero.pet'),
+    pet.breed ? breedLabel(pet.breed) : null,
+  ].filter(Boolean).join(' · ');
   const heroMeta = [
-    pet.age ? `${pet.age} yr${pet.age !== 1 ? 's' : ''}` : null,
-    pet.gender ? cap(pet.gender) : null,
-    pet.microchipped ? 'Microchipped' : null,
+    pet.age ? t('petProfile.hero.age', { count: pet.age }) : null,
+    pet.gender ? t(`pets.genders.${pet.gender}`, { defaultValue: cap(pet.gender) }) : null,
+    pet.microchipped ? t('petProfile.hero.microchipped') : null,
   ].filter(Boolean).join(' · ');
 
   // Today: active daily meds, done = a dose logged on today's local date.
@@ -477,17 +489,21 @@ export default function PetProfileScreen({ navigation, route }) {
 
   const memberCount = (share?.members || []).length;
   const teamSummary = !share
-    ? 'Loading…'
+    ? t('petProfile.team.loading')
     : isOwner
       ? memberCount > 0
-        ? `You + ${memberCount} co-owner${memberCount !== 1 ? 's' : ''}`
-        : 'Just you — invite family to co-own'
-      : `Shared with you${share.owner ? ` by ${share.owner.name}` : ''}`;
+        ? t('petProfile.team.youPlus', { count: memberCount })
+        : t('petProfile.team.justYou')
+      : share.owner
+        ? t('petProfile.team.sharedWithYouBy', { owner: share.owner.name })
+        : t('petProfile.team.sharedWithYou');
 
   const trendText = wInsight
     ? wInsight.direction === 'stable'
-      ? 'Steady'
-      : `${wInsight.direction === 'up' ? 'Up' : 'Down'} ${Math.abs(wInsight.changeAbs).toFixed(1)} ${wUnit}`
+      ? t('petProfile.trend.steady')
+      : t(wInsight.direction === 'up' ? 'petProfile.trend.up' : 'petProfile.trend.down', {
+        value: Math.abs(wInsight.changeAbs).toFixed(1), unit: wUnit,
+      })
     : null;
   const trendColor = wInsight && wInsight.direction === 'up' ? ui.subtle : ui.success;
 
@@ -499,8 +515,8 @@ export default function PetProfileScreen({ navigation, route }) {
         <Pressable accessibilityRole="button" style={({ pressed }) => [styles.lostBanner, pressed && { backgroundColor: ui.dangerPressTint }]} onPress={handleMarkFound}>
           <MaterialCommunityIcons name="map-marker-alert" size={20} color={ui.danger} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.lostTitle}>{pet.name} is reported lost</Text>
-            <Text style={styles.lostSub}>Shared to the community board · tap to mark found</Text>
+            <Text style={styles.lostTitle}>{t('petProfile.overview.lostTitle', { name: pet.name })}</Text>
+            <Text style={styles.lostSub}>{t('petProfile.overview.lostSub')}</Text>
           </View>
           <MaterialCommunityIcons name="check-circle-outline" size={20} color={ui.success} />
         </Pressable>
@@ -510,8 +526,8 @@ export default function PetProfileScreen({ navigation, route }) {
       {dailyMeds.length > 0 ? (
         <Card padded elevated style={[styles.block, { padding: 18, gap: 12 }]}>
           <View style={styles.rowBetween}>
-            <Text style={styles.cardLabel}>Today for {pet.name}</Text>
-            <Text style={styles.todayCount}>{dailyDone} of {dosesTotal} done</Text>
+            <Text style={styles.cardLabel}>{t('petProfile.overview.todayFor', { name: pet.name })}</Text>
+            <Text style={styles.todayCount}>{t('petProfile.overview.dosesDone', { done: dailyDone, total: dosesTotal })}</Text>
           </View>
           <StepProgress done={dailyDone} total={dosesTotal} tone="success" />
           <View>
@@ -532,17 +548,17 @@ export default function PetProfileScreen({ navigation, route }) {
                     </Text>
                     {med.times?.length ? (
                       <Text style={[type.secondary, { color: ui.sub }]}>
-                        {med.times.map((t) => fmtTime(t) || t).join(', ')}
-                        {expected > 1 && !done ? ` · ${taken} of ${expected} given` : ''}
+                        {med.times.map((time) => fmtTime(time) || time).join(', ')}
+                        {expected > 1 && !done ? ` · ${t('petProfile.overview.dosesGiven', { taken, expected })}` : ''}
                       </Text>
                     ) : null}
                   </View>
                   {done ? (
-                    <Text style={[type.secondary, { color: ui.success, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>Given</Text>
+                    <Text style={[type.secondary, { color: ui.success, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>{t('petProfile.overview.given')}</Text>
                   ) : (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`Mark ${med.name} done`}
+                      accessibilityLabel={t('petProfile.overview.markDoneA11y', { med: med.name })}
                       onPress={() => handleLogDose(med)}
                       disabled={isBusy(med.id)}
                       accessibilityState={{ disabled: isBusy(med.id) }}
@@ -552,7 +568,7 @@ export default function PetProfileScreen({ navigation, route }) {
                         (pressed || isBusy(med.id)) && { opacity: motion.pressOpacitySoft },
                       ]}
                     >
-                      <Text style={styles.doneBtnText}>Done</Text>
+                      <Text style={styles.doneBtnText}>{t('petProfile.overview.done')}</Text>
                     </Pressable>
                   )}
                 </View>
@@ -566,10 +582,10 @@ export default function PetProfileScreen({ navigation, route }) {
             <MaterialCommunityIcons name="pill" size={20} color={pair.fg} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[type.rowTitle, { color: ui.ink }]}>Nothing to give today</Text>
-            <Text style={[type.secondary, { color: ui.sub }]}>Add a daily med and we'll nudge you on time.</Text>
+            <Text style={[type.rowTitle, { color: ui.ink }]}>{t('petProfile.overview.nothingToday')}</Text>
+            <Text style={[type.secondary, { color: ui.sub }]}>{t('petProfile.overview.nothingTodaySub')}</Text>
           </View>
-          <Button pill small label="Add" icon="plus" variant="soft" onPress={() => setMedSheet(true)} />
+          <Button pill small label={t('petProfile.overview.add')} icon="plus" variant="soft" onPress={() => setMedSheet(true)} />
         </Card>
       )}
 
@@ -578,46 +594,50 @@ export default function PetProfileScreen({ navigation, route }) {
         {[
           [
             {
-              icon: 'needle', title: 'Health', value: healthTileValue,
+              icon: 'needle', title: t('petProfile.overview.tileHealth'), value: healthTileValue,
               onPress: () => setSegment('health'),
             },
             {
-              icon: 'run', title: 'Routine',
-              value: activities.length ? `${activities.length} daily ${activities.length === 1 ? 'activity' : 'activities'}` : 'Not set up yet',
+              icon: 'run', title: t('petProfile.overview.tileRoutine'),
+              value: activities.length
+                ? t('petProfile.overview.dailyActivities', { count: activities.length })
+                : t('petProfile.overview.notSetUp'),
               onPress: () => setSegment('notes'),
             },
           ],
           [
             {
-              icon: 'scale-bathroom', title: 'Weight',
-              value: latestWeight ? `${latestWeight.value.toFixed(1)} ${wUnit}${trendText ? ` · ${trendText.toLowerCase()}` : ''}` : 'Log a first weight',
+              icon: 'scale-bathroom', title: t('petProfile.overview.tileWeight'),
+              value: latestWeight
+                ? `${latestWeight.value.toFixed(1)} ${wUnit}${trendText ? ` · ${trendText.toLowerCase()}` : ''}`
+                : t('petProfile.overview.logFirstWeight'),
               onPress: () => setWeightSheet(true),
             },
             {
-              icon: 'note-text-outline', title: 'Notes', value: 'Sitter notes & handoff',
+              icon: 'note-text-outline', title: t('petProfile.overview.tileNotes'), value: t('petProfile.overview.notesValue'),
               onPress: () => setSegment('notes'),
             },
           ],
         ].map((row, ri) => (
           <View key={ri} style={styles.tileRow}>
-            {row.map((t) => (
+            {row.map((tile) => (
               <Pressable
-                key={t.title}
+                key={tile.title}
                 accessibilityRole="button"
-                accessibilityLabel={`${t.title}: ${t.value}`}
-                onPress={t.onPress}
+                accessibilityLabel={t('petProfile.overview.tileA11y', { title: tile.title, value: tile.value })}
+                onPress={tile.onPress}
                 style={({ pressed }) => [styles.tile, pressed && { backgroundColor: ui.pressTint }]}
               >
                 <View style={[styles.tileChip, { backgroundColor: pair.bg }]}>
-                  <MaterialCommunityIcons name={t.icon} size={20} color={pair.fg} />
+                  <MaterialCommunityIcons name={tile.icon} size={20} color={pair.fg} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.tileTitle}>{t.title}</Text>
+                  <Text style={styles.tileTitle}>{tile.title}</Text>
                   <Text
                     numberOfLines={2}
                     style={styles.tileValue}
                   >
-                    {t.value}
+                    {tile.value}
                   </Text>
                 </View>
               </Pressable>
@@ -630,7 +650,9 @@ export default function PetProfileScreen({ navigation, route }) {
       <Card padded style={[styles.block, { padding: 18, gap: 13 }]}>
         <View style={styles.rowBetween}>
           <Text style={styles.cardLabel}>
-            {latestWeight ? `WEIGHT — ${latestWeight.value.toFixed(1)} ${wUnit.toUpperCase()}` : 'WEIGHT'}
+            {latestWeight
+              ? t('petProfile.overview.weightLabelValue', { value: latestWeight.value.toFixed(1), unit: wUnit.toUpperCase() })
+              : t('petProfile.overview.weightLabel')}
           </Text>
           {trendText && <Text style={[styles.trendText, { color: trendColor }]}>{trendText}</Text>}
         </View>
@@ -641,7 +663,7 @@ export default function PetProfileScreen({ navigation, route }) {
             {wInsight?.notable && (
               <View style={styles.notableFlag}>
                 <MaterialCommunityIcons name="alert-circle-outline" size={14} color={ui.warnText} />
-                <Text style={styles.notableText}>Notable change — worth a vet check.</Text>
+                <Text style={styles.notableText}>{t('petProfile.overview.notable')}</Text>
               </View>
             )}
             <View>
@@ -653,7 +675,7 @@ export default function PetProfileScreen({ navigation, route }) {
                     onPress={() => handleDeleteWeight(w)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityRole="button"
-                    accessibilityLabel={`Delete weight from ${fullDate(w.loggedAt)}`}
+                    accessibilityLabel={t('petProfile.overview.deleteWeightA11y', { date: fullDate(w.loggedAt) })}
                   >
                     <MaterialCommunityIcons name="close" size={16} color={ui.subtle} />
                   </Pressable>
@@ -662,27 +684,27 @@ export default function PetProfileScreen({ navigation, route }) {
             </View>
           </>
         ) : (
-          <Text style={styles.emptyText}>No weights logged yet.</Text>
+          <Text style={styles.emptyText}>{t('petProfile.overview.noWeights')}</Text>
         )}
-        <Button variant="ghost" small icon="scale" label="Log weight" onPress={() => setWeightSheet(true)} />
+        <Button variant="ghost" small icon="scale" label={t('petProfile.overview.logWeight')} onPress={() => setWeightSheet(true)} />
       </Card>
 
       {/* Details */}
       <Card style={styles.block}>
         <ListRow
           icon="chip"
-          title="Microchip"
-          right={<Text style={styles.mono}>{pet.microchipped ? 'Registered' : 'Not recorded'}</Text>}
+          title={t('petProfile.overview.microchip')}
+          right={<Text style={styles.mono}>{pet.microchipped ? t('petProfile.overview.registered') : t('petProfile.overview.notRecorded')}</Text>}
         />
         <ListRow
           icon="cake-variant-outline"
-          title="Birthday"
-          value={pet.birthday ? fullDate(pet.birthday) : 'Not set'}
+          title={t('petProfile.overview.birthday')}
+          value={pet.birthday ? fullDate(pet.birthday) : t('petProfile.overview.notSet')}
         />
         <ListRow
           icon="food-drumstick-outline"
-          title="Favorite foods"
-          value={foods.length ? foods.map((f) => f.name).join(', ').slice(0, 28) : 'None yet'}
+          title={t('petProfile.overview.favoriteFoods')}
+          value={foods.length ? foods.map((f) => f.name).join(', ').slice(0, 28) : t('petProfile.overview.noneYet')}
           chevron
           onPress={() => setFoodSheet(true)}
           last
@@ -693,22 +715,22 @@ export default function PetProfileScreen({ navigation, route }) {
       <Card style={styles.block}>
         <ListRow
           icon="account-group-outline"
-          title="Care team"
+          title={t('petProfile.overview.careTeam')}
           subtitle={teamSummary}
           chevron
           onPress={() => { setInviteError(null); setTeamSheet(true); }}
         />
         <ListRow
           icon="share-variant-outline"
-          title="Share with vet"
-          subtitle={`Read-only link to ${pet.name}'s health summary`}
+          title={t('petProfile.overview.shareWithVet')}
+          subtitle={t('petProfile.overview.shareWithVetSub', { name: pet.name })}
           chevron
           onPress={() => setVetSheet(true)}
         />
         <ListRow
           icon="home-heart"
-          title="Caretaker handoff"
-          subtitle="Sitter notes + a time-limited link"
+          title={t('petProfile.overview.caretakerHandoff')}
+          subtitle={t('petProfile.overview.caretakerHandoffSub')}
           chevron
           onPress={() => setSegment('notes')}
           last
@@ -716,10 +738,10 @@ export default function PetProfileScreen({ navigation, route }) {
       </Card>
 
       {/* Expenses */}
-      <Text style={styles.sectionLabel}>Expenses</Text>
+      <Text style={styles.sectionLabel}>{t('petProfile.overview.expenses')}</Text>
       <Card style={styles.block}>
         <View style={styles.spendRow}>
-          <Text style={[type.rowTitle, { color: ui.ink, flex: 1 }]}>This month</Text>
+          <Text style={[type.rowTitle, { color: ui.ink, flex: 1 }]}>{t('petProfile.overview.thisMonth')}</Text>
           <Text style={styles.spendValue}>{thisMonthSpend.toFixed(2)}</Text>
         </View>
         {expenses.slice(0, 5).map((e) => {
@@ -729,7 +751,7 @@ export default function PetProfileScreen({ navigation, route }) {
               <IconChip icon={m.icon} pair={pair} />
               <View style={{ flex: 1 }}>
                 <Text style={[type.rowTitle, { color: ui.ink }]}>
-                  {m.label}{e.notes ? <Text style={[type.secondary, { color: ui.sub }]}>  ·  {e.notes}</Text> : null}
+                  {catLabel(e.category)}{e.notes ? <Text style={[type.secondary, { color: ui.sub }]}>  ·  {e.notes}</Text> : null}
                 </Text>
                 <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>{fullDate(e.incurredOn)}</Text>
               </View>
@@ -738,14 +760,14 @@ export default function PetProfileScreen({ navigation, route }) {
                 onPress={() => handleDeleteExpense(e)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
-                accessibilityLabel={`Delete ${m.label} expense from ${fullDate(e.incurredOn)}`}
+                accessibilityLabel={t('petProfile.overview.deleteExpenseA11y', { category: catLabel(e.category), date: fullDate(e.incurredOn) })}
               >
                 <MaterialCommunityIcons name="close" size={15} color={ui.subtle} />
               </Pressable>
             </View>
           );
         })}
-        <AddRow label="Add expense" onPress={() => setExpenseSheet(true)} />
+        <AddRow label={t('petProfile.overview.addExpense')} onPress={() => setExpenseSheet(true)} />
       </Card>
       {/* Report lost moved to the ••• menu — out of the browse path. */}
     </View>
@@ -753,10 +775,10 @@ export default function PetProfileScreen({ navigation, route }) {
 
   const renderHealth = () => (
     <View>
-      <Text style={styles.sectionLabel}>Upcoming</Text>
+      <Text style={styles.sectionLabel}>{t('petProfile.health.upcoming')}</Text>
       <Card style={styles.block}>
         {upcoming.length === 0 && (
-          <Text style={styles.emptyRowText}>Nothing scheduled — enjoy the calm.</Text>
+          <Text style={styles.emptyRowText}>{t('petProfile.health.nothingScheduled')}</Text>
         )}
         {upcoming.map((v) => {
           const p = vaxPill(v);
@@ -764,8 +786,8 @@ export default function PetProfileScreen({ navigation, route }) {
             <Animated.View key={v.id} exiting={ROW_OUT} layout={ROW_LAYOUT}>
               <ListRow
                 title={v.name}
-                subtitle={`Due ${fullDate(v.dueDate) || '—'}`}
-                right={<StatusPill status={p.status} label={p.label} />}
+                subtitle={t('petProfile.health.dueOn', { date: fullDate(v.dueDate) || '—' })}
+                right={<StatusPill status={p.status} label={t(`petProfile.vaxStatus.${p.key}`)} />}
                 onPress={() => navigation.navigate('VaccinationTracker', { petId })}
               />
             </Animated.View>
@@ -773,18 +795,18 @@ export default function PetProfileScreen({ navigation, route }) {
         })}
         <ListRow
           icon="needle"
-          title="Vaccination tracker"
-          subtitle="Add, complete or edit vaccinations"
+          title={t('petProfile.health.vaccinationTracker')}
+          subtitle={t('petProfile.health.vaccinationTrackerSub')}
           chevron
           onPress={() => navigation.navigate('VaccinationTracker', { petId })}
           last
         />
       </Card>
 
-      <Text style={styles.sectionLabel}>Medications</Text>
+      <Text style={styles.sectionLabel}>{t('petProfile.health.medications')}</Text>
       <Card style={styles.block}>
         {(pet.medications || []).length === 0 && (
-          <Text style={styles.emptyRowText}>No medications yet.</Text>
+          <Text style={styles.emptyRowText}>{t('petProfile.health.noMedications')}</Text>
         )}
         {(pet.medications || []).map((med) => (
           <Animated.View key={med.id} exiting={ROW_OUT} layout={ROW_LAYOUT}>
@@ -797,12 +819,12 @@ export default function PetProfileScreen({ navigation, route }) {
             />
           </Animated.View>
         ))}
-        <AddRow label="Add medication" onPress={() => setMedSheet(true)} />
+        <AddRow label={t('petProfile.health.addMedication')} onPress={() => setMedSheet(true)} />
       </Card>
 
       {completedVax.length > 0 && (
         <>
-          <Text style={styles.sectionLabel}>History</Text>
+          <Text style={styles.sectionLabel}>{t('petProfile.health.history')}</Text>
           <Card style={styles.block}>
             {completedVax.slice(0, 6).map((v, i, arr) => (
               <View key={v.id} style={[styles.historyRow, i === arr.length - 1 && { borderBottomWidth: 0 }]}>
@@ -819,10 +841,10 @@ export default function PetProfileScreen({ navigation, route }) {
 
       {petMilestones.length > 0 && (
         <>
-          <Text style={styles.sectionLabel}>Milestones</Text>
+          <Text style={styles.sectionLabel}>{t('petProfile.health.milestones')}</Text>
           {careStreak?.current_weeks > 0 && (
             <Text style={[type.secondary, { color: ui.accent, marginBottom: 8, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>
-              {careStreak.current_weeks} week{careStreak.current_weeks === 1 ? '' : 's'} of consistent care
+              {t('petProfile.health.streakWeeks', { count: careStreak.current_weeks })}
             </Text>
           )}
           <Card style={styles.block}>
@@ -841,8 +863,8 @@ export default function PetProfileScreen({ navigation, route }) {
       <Card style={styles.block}>
         <ListRow
           icon="folder-heart-outline"
-          title="Medical records"
-          subtitle="Vet clinics, appointments & documents"
+          title={t('petProfile.health.medicalRecords')}
+          subtitle={t('petProfile.health.medicalRecordsSub')}
           chevron
           onPress={() => navigation.navigate('MedicalRecords', { petId, petName: pet.name })}
           last
@@ -853,18 +875,18 @@ export default function PetProfileScreen({ navigation, route }) {
 
   const renderNotes = () => (
     <View>
-      <Text style={styles.sectionLabel}>Daily routine</Text>
+      <Text style={styles.sectionLabel}>{t('petProfile.notes.dailyRoutine')}</Text>
       <Card style={styles.block}>
         {(pet.activities || []).length === 0 && (
-          <Text style={styles.emptyRowText}>No daily activities yet.</Text>
+          <Text style={styles.emptyRowText}>{t('petProfile.notes.noActivities')}</Text>
         )}
         {(pet.activities || []).map((act) => (
           <ActivityRow key={act.id} activity={act} pair={pair} />
         ))}
-        <AddRow label="Add activity" onPress={() => setActivitySheet(true)} />
+        <AddRow label={t('petProfile.notes.addActivity')} onPress={() => setActivitySheet(true)} />
       </Card>
 
-      <Text style={styles.sectionLabel}>Caretaker notes</Text>
+      <Text style={styles.sectionLabel}>{t('petProfile.notes.caretakerNotes')}</Text>
       <CareNotesPanel
         petName={pet.name}
         onLoad={() => getCareProfile(petId)}
@@ -876,13 +898,13 @@ export default function PetProfileScreen({ navigation, route }) {
   );
 
   const menuItems = [
-    { icon: 'pencil-outline', title: 'Edit details', onPress: () => { setMenuSheet(false); navigation.navigate('EditPet', { petId }); } },
-    { icon: 'share-variant-outline', title: 'Share with vet', onPress: () => fromMenu(() => setVetSheet(true)) },
-    { icon: 'account-group-outline', title: 'Care team', onPress: () => fromMenu(() => { setInviteError(null); setTeamSheet(true); }) },
+    { icon: 'pencil-outline', title: t('petProfile.menu.editDetails'), onPress: () => { setMenuSheet(false); navigation.navigate('EditPet', { petId }); } },
+    { icon: 'share-variant-outline', title: t('petProfile.menu.shareWithVet'), onPress: () => fromMenu(() => setVetSheet(true)) },
+    { icon: 'account-group-outline', title: t('petProfile.menu.careTeam'), onPress: () => fromMenu(() => { setInviteError(null); setTeamSheet(true); }) },
     activeReport
-      ? { icon: 'home-heart', title: `Mark ${pet.name} as found`, onPress: () => fromMenu(handleMarkFound) }
-      : { icon: 'map-marker-alert-outline', title: `Report ${pet.name} as lost`, danger: true, onPress: () => fromMenu(() => setLostSheet(true)) },
-    !isOwner && { icon: 'exit-to-app', title: 'Leave this pet', danger: true, onPress: () => fromMenu(() => askConfirm(leaveConfig())) },
+      ? { icon: 'home-heart', title: t('petProfile.menu.markFound', { name: pet.name }), onPress: () => fromMenu(handleMarkFound) }
+      : { icon: 'map-marker-alert-outline', title: t('petProfile.menu.reportLost', { name: pet.name }), danger: true, onPress: () => fromMenu(() => setLostSheet(true)) },
+    !isOwner && { icon: 'exit-to-app', title: t('petProfile.menu.leave'), danger: true, onPress: () => fromMenu(() => askConfirm(leaveConfig())) },
   ].filter(Boolean);
 
   return (
@@ -901,7 +923,7 @@ export default function PetProfileScreen({ navigation, route }) {
               <Image
                 source={{ uri: photoUri }}
                 style={styles.heroImg}
-                accessibilityLabel={`Photo of ${pet.name}`}
+                accessibilityLabel={t('petProfile.hero.photoA11y', { name: pet.name })}
               />
               {/* Light top scrim keeps the dark status bar legible. */}
               <LinearGradient
@@ -927,7 +949,7 @@ export default function PetProfileScreen({ navigation, route }) {
           <View style={[styles.heroBar, { top: insets.top + 8 }]}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Back"
+              accessibilityLabel={t('petProfile.hero.back')}
               style={({ pressed }) => [styles.heroBtn, pressed && { opacity: motion.pressOpacity }]}
               onPress={() => navigation.goBack()}
               hitSlop={4}
@@ -936,7 +958,7 @@ export default function PetProfileScreen({ navigation, route }) {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`More actions for ${pet.name}`}
+              accessibilityLabel={t('petProfile.hero.moreA11y', { name: pet.name })}
               style={({ pressed }) => [styles.heroBtn, pressed && { opacity: motion.pressOpacity }]}
               onPress={() => setMenuSheet(true)}
               hitSlop={4}
@@ -962,7 +984,7 @@ export default function PetProfileScreen({ navigation, route }) {
         {/* Cream sheet sliding up over the hero. */}
         <View style={styles.sheet}>
           <SegmentedControl
-            segments={SEGMENTS}
+            segments={segments}
             value={segment}
             onChange={setSegment}
             style={styles.segmented}
@@ -1001,7 +1023,7 @@ export default function PetProfileScreen({ navigation, route }) {
       {/* ── Sheets ── */}
 
       {/* Favorite foods */}
-      <Sheet visible={foodSheet} onClose={() => { setFoodSheet(false); setNewFood(''); }} title="Favorite foods">
+      <Sheet visible={foodSheet} onClose={() => { setFoodSheet(false); setNewFood(''); }} title={t('petProfile.foods.title')}>
         {foods.length > 0 && (
           <View style={styles.foodWrap}>
             {foods.map((food) => (
@@ -1012,7 +1034,7 @@ export default function PetProfileScreen({ navigation, route }) {
                   onPress={() => handleRemoveFood(food)}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   accessibilityRole="button"
-                  accessibilityLabel={`Remove ${food.name}`}
+                  accessibilityLabel={t('petProfile.foods.removeA11y', { food: food.name })}
                 >
                   <MaterialCommunityIcons name="close" size={13} color={ui.subtle} />
                 </Pressable>
@@ -1023,7 +1045,7 @@ export default function PetProfileScreen({ navigation, route }) {
         <View style={styles.inlineAddRow}>
           <TextInput
             style={[styles.input, { flex: 1 }]}
-            placeholder="e.g. Salmon kibble"
+            placeholder={t('petProfile.foods.placeholder')}
             placeholderTextColor={ui.placeholder}
             value={newFood}
             onChangeText={setNewFood}
@@ -1033,7 +1055,7 @@ export default function PetProfileScreen({ navigation, route }) {
             onPress={handleAddFood}
             disabled={isBusy('food')}
             accessibilityRole="button"
-            accessibilityLabel="Add food"
+            accessibilityLabel={t('petProfile.foods.addA11y')}
           >
             <MaterialCommunityIcons name="plus" size={20} color={ui.onAccent} />
           </Pressable>
@@ -1041,60 +1063,60 @@ export default function PetProfileScreen({ navigation, route }) {
       </Sheet>
 
       {/* Add activity */}
-      <Sheet visible={activitySheet} onClose={() => setActivitySheet(false)} title="Add activity">
+      <Sheet visible={activitySheet} onClose={() => setActivitySheet(false)} title={t('petProfile.activity.title')}>
         <TextInput
           style={styles.input}
-          placeholder="Activity name (e.g. Park walk)"
+          placeholder={t('petProfile.activity.namePlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={newActivity.name}
           onChangeText={(v) => setNewActivity({ ...newActivity, name: v })}
         />
         <TextInput
           style={styles.input}
-          placeholder="Duration in minutes"
+          placeholder={t('petProfile.activity.durationPlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={newActivity.duration}
           onChangeText={(v) => setNewActivity({ ...newActivity, duration: v })}
           keyboardType="number-pad"
         />
         <View style={styles.chipWrap}>
-          {['morning', 'afternoon', 'evening'].map((t) => (
+          {['morning', 'afternoon', 'evening'].map((tod) => (
             <Chip
               accessibilityRole="radio"
-              key={t}
-              label={cap(t)}
-              active={newActivity.timeOfDay === t}
-              onPress={() => setNewActivity({ ...newActivity, timeOfDay: t })}
+              key={tod}
+              label={t(`petProfile.timesOfDay.${tod}`)}
+              active={newActivity.timeOfDay === tod}
+              onPress={() => setNewActivity({ ...newActivity, timeOfDay: tod })}
             />
           ))}
         </View>
-        <Button label="Add activity" onPress={handleAddActivity} disabled={!newActivity.name.trim() || isBusy('activity')} />
+        <Button label={t('petProfile.activity.submit')} onPress={handleAddActivity} disabled={!newActivity.name.trim() || isBusy('activity')} />
       </Sheet>
 
       {/* Add medication */}
-      <Sheet visible={medSheet} onClose={() => setMedSheet(false)} title="Add medication">
+      <Sheet visible={medSheet} onClose={() => setMedSheet(false)} title={t('petProfile.medication.title')}>
         <TextInput
           style={styles.input}
-          placeholder="Name (e.g. Apoquel)"
+          placeholder={t('petProfile.medication.namePlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={newMed.name}
           onChangeText={(v) => setNewMed({ ...newMed, name: v })}
         />
         <TextInput
           style={styles.input}
-          placeholder="Dosage (e.g. 5mg, 1 tablet)"
+          placeholder={t('petProfile.medication.dosagePlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={newMed.dosage}
           onChangeText={(v) => setNewMed({ ...newMed, dosage: v })}
         />
         <View>
-          <Text style={styles.fieldLabel}>Frequency</Text>
+          <Text style={styles.fieldLabel}>{t('petProfile.medication.frequency')}</Text>
           <View style={styles.chipWrap}>
             {['daily', 'weekly', 'monthly', 'as_needed'].map((f) => (
               <Chip
                 accessibilityRole="radio"
                 key={f}
-                label={f === 'as_needed' ? 'As needed' : cap(f)}
+                label={t(`petProfile.frequency.${freqKey(f)}`)}
                 active={newMed.frequency === f}
                 onPress={() => setNewMed({ ...newMed, frequency: f })}
               />
@@ -1103,30 +1125,30 @@ export default function PetProfileScreen({ navigation, route }) {
         </View>
         {newMed.frequency !== 'as_needed' && (
           <View>
-            <Text style={styles.fieldLabel}>Dose times</Text>
+            <Text style={styles.fieldLabel}>{t('petProfile.medication.doseTimes')}</Text>
             <View style={styles.chipWrap}>
-              {[['Morning', '08:00'], ['Noon', '12:00'], ['Evening', '18:00'], ['Night', '22:00']].map(([label, t]) => (
-                <Chip key={t} label={label} active={newMed.times.includes(t)} onPress={() => toggleMedTime(t)} />
+              {[['morning', '08:00'], ['noon', '12:00'], ['evening', '18:00'], ['night', '22:00']].map(([key, time]) => (
+                <Chip key={time} label={t(`petProfile.doseTimes.${key}`)} active={newMed.times.includes(time)} onPress={() => toggleMedTime(time)} />
               ))}
             </View>
           </View>
         )}
-        <Button label="Add medication" onPress={handleAddMedication} disabled={!newMed.name.trim() || isBusy('medication')} />
+        <Button label={t('petProfile.medication.submit')} onPress={handleAddMedication} disabled={!newMed.name.trim() || isBusy('medication')} />
       </Sheet>
 
       {/* Report lost */}
-      <Sheet visible={lostSheet} onClose={() => setLostSheet(false)} title={`Report ${pet.name} as lost`}>
-        <Text style={styles.sheetHint}>This shares an alert to the community Lost Pets board.</Text>
+      <Sheet visible={lostSheet} onClose={() => setLostSheet(false)} title={t('petProfile.lost.title', { name: pet.name })}>
+        <Text style={styles.sheetHint}>{t('petProfile.lost.hint')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Last seen location (e.g. Riverside Park)"
+          placeholder={t('petProfile.lost.locationPlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={lostForm.lastSeenLocation}
           onChangeText={(v) => setLostForm({ ...lostForm, lastSeenLocation: v })}
         />
         <TextInput
           style={[styles.input, styles.inputArea]}
-          placeholder="Details (color, collar, temperament…)"
+          placeholder={t('petProfile.lost.detailsPlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={lostForm.description}
           onChangeText={(v) => setLostForm({ ...lostForm, description: v })}
@@ -1134,21 +1156,21 @@ export default function PetProfileScreen({ navigation, route }) {
         />
         <TextInput
           style={styles.input}
-          placeholder="Contact phone"
+          placeholder={t('petProfile.lost.phonePlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={lostForm.contactPhone}
           onChangeText={(v) => setLostForm({ ...lostForm, contactPhone: v })}
           keyboardType="phone-pad"
         />
-        <Button variant="danger" label="Report lost" onPress={handleReportLost} disabled={isBusy('report-lost')} />
+        <Button variant="danger" label={t('petProfile.lost.submit')} onPress={handleReportLost} disabled={isBusy('report-lost')} />
       </Sheet>
 
       {/* Log weight */}
-      <Sheet visible={weightSheet} onClose={() => setWeightSheet(false)} title={`Log ${pet.name}'s weight`}>
+      <Sheet visible={weightSheet} onClose={() => setWeightSheet(false)} title={t('petProfile.weight.title', { name: pet.name })}>
         <View style={styles.inlineAddRow}>
           <TextInput
             style={[styles.input, { flex: 1 }]}
-            placeholder="e.g. 22.5"
+            placeholder={t('petProfile.weight.placeholder')}
             placeholderTextColor={ui.placeholder}
             value={newWeight.value}
             onChangeText={(v) => setNewWeight({ value: v })}
@@ -1158,20 +1180,20 @@ export default function PetProfileScreen({ navigation, route }) {
             <Text style={styles.unitText}>{wUnit}</Text>
           </View>
         </View>
-        <Text style={styles.sheetHint}>Logged in {wUnit} — change the unit in Edit Pet.</Text>
-        <Button label="Log weight" onPress={handleAddWeight} disabled={!parseFloat(newWeight.value) || isBusy('weight')} />
+        <Text style={styles.sheetHint}>{t('petProfile.weight.hint', { unit: wUnit })}</Text>
+        <Button label={t('petProfile.weight.submit')} onPress={handleAddWeight} disabled={!parseFloat(newWeight.value) || isBusy('weight')} />
       </Sheet>
 
       {/* Add expense */}
-      <Sheet visible={expenseSheet} onClose={() => setExpenseSheet(false)} title={`Add expense for ${pet.name}`}>
+      <Sheet visible={expenseSheet} onClose={() => setExpenseSheet(false)} title={t('petProfile.expense.title', { name: pet.name })}>
         <View>
-          <Text style={styles.fieldLabel}>Category</Text>
+          <Text style={styles.fieldLabel}>{t('petProfile.expense.category')}</Text>
           <View style={styles.chipWrap}>
             {EXPENSE_CATEGORIES.map((c) => (
               <Chip
                 accessibilityRole="radio"
                 key={c.id}
-                label={c.label}
+                label={catLabel(c.id)}
                 active={newExpense.category === c.id}
                 onPress={() => setNewExpense({ ...newExpense, category: c.id })}
               />
@@ -1180,7 +1202,7 @@ export default function PetProfileScreen({ navigation, route }) {
         </View>
         <TextInput
           style={styles.input}
-          placeholder="Amount (e.g. 45.00)"
+          placeholder={t('petProfile.expense.amountPlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={newExpense.amount}
           onChangeText={(v) => setNewExpense({ ...newExpense, amount: v })}
@@ -1188,19 +1210,19 @@ export default function PetProfileScreen({ navigation, route }) {
         />
         <TextInput
           style={styles.input}
-          placeholder="Note (optional)"
+          placeholder={t('petProfile.expense.notePlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={newExpense.notes}
           onChangeText={(v) => setNewExpense({ ...newExpense, notes: v })}
         />
-        <Button label="Add expense" onPress={handleAddExpense} disabled={!parseFloat(newExpense.amount) || isBusy('expense')} />
+        <Button label={t('petProfile.expense.submit')} onPress={handleAddExpense} disabled={!parseFloat(newExpense.amount) || isBusy('expense')} />
       </Sheet>
 
       {/* Care team (owner list + invite / leave) */}
       <Sheet
         visible={teamSheet}
         onClose={() => { setTeamSheet(false); setInviteEmail(''); setInviteError(null); }}
-        title="Care team"
+        title={t('petProfile.careTeam.title')}
       >
         {share?.owner && (
           <View style={styles.memberRow}>
@@ -1209,11 +1231,11 @@ export default function PetProfileScreen({ navigation, route }) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[type.rowTitle, { color: ui.ink }]}>
-                {share.owner.name}{share.owner.id === user?.id ? ' (You)' : ''}
+                {share.owner.id === user?.id ? t('petProfile.careTeam.memberYou', { name: share.owner.name }) : share.owner.name}
               </Text>
               <Text style={[type.secondary, { color: ui.sub }]}>{share.owner.email}</Text>
             </View>
-            <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>Owner</Text></View>
+            <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{t('petProfile.careTeam.owner')}</Text></View>
           </View>
         )}
         {(share?.members || []).map((m) => (
@@ -1222,7 +1244,7 @@ export default function PetProfileScreen({ navigation, route }) {
               <Text style={styles.memberAvatarText}>{(m.name || '?')[0].toUpperCase()}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[type.rowTitle, { color: ui.ink }]}>{m.name}{m.id === user?.id ? ' (You)' : ''}</Text>
+              <Text style={[type.rowTitle, { color: ui.ink }]}>{m.id === user?.id ? t('petProfile.careTeam.memberYou', { name: m.name }) : m.name}</Text>
               <Text style={[type.secondary, { color: ui.sub }]}>{m.email}</Text>
             </View>
             {isOwner ? (
@@ -1230,12 +1252,12 @@ export default function PetProfileScreen({ navigation, route }) {
                 onPress={() => handleRemoveMember(m)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
-                accessibilityLabel={`Remove ${m.name || m.email} from the care team`}
+                accessibilityLabel={t('petProfile.careTeam.removeA11y', { member: m.name || m.email })}
               >
                 <MaterialCommunityIcons name="close" size={18} color={ui.subtle} />
               </Pressable>
             ) : (
-              <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>Co-owner</Text></View>
+              <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{t('petProfile.careTeam.coOwner')}</Text></View>
             )}
           </View>
         ))}
@@ -1246,13 +1268,13 @@ export default function PetProfileScreen({ navigation, route }) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[type.rowTitle, { color: ui.ink }]}>{inv.email}</Text>
-              <Text style={[type.secondary, { color: ui.sub }]}>Invitation pending</Text>
+              <Text style={[type.secondary, { color: ui.sub }]}>{t('petProfile.careTeam.invitePending')}</Text>
             </View>
             <Pressable
               onPress={() => handleCancelInvite(inv)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
-              accessibilityLabel={`Cancel the invite to ${inv.email}`}
+              accessibilityLabel={t('petProfile.careTeam.cancelInviteA11y', { email: inv.email })}
             >
               <MaterialCommunityIcons name="close" size={18} color={ui.subtle} />
             </Pressable>
@@ -1262,11 +1284,11 @@ export default function PetProfileScreen({ navigation, route }) {
         {isOwner ? (
           <>
             <Text style={styles.sheetHint}>
-              Invite someone by email to co-own {pet.name}. They can view and update records, but only you can delete the pet.
+              {t('petProfile.careTeam.inviteHint', { name: pet.name })}
             </Text>
             <TextInput
               style={styles.input}
-              placeholder="family@example.com"
+              placeholder={t('petProfile.careTeam.emailPlaceholder')}
               placeholderTextColor={ui.placeholder}
               value={inviteEmail}
               onChangeText={(v) => { setInviteEmail(v); setInviteError(null); }}
@@ -1276,7 +1298,7 @@ export default function PetProfileScreen({ navigation, route }) {
             />
             {!!inviteError && <Text style={styles.errorText}>{inviteError}</Text>}
             <Button
-              label={inviteBusy ? 'Sending…' : 'Send invite'}
+              label={inviteBusy ? t('petProfile.careTeam.sending') : t('petProfile.careTeam.sendInvite')}
               onPress={handleInvite}
               disabled={inviteBusy || !inviteEmail.trim()}
             />
@@ -1284,14 +1306,16 @@ export default function PetProfileScreen({ navigation, route }) {
         ) : (
           <>
             <Text style={styles.sheetHint}>
-              Shared with you{share?.owner ? ` by ${share.owner.name}` : ''}. You can view and update {pet.name}'s records.
+              {share?.owner
+                ? t('petProfile.careTeam.sharedHintBy', { owner: share.owner.name, name: pet.name })
+                : t('petProfile.careTeam.sharedHint', { name: pet.name })}
             </Text>
             <Pressable accessibilityRole="button"
               style={({ pressed }) => [styles.dangerOutlineBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
               onPress={handleLeave}
             >
               <MaterialCommunityIcons name="exit-to-app" size={16} color={ui.danger} />
-              <Text style={styles.dangerOutlineText}>Leave this pet</Text>
+              <Text style={styles.dangerOutlineText}>{t('petProfile.careTeam.leave')}</Text>
             </Pressable>
           </>
         )}
@@ -1362,9 +1386,11 @@ function WeightSparkline({ weights }) {
 }
 
 function MedicationRow({ med, pair, streakLabel, onLog, onDelete }) {
+  const { t } = useTranslation();
+  const freqName = t(`petProfile.frequency.${freqKey(med.frequency)}`, { defaultValue: cap(med.frequency) });
   const freqLabel = med.frequency === 'as_needed'
-    ? 'As needed'
-    : `${cap(med.frequency)}${med.times?.length ? ` · ${med.times.join(', ')}` : ''}`;
+    ? freqName
+    : `${freqName}${med.times?.length ? ` · ${med.times.join(', ')}` : ''}`;
   const lastGiven = med.lastAdministeredAt
     ? fmtDate(new Date(med.lastAdministeredAt), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     : null;
@@ -1377,7 +1403,7 @@ function MedicationRow({ med, pair, streakLabel, onLog, onDelete }) {
           {med.name}{med.dosage ? <Text style={[type.secondary, { color: ui.sub }]}>  ·  {med.dosage}</Text> : null}
         </Text>
         <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>{freqLabel}</Text>
-        {lastGiven && <Text style={[type.secondary, { color: ui.subtle, marginTop: 1 }]}>Last given: {lastGiven}</Text>}
+        {lastGiven && <Text style={[type.secondary, { color: ui.subtle, marginTop: 1 }]}>{t('petProfile.medication.lastGiven', { date: lastGiven })}</Text>}
         {/* Daily-med streak — supplementary care-consistency line, not a health
             status (StatusRing/StatusPill stay the only status renderers). */}
         {streakLabel && (
@@ -1386,12 +1412,12 @@ function MedicationRow({ med, pair, streakLabel, onLog, onDelete }) {
           </Text>
         )}
       </View>
-      <Button pill small label="Log" onPress={onLog} />
+      <Button pill small label={t('petProfile.medication.log')} onPress={onLog} />
       <Pressable
         onPress={onDelete}
         hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
         accessibilityRole="button"
-        accessibilityLabel={`Delete ${med.name}`}
+        accessibilityLabel={t('petProfile.medication.deleteA11y', { med: med.name })}
       >
         <MaterialCommunityIcons name="close" size={16} color={ui.subtle} />
       </Pressable>
@@ -1400,6 +1426,7 @@ function MedicationRow({ med, pair, streakLabel, onLog, onDelete }) {
 }
 
 function ActivityRow({ activity, pair }) {
+  const { t } = useTranslation();
   const timeIcons = { morning: 'weather-sunny', afternoon: 'weather-partly-cloudy', evening: 'weather-night' };
   return (
     <View style={styles.itemRow}>
@@ -1407,7 +1434,10 @@ function ActivityRow({ activity, pair }) {
       <View style={{ flex: 1 }}>
         <Text style={[type.rowTitle, { color: ui.ink }]}>{activity.name}</Text>
         <Text style={[type.secondary, { color: ui.sub, marginTop: 1, textTransform: 'capitalize' }]}>
-          {activity.duration} min · {activity.timeOfDay}
+          {t('petProfile.activity.meta', {
+            duration: activity.duration,
+            time: activity.timeOfDay ? t(`petProfile.activityTime.${activity.timeOfDay}`, { defaultValue: activity.timeOfDay }) : '',
+          })}
         </Text>
       </View>
     </View>
@@ -1434,16 +1464,18 @@ function AddRow({ label, onPress }) {
   );
 }
 
+// `key` is under petProfile.vetExpiries; the id is what the API takes.
 const VET_EXPIRIES = [
-  { id: '1h', label: '1 hour' },
-  { id: '24h', label: '24 hours' },
-  { id: '7d', label: '7 days' },
+  { id: '1h', key: 'h1' },
+  { id: '24h', key: 'h24' },
+  { id: '7d', key: 'd7' },
 ];
 
 // Generate a vet share link, hand it to the OS share sheet, and offer to
 // revoke all outstanding links. The link itself is never persisted client-side
 // — it's shared straight from the create response.
 function VetShareSheet({ visible, petName, onClose, onCreate, onRevoke }) {
+  const { t } = useTranslation();
   const [expiresIn, setExpiresIn] = useState('24h');
   const [link, setLink] = useState(null); // { url, expires_at }
   const [busy, setBusy] = useState(false);
@@ -1460,23 +1492,23 @@ function VetShareSheet({ visible, petName, onClose, onCreate, onRevoke }) {
       setLink(result);
       try {
         await Share.share({
-          message: `${petName}'s medical summary (read-only, link expires soon):\n${result.url}`,
+          message: t('petProfile.vetShare.shareMessage', { name: petName, url: result.url }),
         });
       } catch { /* user dismissed the share sheet — link is still shown below */ }
     } catch (e) {
-      setError(e.message || 'Could not create the link.');
+      setError(e.message || t('petProfile.vetShare.createFailed'));
     } finally { setBusy(false); }
   };
 
   const reshare = () => {
-    if (link) Share.share({ message: `${petName}'s medical summary:\n${link.url}` }).catch(() => {});
+    if (link) Share.share({ message: t('petProfile.vetShare.reshareMessage', { name: petName, url: link.url }) }).catch(() => {});
   };
 
   const revoke = async () => {
     setConfirmRevoke(false);
     setBusy(true); setError(null);
-    try { await onRevoke(); setLink(null); showToast('All share links revoked'); }
-    catch (e) { setError(e.message || 'Could not revoke links.'); }
+    try { await onRevoke(); setLink(null); showToast(t('petProfile.toast.shareLinksRevoked')); }
+    catch (e) { setError(e.message || t('petProfile.vetShare.revokeFailed')); }
     finally { setBusy(false); }
   };
 
@@ -1486,23 +1518,23 @@ function VetShareSheet({ visible, petName, onClose, onCreate, onRevoke }) {
   };
 
   return (
-    <Sheet visible={visible} onClose={close} title="Share with vet">
+    <Sheet visible={visible} onClose={close} title={t('petProfile.vetShare.title')}>
       <Text style={styles.sheetHint}>
-        Creates a read-only web link to {petName}'s vaccinations, medications, weight, and recent documents. No account needed to open it.
+        {t('petProfile.vetShare.hint', { name: petName })}
       </Text>
 
       {!link ? (
         <>
           <View>
-            <Text style={styles.fieldLabel}>Link expires after</Text>
+            <Text style={styles.fieldLabel}>{t('petProfile.vetShare.expiresAfter')}</Text>
             <View style={styles.chipWrap}>
               {VET_EXPIRIES.map((e) => (
-                <Chip accessibilityRole="radio" key={e.id} label={e.label} active={expiresIn === e.id} onPress={() => setExpiresIn(e.id)} />
+                <Chip accessibilityRole="radio" key={e.id} label={t(`petProfile.vetExpiries.${e.key}`)} active={expiresIn === e.id} onPress={() => setExpiresIn(e.id)} />
               ))}
             </View>
           </View>
           {!!error && <Text style={styles.errorText}>{error}</Text>}
-          <Button label={busy ? 'Creating…' : 'Create & share'} onPress={create} disabled={busy} />
+          <Button label={busy ? t('petProfile.vetShare.creating') : t('petProfile.vetShare.createShare')} onPress={create} disabled={busy} />
         </>
       ) : (
         <>
@@ -1510,25 +1542,25 @@ function VetShareSheet({ visible, petName, onClose, onCreate, onRevoke }) {
             <MaterialCommunityIcons name="link-variant" size={16} color={ui.accent} />
             <Text style={styles.linkText} numberOfLines={1}>{link.url}</Text>
           </View>
-          <Text style={styles.linkExpiry}>Expires {expiry(link.expires_at)}</Text>
+          <Text style={styles.linkExpiry}>{t('petProfile.vetShare.expires', { date: expiry(link.expires_at) })}</Text>
           {!!error && <Text style={styles.errorText}>{error}</Text>}
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Button variant="ghost" label="Share again" onPress={reshare} style={{ flex: 1 }} />
-            <Button label="Done" onPress={close} style={{ flex: 1 }} />
+            <Button variant="ghost" label={t('petProfile.vetShare.shareAgain')} onPress={reshare} style={{ flex: 1 }} />
+            <Button label={t('petProfile.vetShare.done')} onPress={close} style={{ flex: 1 }} />
           </View>
         </>
       )}
 
       <Pressable accessibilityRole="button" style={styles.revokeBtn} onPress={() => setConfirmRevoke(true)} disabled={busy}>
         <MaterialCommunityIcons name="link-off" size={15} color={ui.danger} />
-        <Text style={styles.revokeText}>Revoke all active links</Text>
+        <Text style={styles.revokeText}>{t('petProfile.vetShare.revokeAll')}</Text>
       </Pressable>
 
       <ConfirmDialog
         visible={confirmRevoke}
-        title="Revoke links?"
-        message={`Disable every share link for ${petName}? Anyone holding one will lose access.`}
-        confirmLabel="Revoke"
+        title={t('petProfile.confirm.revokeTitle')}
+        message={t('petProfile.confirm.revokeShareMessage', { name: petName })}
+        confirmLabel={t('petProfile.confirm.revoke')}
         destructive
         onCancel={() => setConfirmRevoke(false)}
         onConfirm={revoke}
@@ -1537,11 +1569,12 @@ function VetShareSheet({ visible, petName, onClose, onCreate, onRevoke }) {
   );
 }
 
+// `key` is under petProfile.careExpiries; the id is what the API takes.
 const CARE_EXPIRIES = [
-  { id: '1d', label: '1 day' },
-  { id: '3d', label: '3 days' },
-  { id: '7d', label: '1 week' },
-  { id: '14d', label: '2 weeks' },
+  { id: '1d', key: 'd1' },
+  { id: '3d', key: 'd3' },
+  { id: '7d', key: 'd7' },
+  { id: '14d', key: 'd14' },
 ];
 
 // Caretaker handoff, now inline in the Notes segment: edit the sitter notes,
@@ -1550,6 +1583,7 @@ const CARE_EXPIRIES = [
 // an editable blank form — saving it would overwrite real notes with nulls —
 // so editing stays locked until a load succeeds.
 function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
+  const { t } = useTranslation();
   const [form, setForm] = useState({ feeding: '', instructions: '', emergency_name: '', emergency_phone: '' });
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -1591,8 +1625,8 @@ function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
 
   const saveNotes = async () => {
     setBusy(true); setError(null);
-    try { await onSaveNotes(payload()); setSavedOk(true); showToast('Notes saved'); }
-    catch (e) { setError(e.message || 'Could not save notes.'); } finally { setBusy(false); }
+    try { await onSaveNotes(payload()); setSavedOk(true); showToast(t('petProfile.toast.notesSaved')); }
+    catch (e) { setError(e.message || t('petProfile.careNotes.saveFailed')); } finally { setBusy(false); }
   };
 
   const createAndShare = async () => {
@@ -1601,17 +1635,19 @@ function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
       await onSaveNotes(payload()); // persist edits so the link reflects them
       const result = await onCreate(expiresIn);
       setLink(result);
-      try { await Share.share({ message: `Caring for ${petName} — everything you need (link expires soon):\n${result.url}` }); } catch {}
-    } catch (e) { setError(e.message || 'Could not create the link.'); } finally { setBusy(false); }
+      try { await Share.share({ message: t('petProfile.careNotes.shareMessage', { name: petName, url: result.url }) }); } catch {}
+    } catch (e) { setError(e.message || t('petProfile.careNotes.createFailed')); } finally { setBusy(false); }
   };
 
-  const reshare = () => { if (link) Share.share({ message: `Caring for ${petName}:\n${link.url}` }).catch(() => {}); };
+  const reshare = () => {
+    if (link) Share.share({ message: t('petProfile.careNotes.reshareMessage', { name: petName, url: link.url }) }).catch(() => {});
+  };
 
   const revoke = async () => {
     setConfirmRevoke(false);
     setBusy(true); setError(null);
-    try { await onRevoke(); setLink(null); showToast('All caretaker links revoked'); }
-    catch (e) { setError(e.message || 'Could not revoke links.'); } finally { setBusy(false); }
+    try { await onRevoke(); setLink(null); showToast(t('petProfile.toast.careLinksRevoked')); }
+    catch (e) { setError(e.message || t('petProfile.careNotes.revokeFailed')); } finally { setBusy(false); }
   };
 
   const expiry = (iso) => (iso ? fmtDate(new Date(iso), { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
@@ -1619,46 +1655,51 @@ function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
   return (
     <Card padded style={[styles.block, { padding: 18, gap: 14 }]}>
       <Text style={styles.sheetHint}>
-        Notes for whoever looks after {petName}, plus a read-only link you can text them — no app needed.
+        {t('petProfile.careNotes.hint', { name: petName })}
       </Text>
 
       {loading ? (
         <ActivityIndicator color={ui.accent} style={{ paddingVertical: 24 }} />
       ) : loadFailed ? (
         <View style={{ alignItems: 'center', gap: 12, paddingVertical: 12 }}>
-          <Text style={styles.errorText}>Couldn't load the saved notes — editing is paused so they don't get overwritten.</Text>
-          <Button variant="ghost" small label="Try again" onPress={load} />
+          <Text style={styles.errorText}>{t('petProfile.careNotes.loadFailed')}</Text>
+          <Button variant="ghost" small label={t('petProfile.careNotes.tryAgain')} onPress={load} />
         </View>
       ) : (
         <>
           <View>
-            <Text style={styles.fieldLabel}>Feeding</Text>
+            <Text style={styles.fieldLabel}>{t('petProfile.careNotes.feeding')}</Text>
             <TextInput
               style={[styles.input, styles.inputArea]}
               multiline
-              placeholder="e.g. 1 cup of kibble at 8am & 6pm, fresh water daily"
+              placeholder={t('petProfile.careNotes.feedingPlaceholder')}
               {...bind('feeding')}
             />
           </View>
           <View>
-            <Text style={styles.fieldLabel}>Instructions</Text>
+            <Text style={styles.fieldLabel}>{t('petProfile.careNotes.instructions')}</Text>
             <TextInput
               style={[styles.input, styles.inputArea]}
               multiline
-              placeholder="Litter box, walks, meds, quirks…"
+              placeholder={t('petProfile.careNotes.instructionsPlaceholder')}
               {...bind('instructions')}
             />
           </View>
           <View style={styles.careWarn}>
             <MaterialCommunityIcons name="shield-alert-outline" size={13} color={ui.subtle} />
             <Text style={styles.careWarnText}>
-              Anyone with the link can read this — skip door codes or alarm PINs, or pick a short expiry.
+              {t('petProfile.careNotes.warning')}
             </Text>
           </View>
           <View>
-            <Text style={styles.fieldLabel}>Emergency contact</Text>
-            <TextInput style={styles.input} placeholder="Name (e.g. Dr. Meow at Happy Paws)" {...bind('emergency_name')} />
-            <TextInput style={[styles.input, { marginTop: 8 }]} placeholder="Phone" keyboardType="phone-pad" {...bind('emergency_phone')} />
+            <Text style={styles.fieldLabel}>{t('petProfile.careNotes.emergencyContact')}</Text>
+            <TextInput style={styles.input} placeholder={t('petProfile.careNotes.emergencyNamePlaceholder')} {...bind('emergency_name')} />
+            <TextInput
+              style={[styles.input, { marginTop: 8 }]}
+              placeholder={t('petProfile.careNotes.phonePlaceholder')}
+              keyboardType="phone-pad"
+              {...bind('emergency_phone')}
+            />
           </View>
 
           {link ? (
@@ -1667,33 +1708,33 @@ function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
                 <MaterialCommunityIcons name="link-variant" size={16} color={ui.accent} />
                 <Text style={styles.linkText} numberOfLines={1}>{link.url}</Text>
               </View>
-              <Text style={styles.linkExpiry}>Expires {expiry(link.expires_at)}</Text>
-              <Button variant="ghost" label="Share again" onPress={reshare} />
+              <Text style={styles.linkExpiry}>{t('petProfile.careNotes.expires', { date: expiry(link.expires_at) })}</Text>
+              <Button variant="ghost" label={t('petProfile.careNotes.shareAgain')} onPress={reshare} />
             </>
           ) : (
             <View>
-              <Text style={styles.fieldLabel}>Link expires after</Text>
+              <Text style={styles.fieldLabel}>{t('petProfile.careNotes.expiresAfter')}</Text>
               <View style={styles.chipWrap}>
                 {CARE_EXPIRIES.map((e) => (
-                  <Chip accessibilityRole="radio" key={e.id} label={e.label} active={expiresIn === e.id} onPress={() => setExpiresIn(e.id)} />
+                  <Chip accessibilityRole="radio" key={e.id} label={t(`petProfile.careExpiries.${e.key}`)} active={expiresIn === e.id} onPress={() => setExpiresIn(e.id)} />
                 ))}
               </View>
             </View>
           )}
           {!!error && <Text style={styles.errorText}>{error}</Text>}
-          {savedOk && !link && <Text style={styles.savedText}>Notes saved ✓</Text>}
+          {savedOk && !link && <Text style={styles.savedText}>{t('petProfile.careNotes.savedCheck')}</Text>}
 
           {!link && (
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Button
                 variant="ghost"
-                label={busy ? '…' : 'Save notes'}
+                label={busy ? '…' : t('petProfile.careNotes.saveNotes')}
                 onPress={saveNotes}
                 disabled={busy}
                 style={{ flex: 1 }}
               />
               <Button
-                label={busy ? 'Working…' : 'Create & share'}
+                label={busy ? t('petProfile.careNotes.working') : t('petProfile.careNotes.createShare')}
                 onPress={createAndShare}
                 disabled={busy}
                 style={{ flex: 1 }}
@@ -1702,16 +1743,16 @@ function CareNotesPanel({ petName, onLoad, onSaveNotes, onCreate, onRevoke }) {
           )}
           <Pressable accessibilityRole="button" style={styles.revokeBtn} onPress={() => setConfirmRevoke(true)} disabled={busy}>
             <MaterialCommunityIcons name="link-off" size={15} color={ui.danger} />
-            <Text style={styles.revokeText}>Revoke all active links</Text>
+            <Text style={styles.revokeText}>{t('petProfile.careNotes.revokeAll')}</Text>
           </Pressable>
         </>
       )}
 
       <ConfirmDialog
         visible={confirmRevoke}
-        title="Revoke links?"
-        message={`Disable every caretaker link for ${petName}? Anyone holding one will lose access.`}
-        confirmLabel="Revoke"
+        title={t('petProfile.confirm.revokeTitle')}
+        message={t('petProfile.confirm.revokeCareMessage', { name: petName })}
+        confirmLabel={t('petProfile.confirm.revoke')}
         destructive
         onCancel={() => setConfirmRevoke(false)}
         onConfirm={revoke}

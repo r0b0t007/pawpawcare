@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { usePetsQuery } from '../../hooks/usePets';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { petMeta, petPhoto } from '../../utils/pets';
+import { useTranslation } from '../../i18n';
 import { ui, type, photos } from '../../theme';
 import { Button, EmptyState, PetCard, Skeleton, petHealthStatus } from '../../components';
 
@@ -18,6 +19,7 @@ const SEVERITY = { overdue: 0, due: 1, ok: 2 };
 export default function PetsListScreen({ navigation }) {
   // Reads come from React Query; writes still go through DataContext, which
   // invalidates the pets query (see queryKeys.js) so this list refetches.
+  const { t } = useTranslation();
   const { data: pets = [], isLoading, isError, refetch } = usePetsQuery();
   useRefetchOnFocus(refetch);
 
@@ -48,9 +50,9 @@ export default function PetsListScreen({ navigation }) {
 
   const ListHeader = (
     <View style={styles.headerWrap}>
-      <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">Your pets</Text>
+      <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">{t('pets.title')}</Text>
       <Text style={styles.pageSubtitle}>
-        {pets.length === 1 ? "1 pet · tap to see today's care" : `${pets.length} pets · tap one to see today's care`}
+        {t('pets.subtitle', { count: pets.length })}
       </Text>
     </View>
   );
@@ -62,7 +64,7 @@ export default function PetsListScreen({ navigation }) {
       accessibilityRole="button"
     >
       <MaterialCommunityIcons name="plus" size={20} color={ui.accent} />
-      <Text style={styles.addCardText}>Add another pet</Text>
+      <Text style={styles.addCardText}>{t('pets.addAnother')}</Text>
     </Pressable>
   );
 
@@ -73,7 +75,7 @@ export default function PetsListScreen({ navigation }) {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.list}>
           <View style={styles.headerWrap}>
-            <Text style={[type.screenTitle, { color: ui.ink }]}>Your pets</Text>
+            <Text style={[type.screenTitle, { color: ui.ink }]}>{t('pets.title')}</Text>
             <Skeleton width={150} height={12} style={{ marginTop: 8 }} />
           </View>
           {[0, 1].map((r) => (
@@ -96,8 +98,8 @@ export default function PetsListScreen({ navigation }) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.centered}>
-          <Text style={styles.errorText}>Couldn't load your pets.</Text>
-          <Button variant="ghost" label="Try again" onPress={() => refetch()} />
+          <Text style={styles.errorText}>{t('pets.loadFailed')}</Text>
+          <Button variant="ghost" label={t('pets.tryAgain')} onPress={() => refetch()} />
         </View>
       </SafeAreaView>
     );
@@ -108,14 +110,14 @@ export default function PetsListScreen({ navigation }) {
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={[styles.list, { flex: 1 }]}>
           <View style={styles.headerWrap}>
-            <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">Your pets</Text>
+            <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">{t('pets.title')}</Text>
           </View>
           <View style={styles.centered}>
             <EmptyState
               photo={photos.emptyKitten}
-              title="No pets yet"
-              body="Add a cat, a dog or any companion. It takes less than a minute."
-              actionLabel="Add your first pet"
+              title={t('pets.emptyTitle')}
+              body={t('pets.emptyBody')}
+              actionLabel={t('pets.emptyAction')}
               actionIcon="plus"
               onAction={addPet}
               style={{ alignSelf: 'stretch' }}

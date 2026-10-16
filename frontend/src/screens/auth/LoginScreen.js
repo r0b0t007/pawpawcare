@@ -8,6 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useTranslation } from '../../i18n';
 import { ui, type, motion, photos } from '../../theme';
 import { Button, TextField, ScreenHeader, PhotoBand, FormError, FormScrollView } from '../../components';
 import SocialAuthButtons from '../../components/SocialAuthButtons';
@@ -20,9 +21,11 @@ import SocialAuthButtons from '../../components/SocialAuthButtons';
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
 export default function LoginScreen({ navigation }) {
+  const { t } = useTranslation();
   const { login, error, isLoading, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // An i18n key, so the message follows a language change while shown.
   const [localError, setLocalError] = useState(null);
   const passwordRef = useRef(null);
   // One request per tap: a double tap (or Return + tap) never logs in twice.
@@ -40,7 +43,7 @@ export default function LoginScreen({ navigation }) {
   const handleLogin = () =>
     !isLoading && run('login', async () => {
       if (!email.trim() || !password) {
-        setLocalError('Add your email and password to log in.');
+        setLocalError('auth.login.missingFields');
         return;
       }
       setLocalError(null);
@@ -48,7 +51,7 @@ export default function LoginScreen({ navigation }) {
       // On failure useAuth().error is set and rendered inline below.
     });
 
-  const displayError = localError || error;
+  const displayError = (localError && t(localError)) || error;
   const busy = isLoading || isBusy('login');
 
   return (
@@ -58,13 +61,13 @@ export default function LoginScreen({ navigation }) {
 
         <PhotoBand source={photos.welcomeHero} height={120} />
 
-        <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Welcome back</Text>
-        <Text style={styles.subtitle}>The pack missed you.</Text>
+        <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">{t('auth.login.title')}</Text>
+        <Text style={styles.subtitle}>{t('auth.login.subtitle')}</Text>
 
         <View style={styles.form}>
           <TextField
-            label="Email"
-            placeholder="you@example.com"
+            label={t('auth.emailLabel')}
+            placeholder={t('auth.emailPlaceholder')}
             value={email}
             onChangeText={onChange(setEmail)}
             keyboardType="email-address"
@@ -79,9 +82,9 @@ export default function LoginScreen({ navigation }) {
 
           <TextField
             ref={passwordRef}
-            label="Password"
+            label={t('auth.passwordLabel')}
             secure
-            placeholder="Your password"
+            placeholder={t('auth.login.passwordPlaceholder')}
             value={password}
             onChangeText={onChange(setPassword)}
             textContentType="password"
@@ -91,7 +94,7 @@ export default function LoginScreen({ navigation }) {
           >
             <View style={styles.forgotRow}>
               <Text style={styles.pasteHint}>
-                Paste from your password manager always works
+                {t('auth.login.pasteHint')}
               </Text>
               <Pressable
                 onPress={() => {
@@ -101,7 +104,7 @@ export default function LoginScreen({ navigation }) {
                 hitSlop={HIT}
                 accessibilityRole="link"
               >
-                <Text style={styles.forgotLink}>Forgot password?</Text>
+                <Text style={styles.forgotLink}>{t('auth.login.forgot')}</Text>
               </Pressable>
             </View>
           </TextField>
@@ -110,7 +113,7 @@ export default function LoginScreen({ navigation }) {
         <FormError message={displayError} style={styles.formError} />
 
         <Button
-          label={busy ? 'Logging in…' : 'Log in'}
+          label={busy ? t('auth.login.submitting') : t('auth.login.submit')}
           onPress={handleLogin}
           disabled={busy}
           style={styles.submitBtn}
@@ -127,7 +130,7 @@ export default function LoginScreen({ navigation }) {
           hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
           accessibilityRole="link"
         >
-          <Text style={styles.switchLinkText}>New here? Create an account</Text>
+          <Text style={styles.switchLinkText}>{t('auth.login.toSignup')}</Text>
         </Pressable>
       </FormScrollView>
     </SafeAreaView>

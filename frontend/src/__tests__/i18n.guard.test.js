@@ -1,9 +1,11 @@
 // i18n guards (CHW-188), so the translations can't quietly drift:
 //  (a) fr and es have exactly en's keys — plural keys in each language's own
 //      plural forms — and nothing extra;
-//  (b) screens that have migrated to t() keep no hard-coded English: no bare
-//      JSX text and no literal strings in the props people read or hear.
-// Add a file to MIGRATED once its strings live in src/i18n/*.json.
+//  (b) every screen, component and navigator keeps no hard-coded English: no
+//      bare JSX text, no literal strings in the props people read or hear,
+//      and no literal toast / alert messages (CHW-191 translated them all).
+// New files under the GUARDED folders are checked automatically; put text in
+// src/i18n/*.json and render it with t().
 const fs = require('fs');
 const path = require('path');
 const { parse } = require('@babel/parser');
@@ -67,15 +69,41 @@ test('en plural keys carry exactly the English plural forms', () => {
   expect(wrong).toEqual([]);
 });
 
-// ── (b) no hard-coded strings in migrated files ─────────────────────────────
+// ── (b) no hard-coded strings in screens, components or navigation ──────────
 
-const MIGRATED = ['screens/main/ProfileScreen.js'];
+// Every non-test .js file under these folders (relative to src/).
+const GUARDED = ['screens', 'components', 'navigation'];
+
+function jsFiles(dir) {
+  return fs.readdirSync(path.join(SRC, dir), { withFileTypes: true }).flatMap((entry) => {
+    const rel = `${dir}/${entry.name}`;
+    if (entry.isDirectory()) return entry.name === '__tests__' ? [] : jsFiles(rel);
+    return entry.name.endsWith('.js') ? [rel] : [];
+  });
+}
+
+const MIGRATED = GUARDED.flatMap(jsFiles);
 
 // Props whose string value is shown or announced.
 const VISIBLE_PROPS = new Set([
   'title', 'subtitle', 'label', 'message', 'confirmLabel', 'cancelLabel', 'value',
   'placeholder', 'accessibilityLabel', 'accessibilityHint', 'text', 'caption',
+  'body', 'actionLabel', 'toggleLabel', 'seenLabel', 'tabBarLabel', 'headerTitle',
 ]);
+
+// Calls whose first argument is shown to the user.
+const VISIBLE_CALLS = new Set(['showToast', 'Alert.alert']);
+
+const literalText = (node) =>
+  node?.type === 'StringLiteral' ? node.value
+    : node?.type === 'TemplateLiteral' ? node.quasis.map((q) => q.value.cooked).join('')
+      : null;
+
+const calleeName = (callee) =>
+  callee.type === 'Identifier' ? callee.name
+    : callee.type === 'MemberExpression' && callee.object.type === 'Identifier' && callee.property.type === 'Identifier'
+      ? `${callee.object.name}.${callee.property.name}`
+      : null;
 
 function hardCodedStrings(file, src = fs.readFileSync(path.join(SRC, file), 'utf8')) {
   const ast = parse(src, { sourceType: 'module', plugins: ['jsx'] });
@@ -87,14 +115,15 @@ function hardCodedStrings(file, src = fs.readFileSync(path.join(SRC, file), 'utf
     }
     if (node.type === 'JSXAttribute' && VISIBLE_PROPS.has(node.name.name)) {
       const v = node.value;
-      const literal =
-        v?.type === 'StringLiteral' ? v.value
-          : v?.type === 'JSXExpressionContainer' && v.expression.type === 'StringLiteral' ? v.expression.value
-            : v?.type === 'JSXExpressionContainer' && v.expression.type === 'TemplateLiteral'
-              ? v.expression.quasis.map((q) => q.value.cooked).join('')
-              : null;
+      const literal = v?.type === 'JSXExpressionContainer' ? literalText(v.expression) : literalText(v);
       if (literal && /\p{L}/u.test(literal)) {
         found.push(`${file}:${node.loc.start.line} ${node.name.name}="${literal}"`);
+      }
+    }
+    if (node.type === 'CallExpression' && VISIBLE_CALLS.has(calleeName(node.callee))) {
+      const literal = literalText(node.arguments[0]);
+      if (literal && /\p{L}/u.test(literal)) {
+        found.push(`${file}:${node.loc.start.line} ${calleeName(node.callee)}("${literal}")`);
       }
     }
     Object.values(node).forEach((child) => {
@@ -106,7 +135,21 @@ function hardCodedStrings(file, src = fs.readFileSync(path.join(SRC, file), 'utf
   return found;
 }
 
-test('migrated files have no hard-coded user-facing strings', () => {
+test('the guard covers every screen, component and navigator', () => {
+  // A path change must not silently empty the list.
+  expect(MIGRATED).toEqual(expect.arrayContaining([
+    'screens/main/ProfileScreen.js',
+    'screens/auth/LoginScreen.js',
+    'screens/main/DashboardScreen.js',
+    'screens/main/PetProfileScreen.js',
+    'screens/main/CommunityScreen.js',
+    'components/TextField.js',
+    'navigation/AppNavigator.js',
+  ]));
+  expect(MIGRATED.some((file) => file.includes('__tests__'))).toBe(false);
+});
+
+test('screens, components and navigators have no hard-coded user-facing strings', () => {
   expect(MIGRATED.flatMap((file) => hardCodedStrings(file))).toEqual([]);
 });
 
@@ -117,6 +160,8 @@ test('the guard catches hard-coded strings', () => {
     '  <Row title="Log out" label={`Hi ${n}`} value={t(`languages.${l}`)} icon="logout">',
     '    <Text>Profile</Text>',
     '    <Text>{t("profile.title")} {name}</Text>',
+    '    <Field toggleLabel="passwords" body={t("x.body")} onPress={() => showToast("Saved")} />',
+    '    <Button onPress={() => { showToast(t("x.saved")); Alert.alert(`Oops`); }} />',
     '  </Row>',
     ');',
   ].join('\n');
@@ -124,5 +169,8 @@ test('the guard catches hard-coded strings', () => {
     'sample.js:2 title="Log out"',
     'sample.js:2 label="Hi "',
     'sample.js:3 text "Profile"',
+    'sample.js:5 toggleLabel="passwords"',
+    'sample.js:5 showToast("Saved")',
+    'sample.js:6 Alert.alert("Oops")',
   ]);
 });

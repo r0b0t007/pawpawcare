@@ -22,7 +22,7 @@ import { noteGoodMoment } from '../../services/storeReview';
 import { dayKey } from '../../utils/streaks';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { dayDiff, fmtClock, fmtShort, fmtTime, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
-import { useLocale } from '../../i18n';
+import { useLocale, useTranslation } from '../../i18n';
 import { petById, petMeta, petPhoto } from '../../utils/pets';
 import { ui, type, motion, petPair, photos, PET_COLOR_PAIRS } from '../../theme';
 import {
@@ -37,11 +37,11 @@ import {
 // up with each pet's face. A home with no pets is an invitation (photo empty
 // state), never a blank screen.
 
-function getGreeting() {
+function getGreeting(t, name) {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 12) return t('home.greeting.morning', { name });
+  if (h < 18) return t('home.greeting.afternoon', { name });
+  return t('home.greeting.evening', { name });
 }
 
 const vaxDate = (v) => parseDay(v.dueDate);
@@ -50,21 +50,19 @@ const vaxDate = (v) => parseDay(v.dueDate);
 // read; never alarming, never shaming. Same buckets as petHealthStatus
 // (overdue, then due soon, then all good), so Home never calls a pet "all
 // good" that another screen shows as due — nor one whose vaccines didn't load.
-function statusSentence(pets, overdueCount, dueCount, unknownCount) {
-  if (overdueCount === 1) return 'One thing needs\nyou today';
-  if (overdueCount > 1) return `${overdueCount} things need\nyou today`;
-  if (dueCount === 1) return 'One thing is\ndue soon';
-  if (dueCount > 1) return `${dueCount} things are\ndue soon`;
-  if (unknownCount > 0) return "Some records\ndidn't load";
-  if (pets.length === 1) return `${pets[0].name} is\nall good`;
-  if (pets.length === 2) return `${pets[0].name} and ${pets[1].name}\nare all good`;
-  return `All ${pets.length} pets\nare all good`;
+function statusSentence(t, pets, overdueCount, dueCount, unknownCount) {
+  if (overdueCount > 0) return t('home.status.overdue', { count: overdueCount });
+  if (dueCount > 0) return t('home.status.dueSoon', { count: dueCount });
+  if (unknownCount > 0) return t('home.status.unknown');
+  if (pets.length === 1) return t('home.status.oneOk', { name: pets[0].name });
+  if (pets.length === 2) return t('home.status.twoOk', { first: pets[0].name, second: pets[1].name });
+  return t('home.status.allOk', { total: pets.length });
 }
 
 const BENEFITS = [
-  { icon: 'bell-ring-outline', pair: PET_COLOR_PAIRS[0], label: 'Reminders before anything is due' },
-  { icon: 'shield-check-outline', pair: PET_COLOR_PAIRS[1], label: 'Every record in one safe place' },
-  { icon: 'account-group-outline', pair: PET_COLOR_PAIRS[2], label: 'Share care with your family' },
+  { icon: 'bell-ring-outline', pair: PET_COLOR_PAIRS[0], labelKey: 'home.benefits.reminders' },
+  { icon: 'shield-check-outline', pair: PET_COLOR_PAIRS[1], labelKey: 'home.benefits.records' },
+  { icon: 'account-group-outline', pair: PET_COLOR_PAIRS[2], labelKey: 'home.benefits.family' },
 ];
 const TEASER_PAIR = PET_COLOR_PAIRS[3];
 const MED_ROWS = 4;
@@ -73,6 +71,7 @@ export default function DashboardScreen({ navigation }) {
   // The app language: tabs stay mounted, so a language switch must re-render
   // (and re-run the memos below that build date strings).
   const locale = useLocale();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const {
     dataLoaded, pets, posts, reminders, unreadCount, medDoseDays, medDoseCounts,
@@ -137,16 +136,16 @@ export default function DashboardScreen({ navigation }) {
         if (fresh) {
           const pet = pets.find((p) => p.id === fresh.pet_id);
           const label = milestoneLabel(fresh.key);
-          showToast(pet ? `${pet.name}: ${label}` : label, { celebrate: true, actionType: 'milestone_earned' });
+          showToast(pet ? t('home.milestoneToast', { pet: pet.name, label }) : label, { celebrate: true, actionType: 'milestone_earned' });
           track('milestone_earned', { key: fresh.key });
           noteGoodMoment('milestone');
         }
       }
       setPref('seenMilestones', ids);
     })();
-  }, [gamification, pets]);
+  }, [gamification, pets, t]);
 
-  const firstName = user?.name?.split(' ')[0] || 'Friend';
+  const firstName = user?.name?.split(' ')[0] || t('home.friend');
   // Rolls over at midnight / on refocus — Home stays mounted, and "done
   // today" must never key on yesterday.
   const today = useToday();
@@ -317,8 +316,8 @@ export default function DashboardScreen({ navigation }) {
   // Four rows keep the card scannable; the rest are one tap away — every med
   // the progress bar counts can be logged from here.
   const [showAllMeds, setShowAllMeds] = useState(false);
-  const dosesTotal = todayMeds.reduce((n, t) => n + t.expected, 0);
-  const dosesDone = todayMeds.reduce((n, t) => n + t.taken, 0);
+  const dosesTotal = todayMeds.reduce((n, m) => n + m.expected, 0);
+  const dosesDone = todayMeds.reduce((n, m) => n + m.taken, 0);
 
   // Headline and subline read the same rule as every other screen
   // (petHealthStatus: overdue, then due soon, then all good).
@@ -336,14 +335,16 @@ export default function DashboardScreen({ navigation }) {
   const upNextItem = upNext
     ? {
         title: upNext.name,
-        subtitle: `${upNext.pet.name} · due ${fmtShort(vaxDate(upNext))}`,
+        subtitle: t('home.upNext.subtitle', { pet: upNext.pet.name, date: fmtShort(vaxDate(upNext)) }),
         status: upNext.status === 'overdue' ? 'overdue' : 'due',
         statusLabel:
-          upNext.status === 'overdue' ? overdueLabel(upNext.dueDate, today) : `Due ${fmtShort(vaxDate(upNext))}`,
+          upNext.status === 'overdue'
+            ? overdueLabel(upNext.dueDate, today)
+            : t('home.upNext.dueOn', { date: fmtShort(vaxDate(upNext)) }),
         // No-shame framing: an invitation to act, never "you missed".
         note:
           upNext.status === 'overdue'
-            ? `Let's get ${upNext.pet.name}'s ${upNext.name} booked.`
+            ? t('home.upNext.note', { pet: upNext.pet.name, vaccine: upNext.name })
             : null,
         avatarColor: upNext.pet.color || ui.accentTint,
         avatarTextColor: petPair(upNext.pet.color).fg,
@@ -359,26 +360,28 @@ export default function DashboardScreen({ navigation }) {
     run(`dose-${med.id}`, async () => {
       const saved = await logMedicationDose(pet.id, med.id);
       if (saved) {
-        showToast(`${pet.name}'s ${med.name} logged`, { celebrate: true, actionType: 'dose_logged' });
+        showToast(t('home.toast.doseLogged', { pet: pet.name, med: med.name }), { celebrate: true, actionType: 'dose_logged' });
       } else {
-        showToast(`Couldn't log ${pet.name}'s ${med.name}. Try again.`);
+        showToast(t('home.toast.doseFailed', { pet: pet.name, med: med.name }));
       }
     });
   const markUpNextDone = () =>
     run(`vax-${upNext.id}`, async () => {
       const saved = await markVaccinationComplete(upNext.pet.id, upNext.id);
       if (saved) {
-        showToast(`${upNext.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
+        showToast(t('home.toast.vaccineDone', { name: upNext.name }), { celebrate: true, actionType: 'vaccination_done' });
       } else {
-        showToast(`Couldn't mark ${upNext.name} done. Try again.`);
+        showToast(t('home.toast.vaccineFailed', { name: upNext.name }));
       }
     });
   // "2 more overdue · 1 due soon" — whatever the headline counted that isn't
   // on Home is one tap away in Health.
   const moreLabel = [
-    hiddenOverdue > 0 && `${hiddenOverdue} more overdue`,
-    hiddenDue > 0 && `${hiddenDue} ${hiddenOverdue > 0 ? '' : 'more '}due soon`,
-  ].filter(Boolean).join(', ');
+    hiddenOverdue > 0 && t('home.more.overdue', { count: hiddenOverdue }),
+    hiddenDue > 0 && (hiddenOverdue > 0
+      ? t('home.more.dueSoon', { count: hiddenDue })
+      : t('home.more.moreDueSoon', { count: hiddenDue })),
+  ].filter(Boolean).join(t('home.more.separator'));
 
   const goPet = (pet) =>
     navigation.navigate('Pets', { screen: 'PetProfile', params: { petId: pet.id } });
@@ -391,9 +394,9 @@ export default function DashboardScreen({ navigation }) {
   const renderPets = (list, interactive) => (
     <>
       <View style={styles.sectionHead}>
-        <Text style={styles.sectionLabel}>Your pets</Text>
+        <Text style={styles.sectionLabel}>{t('home.pets.title')}</Text>
         <Pressable onPress={() => navigation.navigate('Pets')} hitSlop={8} accessibilityRole="link">
-          <Text style={styles.sectionLink}>See all</Text>
+          <Text style={styles.sectionLink}>{t('home.pets.seeAll')}</Text>
         </Pressable>
       </View>
       <ScrollView
@@ -420,10 +423,10 @@ export default function DashboardScreen({ navigation }) {
             style={({ pressed }) => [styles.addCard, pressed && { backgroundColor: ui.pressTint }]}
             onPress={addPet}
             accessibilityRole="button"
-            accessibilityLabel="Add a pet"
+            accessibilityLabel={t('home.pets.addA11y')}
           >
             <MaterialCommunityIcons name="plus" size={24} color={ui.accent} />
-            <Text style={styles.addCardText}>Add</Text>
+            <Text style={styles.addCardText}>{t('home.pets.add')}</Text>
           </Pressable>
         )}
       </ScrollView>
@@ -436,22 +439,23 @@ export default function DashboardScreen({ navigation }) {
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting}>
-              {noPets ? `Welcome to PawPawCare, ${firstName}` : `${getGreeting()}, ${firstName}`}
+              {noPets ? t('home.welcome', { name: firstName }) : getGreeting(t, firstName)}
             </Text>
             {(noPets || pets.length > 0) && (
               <Text style={[type.screenTitle, { color: ui.ink }]} accessibilityRole="header">
-                {noPets ? "Let's meet your pets" : statusSentence(pets, overdueCount, dueCount, unknownPets.length)}
+                {noPets ? t('home.meetYourPets') : statusSentence(t, pets, overdueCount, dueCount, unknownPets.length)}
               </Text>
             )}
             {unknownPets.length > 0 ? (
               <Text style={styles.subline}>
-                {unknownPets.length === 1 ? `${unknownPets[0].name}'s vaccines` : 'Some vaccines'} couldn't be
-                loaded. Check your connection.
+                {unknownPets.length === 1
+                  ? t('home.vaccinesFailedOne', { name: unknownPets[0].name })
+                  : t('home.vaccinesFailedSome')}
               </Text>
             ) : (
               okPets < pets.length && pets.length > 1 && (
                 <Text style={styles.subline}>
-                  {okPets} of your {pets.length} pets {okPets === 1 ? 'is' : 'are'} all good.
+                  {t('home.okPets', { count: okPets, total: pets.length })}
                 </Text>
               )
             )}
@@ -460,7 +464,7 @@ export default function DashboardScreen({ navigation }) {
             style={({ pressed }) => [styles.bell, pressed && { opacity: motion.pressOpacity }]}
             onPress={() => navigation.navigate('Notifications')}
             accessibilityRole="button"
-            accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            accessibilityLabel={unreadCount > 0 ? t('home.notificationsUnreadA11y', { count: unreadCount }) : t('home.notificationsA11y')}
           >
             <MaterialCommunityIcons name="bell-outline" size={22} color={ui.ink} />
             {unreadCount > 0 && <View style={styles.bellDot} />}
@@ -478,14 +482,14 @@ export default function DashboardScreen({ navigation }) {
               <View
                 style={[styles.loading, styles.loadingHero]}
                 accessible
-                accessibilityLabel="Loading your pets' care summary"
+                accessibilityLabel={t('home.loadingSummaryA11y')}
               >
                 <Skeleton width="100%" height={170} radius={20} />
               </View>
               {renderPets(earlyPets, false)}
             </>
           ) : (
-            <View style={styles.loading} accessibilityLabel="Loading your pets">
+            <View style={styles.loading} accessibilityLabel={t('home.loadingPetsA11y')}>
               <Skeleton width="100%" height={170} radius={20} />
               <Skeleton width={110} height={11} style={{ marginTop: 28 }} />
               <View style={styles.loadingRow}>
@@ -498,19 +502,19 @@ export default function DashboardScreen({ navigation }) {
           <View style={styles.empty}>
             <EmptyState
               photo={photos.emptyKitten}
-              title="Add your first pet"
-              body="A cat, a dog or any companion. It takes less than a minute."
-              actionLabel="Add your first pet"
+              title={t('home.empty.title')}
+              body={t('home.empty.body')}
+              actionLabel={t('home.empty.action')}
               actionIcon="plus"
               onAction={addPet}
             />
-            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>What you'll get</Text>
+            <Text style={[styles.sectionLabel, { marginTop: 30 }]}>{t('home.empty.benefitsTitle')}</Text>
             {BENEFITS.map((b) => (
-              <View key={b.label} style={styles.benefit}>
+              <View key={b.labelKey} style={styles.benefit}>
                 <View style={[styles.iconChip, { backgroundColor: b.pair.bg }]}>
                   <MaterialCommunityIcons name={b.icon} size={19} color={b.pair.fg} />
                 </View>
-                <Text style={styles.benefitText}>{b.label}</Text>
+                <Text style={styles.benefitText}>{t(b.labelKey)}</Text>
               </View>
             ))}
           </View>
@@ -527,16 +531,16 @@ export default function DashboardScreen({ navigation }) {
                   <View style={{ flex: 1 }}>
                     <Text style={[type.cardTitleSm, { color: ui.ink }]}>
                       {celebration.kind === 'birthday'
-                        ? `Happy birthday, ${celebration.pet.name}!`
-                        : `Gotcha day — ${celebration.years} year${celebration.years === 1 ? '' : 's'} with ${celebration.pet.name}`}
+                        ? t('home.celebration.birthday', { name: celebration.pet.name })
+                        : t('home.celebration.gotchaDay', { count: celebration.years, name: celebration.pet.name })}
                     </Text>
                     {celebration.kind === 'birthday' && (
                       <Text style={[type.secondary, { color: ui.sub, marginTop: 1 }]}>
-                        {celebration.pet.name} turns {celebration.years} today
+                        {t('home.celebration.turns', { count: celebration.years, name: celebration.pet.name })}
                       </Text>
                     )}
                   </View>
-                  <Pressable onPress={dismissCelebration} hitSlop={10} accessibilityRole="button" accessibilityLabel="Dismiss">
+                  <Pressable onPress={dismissCelebration} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('home.celebration.dismiss')}>
                     <MaterialCommunityIcons name="close" size={16} color={ui.subtle} />
                   </Pressable>
                 </Card>
@@ -566,7 +570,7 @@ export default function DashboardScreen({ navigation }) {
                 style={({ pressed }) => [styles.moreLink, pressed && { opacity: motion.pressOpacity }]}
               >
                 <Text style={styles.sectionLink}>
-                  {moreLabel} · see all in Health
+                  {t('home.more.seeAllInHealth', { items: moreLabel })}
                 </Text>
                 <MaterialCommunityIcons name="chevron-right" size={18} color={ui.accent} />
               </Pressable>
@@ -575,39 +579,41 @@ export default function DashboardScreen({ navigation }) {
             {todayMeds.length > 0 && (
               <Card padded elevated={!upNextItem} style={[styles.hero, { padding: 18, gap: 12 }]}>
                 <View style={styles.rowBetween}>
-                  <Text style={styles.sectionLabel}>Today</Text>
+                  <Text style={styles.sectionLabel}>{t('home.today.title')}</Text>
                   <Text style={styles.progressLabel}>
-                    {dosesDone === dosesTotal ? 'All done' : `${dosesDone} of ${dosesTotal} done`}
+                    {dosesDone === dosesTotal ? t('home.today.allDone') : t('home.today.doneOf', { done: dosesDone, total: dosesTotal })}
                   </Text>
                 </View>
                 <StepProgress done={dosesDone} total={dosesTotal} tone="success" height={8} />
-                {(showAllMeds ? todayMeds : todayMeds.slice(0, MED_ROWS)).map((t) => (
-                  <View key={t.med.id} style={styles.medRow}>
-                    <Pressable onPress={() => goPet(t.pet)} accessibilityRole="button" accessibilityLabel={t.pet.name}>
-                      <PetFace pet={t.pet} size={36} />
+                {(showAllMeds ? todayMeds : todayMeds.slice(0, MED_ROWS)).map((row) => (
+                  <View key={row.med.id} style={styles.medRow}>
+                    <Pressable onPress={() => goPet(row.pet)} accessibilityRole="button" accessibilityLabel={row.pet.name}>
+                      <PetFace pet={row.pet} size={36} />
                     </Pressable>
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={[styles.rowTitle, t.done && { color: ui.sub }]} numberOfLines={1}>
-                        {t.pet.name}'s {t.med.name}
+                      <Text style={[styles.rowTitle, row.done && { color: ui.sub }]} numberOfLines={1}>
+                        {t('home.today.medTitle', { pet: row.pet.name, med: row.med.name })}
                       </Text>
                       <Text style={styles.rowSub} numberOfLines={1}>
                         {[
-                          t.times.map(fmtTime).filter(Boolean).join(', ') || 'Today',
-                          t.med.dosage,
-                          t.expected > 1 && !t.done ? `${t.taken} of ${t.expected} given` : null,
+                          row.times.map(fmtTime).filter(Boolean).join(', ') || t('home.today.anyTime'),
+                          row.med.dosage,
+                          row.expected > 1 && !row.done
+                            ? t('home.today.givenOf', { taken: row.taken, expected: row.expected })
+                            : null,
                         ].filter(Boolean).join(' · ')}
                       </Text>
                     </View>
-                    {t.done ? (
-                      <StatusPill status="ok" label="Done" style={styles.rowPill} />
+                    {row.done ? (
+                      <StatusPill status="ok" label={t('home.today.done')} style={styles.rowPill} />
                     ) : (
                       <Button
                         small
                         variant="soft"
-                        label="Log"
+                        label={t('home.today.log')}
                         icon="check"
-                        disabled={isBusy(`dose-${t.med.id}`)}
-                        onPress={() => logDose(t)}
+                        disabled={isBusy(`dose-${row.med.id}`)}
+                        onPress={() => logDose(row)}
                         style={styles.logBtn}
                       />
                     )}
@@ -622,7 +628,7 @@ export default function DashboardScreen({ navigation }) {
                     style={({ pressed }) => [styles.showMore, pressed && { opacity: motion.pressOpacity }]}
                   >
                     <Text style={styles.sectionLink}>
-                      {showAllMeds ? 'Show less' : `Show ${todayMeds.length - MED_ROWS} more`}
+                      {showAllMeds ? t('home.today.showLess') : t('home.today.showMore', { count: todayMeds.length - MED_ROWS })}
                     </Text>
                     <MaterialCommunityIcons name={showAllMeds ? 'chevron-up' : 'chevron-down'} size={18} color={ui.accent} />
                   </Pressable>
@@ -637,16 +643,16 @@ export default function DashboardScreen({ navigation }) {
             {recapWindow && <RecapCard rows={recapRows} style={styles.hero} />}
 
             <View style={styles.sectionHead}>
-              <Text style={styles.sectionLabel}>Coming up</Text>
+              <Text style={styles.sectionLabel}>{t('home.comingUp.title')}</Text>
               <Pressable onPress={() => navigation.navigate('Health')} hitSlop={8} accessibilityRole="link">
-                <Text style={styles.sectionLink}>Health</Text>
+                <Text style={styles.sectionLink}>{t('home.comingUp.healthLink')}</Text>
               </Pressable>
             </View>
             <Card style={styles.weekCard}>
               {weekItems.length === 0 ? (
                 <View style={styles.weekEmpty}>
                   <MaterialCommunityIcons name="weather-sunny" size={18} color={ui.accent} />
-                  <Text style={styles.emptyText}>Nothing scheduled this week. Enjoy the calm.</Text>
+                  <Text style={styles.emptyText}>{t('home.comingUp.empty')}</Text>
                 </View>
               ) : (
                 weekItems.map((item, i) => (
@@ -688,12 +694,12 @@ export default function DashboardScreen({ navigation }) {
                   {posts.length > 0 ? (
                     <>
                       <Text style={styles.teaserBold}>
-                        {posts.length} recent {posts.length === 1 ? 'post' : 'posts'}
+                        {t('home.community.recentPosts', { count: posts.length })}
                       </Text>
-                      {' in the community'}
+                      {t('home.community.inCommunity')}
                     </>
                   ) : (
-                    'Say hi to the community'
+                    t('home.community.sayHi')
                   )}
                 </Text>
                 <MaterialCommunityIcons name="chevron-right" size={18} color={ui.faint} />

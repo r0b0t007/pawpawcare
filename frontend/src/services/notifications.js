@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
+import i18n from '../i18n';
 import { getPref } from './prefs';
 
 // expo-notifications wires its push-token machinery at import time, and since
@@ -29,13 +30,27 @@ const ANDROID_CHANNEL = 'reminders';
 export async function ensureAndroidChannel() {
   if (Notifications && Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
-      name: 'Reminders',
+      name: i18n.t('notifications.channelName'),
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#855300',
     });
   }
 }
+
+// The channel name shows in Android's notification settings: rename it when
+// the app language changes. Only an existing channel is touched (renaming
+// keeps its importance and the user's choices); a fresh install still gets
+// it from registerForPushNotificationsAsync.
+export async function renameAndroidChannel() {
+  if (!Notifications || Platform.OS !== 'android') return;
+  try {
+    if (await Notifications.getNotificationChannelAsync(ANDROID_CHANNEL)) await ensureAndroidChannel();
+  } catch {
+    // best effort: the name catches up on the next registration
+  }
+}
+i18n.on('languageChanged', renameAndroidChannel);
 
 export const deviceTimezone = () => {
   try {

@@ -1,6 +1,9 @@
 // Pure weight helpers, extracted from PetProfileScreen so the trend math is
 // unit-testable. `weightInsight` mirrors the backend App\Support\WeightInsight
 // — keep the 3% / 10% thresholds and the span humanizer in sync.
+// The summary is built in the current app language (petProfile.weightInsight).
+
+import i18n from '../i18n';
 
 const KG_PER_LB = 0.45359237;
 
@@ -29,13 +32,14 @@ export const weightInsight = (points, unit) => {
   const changePct = first.value > 0 ? Math.round((changeAbs / first.value) * 1000) / 10 : 0;
   const days = Math.max(1, Math.round((new Date(last.loggedAt) - new Date(first.loggedAt)) / 86400000));
   const direction = Math.abs(changePct) < WEIGHT_STABLE_PCT ? 'stable' : changeAbs > 0 ? 'up' : 'down';
-  const span = days < 14 ? `${days} day${days === 1 ? '' : 's'}`
-    : days < 60 ? `${Math.round(days / 7)} weeks`
-      : `${Math.round(days / 30)} months`;
+  const t = (key, options) => i18n.t(`petProfile.weightInsight.${key}`, options);
+  const span = days < 14 ? t('days', { count: days })
+    : days < 60 ? t('weeks', { count: Math.round(days / 7) })
+      : t('months', { count: Math.round(days / 30) });
   const mag = Math.abs(changeAbs).toFixed(1).replace(/\.0$/, '');
+  // "Down" already conveys the sign — show the percent unsigned.
   const summary = direction === 'stable'
-    ? `Stable over the last ${span}`
-    // "Down" already conveys the sign — show the percent unsigned.
-    : `${direction === 'up' ? 'Up' : 'Down'} ${mag} ${unit} (${Math.abs(changePct)}%) over the last ${span}`;
+    ? t('stable', { span })
+    : t(direction, { amount: mag, unit, pct: Math.abs(changePct), span });
   return { current: last.value, changeAbs, changePct, days, direction, notable: Math.abs(changePct) >= WEIGHT_NOTABLE_PCT, summary };
 };

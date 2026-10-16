@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { post } from '../../services/api';
+import { useTranslation } from '../../i18n';
 import { ui, type } from '../../theme';
 import { Card, ListRow, Button, Chip, showToast, FormScrollView, ScreenHeader } from '../../components';
 
@@ -19,28 +20,23 @@ import { Card, ListRow, Button, Chip, showToast, FormScrollView, ScreenHeader } 
 // Placeholders until the real guides exist (CHW-175): shown as "Soon", not
 // tappable, so they don't read as broken links.
 const GUIDES = [
-  { icon: 'rocket-launch-outline', title: 'Getting started' },
-  { icon: 'bell-outline', title: 'Reminders & notifications' },
-  { icon: 'account-group-outline', title: 'Sharing with family & your vet' },
+  { id: 'gettingStarted', icon: 'rocket-launch-outline' },
+  { id: 'reminders', icon: 'bell-outline' },
+  { id: 'sharing', icon: 'account-group-outline' },
 ];
 
-// Optional; ids match SupportMessage::CATEGORIES on the backend.
+// Optional; ids match SupportMessage::CATEGORIES on the backend. Labels and
+// placeholders are `support.category.<id>` / `support.placeholder.<id>`.
 // `expectsReply` drives both the caption and the sent toast: problems and
 // questions get the reply promise, feedback and ideas don't need an answer.
 const CATEGORIES = [
-  { id: 'feedback', label: 'Feedback', expectsReply: false, placeholder: "What's working, and what isn't? Every note is read." },
-  { id: 'problem', label: 'Problem', expectsReply: true, placeholder: "Tell us what's going on — the more detail, the faster we can help." },
-  { id: 'idea', label: 'Idea', expectsReply: false, placeholder: 'What would make PawPawCare better for you and your pets?' },
-  { id: 'question', label: 'Question', expectsReply: true, placeholder: 'Ask us anything about the app.' },
+  { id: 'feedback', expectsReply: false },
+  { id: 'problem', expectsReply: true },
+  { id: 'idea', expectsReply: false },
+  { id: 'question', expectsReply: true },
 ];
 // No chip picked: a neutral prompt, and the reply promise (it may need one).
-const NO_CATEGORY = {
-  expectsReply: true,
-  placeholder: 'How can we help? Ask a question, report a problem or share an idea.',
-};
-const PRIVATE = "Only our team reads this, and it's never posted publicly.";
-const REPLY_CAPTION = `${PRIVATE} We reply within 2 business days.`;
-const NOTE_CAPTION = `${PRIVATE} We read every note.`;
+const NO_CATEGORY = { id: 'none', expectsReply: true };
 
 // The installed app's version, for triage. Guarded like purchases.js: an
 // OTA update on a build without expo-application just sends none.
@@ -65,9 +61,12 @@ export default function SupportScreen({ navigation, route }) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [focused, setFocused] = useState(false);
+  const { t } = useTranslation();
 
   const canSend = message.trim().length > 0 && !sending;
-  const { expectsReply, placeholder } = CATEGORIES.find((c) => c.id === category) ?? NO_CATEGORY;
+  const picked = CATEGORIES.find((c) => c.id === category) ?? NO_CATEGORY;
+  const { expectsReply } = picked;
+  const placeholder = t(`support.placeholder.${picked.id}`);
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -80,24 +79,24 @@ export default function SupportScreen({ navigation, route }) {
         platform: Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : null,
       });
       setMessage('');
-      showToast(expectsReply ? "Sent — we'll reply within 2 business days" : 'Thanks — we read every note');
+      showToast(expectsReply ? t('support.sentReply') : t('support.sentNote'));
       navigation.goBack();
     } catch (e) {
-      showToast(e?.message || 'Could not send — try again');
+      showToast(e?.message || t('support.sendFailed'));
       setSending(false);
     }
   };
 
   const guides = (
     <>
-      <Text style={[type.sectionLabel, styles.sectionLabel]}>Guides</Text>
+      <Text style={[type.sectionLabel, styles.sectionLabel]}>{t('support.guides')}</Text>
       <Card style={styles.sectionCard}>
         {GUIDES.map((guide, i) => (
           <ListRow
-            key={guide.title}
+            key={guide.id}
             icon={guide.icon}
-            title={guide.title}
-            value="Soon"
+            title={t(`support.guide.${guide.id}`)}
+            value={t('support.soon')}
             last={i === GUIDES.length - 1}
           />
         ))}
@@ -107,14 +106,14 @@ export default function SupportScreen({ navigation, route }) {
 
   const form = (
     <>
-      <Text style={[type.sectionLabel, styles.sectionLabel]}>Message our team</Text>
+      <Text style={[type.sectionLabel, styles.sectionLabel]}>{t('support.messageTeam')}</Text>
       <Card style={styles.contactCard}>
         <View style={styles.chips}>
           {CATEGORIES.map((c) => (
             <Chip
               accessibilityRole="radio"
               key={c.id}
-              label={c.label}
+              label={t(`support.category.${c.id}`)}
               active={category === c.id}
               onPress={() => setCategory(category === c.id ? null : c.id)}
             />
@@ -124,7 +123,7 @@ export default function SupportScreen({ navigation, route }) {
           style={[styles.messageInput, focused && styles.inputFocused]}
           placeholder={placeholder}
           placeholderTextColor={ui.placeholder}
-          accessibilityLabel="Your message"
+          accessibilityLabel={t('support.messageA11y')}
           value={message}
           onChangeText={setMessage}
           multiline
@@ -134,11 +133,11 @@ export default function SupportScreen({ navigation, route }) {
           onBlur={() => setFocused(false)}
         />
         <Button
-          label={sending ? 'Sending…' : 'Send message'}
+          label={sending ? t('support.sending') : t('support.send')}
           onPress={handleSend}
           disabled={!canSend}
         />
-        <Text style={styles.caption}>{expectsReply ? REPLY_CAPTION : NOTE_CAPTION}</Text>
+        <Text style={styles.caption}>{expectsReply ? t('support.captionReply') : t('support.captionNote')}</Text>
       </Card>
     </>
   );
@@ -146,7 +145,7 @@ export default function SupportScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
-        <ScreenHeader title="Help & feedback" onBack={() => navigation.goBack()} />
+        <ScreenHeader title={t('support.title')} onBack={() => navigation.goBack()} />
 
         {form}
         {guides}

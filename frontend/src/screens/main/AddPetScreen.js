@@ -15,7 +15,8 @@ import { pickAndUploadImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
 import { useInFlight } from '../../hooks/useInFlight';
 import { fmtFull, parseDay } from '../../utils/dates';
-import { useLocale } from '../../i18n';
+import { useLocale, useTranslation } from '../../i18n';
+import { breedLabel, breedValue } from '../../utils/pets';
 import { resolveAsset } from '../../config';
 import { ui, radii, type, motion, petPair, photos, scrim, PET_COLOR_PAIRS } from '../../theme';
 import { Button, Card, Chip, StepProgress, Toggle, showToast, speciesIcon } from '../../components';
@@ -29,19 +30,25 @@ import { Button, Card, Chip, StepProgress, Toggle, showToast, speciesIcon } from
 const STEP_IN = FadeIn.duration(200);
 const TOTAL_STEPS = 3;
 
+// Display labels come from i18n (`pets.types.*`, `pets.genders.*`,
+// `addPet.breeds.*`); the ids and the English breed values are what gets
+// stored, whatever the app language.
 const PET_TYPES = [
-  { id: 'dog', label: 'Dog' },
-  { id: 'cat', label: 'Cat' },
-  { id: 'bird', label: 'Bird' },
-  { id: 'rabbit', label: 'Rabbit' },
-  { id: 'other', label: 'Other' },
+  { id: 'dog' },
+  { id: 'cat' },
+  { id: 'bird' },
+  { id: 'rabbit' },
+  { id: 'other' },
 ];
 const SPECIES_CARDS = [
-  { id: 'dog', label: 'Dog', photo: photos.speciesDog },
-  { id: 'cat', label: 'Cat', photo: photos.speciesCat },
+  { id: 'dog', photo: photos.speciesDog },
+  { id: 'cat', photo: photos.speciesCat },
 ];
-const OTHER_TYPES = PET_TYPES.filter((t) => t.id !== 'dog' && t.id !== 'cat');
+const OTHER_TYPES = PET_TYPES.filter((pt) => pt.id !== 'dog' && pt.id !== 'cat');
 
+// Stored (English) values; utils/pets breedLabel shows them in the app
+// language. The breed field holds what the user sees — a chip fills it with
+// the translated label — and breedValue maps that back to the stored value.
 const BREED_SUGGESTIONS = {
   dog: ['Golden Retriever', 'Labrador', 'Mixed'],
   cat: ['Domestic Shorthair', 'Siamese', 'Mixed'],
@@ -51,9 +58,12 @@ const BREED_SUGGESTIONS = {
 };
 
 const GENDERS = [
-  { id: 'male', label: 'Male', icon: 'gender-male' },
-  { id: 'female', label: 'Female', icon: 'gender-female' },
+  { id: 'male', icon: 'gender-male' },
+  { id: 'female', icon: 'gender-female' },
 ];
+
+// i18n key for a theme color pair's name ('Sky blue' -> 'skyBlue').
+const colorKey = (name) => name.replace(/ (\w)/g, (_, c) => c.toUpperCase()).replace(/^\w/, (c) => c.toLowerCase());
 
 const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
@@ -76,6 +86,7 @@ export default function AddPetScreen({ navigation }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
+  const { t } = useTranslation();
   const { addPet } = useData();
 
   const [form, setForm] = useState(blankForm);
@@ -119,10 +130,10 @@ export default function AddPetScreen({ navigation }) {
     const res = await pickAndUploadImage({ aspect: [1, 1] });
     setUploading(false);
     if (res.url) { set('avatarUrl', res.url); setLocalPreview(null); }
-    else if (res.error === 'permission') showToast('Allow photo access to set a pet photo');
+    else if (res.error === 'permission') showToast(t('addPet.photoPermission'));
     else if (res.error) {
       if (res.uri) setLocalPreview(res.uri);
-      showToast('Could not upload that image — try again');
+      showToast(t('addPet.uploadFailed'));
     }
   };
 
@@ -145,7 +156,7 @@ export default function AddPetScreen({ navigation }) {
   const buildData = (skipDetails = false) => ({
     name: form.name.trim(),
     type: form.type,
-    breed: form.breed.trim(),
+    breed: breedValue(form.breed),
     birthday: skipDetails ? null : form.birthday || null,
     adoptedOn: skipDetails ? null : form.adoptedOn || null,
     age: skipDetails ? 0 : parseInt(form.age) || 0,
@@ -159,7 +170,7 @@ export default function AddPetScreen({ navigation }) {
 
   const requireName = () => {
     if (form.name.trim()) return true;
-    showToast('Give your pet a name first');
+    showToast(t('addPet.nameRequired'));
     return false;
   };
 
@@ -172,7 +183,7 @@ export default function AddPetScreen({ navigation }) {
       // addPet resolves undefined on failure without telling the user — say
       // so here, keeping everything they typed for the retry.
       if (pet) setCreated(pet);
-      else showToast(`Couldn't add ${data.name}. Check your connection and try again.`);
+      else showToast(t('addPet.addFailed', { name: data.name }));
     });
   };
 
@@ -204,7 +215,7 @@ export default function AddPetScreen({ navigation }) {
           onPress={pickAvatar}
           disabled={uploading}
           accessibilityRole="button"
-          accessibilityLabel={photoUri ? 'Change photo' : 'Add a photo'}
+          accessibilityLabel={photoUri ? t('addPet.changePhoto') : t('addPet.addPhoto')}
           style={[styles.photoRing, { width: size + 20, height: size + 20, borderRadius: (size + 20) / 2, backgroundColor: pair.bg }]}
         >
           <View style={[styles.photo, { width: size, height: size, borderRadius: size / 2, backgroundColor: pair.bg }]}>
@@ -220,17 +231,17 @@ export default function AddPetScreen({ navigation }) {
             <MaterialCommunityIcons name="camera" size={18} color={ui.onAccent} />
           </View>
         </Pressable>
-        <Text style={styles.photoHint}>{photoUri ? 'Change photo' : 'Add a photo'}</Text>
+        <Text style={styles.photoHint}>{photoUri ? t('addPet.changePhoto') : t('addPet.addPhoto')}</Text>
       </View>
     );
   };
 
   const renderName = () => (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>Name</Text>
+      <Text style={styles.fieldLabel}>{t('addPet.name')}</Text>
       <TextInput
         style={[styles.input, styles.nameInput, nameFocused && styles.inputFocused]}
-        placeholder="e.g. Luna"
+        placeholder={t('addPet.namePlaceholder')}
         placeholderTextColor={ui.placeholder}
         value={form.name}
         onChangeText={(v) => set('name', v)}
@@ -239,36 +250,37 @@ export default function AddPetScreen({ navigation }) {
         autoFocus={inFlow && !form.name}
         autoCapitalize="words"
         returnKeyType="next"
-        accessibilityLabel="Pet name"
+        accessibilityLabel={t('addPet.nameA11y')}
       />
     </View>
   );
 
   const renderBreed = () => {
     const suggestions = BREED_SUGGESTIONS[form.type] || [];
+    const chosen = breedValue(form.breed);
     return (
       <View style={styles.field}>
-        <Text style={styles.fieldLabel}>Breed · optional</Text>
+        <Text style={styles.fieldLabel}>{t('addPet.breedOptional')}</Text>
         {suggestions.length > 0 && (
           <View style={styles.chipWrap}>
             {suggestions.map((b) => (
               <Chip
                 key={b}
-                label={b}
-                active={form.breed === b}
+                label={breedLabel(b)}
+                active={chosen === b}
                 accessibilityRole="radio"
-                onPress={() => set('breed', form.breed === b ? '' : b)}
+                onPress={() => set('breed', chosen === b ? '' : breedLabel(b))}
               />
             ))}
           </View>
         )}
         <TextInput
           style={[styles.input, suggestions.length > 0 && { marginTop: 10 }]}
-          placeholder={suggestions.length ? 'Or type a breed' : 'e.g. Holland Lop'}
+          placeholder={suggestions.length ? t('addPet.breedPlaceholderOr') : t('addPet.breedPlaceholder')}
           placeholderTextColor={ui.placeholder}
           value={form.breed}
           onChangeText={(v) => set('breed', v)}
-          accessibilityLabel="Breed"
+          accessibilityLabel={t('addPet.breedA11y')}
         />
       </View>
     );
@@ -276,7 +288,7 @@ export default function AddPetScreen({ navigation }) {
 
   const renderColors = () => (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>Their color</Text>
+      <Text style={styles.fieldLabel}>{t('addPet.theirColor')}</Text>
       <View style={styles.swatchRow}>
         {PET_COLOR_PAIRS.map((c, i) => {
           const on = form.color === c.bg;
@@ -287,7 +299,7 @@ export default function AddPetScreen({ navigation }) {
               onPress={() => set('color', c.bg)}
               accessibilityRole="radio"
               accessibilityState={{ checked: on }}
-              accessibilityLabel={`${c.name} profile color`}
+              accessibilityLabel={t('pets.colorA11y', { color: t(`pets.colors.${colorKey(c.name)}`, { defaultValue: c.name }) })}
             >
               <View style={[styles.swatch, { backgroundColor: c.bg }]}>
                 {on && <MaterialCommunityIcons name="check" size={18} color={c.fg} />}
@@ -303,7 +315,7 @@ export default function AddPetScreen({ navigation }) {
     <>
       <View style={styles.row2}>
         <View style={[styles.field, { flex: 1 }]}>
-          <Text style={styles.fieldLabel}>Age (years)</Text>
+          <Text style={styles.fieldLabel}>{t('addPet.age')}</Text>
           <TextInput
             style={styles.input}
             placeholder="2"
@@ -311,20 +323,20 @@ export default function AddPetScreen({ navigation }) {
             value={form.age}
             onChangeText={(v) => set('age', v)}
             keyboardType="number-pad"
-            accessibilityLabel="Age in years"
+            accessibilityLabel={t('addPet.ageA11y')}
           />
         </View>
         <View style={[styles.field, { flex: 1 }]}>
-          <Text style={styles.fieldLabel}>Birthday</Text>
+          <Text style={styles.fieldLabel}>{t('addPet.birthday')}</Text>
           <Pressable
             style={({ pressed }) => [styles.dateBtn, pressed && { backgroundColor: ui.pressTint }]}
             onPress={() => setDatePickerField('birthday')}
             accessibilityRole="button"
-            accessibilityLabel={`Birthday, ${form.birthday ? formatDate(form.birthday) : 'not set'}`}
+            accessibilityLabel={t('addPet.birthdayA11y', { value: form.birthday ? formatDate(form.birthday) : t('addPet.notSet') })}
           >
             <MaterialCommunityIcons name="calendar-month-outline" size={17} color={ui.accent} />
             <Text style={[styles.dateBtnText, !form.birthday && { color: ui.subtle }]} numberOfLines={1}>
-              {form.birthday ? formatDate(form.birthday) : 'Select date'}
+              {form.birthday ? formatDate(form.birthday) : t('addPet.selectDate')}
             </Text>
           </Pressable>
         </View>
@@ -332,41 +344,41 @@ export default function AddPetScreen({ navigation }) {
 
       {/* Gotcha day (adoption date) — drives care anniversaries */}
       <View style={styles.field}>
-        <Text style={styles.fieldLabel}>Gotcha day</Text>
+        <Text style={styles.fieldLabel}>{t('addPet.gotchaDay')}</Text>
         <Pressable
           style={({ pressed }) => [styles.dateBtn, pressed && { backgroundColor: ui.pressTint }]}
           onPress={() => setDatePickerField('adoptedOn')}
           accessibilityRole="button"
-          accessibilityLabel={`Gotcha day, ${form.adoptedOn ? formatDate(form.adoptedOn) : 'not set'}`}
+          accessibilityLabel={t('addPet.gotchaDayA11y', { value: form.adoptedOn ? formatDate(form.adoptedOn) : t('addPet.notSet') })}
         >
           <MaterialCommunityIcons name="heart-outline" size={17} color={ui.accent} />
           <Text style={[styles.dateBtnText, !form.adoptedOn && { color: ui.subtle }]} numberOfLines={1}>
-            {form.adoptedOn ? formatDate(form.adoptedOn) : 'The day they came home'}
+            {form.adoptedOn ? formatDate(form.adoptedOn) : t('addPet.gotchaDayPlaceholder')}
           </Text>
         </Pressable>
       </View>
 
       <View style={styles.row2}>
         <View style={[styles.field, { flex: 2 }]}>
-          <Text style={styles.fieldLabel}>Weight</Text>
+          <Text style={styles.fieldLabel}>{t('addPet.weight')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. 28"
+            placeholder={t('addPet.weightPlaceholder')}
             placeholderTextColor={ui.placeholder}
             value={form.weight}
             onChangeText={(v) => set('weight', v)}
             keyboardType="decimal-pad"
-            accessibilityLabel={`Weight in ${form.weightUnit}`}
+            accessibilityLabel={t('addPet.weightA11y', { unit: form.weightUnit })}
           />
         </View>
         <View style={[styles.field, { flex: 1 }]}>
-          <Text style={styles.fieldLabel}>Unit</Text>
+          <Text style={styles.fieldLabel}>{t('addPet.unit')}</Text>
           <Pressable
             // A button (its text identifies it), so the soft border, not the field outline.
             style={({ pressed }) => [styles.dateBtn, { justifyContent: 'center', borderColor: ui.controlBorder }, pressed && { backgroundColor: ui.pressTint }]}
             onPress={() => set('weightUnit', form.weightUnit === 'kg' ? 'lbs' : 'kg')}
             accessibilityRole="button"
-            accessibilityLabel={`Unit ${form.weightUnit}, tap to switch`}
+            accessibilityLabel={t('addPet.unitA11y', { unit: form.weightUnit })}
           >
             <Text style={styles.unitText}>{form.weightUnit}</Text>
             <MaterialCommunityIcons name="swap-horizontal" size={15} color={ui.accent} />
@@ -375,7 +387,7 @@ export default function AddPetScreen({ navigation }) {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.fieldLabel}>Gender</Text>
+        <Text style={styles.fieldLabel}>{t('addPet.gender')}</Text>
         <View style={styles.genderRow}>
           {GENDERS.map((g) => {
             const on = form.gender === g.id;
@@ -388,7 +400,7 @@ export default function AddPetScreen({ navigation }) {
                 accessibilityState={{ checked: on }}
               >
                 <MaterialCommunityIcons name={g.icon} size={16} color={on ? ui.background : ui.ink} />
-                <Text style={[styles.genderText, on && { color: ui.background }]}>{g.label}</Text>
+                <Text style={[styles.genderText, on && { color: ui.background }]}>{t(`pets.genders.${g.id}`)}</Text>
               </Pressable>
             );
           })}
@@ -401,14 +413,14 @@ export default function AddPetScreen({ navigation }) {
             <MaterialCommunityIcons name="chip" size={18} color={ui.accent} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.switchLabel}>Microchipped</Text>
-            <Text style={styles.switchSub}>Is your pet microchipped?</Text>
+            <Text style={styles.switchLabel}>{t('addPet.microchipped')}</Text>
+            <Text style={styles.switchSub}>{t('addPet.microchippedQuestion')}</Text>
           </View>
         </View>
         <Toggle
           value={form.microchipped}
           onValueChange={(v) => set('microchipped', v)}
-          accessibilityLabel="Microchipped"
+          accessibilityLabel={t('addPet.microchipped')}
         />
       </View>
     </>
@@ -426,7 +438,7 @@ export default function AddPetScreen({ navigation }) {
             onPress={() => { set('type', s.id); setShowOther(false); }}
             accessibilityRole="radio"
             accessibilityState={{ checked: on }}
-            accessibilityLabel={s.label}
+            accessibilityLabel={t(`pets.types.${s.id}`)}
             style={({ pressed }) => [
               styles.speciesCard,
               on ? styles.speciesCardOn : null,
@@ -436,7 +448,7 @@ export default function AddPetScreen({ navigation }) {
             <Image source={s.photo} style={styles.fill} resizeMode="cover" />
             <View style={styles.speciesLabel}>
               <MaterialCommunityIcons name={speciesIcon(s.id)} size={20} color={ui.accent} />
-              <Text style={styles.speciesLabelText}>{s.label}</Text>
+              <Text style={styles.speciesLabelText}>{t(`pets.types.${s.id}`)}</Text>
             </View>
             {on && (
               <View style={styles.checkBadge}>
@@ -457,18 +469,18 @@ export default function AddPetScreen({ navigation }) {
           <View style={[styles.iconChip, { backgroundColor: PET_COLOR_PAIRS[4].bg }]}>
             <MaterialCommunityIcons name="rabbit" size={20} color={PET_COLOR_PAIRS[4].fg} />
           </View>
-          <Text style={styles.otherText}>Rabbit, bird or other</Text>
+          <Text style={styles.otherText}>{t('addPet.otherSpecies')}</Text>
           <MaterialCommunityIcons name={showOther ? 'chevron-up' : 'chevron-down'} size={22} color={ui.faint} />
         </Pressable>
         {showOther && (
           <Animated.View entering={STEP_IN} style={styles.otherChips}>
-            {OTHER_TYPES.map((t) => (
+            {OTHER_TYPES.map((pt) => (
               <Chip
-                key={t.id}
-                label={t.label}
-                active={form.type === t.id}
+                key={pt.id}
+                label={t(`pets.types.${pt.id}`)}
+                active={form.type === pt.id}
                 accessibilityRole="radio"
-                onPress={() => set('type', t.id)}
+                onPress={() => set('type', pt.id)}
               />
             ))}
           </Animated.View>
@@ -486,18 +498,18 @@ export default function AddPetScreen({ navigation }) {
       <View style={styles.note}>
         <MaterialCommunityIcons name="information-outline" size={20} color={ui.subtle} />
         <Text style={styles.noteText}>
-          Birthday, weight and vet details can wait. Nothing here is permanent.
+          {t('addPet.note')}
         </Text>
       </View>
     </View>
   );
 
   const STEP_COPY = {
-    1: { title: 'Who are we caring for?', sub: 'Pick one. You can add more pets later.' },
-    2: { title: "What's their name?", sub: 'A photo helps you spot them at a glance.' },
+    1: { title: t('addPet.step1Title'), sub: t('addPet.step1Sub') },
+    2: { title: t('addPet.step2Title'), sub: t('addPet.step2Sub') },
     3: {
-      title: 'A few optional details',
-      sub: `Add what you know now. ${form.name.trim() || 'Their'}${form.name.trim() ? "'s" : ''} profile works without them.`,
+      title: t('addPet.step3Title'),
+      sub: form.name.trim() ? t('addPet.step3SubNamed', { name: form.name.trim() }) : t('addPet.step3Sub'),
     },
   };
 
@@ -526,24 +538,24 @@ export default function AddPetScreen({ navigation }) {
           </View>
           <ScrollView contentContainerStyle={styles.successScroll} showsVerticalScrollIndicator={false}>
             <Animated.View entering={STEP_IN} style={{ gap: 6, alignItems: 'center' }}>
-              <Text style={styles.successTitle} accessibilityRole="header">{name} is all set!</Text>
-              <Text style={styles.successSub}>We'll nudge you before anything is due.</Text>
+              <Text style={styles.successTitle} accessibilityRole="header">{t('addPet.successTitle', { name })}</Text>
+              <Text style={styles.successSub}>{t('addPet.successSub')}</Text>
             </Animated.View>
 
-            <Text style={[styles.fieldLabel, { marginTop: 22 }]}>Two quick wins next</Text>
+            <Text style={[styles.fieldLabel, { marginTop: 22 }]}>{t('addPet.quickWins')}</Text>
             <Card>
               <QuickWin
                 icon="needle"
                 pairIndex={0}
-                title="Add vaccine records"
-                sub="~2 min · keeps reminders accurate"
+                title={t('addPet.addVaccines')}
+                sub={t('addPet.addVaccinesSub')}
                 onPress={() => navigation.replace('VaccinationTracker', { petId: created.id })}
               />
               <QuickWin
                 icon="bowl-mix"
                 pairIndex={2}
-                title="Set up daily care"
-                sub="~1 min · meals, meds and walks"
+                title={t('addPet.dailyCare')}
+                sub={t('addPet.dailyCareSub')}
                 onPress={() => navigation.replace('PetProfile', { petId: created.id })}
                 last
               />
@@ -551,12 +563,12 @@ export default function AddPetScreen({ navigation }) {
 
             <View style={{ gap: 6, marginTop: 24 }}>
               <Button
-                label={`Go to ${name}'s profile`}
+                label={t('addPet.goToProfile', { name })}
                 onPress={() => navigation.replace('PetProfile', { petId: created.id })}
                 style={styles.bigBtn}
               />
               <Pressable onPress={restart} style={styles.textLink} hitSlop={HIT} accessibilityRole="button">
-                <Text style={styles.textLinkText}>Add another pet</Text>
+                <Text style={styles.textLinkText}>{t('addPet.addAnother')}</Text>
               </Pressable>
             </View>
           </ScrollView>
@@ -577,12 +589,12 @@ export default function AddPetScreen({ navigation }) {
               onPress={goBack}
               hitSlop={HIT}
               accessibilityRole="button"
-              accessibilityLabel={inFlow && step > 1 ? 'Previous step' : 'Back'}
+              accessibilityLabel={inFlow && step > 1 ? t('addPet.previousStep') : t('addPet.back')}
             >
               <MaterialCommunityIcons name="arrow-left" size={20} color={ui.ink} />
             </Pressable>
             <Text style={styles.stepLabel} numberOfLines={1}>
-              Step {step} of {TOTAL_STEPS}
+              {t('addPet.stepOf', { step, total: TOTAL_STEPS })}
             </Text>
             <View style={{ width: 42 }} />
           </View>
@@ -606,11 +618,11 @@ export default function AddPetScreen({ navigation }) {
         {/* Primary action pinned in the thumb zone, same place every step. */}
         <View style={styles.footer}>
           {step < TOTAL_STEPS ? (
-            <Button label="Continue" onPress={next} disabled={uploading} style={styles.bigBtn} />
+            <Button label={t('addPet.continue')} onPress={next} disabled={uploading} style={styles.bigBtn} />
           ) : (
             <>
               <Button
-                label={saving ? 'Adding…' : `Add ${form.name.trim() || 'pet'}`}
+                label={saving ? t('addPet.adding') : form.name.trim() ? t('addPet.addNamed', { name: form.name.trim() }) : t('addPet.addUnnamed')}
                 icon="paw"
                 onPress={() => handleCreate(false)}
                 disabled={uploading || saving}
@@ -623,7 +635,7 @@ export default function AddPetScreen({ navigation }) {
                 hitSlop={HIT}
                 accessibilityRole="button"
               >
-                <Text style={styles.textLinkText}>Skip for now</Text>
+                <Text style={styles.textLinkText}>{t('addPet.skip')}</Text>
               </Pressable>
             </>
           )}
@@ -649,11 +661,11 @@ export default function AddPetScreen({ navigation }) {
               <View style={styles.sheetHandle} />
               <View style={styles.iosPickerHeader}>
                 <Pressable accessibilityRole="button" onPress={() => setDatePickerField(null)} hitSlop={HIT}>
-                  <Text style={styles.iosPickerCancel}>Cancel</Text>
+                  <Text style={styles.iosPickerCancel}>{t('addPet.cancel')}</Text>
                 </Pressable>
-                <Text style={styles.iosPickerTitle}>{datePickerField === 'adoptedOn' ? 'Gotcha day' : 'Birthday'}</Text>
+                <Text style={styles.iosPickerTitle}>{datePickerField === 'adoptedOn' ? t('addPet.gotchaDay') : t('addPet.birthday')}</Text>
                 <Pressable accessibilityRole="button" onPress={() => setDatePickerField(null)} hitSlop={HIT}>
-                  <Text style={styles.iosPickerDone}>Done</Text>
+                  <Text style={styles.iosPickerDone}>{t('addPet.done')}</Text>
                 </Pressable>
               </View>
               <DateTimePicker

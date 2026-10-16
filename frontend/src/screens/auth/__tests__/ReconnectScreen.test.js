@@ -51,3 +51,18 @@ describe('ReconnectScreen', () => {
     expect(mockAuth.logout).toHaveBeenCalledTimes(1);
   });
 });
+
+test('speaks French when the app does', async () => {
+  const i18n = require('../../../i18n').default;
+  await act(async () => { await i18n.changeLanguage('fr'); });
+  let tree;
+  try {
+    act(() => {
+      tree = TestRenderer.create(<ReconnectScreen />);
+    });
+    expect(text(tree.root)).toContain('Impossible de joindre PawPawCare');
+  } finally {
+    act(() => tree?.unmount());
+    await act(async () => { await i18n.changeLanguage('en'); });
+  }
+});

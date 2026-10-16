@@ -9,7 +9,7 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { getPref } from '../../services/prefs';
 import { fmtShort, fmtDay, fmtDate, fmtClock, fmtWeekday, dayDiff, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
-import { useLocale } from '../../i18n';
+import i18n, { useLocale, useTranslation } from '../../i18n';
 import { petById } from '../../utils/pets';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
@@ -34,16 +34,26 @@ const VAULT = vaultColors;
 // "Synced just now" / "Synced 5m ago" / "Synced 2h ago" — quiet trust line.
 const syncedLabel = (ts) => {
   const diff = Date.now() - ts;
-  if (diff < 60000) return 'Synced just now';
-  if (diff < 3600000) return `Synced ${Math.floor(diff / 60000)}m ago`;
-  if (diff < 86400000) return `Synced ${Math.floor(diff / 3600000)}h ago`;
-  return `Synced ${Math.floor(diff / 86400000)}d ago`;
+  if (diff < 60000) return i18n.t('health.synced.justNow');
+  if (diff < 3600000) return i18n.t('health.synced.minutes', { n: Math.floor(diff / 60000) });
+  if (diff < 86400000) return i18n.t('health.synced.hours', { n: Math.floor(diff / 3600000) });
+  return i18n.t('health.synced.days', { n: Math.floor(diff / 86400000) });
 };
 
 // "Tue 9:00 AM" — when the local notification for a reminder will fire.
 const fmtDelivery = (date) => `${fmtWeekday(date)} ${fmtClock(date)}`;
 
-const RECORD_TYPES = ['Vaccine', 'Vet visit', 'Medication', 'Weight'];
+// Record type ids; their labels live under health.types.
+const RECORD_TYPES = ['vaccine', 'vetVisit', 'medication', 'weight'];
+
+// "Weekly reminder" — recurrence is daily | weekly | monthly (server enum).
+const reminderKind = (r) => {
+  if (r.schedule_type !== 'recurring') return i18n.t('health.reminderKind.once');
+  const rec = r.recurrence || 'daily';
+  return i18n.t(`health.reminderKind.${rec}`, {
+    defaultValue: i18n.t('health.reminderKind.other', { recurrence: rec.replace(/^\w/, (c) => c.toUpperCase()) }),
+  });
+};
 
 const defaultDueDate = () => {
   const d = new Date();
@@ -76,6 +86,7 @@ export default function HealthHubScreen({ navigation }) {
   // The app language: tabs stay mounted, so a language switch must re-render
   // (and re-run the memos below that build date strings).
   const locale = useLocale();
+  const { t } = useTranslation();
   const { pets, reminders, lastSyncedAt, addVaccination, markVaccinationComplete } = useData();
 
   const [filter, setFilter] = useState('all');
@@ -91,7 +102,7 @@ export default function HealthHubScreen({ navigation }) {
     return () => { alive = false; };
   }, []);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [recType, setRecType] = useState('Vaccine');
+  const [recType, setRecType] = useState('vaccine');
   const [recPetId, setRecPetId] = useState(null);
   const [recName, setRecName] = useState('');
   const [recDate, setRecDate] = useState(defaultDueDate);
@@ -136,7 +147,7 @@ export default function HealthHubScreen({ navigation }) {
           key: `od-${v.pet.id}-${v.id}`,
           date,
           title: v.name,
-          sub: `${v.pet.name} · was due ${fmtDay(date)}`,
+          sub: t('health.wasDue', { pet: v.pet.name, date: fmtDay(date) }),
           pet: v.pet,
           overdueVax: v,
           onPress: () => navigation.navigate('VaccinationTracker', { petId: v.pet.id }),
@@ -163,10 +174,7 @@ export default function HealthHubScreen({ navigation }) {
             .filter((r) => r.next_fire_at || r.fire_at)
             .map((r) => {
               const pet = petById(pets, r.pet_id) || null;
-              const kind =
-                r.schedule_type === 'recurring'
-                  ? `${(r.recurrence || 'daily').replace(/^\w/, (c) => c.toUpperCase())} reminder`
-                  : 'Reminder';
+              const kind = reminderKind(r);
               return {
                 key: `rem-${r.id}`,
                 date: new Date(r.next_fire_at || r.fire_at),
@@ -201,13 +209,13 @@ export default function HealthHubScreen({ navigation }) {
 
     return {
       sections: [
-        { label: 'Today', items: todayItems },
-        { label: 'This week', items: week },
-        { label: 'Later', items: later },
+        { id: 'today', label: t('health.sections.today'), items: todayItems },
+        { id: 'week', label: t('health.sections.week'), items: week },
+        { id: 'later', label: t('health.sections.later'), items: later },
       ].filter((sec) => sec.items.length > 0),
       history: done,
     };
-  }, [shownPets, pets, listedReminders, filter, navigation, today, reminderTick, locale]);
+  }, [shownPets, pets, listedReminders, filter, navigation, today, reminderTick, locale, t]);
 
   // The "Scheduled on this device" caption sits on the first section holding
   // a reminder, and stays hidden when there are none (findIndex → -1).
@@ -223,10 +231,10 @@ export default function HealthHubScreen({ navigation }) {
 
   const openSheet = () => {
     if (!pets.length) {
-      showToast('Add a pet first');
+      showToast(t('health.toast.addPetFirst'));
       return;
     }
-    setRecType('Vaccine');
+    setRecType('vaccine');
     setRecPetId(filter !== 'all' ? filter : pets[0].id);
     setRecName('');
     setRecDate(defaultDueDate());
@@ -252,18 +260,18 @@ export default function HealthHubScreen({ navigation }) {
         administeredDate: null,
       });
       if (!saved) {
-        showToast("Couldn't save the record. Try again.");
+        showToast(t('health.toast.saveFailed'));
         return;
       }
       setSheetOpen(false);
-      showToast('Record saved');
+      showToast(t('health.toast.saved'));
     });
   };
 
   const continueElsewhere = () => {
     if (!recPet) return;
     setSheetOpen(false);
-    if (recType === 'Vet visit') {
+    if (recType === 'vetVisit') {
       navigation.navigate('MedicalRecords', { petId: recPet.id, petName: recPet.name });
     } else {
       navigation.navigate('Pets', { screen: 'PetProfile', params: { petId: recPet.id } });
@@ -274,8 +282,8 @@ export default function HealthHubScreen({ navigation }) {
   const markDone = (v) =>
     run(v.id, async () => {
       const saved = await markVaccinationComplete(v.pet.id, v.id);
-      if (saved) showToast(`${v.name} marked done`, { celebrate: true, actionType: 'vaccination_done' });
-      else showToast(`Couldn't mark ${v.name} done. Try again.`);
+      if (saved) showToast(t('health.toast.vaccineDone', { name: v.name }), { celebrate: true, actionType: 'vaccination_done' });
+      else showToast(t('health.toast.vaccineFailed', { name: v.name }));
     });
 
   const renderRow = (item, i, items) => {
@@ -309,14 +317,14 @@ export default function HealthHubScreen({ navigation }) {
                 style={{ marginTop: 6 }}
               />
             ) : item.dueSoon ? (
-              <StatusPill status="due" label={`Due ${relativeDay(item.date, today)}`} style={{ marginTop: 6 }} />
+              <StatusPill status="due" label={t('health.dueWhen', { when: relativeDay(item.date, today) })} style={{ marginTop: 6 }} />
             ) : null}
             {item.isReminder && remindersPrefOn !== null && (
               remindersPrefOn ? (
                 <View style={[styles.deliveryPill, { backgroundColor: ui.successTint }]}>
                   <MaterialCommunityIcons name="bell-check-outline" size={11} color={ui.success} />
                   <Text style={[styles.deliveryPillText, { color: ui.success }]}>
-                    Scheduled · {fmtDelivery(item.date)}
+                    {t('health.scheduledAt', { time: fmtDelivery(item.date) })}
                   </Text>
                 </View>
               ) : (
@@ -326,14 +334,14 @@ export default function HealthHubScreen({ navigation }) {
                   {/* sub, not subtle: subtle on track is under 4.5:1 */}
                   <MaterialCommunityIcons name="bell-off-outline" size={11} color={ui.sub} />
                   <Text style={[styles.deliveryPillText, { color: ui.sub }]}>
-                    Notifications off
+                    {t('health.notificationsOff')}
                   </Text>
                 </View>
               )
             )}
           </View>
           {v ? (
-            <Button small variant="soft" icon="check" label="Done" disabled={isBusy(v.id)} onPress={() => markDone(v)} />
+            <Button small variant="soft" icon="check" label={t('health.done')} disabled={isBusy(v.id)} onPress={() => markDone(v)} />
           ) : item.dueSoon ? (
             <MaterialCommunityIcons name="chevron-right" size={20} color={ui.faint} />
           ) : (
@@ -348,7 +356,7 @@ export default function HealthHubScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          <Text style={[type.screenTitle, { color: ui.ink }]}>Health</Text>
+          <Text style={[type.screenTitle, { color: ui.ink }]}>{t('health.title')}</Text>
           {lastSyncedAt != null && (
             <View style={styles.syncRow}>
               <MaterialCommunityIcons name="cloud-check" size={13} color={ui.ringOk} />
@@ -365,7 +373,7 @@ export default function HealthHubScreen({ navigation }) {
           >
             <Chip
               accessibilityRole="radio"
-              label="All"
+              label={t('health.filterAll')}
               active={filter === 'all'}
               onPress={() => setFilter('all')}
               style={styles.allChip}
@@ -385,16 +393,18 @@ export default function HealthHubScreen({ navigation }) {
           pets.length ? (
             <EmptyState
               photo={photos.emptyBlanket}
-              title="All quiet on the health front"
-              body={`Nothing scheduled${filter !== 'all' && shownPets[0] ? ` for ${shownPets[0].name}` : ''}. Add a vaccine or vet visit and we'll nudge you before it's due.`}
+              title={t('health.empty.title')}
+              body={filter !== 'all' && shownPets[0]
+                ? t('health.empty.bodyPet', { name: shownPets[0].name })
+                : t('health.empty.body')}
               style={styles.empty}
             />
           ) : (
             <EmptyState
               photo={photos.emptyBlanket}
-              title="No pets yet"
-              body="Add your first pet and their vaccines, meds and vet visits will line up here."
-              actionLabel="Add a pet"
+              title={t('health.noPets.title')}
+              body={t('health.noPets.body')}
+              actionLabel={t('health.noPets.action')}
               actionIcon="plus"
               onAction={() => navigation.navigate('Pets', { screen: 'AddPet' })}
               style={styles.empty}
@@ -402,13 +412,13 @@ export default function HealthHubScreen({ navigation }) {
           )
         ) : (
           sections.map((sec, si) => (
-            <View key={sec.label}>
+            <View key={sec.id}>
               <View style={styles.sectionHeadRow}>
                 <Text style={[type.sectionLabel, { color: ui.subtle }]}>{sec.label}</Text>
                 {si === firstReminderSectionIdx && remindersPrefOn === true && (
                   <View style={styles.deviceCaption}>
                     <MaterialCommunityIcons name="cellphone-check" size={12} color={ui.sub} />
-                    <Text style={styles.deviceCaptionText}>Scheduled on this device</Text>
+                    <Text style={styles.deviceCaptionText}>{t('health.scheduledOnDevice')}</Text>
                   </View>
                 )}
               </View>
@@ -437,10 +447,10 @@ export default function HealthHubScreen({ navigation }) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.vaultTitle}>
-                {vaultPet ? `${vaultPet.name}'s medical vault` : 'Medical vault'}
+                {vaultPet ? t('health.vault.petTitle', { name: vaultPet.name }) : t('health.vault.title')}
               </Text>
               <Text style={styles.vaultSub}>
-                {vaultPet ? 'Vet records, lab results & documents' : 'Pick a pet to open their records'}
+                {vaultPet ? t('health.vault.subtitle') : t('health.vault.pickPet')}
               </Text>
               {!vaultPet && (
               <View style={styles.vaultFaces}>
@@ -449,7 +459,7 @@ export default function HealthHubScreen({ navigation }) {
                     key={p.id}
                     onPress={() => openVault(p)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${p.name}'s medical vault`}
+                    accessibilityLabel={t('health.vault.petTitle', { name: p.name })}
                     hitSlop={6}
                     style={({ pressed }) => pressed && { opacity: motion.pressOpacity }}
                   >
@@ -466,7 +476,7 @@ export default function HealthHubScreen({ navigation }) {
         {history.length > 0 && (
           <>
             <Text style={[type.sectionLabel, styles.sectionLabel, { color: ui.subtle }]}>
-              History
+              {t('health.history')}
             </Text>
             <Card style={styles.sectionCard}>
               {history.slice(0, 8).map((v, i) => (
@@ -490,21 +500,21 @@ export default function HealthHubScreen({ navigation }) {
 
       {/* The screen's one primary action floats in the thumb zone. */}
       {pets.length > 0 && (
-        <Button pill icon="plus" label="Add record" onPress={openSheet} style={styles.fab} />
+        <Button pill icon="plus" label={t('health.addRecord')} onPress={openSheet} style={styles.fab} />
       )}
 
-      <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)} title="New record">
+      <Sheet visible={sheetOpen} onClose={() => setSheetOpen(false)} title={t('health.sheet.title')}>
         <View>
-          <Text style={[type.sectionLabel, styles.fieldLabel, { color: ui.subtle }]}>Type</Text>
+          <Text style={[type.sectionLabel, styles.fieldLabel, { color: ui.subtle }]}>{t('health.sheet.type')}</Text>
           <View style={styles.chipWrap}>
-            {RECORD_TYPES.map((t) => (
-              <Chip accessibilityRole="radio" key={t} label={t} active={recType === t} onPress={() => setRecType(t)} />
+            {RECORD_TYPES.map((id) => (
+              <Chip accessibilityRole="radio" key={id} label={t(`health.types.${id}`)} active={recType === id} onPress={() => setRecType(id)} />
             ))}
           </View>
         </View>
 
         <View>
-          <Text style={[type.sectionLabel, styles.fieldLabel, { color: ui.subtle }]}>Pet</Text>
+          <Text style={[type.sectionLabel, styles.fieldLabel, { color: ui.subtle }]}>{t('health.sheet.pet')}</Text>
           <View style={styles.chipWrap}>
             {pets.map((p) => {
               const on = recPet?.id === p.id;
@@ -524,13 +534,13 @@ export default function HealthHubScreen({ navigation }) {
           </View>
         </View>
 
-        {recType === 'Vaccine' ? (
+        {recType === 'vaccine' ? (
           <>
             <View>
-              <Text style={[type.sectionLabel, styles.fieldLabel, { color: ui.subtle }]}>Name</Text>
+              <Text style={[type.sectionLabel, styles.fieldLabel, { color: ui.subtle }]}>{t('health.sheet.name')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="e.g. Rabies booster"
+                placeholder={t('health.sheet.namePlaceholder')}
                 placeholderTextColor={ui.placeholder}
                 value={recName}
                 onChangeText={setRecName}
@@ -539,7 +549,7 @@ export default function HealthHubScreen({ navigation }) {
             <Pressable accessibilityRole="button" style={styles.dateRow} onPress={() => setShowDatePicker(true)}>
               <MaterialCommunityIcons name="calendar-blank-outline" size={18} color={ui.accent} />
               <Text style={styles.dateText}>
-                Due {fmtDate(recDate, { weekday: 'short', month: 'short', day: 'numeric' })}
+                {t('health.sheet.dueDate', { date: fmtDate(recDate, { weekday: 'short', month: 'short', day: 'numeric' }) })}
               </Text>
               <MaterialCommunityIcons name="pencil-outline" size={16} color={ui.faint} />
             </Pressable>
@@ -552,7 +562,7 @@ export default function HealthHubScreen({ navigation }) {
               />
             )}
             <Button
-              label={`Save · ${fmtShort(recDate)}`}
+              label={t('health.sheet.saveOn', { date: fmtShort(recDate) })}
               onPress={saveVaccine}
               disabled={!recName.trim() || isBusy('record')}
             />
@@ -560,11 +570,13 @@ export default function HealthHubScreen({ navigation }) {
         ) : (
           <>
             <Text style={styles.redirectHint}>
-              {recType === 'Vet visit'
-                ? `Vet visits and documents are logged in ${recPet?.name ?? 'the pet'}'s medical records.`
-                : `${recType}s are logged on ${recPet?.name ?? 'the pet'}'s profile.`}
+              {recType === 'vetVisit'
+                ? t('health.sheet.vetVisitHint', { name: recPet?.name ?? t('health.sheet.thePet') })
+                : recType === 'medication'
+                  ? t('health.sheet.medicationHint', { name: recPet?.name ?? t('health.sheet.thePet') })
+                  : t('health.sheet.weightHint', { name: recPet?.name ?? t('health.sheet.thePet') })}
             </Text>
-            <Button label="Continue" onPress={continueElsewhere} />
+            <Button label={t('health.sheet.continue')} onPress={continueElsewhere} />
           </>
         )}
       </Sheet>

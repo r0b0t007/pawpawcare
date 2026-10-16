@@ -120,6 +120,1500 @@
       "active": "Active",
       "ends": "Ends {{date}}",
       "endsSoon": "Ends soon"
+    },
+    "title": "Subscription",
+    "seePlus": "See PawPawCare Plus",
+    "body": {
+      "billingIssue": "{{store}} couldn't charge your payment method. Update it there to keep Plus.",
+      "thanks": "Thanks for supporting PawPawCare.",
+      "earlyMember": "As an early member, Plus features are included for you.",
+      "free": "Your pets, records and exports are free forever."
+    },
+    "updatePayment": "Update payment method",
+    "manage": "Manage subscription",
+    "manageSubtitle": "Change or cancel in {{store}}",
+    "restore": "Restore purchases",
+    "restoring": "Restoring…",
+    "restoreSubtitle": "Bought on another device or account",
+    "deleteCaption": "Deleting your PawPawCare account doesn't cancel billing — cancel in {{store}} first.",
+    "openStoreFailed": "Couldn't open the store — try from its settings",
+    "manageInStore": "Manage it from your app store settings",
+    "restoreFailed": "Couldn't restore purchases — try again",
+    "restoreOutcome": {
+      "restored": "Purchases restored",
+      "pending": "Restored — it may take a minute to show up",
+      "none": "No purchases found to restore"
+    },
+    "store": {
+      "appStore": "the App Store",
+      "playStore": "Google Play",
+      "unknown": "your app store"
+    },
+    "unit": {
+      "day": "day",
+      "week": "week",
+      "month": "month",
+      "year": "year"
+    },
+    "duration": {
+      "day_one": "{{count}} day",
+      "day_other": "{{count}} days",
+      "week_one": "{{count}} week",
+      "week_other": "{{count}} weeks",
+      "month_one": "{{count}} month",
+      "month_other": "{{count}} months",
+      "year_one": "{{count}} year",
+      "year_other": "{{count}} years"
+    },
+    "firstSpan": {
+      "day_one": "first day",
+      "day_other": "first {{count}} days",
+      "week_one": "first week",
+      "week_other": "first {{count}} weeks",
+      "month_one": "first month",
+      "month_other": "first {{count}} months",
+      "year_one": "first year",
+      "year_other": "first {{count}} years"
+    },
+    "priceWithPeriod": "{{price}} / {{period}}",
+    "intro": {
+      "freeTrial": "Try {{duration}} free",
+      "repeating": "{{price}} / {{period}} for {{total}}",
+      "first": "{{price}} for the {{span}}"
+    }
+  },
+  "auth": {
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "confirmPasswordLabel": "Confirm password",
+    "reactivated": "Welcome back — your account deletion was cancelled.",
+    "welcome": {
+      "heroA11y": "A kitten and a puppy looking at each other",
+      "brandTagline": "Pet health, made gentle",
+      "headline": "Every wag and whisker,\ncared for.",
+      "tagline": "Vaccines, meds and daily routines for all your pets, in one calm place.",
+      "getStarted": "Get started",
+      "haveAccount": "I already have an account"
+    },
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "The pack missed you.",
+      "passwordPlaceholder": "Your password",
+      "pasteHint": "Paste from your password manager always works",
+      "forgot": "Forgot password?",
+      "missingFields": "Add your email and password to log in.",
+      "submit": "Log in",
+      "submitting": "Logging in…",
+      "toSignup": "New here? Create an account"
+    },
+    "signup": {
+      "title": "Create your account",
+      "subtitle": "Your pack's records, safe in one place.",
+      "nameLabel": "Your name",
+      "namePlaceholder": "e.g. Ahmed",
+      "minChars": "{{min}}+ characters",
+      "confirmPlaceholder": "Repeat password",
+      "rulesMatch": "Passwords match",
+      "ruleDone": "{{rule}}, done",
+      "missingFields": "Fill in each field to create your account.",
+      "mismatch": "The two passwords don't match yet. Try typing them again.",
+      "tooShort": "Use at least {{min}} characters for your password.",
+      "submit": "Create account",
+      "submitting": "Creating account…",
+      "toLogin": "Already have an account? Log in",
+      "passwordsToggle": "passwords"
+    },
+    "forgot": {
+      "title": "Reset your password",
+      "subtitle": "Enter your account email and we'll send you a 6-digit code.",
+      "missingEmail": "Please enter your email.",
+      "send": "Send code",
+      "sending": "Sending…",
+      "codeResent": "New code sent",
+      "checkTitle": "Check your inbox",
+      "checkBody": "We sent a 6-digit code to {{email}}. It's valid for 30 minutes.",
+      "codeLabel": "6-digit code",
+      "newPasswordLabel": "New password",
+      "newPasswordPlaceholder": "At least 8 characters",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "confirmPlaceholder": "Same password again",
+      "badCode": "Enter the 6-digit code from your email.",
+      "tooShort": "Your new password needs at least 8 characters.",
+      "mismatch": "Those passwords don't match.",
+      "submit": "Reset password",
+      "submitting": "Updating…",
+      "updated": "Password updated — log in",
+      "resend": "Didn't get it? Send again"
+    },
+    "reconnect": {
+      "title": "Can't reach PawPawCare",
+      "offline": "You're still signed in. Check your connection and try again.",
+      "serverDown": "You're still signed in. Our server isn't answering right now — try again in a moment.",
+      "retry": "Try again",
+      "signOut": "Sign out"
+    },
+    "social": {
+      "divider": "or continue with",
+      "google": "Continue with Google",
+      "googleFailed": "Couldn't sign in with Google",
+      "appleFailed": "Couldn't sign in with Apple"
+    }
+  },
+  "account": {
+    "title": "Account details",
+    "avatarFallback": "U",
+    "nameLabel": "Name",
+    "namePlaceholder": "Your name",
+    "emailLabel": "Email",
+    "emailHint": "Contact support to change your email.",
+    "save": "Save changes",
+    "saved": "Saved",
+    "saveFailed": "Couldn't save your name. Try again.",
+    "dangerZone": "Danger zone",
+    "delete": "Delete account",
+    "deleting": "Deleting account…",
+    "deleteHint": "Your account is deactivated right away and permanently deleted after 30 days. Log back in before then to cancel.",
+    "deleteFailed": "Couldn't delete your account — try again",
+    "confirmTitle": "Delete your account?",
+    "confirmMessage": "Your account will be deactivated now and permanently deleted in 30 days — pets, records, photos and posts included. Logging back in before then cancels the deletion.",
+    "confirmBilling": "Your PawPawCare Plus subscription keeps billing through {{store}} — cancel it there too."
+  },
+  "paywall": {
+    "title": "PawPawCare Plus",
+    "close": "Close",
+    "done": "Done",
+    "retry": "Try again",
+    "reason": {
+      "ai_extraction": "Reading vet documents with AI is part of Plus.",
+      "care_links": "Caretaker links are part of Plus."
+    },
+    "promise": "Your pets, records and exports stay free forever.",
+    "benefits": {
+      "aiTitle": "Read vet documents with AI",
+      "aiSubtitle": "Snap a record — vaccines, meds and weights fill in for you",
+      "linksTitle": "Caretaker links",
+      "linksSubtitle": "Share a care guide with sitters, no app needed",
+      "independentTitle": "Keep PawPawCare independent",
+      "independentSubtitle": "No ads, no selling data — ever"
+    },
+    "storeAccount": {
+      "ios": "Apple ID",
+      "android": "Google Play account",
+      "default": "store account"
+    },
+    "storeSettings": {
+      "ios": "App Store",
+      "android": "Google Play",
+      "default": "store"
+    },
+    "errors": {
+      "already_owned": "Your {{store}} already has Plus — tap Restore purchases to use it here",
+      "network": "No connection — check it and try again",
+      "unavailable": "Purchases aren't available right now — try again later",
+      "other": "Couldn't complete the purchase — try again"
+    },
+    "legal": {
+      "oneTime": "Payment is charged to your {{store}} when you confirm. This is a one-time purchase — it never renews.",
+      "charged": "Payment is charged to your {{store}} when you confirm.",
+      "trial": "Your free trial becomes a paid subscription unless you cancel at least 24 hours before it ends.",
+      "intro": "The introductory price applies for the period shown, then the regular price.",
+      "renews": "The subscription renews automatically at the same price unless you cancel at least 24 hours before the end of the current period. Manage or cancel anytime in your {{settings}} settings."
+    },
+    "states": {
+      "plusTitle": "You're on Plus",
+      "plusMessage": "Thanks for supporting PawPawCare. Manage it from Profile → Subscription.",
+      "includedTitle": "Plus features are included for you",
+      "includedMessage": "As an early member you already have them — nothing to buy.",
+      "hiddenTitle": "Plus isn't available yet",
+      "staysFree": "Everything you use today stays free.",
+      "updateTitle": "Update the app to subscribe",
+      "updateMessage": "Subscriptions need the latest version of PawPawCare. Everything you use today stays free.",
+      "deviceTitle": "Subscriptions aren't available on this device yet",
+      "plansErrorTitle": "Plans aren't available right now",
+      "plansErrorMessage": "Check your connection and try again in a moment."
+    },
+    "annual": "Annual",
+    "monthly": "Monthly",
+    "oneTimePrice": "{{price}} · one-time",
+    "save": "Save {{percent}}%",
+    "introThen": "{{intro}}, then {{price}}",
+    "processing": "Processing…",
+    "buy": "Buy",
+    "startTrial": "Start free trial",
+    "subscribe": "Subscribe",
+    "restore": "Restore purchases",
+    "restoring": "Restoring…",
+    "restoreFailed": "Couldn't restore purchases — try again",
+    "terms": "Terms of Use",
+    "privacy": "Privacy Policy",
+    "toast": {
+      "pending": "Purchase pending — it will unlock once approved",
+      "welcome": "Welcome to Plus!",
+      "complete": "Purchase complete — it may take a minute to show up"
+    }
+  },
+  "invites": {
+    "title": "Invitations",
+    "verify": {
+      "title": "Confirm your email",
+      "intro": "Pets are shared by email. Confirm {{email}} is yours and invitations sent to it will appear here.",
+      "codeSentBody": "We sent a 6-digit code to {{email}}. It's valid for 30 minutes.",
+      "alreadyConfirmed": "Your email is already confirmed",
+      "codeSent": "Code sent — check your email",
+      "sendFailed": "Could not send the code — try again.",
+      "badCode": "Enter the 6-digit code from your email.",
+      "codeFailed": "That code didn’t work — try again.",
+      "confirmed": "Email confirmed",
+      "send": "Send code",
+      "sending": "Sending…",
+      "confirm": "Confirm",
+      "confirming": "Confirming…",
+      "resend": "Send a new code"
+    },
+    "emptyTitle": "No pending invitations",
+    "emptyBody": "When someone shares a pet with you, the invite will appear here.",
+    "invitedYou": "{{inviter}} invited you to co-own {{pet}}",
+    "accept": "Accept",
+    "decline": "Decline",
+    "accepted": "You're now caring for {{pet}}",
+    "acceptFailed": "Couldn't accept the invite for {{pet}}. Try again.",
+    "declined": "Invitation declined",
+    "declineFailed": "Couldn't decline the invitation. Try again.",
+    "declineTitle": "Decline invitation?",
+    "declineMessage": "{{inviter}} will need to invite you again if you change your mind."
+  },
+  "support": {
+    "title": "Help & feedback",
+    "guides": "Guides",
+    "soon": "Soon",
+    "guide": {
+      "gettingStarted": "Getting started",
+      "reminders": "Reminders & notifications",
+      "sharing": "Sharing with family & your vet"
+    },
+    "messageTeam": "Message our team",
+    "category": {
+      "feedback": "Feedback",
+      "problem": "Problem",
+      "idea": "Idea",
+      "question": "Question"
+    },
+    "placeholder": {
+      "feedback": "What's working, and what isn't? Every note is read.",
+      "problem": "Tell us what's going on — the more detail, the faster we can help.",
+      "idea": "What would make PawPawCare better for you and your pets?",
+      "question": "Ask us anything about the app.",
+      "none": "How can we help? Ask a question, report a problem or share an idea."
+    },
+    "messageA11y": "Your message",
+    "send": "Send message",
+    "sending": "Sending…",
+    "captionReply": "Only our team reads this, and it's never posted publicly. We reply within 2 business days.",
+    "captionNote": "Only our team reads this, and it's never posted publicly. We read every note.",
+    "sentReply": "Sent — we'll reply within 2 business days",
+    "sentNote": "Thanks — we read every note",
+    "sendFailed": "Could not send — try again"
+  },
+  "errors": {
+    "generic": "Something went wrong — try again.",
+    "signupFailed": "Something went wrong. Please try again.",
+    "loginFailed": "Invalid email or password.",
+    "socialFailed": "Could not sign in. Please try again.",
+    "crash": {
+      "title": "Something went wrong",
+      "body": "The app hit an unexpected error. Your pets and records are safe — try again, and if it keeps happening, email {{email}}.",
+      "retry": "Try again"
+    }
+  },
+  "home": {
+    "greeting": {
+      "morning": "Good morning, {{name}}",
+      "afternoon": "Good afternoon, {{name}}",
+      "evening": "Good evening, {{name}}"
+    },
+    "welcome": "Welcome to PawPawCare, {{name}}",
+    "friend": "Friend",
+    "meetYourPets": "Let's meet your pets",
+    "status": {
+      "overdue_one": "One thing needs\nyou today",
+      "overdue_other": "{{count}} things need\nyou today",
+      "dueSoon_one": "One thing is\ndue soon",
+      "dueSoon_other": "{{count}} things are\ndue soon",
+      "unknown": "Some records\ndidn't load",
+      "oneOk": "{{name}} is\nall good",
+      "twoOk": "{{first}} and {{second}}\nare all good",
+      "allOk": "All {{total}} pets\nare all good"
+    },
+    "vaccinesFailedOne": "{{name}}'s vaccines couldn't be loaded. Check your connection.",
+    "vaccinesFailedSome": "Some vaccines couldn't be loaded. Check your connection.",
+    "okPets_one": "{{count}} of your {{total}} pets is all good.",
+    "okPets_other": "{{count}} of your {{total}} pets are all good.",
+    "notificationsA11y": "Notifications",
+    "notificationsUnreadA11y_one": "Notifications, {{count}} unread",
+    "notificationsUnreadA11y_other": "Notifications, {{count}} unread",
+    "loadingSummaryA11y": "Loading your pets' care summary",
+    "loadingPetsA11y": "Loading your pets",
+    "milestoneToast": "{{pet}}: {{label}}",
+    "benefits": {
+      "reminders": "Reminders before anything is due",
+      "records": "Every record in one safe place",
+      "family": "Share care with your family"
+    },
+    "empty": {
+      "title": "Add your first pet",
+      "body": "A cat, a dog or any companion. It takes less than a minute.",
+      "action": "Add your first pet",
+      "benefitsTitle": "What you'll get"
+    },
+    "celebration": {
+      "birthday": "Happy birthday, {{name}}!",
+      "gotchaDay_one": "Gotcha day — {{count}} year with {{name}}",
+      "gotchaDay_other": "Gotcha day — {{count}} years with {{name}}",
+      "turns_one": "{{name}} turns {{count}} today",
+      "turns_other": "{{name}} turns {{count}} today",
+      "dismiss": "Dismiss"
+    },
+    "upNext": {
+      "caughtUpTitle": "All caught up",
+      "caughtUpBody": "Nothing needs attention right now",
+      "markDone": "Mark done",
+      "reschedule": "Reschedule",
+      "subtitle": "{{pet}} · due {{date}}",
+      "dueOn": "Due {{date}}",
+      "note": "Let's get {{pet}}'s {{vaccine}} booked."
+    },
+    "toast": {
+      "doseLogged": "{{pet}}'s {{med}} logged",
+      "doseFailed": "Couldn't log {{pet}}'s {{med}}. Try again.",
+      "vaccineDone": "{{name}} marked done",
+      "vaccineFailed": "Couldn't mark {{name}} done. Try again."
+    },
+    "more": {
+      "overdue_one": "{{count}} more overdue",
+      "overdue_other": "{{count}} more overdue",
+      "dueSoon_one": "{{count}} due soon",
+      "dueSoon_other": "{{count}} due soon",
+      "moreDueSoon_one": "{{count}} more due soon",
+      "moreDueSoon_other": "{{count}} more due soon",
+      "separator": ", ",
+      "seeAllInHealth": "{{items}} · see all in Health"
+    },
+    "today": {
+      "title": "Today",
+      "allDone": "All done",
+      "doneOf": "{{done}} of {{total}} done",
+      "medTitle": "{{pet}}'s {{med}}",
+      "anyTime": "Today",
+      "givenOf": "{{taken}} of {{expected}} given",
+      "done": "Done",
+      "log": "Log",
+      "showLess": "Show less",
+      "showMore_one": "Show {{count}} more",
+      "showMore_other": "Show {{count}} more"
+    },
+    "pets": {
+      "title": "Your pets",
+      "seeAll": "See all",
+      "addA11y": "Add a pet",
+      "add": "Add"
+    },
+    "comingUp": {
+      "title": "Coming up",
+      "healthLink": "Health",
+      "empty": "Nothing scheduled this week. Enjoy the calm."
+    },
+    "community": {
+      "recentPosts_one": "{{count}} recent post",
+      "recentPosts_other": "{{count}} recent posts",
+      "inCommunity": " in the community",
+      "sayHi": "Say hi to the community"
+    }
+  },
+  "health": {
+    "title": "Health",
+    "synced": {
+      "justNow": "Synced just now",
+      "minutes": "Synced {{n}}m ago",
+      "hours": "Synced {{n}}h ago",
+      "days": "Synced {{n}}d ago"
+    },
+    "reminderKind": {
+      "once": "Reminder",
+      "daily": "Daily reminder",
+      "weekly": "Weekly reminder",
+      "monthly": "Monthly reminder",
+      "other": "{{recurrence}} reminder"
+    },
+    "wasDue": "{{pet}} · was due {{date}}",
+    "sections": {
+      "today": "Today",
+      "week": "This week",
+      "later": "Later"
+    },
+    "toast": {
+      "addPetFirst": "Add a pet first",
+      "saveFailed": "Couldn't save the record. Try again.",
+      "saved": "Record saved",
+      "vaccineDone": "{{name}} marked done",
+      "vaccineFailed": "Couldn't mark {{name}} done. Try again."
+    },
+    "dueWhen": "Due {{when}}",
+    "scheduledAt": "Scheduled · {{time}}",
+    "notificationsOff": "Notifications off",
+    "done": "Done",
+    "filterAll": "All",
+    "empty": {
+      "title": "All quiet on the health front",
+      "body": "Nothing scheduled. Add a vaccine or vet visit and we'll nudge you before it's due.",
+      "bodyPet": "Nothing scheduled for {{name}}. Add a vaccine or vet visit and we'll nudge you before it's due."
+    },
+    "noPets": {
+      "title": "No pets yet",
+      "body": "Add your first pet and their vaccines, meds and vet visits will line up here.",
+      "action": "Add a pet"
+    },
+    "scheduledOnDevice": "Scheduled on this device",
+    "vault": {
+      "title": "Medical vault",
+      "petTitle": "{{name}}'s medical vault",
+      "subtitle": "Vet records, lab results & documents",
+      "pickPet": "Pick a pet to open their records"
+    },
+    "history": "History",
+    "addRecord": "Add record",
+    "types": {
+      "vaccine": "Vaccine",
+      "vetVisit": "Vet visit",
+      "medication": "Medication",
+      "weight": "Weight"
+    },
+    "sheet": {
+      "title": "New record",
+      "type": "Type",
+      "pet": "Pet",
+      "name": "Name",
+      "namePlaceholder": "e.g. Rabies booster",
+      "dueDate": "Due {{date}}",
+      "saveOn": "Save · {{date}}",
+      "thePet": "the pet",
+      "vetVisitHint": "Vet visits and documents are logged in {{name}}'s medical records.",
+      "medicationHint": "Medications are logged on {{name}}'s profile.",
+      "weightHint": "Weights are logged on {{name}}'s profile.",
+      "continue": "Continue"
+    }
+  },
+  "vaccines": {
+    "title": "Vaccines",
+    "summary": {
+      "oneNeedsBooking": "{{name}} needs booking",
+      "needBooking_one": "{{count}} vaccine needs booking",
+      "needBooking_other": "{{count}} vaccines need booking",
+      "next": "Next: {{name}} {{when}}",
+      "upToDate": "Everything is up to date",
+      "none": "No vaccine records yet"
+    },
+    "toast": {
+      "scheduleFailed": "Couldn't schedule the vaccination. Try again.",
+      "scheduled": "Vaccination scheduled",
+      "done": "{{name}} marked done",
+      "doneFailed": "Couldn't mark {{name}} done. Try again.",
+      "deleted": "Record deleted",
+      "deleteFailed": "Couldn't delete the record. Try again."
+    },
+    "confirmDone": {
+      "title": "Mark as administered",
+      "message": "Mark \"{{name}}\" as administered today?",
+      "confirm": "Mark done"
+    },
+    "confirmDelete": {
+      "title": "Delete record",
+      "message": "Delete \"{{name}}\" record?",
+      "confirm": "Delete"
+    },
+    "dueWhen": "Due {{when}}",
+    "wasDueOn": "Was due {{date}}",
+    "dueOn": "Due {{date}}",
+    "done": "Done",
+    "markDoneA11y": "Mark {{name}} done",
+    "deleteA11y": "Delete {{name}}",
+    "sections": {
+      "needs": "Needs attention",
+      "upcoming": "Upcoming",
+      "done": "Done"
+    },
+    "add": "Add vaccine",
+    "empty": {
+      "title": "No vaccines yet",
+      "body": "Add {{name}}'s vaccines and we'll remind you before each one is due."
+    },
+    "sheet": {
+      "title": "New vaccine",
+      "name": "Vaccine name",
+      "namePlaceholder": "e.g. Rabies booster",
+      "dueDate": "Due date",
+      "dueDateA11y": "Due date, {{date}}",
+      "notSet": "not set",
+      "selectDueDate": "Select due date",
+      "schedule": "Schedule"
+    },
+    "picker": {
+      "cancel": "Cancel",
+      "done": "Done"
+    }
+  },
+  "reminders": {
+    "title": "Reminders",
+    "schedule": {
+      "daily": "Daily at {{time}}",
+      "weekly": "Weekly at {{time}}",
+      "monthly": "Monthly at {{time}}",
+      "other": "{{recurrence}} at {{time}}",
+      "oneTime": "One-time"
+    },
+    "toast": {
+      "addFailed": "Couldn't add the reminder. Try again.",
+      "added": "Reminder added",
+      "deleted": "Reminder deleted",
+      "deleteFailed": "Couldn't delete the reminder. Try again."
+    },
+    "form": {
+      "title": "New reminder",
+      "placeholder": "e.g. Give Rex his heartworm pill",
+      "add": "Add reminder"
+    },
+    "listTitle": "Your reminders",
+    "empty": {
+      "title": "No reminders yet",
+      "body": "Vaccination reminders are added automatically. Add your own above for anything else."
+    },
+    "petSummary": "{{pet}} · {{schedule}}",
+    "toggleA11y": "{{title}} reminder",
+    "deleteA11y": "Delete {{title}}",
+    "confirmDelete": {
+      "title": "Delete reminder?",
+      "message": "\"{{title}}\" will no longer fire. This can't be undone.",
+      "confirm": "Delete"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "channelName": "Reminders",
+    "when": {
+      "snoozed": "Snoozed",
+      "snoozeEnded": "Snooze ended",
+      "snoozedUntil": "Snoozed until {{time}}",
+      "scheduled": "Scheduled"
+    },
+    "sections": {
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "earlier": "Earlier"
+    },
+    "rowA11y": "{{title}}. {{when}}",
+    "rowA11yBody": "{{title}}. {{body}}. {{when}}",
+    "newA11y": "New. {{content}}",
+    "actions": {
+      "markRead": "Mark as read",
+      "snoozeHour": "Snooze 1 hour",
+      "dismiss": "Dismiss"
+    },
+    "new": "New",
+    "snoozeA11y": "Snooze {{title}} for an hour",
+    "snoozeShort": "Snooze 1h",
+    "dismissA11y": "Dismiss {{title}}",
+    "allRead": "All read",
+    "newCount_one": "{{count}} new",
+    "newCount_other": "{{count}} new",
+    "manage": "Manage",
+    "empty": {
+      "title": "You're all caught up",
+      "body": "Reminders for vaccines, meds and care tasks will show up here.",
+      "action": "Add a reminder"
+    }
+  },
+  "records": {
+    "title": "Medical vault",
+    "titlePet": "{{name}}'s vault",
+    "subtitle": "Vet records, lab results & documents",
+    "opening": "Opening the vault…",
+    "openFailed": "Couldn't open the vault",
+    "loadingA11y": "Loading records",
+    "thisPet": "this pet",
+    "yourPet": "your pet",
+    "categories": {
+      "lab": "Lab",
+      "vaccination": "Vaccine",
+      "prescription": "Rx",
+      "invoice": "Invoice",
+      "imaging": "Imaging",
+      "insurance": "Insurance",
+      "other": "Other"
+    },
+    "apptStatus": {
+      "scheduled": "Scheduled",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "size": {
+      "bytes": "{{n}} B",
+      "kb": "{{n}} KB",
+      "mb": "{{n}} MB"
+    },
+    "summary": {
+      "documents_one": "{{count}} document",
+      "documents_other": "{{count}} documents",
+      "visits_one": "{{count}} visit",
+      "visits_other": "{{count}} visits",
+      "clinics_one": "{{count}} clinic",
+      "clinics_other": "{{count}} clinics"
+    },
+    "toast": {
+      "refreshFailed": "Couldn't refresh the vault. Showing what was already here.",
+      "openFailed": "Could not open this file",
+      "stillReading": "Still reading another record. Try again in a moment.",
+      "readFailed": "Could not read the document"
+    },
+    "delete": {
+      "confirm": "Delete",
+      "document": {
+        "title": "Delete document?",
+        "message": "Remove this document from {{name}}'s vault?",
+        "removed": "Document removed",
+        "failed": "Couldn't remove the document. Try again."
+      },
+      "appointment": {
+        "title": "Delete appointment?",
+        "message": "Remove this appointment from {{name}}'s vault?",
+        "removed": "Appointment removed",
+        "failed": "Couldn't remove the appointment. Try again."
+      },
+      "clinic": {
+        "title": "Delete clinic?",
+        "message": "Remove this clinic from {{name}}'s vault?",
+        "removed": "Clinic removed",
+        "failed": "Couldn't remove the clinic. Try again."
+      }
+    },
+    "deleteA11y": "Delete {{name}}",
+    "loadFailed": {
+      "title": "We couldn't open the vault",
+      "body": "Check your connection, then try again. Nothing in it has changed.",
+      "action": "Try again"
+    },
+    "empty": {
+      "title": "Start the vault",
+      "titlePet": "Start {{name}}'s vault",
+      "body": "Snap a vaccine certificate, a lab result or an invoice. We can read it and add the records for you."
+    },
+    "upload": "Upload a record",
+    "uploadPhoto": "Upload a photo of a record",
+    "addClinic": "Add a vet clinic",
+    "addPetClinic": "Add {{name}}'s vet clinic",
+    "logVisit": "Log a vet visit",
+    "hero": {
+      "title": "Everything a vet might ask for",
+      "nextVisit": "Next visit {{when}}: {{title}}",
+      "private": "Private to you and your care team"
+    },
+    "sections": {
+      "documents": "Documents",
+      "visits": "Vet visits",
+      "clinics": "Clinics"
+    },
+    "add": "Add",
+    "showLess": "Show less",
+    "showMore_one": "Show {{count}} more",
+    "showMore_other": "Show {{count}} more",
+    "form": {
+      "cancel": "Cancel",
+      "saving": "Saving…"
+    },
+    "doc": {
+      "openHint": "Opens the file",
+      "open": "Open",
+      "review": "Review what was read",
+      "readWithAi": "Read with AI",
+      "reviewA11y": "Review what was read from {{title}}",
+      "readA11y": "Read {{title}} with AI",
+      "read": "Read",
+      "permission": "Photo permission is required.",
+      "pickFailed": "Could not pick the file.",
+      "defaultTitle": "{{category}} record",
+      "uploaded": "Document uploaded",
+      "retry": "Retry upload",
+      "uploadAction": "Upload",
+      "uploading": "Uploading…",
+      "uploadFailed": "Upload failed — nothing was lost.",
+      "chosenA11y": "Chosen file {{name}}, tap to change",
+      "choose": "Choose a photo of the record",
+      "title": "Title",
+      "titlePlaceholder": "e.g. Rabies certificate",
+      "titleA11y": "Document title",
+      "category": "Category"
+    },
+    "clinic": {
+      "fallback": "Vet clinic",
+      "callA11y": "Call {{name}}",
+      "added": "Clinic added",
+      "saveFailed": "Could not save the clinic.",
+      "sheetTitle": "Add vet clinic",
+      "save": "Add clinic",
+      "name": "Clinic name",
+      "namePlaceholder": "e.g. Riverside Vet",
+      "vetName": "Vet name (optional)",
+      "phone": "Phone",
+      "email": "Email",
+      "address": "Address"
+    },
+    "visit": {
+      "logged": "Appointment logged",
+      "saveFailed": "Could not save the appointment.",
+      "save": "Save",
+      "reason": "Reason",
+      "reasonPlaceholder": "e.g. Annual checkup",
+      "reasonA11y": "Reason for the visit",
+      "whenA11y": "Date and time, {{when}}",
+      "clinic": "Clinic (optional)",
+      "status": "Status"
+    },
+    "extract": {
+      "added_one": "{{count}} record added",
+      "added_other": "{{count}} records added",
+      "withSkipped_one": "{{added}} · {{count}} skipped",
+      "withSkipped_other": "{{added}} · {{count}} skipped",
+      "applyFailed": "Could not apply the records.",
+      "title": "Review what we read",
+      "apply": "Apply",
+      "applyCount_one": "Apply {{count}}",
+      "applyCount_other": "Apply {{count}}",
+      "otherPet": "This document may belong to a different pet than {{name}}. Double-check before applying.",
+      "thisOne": "this one",
+      "nothingFound": "No medical data was found in this document.",
+      "vaccinations": "Vaccinations",
+      "includeVaccine": "Include vaccine {{name}}",
+      "vaccineName": "Vaccine name",
+      "given": "Given",
+      "nextDue": "Next due",
+      "medications": "Medications",
+      "includeMedication": "Include medication {{name}}",
+      "medicationName": "Medication name",
+      "dosage": "Dosage",
+      "frequency": {
+        "daily": "daily",
+        "weekly": "weekly",
+        "monthly": "monthly",
+        "as_needed": "as needed"
+      },
+      "weight": "Weight",
+      "includeWeight": "Include weight",
+      "on": "On",
+      "expense": "Expense",
+      "includeExpense": "Include expense",
+      "clinic": "Clinic",
+      "includeClinic": "Include clinic",
+      "renameA11y": "Rename document to {{title}}",
+      "rename": "Rename document to “{{title}}”",
+      "setCategory": "Set category to {{category}}",
+      "datePlaceholder": "YYYY-MM-DD"
+    },
+    "export": {
+      "failed": "Export failed ({{status}})",
+      "dialogTitle": "Export health records"
+    }
+  },
+  "gamification": {
+    "milestones": {
+      "firstRecord": "First health record",
+      "records10": "10 health records",
+      "records25": "25 health records",
+      "records100": "100 health records",
+      "weights5": "5 weight entries",
+      "weights20": "20 weight entries",
+      "weights50": "50 weight entries",
+      "vaxComplete": "Vaccinations all caught up",
+      "anniversary_one": "{{count}} year together",
+      "anniversary_other": "{{count}} years together"
+    },
+    "streak": {
+      "days": "{{days}}-day streak",
+      "started": "Streak started",
+      "loggedYesterday": "Dose logged yesterday",
+      "pickUp": "Pick up where you left off"
+    },
+    "careStreaks": {
+      "title": "Care streaks",
+      "weeks_one": "{{count}} week of consistent care",
+      "weeks_other": "{{count}} weeks of consistent care",
+      "freshStart": "New week, fresh start",
+      "firstEntry": "Starts with one entry"
+    },
+    "recap": {
+      "title": "Your week in care",
+      "doses_one": "{{count}} dose",
+      "doses_other": "{{count}} doses",
+      "weights_one": "{{count}} weight entry",
+      "weights_other": "{{count}} weight entries",
+      "activities_one": "{{count}} activity",
+      "activities_other": "{{count}} activities",
+      "separator": ", ",
+      "vaccinesNeedLook": "vaccinations could use a look"
+    }
+  },
+  "status": {
+    "overdue": "Overdue",
+    "dueSoon": "Due soon",
+    "allGood": "All good",
+    "vaccineOverdue": "Vaccine overdue",
+    "overdueCount_one": "{{count}} overdue",
+    "overdueCount_other": "{{count}} overdue"
+  },
+  "pets": {
+    "title": "Your pets",
+    "subtitle_one": "{{count}} pet · tap to see today's care",
+    "subtitle_other": "{{count}} pets · tap one to see today's care",
+    "addAnother": "Add another pet",
+    "loadFailed": "Couldn't load your pets.",
+    "tryAgain": "Try again",
+    "emptyTitle": "No pets yet",
+    "emptyBody": "Add a cat, a dog or any companion. It takes less than a minute.",
+    "emptyAction": "Add your first pet",
+    "types": {
+      "dog": "Dog",
+      "cat": "Cat",
+      "bird": "Bird",
+      "rabbit": "Rabbit",
+      "other": "Other"
+    },
+    "genders": {
+      "male": "Male",
+      "female": "Female"
+    },
+    "ageShort_one": "{{count}} y",
+    "ageShort_other": "{{count}} y",
+    "colors": {
+      "peach": "Peach",
+      "skyBlue": "Sky blue",
+      "mint": "Mint",
+      "pink": "Pink",
+      "lavender": "Lavender"
+    },
+    "colorA11y": "{{color}} profile color"
+  },
+  "petProfile": {
+    "notFound": "Pet not found.",
+    "segments": {
+      "overview": "Overview",
+      "health": "Health",
+      "notes": "Notes"
+    },
+    "vaxStatus": {
+      "overdue": "Overdue",
+      "dueSoon": "Due soon",
+      "scheduled": "Scheduled"
+    },
+    "expenseCategories": {
+      "vet": "Vet",
+      "food": "Food",
+      "grooming": "Grooming",
+      "medication": "Meds",
+      "supplies": "Supplies",
+      "insurance": "Insurance",
+      "other": "Other"
+    },
+    "frequency": {
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "asNeeded": "As needed"
+    },
+    "timesOfDay": {
+      "morning": "Morning",
+      "afternoon": "Afternoon",
+      "evening": "Evening"
+    },
+    "activityTime": {
+      "morning": "morning",
+      "afternoon": "afternoon",
+      "evening": "evening"
+    },
+    "doseTimes": {
+      "morning": "Morning",
+      "noon": "Noon",
+      "evening": "Evening",
+      "night": "Night"
+    },
+    "vetExpiries": {
+      "h1": "1 hour",
+      "h24": "24 hours",
+      "d7": "7 days"
+    },
+    "careExpiries": {
+      "d1": "1 day",
+      "d3": "3 days",
+      "d7": "1 week",
+      "d14": "2 weeks"
+    },
+    "toast": {
+      "foodAdded": "Food added",
+      "foodAddFailed": "Couldn't add that food. Try again.",
+      "foodRemoved": "Food removed",
+      "foodRemoveFailed": "Couldn't remove that food. Try again.",
+      "activityAdded": "Activity added",
+      "activityAddFailed": "Couldn't add the activity. Try again.",
+      "medAdded": "Medication added",
+      "medAddFailed": "Couldn't add the medication. Try again.",
+      "doseLogged": "Dose logged",
+      "doseLogFailed": "Couldn't log {{med}}. Try again.",
+      "medRemoved": "Medication removed",
+      "medRemoveFailed": "Couldn't remove the medication. Try again.",
+      "reportedLost": "{{name}} reported to the community board",
+      "reportLostFailed": "Couldn't report {{name}}. Check your connection and try again.",
+      "welcomeHome": "Welcome home!",
+      "markFoundFailed": "Couldn't mark them found. Try again.",
+      "weightLogged": "Weight logged",
+      "weightLogFailed": "Couldn't log the weight. Try again.",
+      "entryDeleted": "Entry deleted",
+      "entryDeleteFailed": "Couldn't delete the entry. Try again.",
+      "expenseAdded": "Expense added",
+      "expenseAddFailed": "Couldn't add the expense. Try again.",
+      "expenseDeleted": "Expense deleted",
+      "expenseDeleteFailed": "Couldn't delete the expense. Try again.",
+      "inviteSent": "Invite sent",
+      "inviteFailed": "Could not send the invitation.",
+      "memberRemoved": "Co-owner removed",
+      "memberRemoveFailed": "Couldn't remove {{member}}. Try again.",
+      "inviteWithdrawn": "Invite withdrawn",
+      "inviteWithdrawFailed": "Couldn't withdraw the invite. Try again.",
+      "shareLinksRevoked": "All share links revoked",
+      "careLinksRevoked": "All caretaker links revoked",
+      "notesSaved": "Notes saved"
+    },
+    "confirm": {
+      "remove": "Remove",
+      "delete": "Delete",
+      "removeFoodTitle": "Remove food?",
+      "removeFoodMessage": "Remove {{food}} from {{name}}'s favorite foods?",
+      "removeMedTitle": "Remove medication?",
+      "removeMedMessage": "{{med}} will no longer appear on {{name}}'s schedule.",
+      "markFoundTitle": "Mark as found?",
+      "markFoundMessage": "Has {{name}} been found safe?",
+      "markFoundConfirm": "Found!",
+      "deleteEntryTitle": "Delete entry?",
+      "deleteEntryMessage": "Remove the {{value}} {{unit}} entry?",
+      "deleteExpenseTitle": "Delete expense?",
+      "deleteExpenseMessage": "Remove this {{category}} expense?",
+      "removeMemberTitle": "Remove co-owner?",
+      "removeMemberMessage": "Remove {{member}} from {{name}}?",
+      "cancelInviteTitle": "Cancel invitation?",
+      "cancelInviteMessage": "Withdraw the invite to {{email}}?",
+      "withdraw": "Withdraw",
+      "leaveTitle": "Leave pet?",
+      "leaveMessage": "Stop co-owning {{name}}? You'll lose access to its records.",
+      "leave": "Leave",
+      "revokeTitle": "Revoke links?",
+      "revokeShareMessage": "Disable every share link for {{name}}? Anyone holding one will lose access.",
+      "revokeCareMessage": "Disable every caretaker link for {{name}}? Anyone holding one will lose access.",
+      "revoke": "Revoke"
+    },
+    "hero": {
+      "pet": "Pet",
+      "age_one": "{{count}} yr",
+      "age_other": "{{count}} yrs",
+      "microchipped": "Microchipped",
+      "photoA11y": "Photo of {{name}}",
+      "back": "Back",
+      "moreA11y": "More actions for {{name}}"
+    },
+    "team": {
+      "loading": "Loading…",
+      "youPlus_one": "You + {{count}} co-owner",
+      "youPlus_other": "You + {{count}} co-owners",
+      "justYou": "Just you — invite family to co-own",
+      "sharedWithYou": "Shared with you",
+      "sharedWithYouBy": "Shared with you by {{owner}}"
+    },
+    "trend": {
+      "steady": "Steady",
+      "up": "Up {{value}} {{unit}}",
+      "down": "Down {{value}} {{unit}}"
+    },
+    "overview": {
+      "lostTitle": "{{name}} is reported lost",
+      "lostSub": "Shared to the community board · tap to mark found",
+      "todayFor": "Today for {{name}}",
+      "dosesDone": "{{done}} of {{total}} done",
+      "dosesGiven": "{{taken}} of {{expected}} given",
+      "given": "Given",
+      "markDoneA11y": "Mark {{med}} done",
+      "done": "Done",
+      "nothingToday": "Nothing to give today",
+      "nothingTodaySub": "Add a daily med and we'll nudge you on time.",
+      "add": "Add",
+      "couldntLoadVaccines": "Couldn't load vaccines",
+      "vaccinesOnRecord_one": "{{count}} vaccine on record",
+      "vaccinesOnRecord_other": "{{count}} vaccines on record",
+      "addFirstVaccine": "Add a first vaccine",
+      "tileHealth": "Health",
+      "tileRoutine": "Routine",
+      "tileWeight": "Weight",
+      "tileNotes": "Notes",
+      "dailyActivities_one": "{{count}} daily activity",
+      "dailyActivities_other": "{{count}} daily activities",
+      "notSetUp": "Not set up yet",
+      "logFirstWeight": "Log a first weight",
+      "notesValue": "Sitter notes & handoff",
+      "tileA11y": "{{title}}: {{value}}",
+      "weightLabel": "WEIGHT",
+      "weightLabelValue": "WEIGHT — {{value}} {{unit}}",
+      "notable": "Notable change — worth a vet check.",
+      "deleteWeightA11y": "Delete weight from {{date}}",
+      "noWeights": "No weights logged yet.",
+      "logWeight": "Log weight",
+      "microchip": "Microchip",
+      "registered": "Registered",
+      "notRecorded": "Not recorded",
+      "birthday": "Birthday",
+      "notSet": "Not set",
+      "favoriteFoods": "Favorite foods",
+      "noneYet": "None yet",
+      "careTeam": "Care team",
+      "shareWithVet": "Share with vet",
+      "shareWithVetSub": "Read-only link to {{name}}'s health summary",
+      "caretakerHandoff": "Caretaker handoff",
+      "caretakerHandoffSub": "Sitter notes + a time-limited link",
+      "expenses": "Expenses",
+      "thisMonth": "This month",
+      "deleteExpenseA11y": "Delete {{category}} expense from {{date}}",
+      "addExpense": "Add expense"
+    },
+    "health": {
+      "upcoming": "Upcoming",
+      "nothingScheduled": "Nothing scheduled — enjoy the calm.",
+      "dueOn": "Due {{date}}",
+      "vaccinationTracker": "Vaccination tracker",
+      "vaccinationTrackerSub": "Add, complete or edit vaccinations",
+      "medications": "Medications",
+      "noMedications": "No medications yet.",
+      "addMedication": "Add medication",
+      "history": "History",
+      "milestones": "Milestones",
+      "streakWeeks_one": "{{count}} week of consistent care",
+      "streakWeeks_other": "{{count}} weeks of consistent care",
+      "medicalRecords": "Medical records",
+      "medicalRecordsSub": "Vet clinics, appointments & documents"
+    },
+    "notes": {
+      "dailyRoutine": "Daily routine",
+      "noActivities": "No daily activities yet.",
+      "addActivity": "Add activity",
+      "caretakerNotes": "Caretaker notes"
+    },
+    "menu": {
+      "editDetails": "Edit details",
+      "shareWithVet": "Share with vet",
+      "careTeam": "Care team",
+      "markFound": "Mark {{name}} as found",
+      "reportLost": "Report {{name}} as lost",
+      "leave": "Leave this pet"
+    },
+    "foods": {
+      "title": "Favorite foods",
+      "removeA11y": "Remove {{food}}",
+      "placeholder": "e.g. Salmon kibble",
+      "addA11y": "Add food"
+    },
+    "activity": {
+      "title": "Add activity",
+      "namePlaceholder": "Activity name (e.g. Park walk)",
+      "durationPlaceholder": "Duration in minutes",
+      "submit": "Add activity",
+      "meta": "{{duration}} min · {{time}}"
+    },
+    "medication": {
+      "title": "Add medication",
+      "namePlaceholder": "Name (e.g. Apoquel)",
+      "dosagePlaceholder": "Dosage (e.g. 5mg, 1 tablet)",
+      "frequency": "Frequency",
+      "doseTimes": "Dose times",
+      "submit": "Add medication",
+      "lastGiven": "Last given: {{date}}",
+      "log": "Log",
+      "deleteA11y": "Delete {{med}}"
+    },
+    "lost": {
+      "title": "Report {{name}} as lost",
+      "hint": "This shares an alert to the community Lost Pets board.",
+      "locationPlaceholder": "Last seen location (e.g. Riverside Park)",
+      "detailsPlaceholder": "Details (color, collar, temperament…)",
+      "phonePlaceholder": "Contact phone",
+      "submit": "Report lost"
+    },
+    "weight": {
+      "title": "Log {{name}}'s weight",
+      "placeholder": "e.g. 22.5",
+      "hint": "Logged in {{unit}} — change the unit in Edit Pet.",
+      "submit": "Log weight"
+    },
+    "expense": {
+      "title": "Add expense for {{name}}",
+      "category": "Category",
+      "amountPlaceholder": "Amount (e.g. 45.00)",
+      "notePlaceholder": "Note (optional)",
+      "submit": "Add expense"
+    },
+    "careTeam": {
+      "title": "Care team",
+      "memberYou": "{{name}} (You)",
+      "owner": "Owner",
+      "coOwner": "Co-owner",
+      "removeA11y": "Remove {{member}} from the care team",
+      "invitePending": "Invitation pending",
+      "cancelInviteA11y": "Cancel the invite to {{email}}",
+      "inviteHint": "Invite someone by email to co-own {{name}}. They can view and update records, but only you can delete the pet.",
+      "emailPlaceholder": "family@example.com",
+      "sending": "Sending…",
+      "sendInvite": "Send invite",
+      "sharedHint": "Shared with you. You can view and update {{name}}'s records.",
+      "sharedHintBy": "Shared with you by {{owner}}. You can view and update {{name}}'s records.",
+      "leave": "Leave this pet"
+    },
+    "vetShare": {
+      "title": "Share with vet",
+      "hint": "Creates a read-only web link to {{name}}'s vaccinations, medications, weight, and recent documents. No account needed to open it.",
+      "shareMessage": "{{name}}'s medical summary (read-only, link expires soon):\n{{url}}",
+      "reshareMessage": "{{name}}'s medical summary:\n{{url}}",
+      "expiresAfter": "Link expires after",
+      "creating": "Creating…",
+      "createShare": "Create & share",
+      "expires": "Expires {{date}}",
+      "shareAgain": "Share again",
+      "done": "Done",
+      "revokeAll": "Revoke all active links",
+      "createFailed": "Could not create the link.",
+      "revokeFailed": "Could not revoke links."
+    },
+    "careNotes": {
+      "hint": "Notes for whoever looks after {{name}}, plus a read-only link you can text them — no app needed.",
+      "loadFailed": "Couldn't load the saved notes — editing is paused so they don't get overwritten.",
+      "tryAgain": "Try again",
+      "feeding": "Feeding",
+      "feedingPlaceholder": "e.g. 1 cup of kibble at 8am & 6pm, fresh water daily",
+      "instructions": "Instructions",
+      "instructionsPlaceholder": "Litter box, walks, meds, quirks…",
+      "warning": "Anyone with the link can read this — skip door codes or alarm PINs, or pick a short expiry.",
+      "emergencyContact": "Emergency contact",
+      "emergencyNamePlaceholder": "Name (e.g. Dr. Meow at Happy Paws)",
+      "phonePlaceholder": "Phone",
+      "expires": "Expires {{date}}",
+      "shareAgain": "Share again",
+      "expiresAfter": "Link expires after",
+      "savedCheck": "Notes saved ✓",
+      "saveNotes": "Save notes",
+      "working": "Working…",
+      "createShare": "Create & share",
+      "revokeAll": "Revoke all active links",
+      "shareMessage": "Caring for {{name}} — everything you need (link expires soon):\n{{url}}",
+      "reshareMessage": "Caring for {{name}}:\n{{url}}",
+      "saveFailed": "Could not save notes.",
+      "createFailed": "Could not create the link.",
+      "revokeFailed": "Could not revoke links."
+    },
+    "weightInsight": {
+      "stable": "Stable over the last {{span}}",
+      "up": "Up {{amount}} {{unit}} ({{pct}}%) over the last {{span}}",
+      "down": "Down {{amount}} {{unit}} ({{pct}}%) over the last {{span}}",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "weeks_one": "{{count}} week",
+      "weeks_other": "{{count}} weeks",
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months"
+    }
+  },
+  "addPet": {
+    "photoPermission": "Allow photo access to set a pet photo",
+    "uploadFailed": "Could not upload that image — try again",
+    "nameRequired": "Give your pet a name first",
+    "addFailed": "Couldn't add {{name}}. Check your connection and try again.",
+    "changePhoto": "Change photo",
+    "addPhoto": "Add a photo",
+    "name": "Name",
+    "namePlaceholder": "e.g. Luna",
+    "nameA11y": "Pet name",
+    "breedOptional": "Breed · optional",
+    "breedPlaceholderOr": "Or type a breed",
+    "breedPlaceholder": "e.g. Holland Lop",
+    "breedA11y": "Breed",
+    "breeds": {
+      "goldenRetriever": "Golden Retriever",
+      "labrador": "Labrador",
+      "mixed": "Mixed",
+      "domesticShorthair": "Domestic Shorthair",
+      "siamese": "Siamese",
+      "miniLop": "Mini Lop",
+      "netherlandDwarf": "Netherland Dwarf",
+      "budgie": "Budgie",
+      "cockatiel": "Cockatiel",
+      "parrot": "Parrot"
+    },
+    "theirColor": "Their color",
+    "age": "Age (years)",
+    "ageA11y": "Age in years",
+    "birthday": "Birthday",
+    "birthdayA11y": "Birthday, {{value}}",
+    "notSet": "not set",
+    "selectDate": "Select date",
+    "gotchaDay": "Gotcha day",
+    "gotchaDayA11y": "Gotcha day, {{value}}",
+    "gotchaDayPlaceholder": "The day they came home",
+    "weight": "Weight",
+    "weightPlaceholder": "e.g. 28",
+    "weightA11y": "Weight in {{unit}}",
+    "unit": "Unit",
+    "unitA11y": "Unit {{unit}}, tap to switch",
+    "gender": "Gender",
+    "microchipped": "Microchipped",
+    "microchippedQuestion": "Is your pet microchipped?",
+    "otherSpecies": "Rabbit, bird or other",
+    "note": "Birthday, weight and vet details can wait. Nothing here is permanent.",
+    "step1Title": "Who are we caring for?",
+    "step1Sub": "Pick one. You can add more pets later.",
+    "step2Title": "What's their name?",
+    "step2Sub": "A photo helps you spot them at a glance.",
+    "step3Title": "A few optional details",
+    "step3Sub": "Add what you know now. Their profile works without them.",
+    "step3SubNamed": "Add what you know now. {{name}}'s profile works without them.",
+    "successTitle": "{{name}} is all set!",
+    "successSub": "We'll nudge you before anything is due.",
+    "quickWins": "Two quick wins next",
+    "addVaccines": "Add vaccine records",
+    "addVaccinesSub": "~2 min · keeps reminders accurate",
+    "dailyCare": "Set up daily care",
+    "dailyCareSub": "~1 min · meals, meds and walks",
+    "goToProfile": "Go to {{name}}'s profile",
+    "addAnother": "Add another pet",
+    "previousStep": "Previous step",
+    "back": "Back",
+    "stepOf": "Step {{step}} of {{total}}",
+    "continue": "Continue",
+    "adding": "Adding…",
+    "addNamed": "Add {{name}}",
+    "addUnnamed": "Add pet",
+    "skip": "Skip for now",
+    "cancel": "Cancel",
+    "done": "Done"
+  },
+  "editPet": {
+    "notFound": "Pet not found.",
+    "photoPermission": "Allow photo access to set a pet photo",
+    "uploadFailed": "Could not upload that image — try again",
+    "nameRequired": "Give your pet a name first",
+    "saveFailed": "Couldn't save the changes. Try again.",
+    "saved": "Saved",
+    "removed": "{{name}} removed",
+    "removeFailed": "Couldn't remove {{name}}. Try again.",
+    "title": "Edit {{name}}",
+    "uploadingA11y": "Uploading photo",
+    "changePhotoA11y": "Change {{name}}'s photo",
+    "tapToChange": "Tap to change photo",
+    "tapToAdd": "Tap to add a photo",
+    "name": "Name",
+    "namePlaceholder": "e.g. Luna",
+    "type": "Type",
+    "breed": "Breed (optional)",
+    "breedPlaceholder": "e.g. Golden Retriever",
+    "profileColor": "Profile color",
+    "preview": "This is how {{name}} will appear across the app.",
+    "saving": "Saving…",
+    "saveChanges": "Save changes",
+    "dangerZone": "Danger zone",
+    "dangerHint": "Removing {{name}} deletes their records for everyone they're shared with.",
+    "remove": "Remove {{name}}",
+    "confirmTitle": "Remove {{name}}?",
+    "confirmMessage": "This deletes all records permanently. This can't be undone.",
+    "confirmLabel": "Remove"
+  },
+  "community": {
+    "title": "Community",
+    "sections": {
+      "feed": "Feed",
+      "lost": "Lost pets",
+      "groups": "Groups"
+    },
+    "permissionTitle": "Permission needed",
+    "permissionBody": "Allow photo access to attach a picture.",
+    "postFailed": "Couldn't share that. Try again.",
+    "posted": "Shared with the pack",
+    "groupLeft": "Left {{name}}",
+    "groupJoined": "Joined {{name}}",
+    "leaveFailed": "Couldn't leave {{name}}. Try again.",
+    "joinFailed": "Couldn't join {{name}}. Try again.",
+    "seeAllLost_one": "See all {{count}} lost pet",
+    "seeAllLost_other": "See all {{count}} lost pets",
+    "shareMoment": "Share a moment",
+    "shareMomentPlaceholder": "Share a moment…",
+    "composerPlaceholder": "What's your pack up to?",
+    "newPost": "New post",
+    "removePhoto": "Remove photo",
+    "attachFailed": "Image upload failed — tap to retry",
+    "addPhoto": "Add a photo",
+    "post": "Post",
+    "emptyFeedTitle": "No posts yet",
+    "emptyFeedBody": "Be the first to share a moment with your pet!",
+    "members_one": "{{count}} member",
+    "members_other": "{{count}} members",
+    "join": "Join",
+    "joined": "Joined",
+    "joinA11y": "Join {{name}}",
+    "joinedA11y": "Joined {{name}}",
+    "joinHint": "Joins the group",
+    "leaveHint": "Leaves the group",
+    "emptyGroupsTitle": "No groups yet",
+    "emptyGroupsBody": "Groups will appear here as the community grows.",
+    "reportMissing": "Report a missing pet",
+    "card": {
+      "hidden": "Post hidden — thanks for the report. Our team reviews within 24 hours.",
+      "undoReport": "Undo report",
+      "commentsLoadFailed": "Couldn't load comments",
+      "deleteCommentFailed": "Couldn't delete the comment. Try again.",
+      "commentDeleted": "Comment deleted",
+      "reportA11y": "Report {{name}}'s post",
+      "reportThis": "Report this post",
+      "pawFailed": "Couldn't update the paw. Try again.",
+      "paws_one": "{{count}} paw",
+      "paws_other": "{{count}} paws",
+      "pawTakeBack": "Takes back your paw",
+      "pawGive": "Gives this post a paw",
+      "comments_one": "{{count}} comment",
+      "comments_other": "{{count}} comments",
+      "commentsHide": "Hides the comments",
+      "commentsShow": "Shows the comments",
+      "loadFailedRetry": "Couldn't load comments. Tap to retry.",
+      "loadingComments": "Loading comments…",
+      "noComments": "No comments yet — say something nice!",
+      "deleteCommentA11y": "Delete {{name}}'s comment",
+      "deleteThisComment": "Delete this comment",
+      "addCommentPlaceholder": "Add a comment…",
+      "addComment": "Add a comment",
+      "sendComment": "Send comment",
+      "deleteTitle": "Delete comment?",
+      "deleteMessage": "This comment will be removed for everyone.",
+      "reportTitle": "Report this post?",
+      "reportMessage": "It's hidden for you right away, and our team reviews every report within 24 hours.",
+      "reportConfirm": "Report"
+    }
+  },
+  "lostPets": {
+    "title": "Report missing pet",
+    "intro": "Your report is shared with owners nearby. Most pets are reunited within 48 hours.",
+    "alreadyOnBoard": "{{name}} is already on the board",
+    "postFailed": "Couldn't post {{name}}. Check your connection and try again.",
+    "postFailedNoName": "Couldn't post your pet. Check your connection and try again.",
+    "posted": "{{name}} posted to the board",
+    "postedNoName": "Your pet posted to the board",
+    "whichPet": "Which pet?",
+    "noPets": "Add a pet to your profile first, then report it here.",
+    "lastSeen": "Last seen",
+    "lastSeenPlaceholder": "e.g. Marina Park, near the fountain",
+    "notes": "Anything helpers should know",
+    "notesPlaceholder": "Collar color, temperament, responds to…",
+    "contact": "Contact number",
+    "contactPlaceholder": "So helpers can reach you",
+    "posting": "Posting…",
+    "submit": "Post to the board",
+    "yourReports": "Your active reports",
+    "nearby": "Reported nearby",
+    "emptyTitle": "No pets reported lost",
+    "emptyBody": "Good news — every pet in the community is home safe.",
+    "contactOwner": "Contact owner",
+    "markFound": {
+      "title": "Mark as found?",
+      "message": "Has {{name}} been found safe?",
+      "confirm": "Found!",
+      "success": "Welcome home!",
+      "failed": "Couldn't mark them found. Try again."
+    },
+    "card": {
+      "missing": "Missing",
+      "missingToday": "Missing today",
+      "missingDays_one": "Missing {{count}} day",
+      "missingDays_other": "Missing {{count}} days",
+      "haveYouSeen": "Have you seen {{name}}?",
+      "shareLastSeen": "Last seen near {{location}}.",
+      "shareFooter": "Shared from the PawPawCare lost-pet board.",
+      "seenThem": "I've seen them",
+      "photoOf": "Photo of {{name}}",
+      "onBoard": "{{name}} is on the board",
+      "lastSeenNear": "Last seen near {{location}}",
+      "reportedBy": "Reported by {{name}} · {{time}}",
+      "someone": "someone",
+      "markFound": "Mark as found"
+    }
+  },
+  "moderation": {
+    "title": "Moderation",
+    "loadFailed": "Could not load reports — try again",
+    "loadMoreFailed": "Could not load more — try again",
+    "dismissed": "Reports dismissed — post restored",
+    "dismissFailed": "Could not dismiss — try again",
+    "removed": "Post removed",
+    "removeFailed": "Could not remove — try again",
+    "emptyTitle": "All clear",
+    "emptyBody": "No open reports right now.",
+    "unknownAuthor": "Unknown",
+    "minutesAgo": "{{count}}m ago",
+    "hoursAgo": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago",
+    "reports_one": "{{count}} report",
+    "reports_other": "{{count}} reports",
+    "reportsHidden_one": "{{count}} report · hidden from feed",
+    "reportsHidden_other": "{{count}} reports · hidden from feed",
+    "dismiss": "Dismiss reports",
+    "remove": "Remove post",
+    "removeTitle": "Remove this post?",
+    "removeMessage": "It disappears for everyone. This can't be undone.",
+    "removeConfirm": "Remove"
+  },
+  "nav": {
+    "tabs": {
+      "home": "Home",
+      "pets": "Pets",
+      "health": "Health",
+      "community": "Community",
+      "profile": "Profile"
+    }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "done": "Done",
+    "retry": "Retry",
+    "back": "Back",
+    "close": "Close",
+    "share": "Share",
+    "undo": "Undo",
+    "remove": "Remove",
+    "loading": "Loading…",
+    "loadMore": "Load more",
+    "showSecret": "Show {{label}}",
+    "hideSecret": "Hide {{label}}",
+    "password": "password",
+    "unknown": "Unknown",
+    "someone": "Someone",
+    "aPet": "A pet",
+    "aPetLower": "a pet",
+    "errors": {
+      "network": "Network error: {{cause}}",
+      "networkUnknown": "unknown",
+      "refreshFailed": "Couldn't refresh your session ({{status}})",
+      "requestFailed": "Request failed ({{status}})",
+      "validation": "Validation error",
+      "imageUploadFailed": "Image upload failed ({{status}})",
+      "documentUploadFailed": "Document upload failed ({{status}})"
     }
   }
 }

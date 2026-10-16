@@ -1,7 +1,9 @@
-// Language setting (CHW-188): English / Français / Español (Device default
-// joins them once device detection is rolled out, see src/i18n/rollout.js).
-// Choosing one switches the app at once (no restart), is saved on the device,
-// and is sent to the account fire-and-forget.
+// Language setting (CHW-188): Device default / English / Français / Español.
+// Device detection is switched on since CHW-191 (src/i18n/rollout.js), so
+// "Device default" (follow the phone) is offered first and is the default.
+// Choosing a language switches the app at once (no restart), is saved on the
+// device, and is sent to the account fire-and-forget. The kill-switch mode
+// (detection off) is covered in ProfileScreen.languageRolloutOff.test.js.
 jest.mock('@expo/vector-icons', () => ({ MaterialCommunityIcons: () => null }));
 jest.mock('expo-haptics', () => ({ impactAsync: jest.fn(), ImpactFeedbackStyle: { Medium: 'medium' } }));
 jest.mock('react-native-gesture-handler', () => {
@@ -49,7 +51,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import ProfileScreen from '../ProfileScreen';
 import ListRow from '../../../components/ListRow';
 import Chip from '../../../components/Chip';
-import i18n, { languageChoice } from '../../../i18n';
+import i18n, { languageChoice, setLanguageChoice } from '../../../i18n';
 import { setPref } from '../../../services/prefs';
 
 let mounted;
@@ -64,23 +66,44 @@ const languageRow = (tree, title) => tree.root.findAll((n) => n.type === ListRow
 const chip = (tree, label) => tree.root.findAll((n) => n.type === Chip && n.props.label === label)[0];
 
 beforeEach(() => jest.clearAllMocks());
-// Unmount (clearing the sheet's exit timer) and go back to English.
+// Unmount (clearing the sheet's exit timer) and go back to following the
+// device (English under Jest), so no test depends on the one before it.
 afterEach(() => act(async () => {
   mounted?.unmount();
   mounted = null;
-  await i18n.changeLanguage('en');
+  await setLanguageChoice('device');
 }));
 
-test('the Language row starts in English and offers the three languages', async () => {
+test('the Language row defaults to Device default and offers it first, then the three languages', async () => {
   const tree = await render();
   const row = languageRow(tree, 'App language');
-  expect(row.props.value).toBe('English');
+  expect(row.props.value).toBe('Device default');
 
   await act(async () => row.props.onPress());
-  expect(['English', 'Français', 'Español'].map((l) => chip(tree, l).props.active))
-    .toEqual([true, false, false]);
-  // Not offered until the whole app is translated.
-  expect(chip(tree, 'Device default')).toBeUndefined();
+  const labels = tree.root.findAll((n) => n.type === Chip).map((n) => n.props.label);
+  expect(labels).toEqual(['Device default', 'English', 'Français', 'Español']);
+  expect(['Device default', 'English', 'Français', 'Español'].map((l) => chip(tree, l).props.active))
+    .toEqual([true, false, false, false]);
+});
+
+test('picking Device default after an override follows the device again (English here)', async () => {
+  const tree = await render();
+  await act(async () => languageRow(tree, 'App language').props.onPress());
+  await act(async () => {
+    await chip(tree, 'Français').props.onPress();
+  });
+  expect(i18n.language).toBe('fr');
+
+  await act(async () => languageRow(tree, 'Langue de l\'application').props.onPress());
+  await act(async () => {
+    await chip(tree, 'Langue de l\'appareil').props.onPress();
+  });
+  // jest-setup pins the device to English.
+  expect(i18n.language).toBe('en');
+  expect(languageChoice()).toBe('device');
+  expect(setPref).toHaveBeenLastCalledWith('language', 'device');
+  expect(mockUpdateUser).toHaveBeenLastCalledWith({ locale: 'en' });
+  expect(languageRow(tree, 'App language').props.value).toBe('Device default');
 });
 
 test('choosing Français switches the screen at once, saves it and tells the account', async () => {

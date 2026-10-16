@@ -1,29 +1,36 @@
 // Pure helpers for subscription copy: periods, savings, intro offers and the
 // one status a plan shows. Kept free of React so they're easy to test.
 //
-// planTitle/planStatus are on i18n keys (`subscription.*`, CHW-188) because
-// Profile shows them; the paywall copy below is still English until the
-// paywall screens migrate.
+// Every string is on i18n keys under `subscription.*` (CHW-188, CHW-191),
+// read with i18n.t so callers get the current app language.
 import { getLocales } from 'expo-localization';
 import i18n, { currentLocale } from '../i18n';
 import { fmtDate } from './dates';
 
-const UNIT_WORDS = { D: 'day', W: 'week', M: 'month', Y: 'year' };
+const UNIT_KEYS = { D: 'day', W: 'week', M: 'month', Y: 'year' };
 const RC_UNITS = { DAY: 'D', WEEK: 'W', MONTH: 'M', YEAR: 'Y' };
+
+const parsePeriod = (iso) => {
+  const m = /^P(\d+)([DWMY])$/.exec(iso || '');
+  return m ? { n: Number(m[1]), unit: UNIT_KEYS[m[2]] } : null;
+};
+
+/** "3 months", "1 week": a count of units, always with the number. */
+const duration = (n, unit) => i18n.t(`subscription.duration.${unit}`, { count: n });
 
 /** "P1M" → "month", "P3M" → "3 months", "P1Y" → "year". null if unknown. */
 export function formatPeriod(iso) {
-  const m = /^P(\d+)([DWMY])$/.exec(iso || '');
-  if (!m) return null;
-  const n = Number(m[1]);
-  const word = UNIT_WORDS[m[2]];
-  return n === 1 ? word : `${n} ${word}s`;
+  const p = parsePeriod(iso);
+  if (!p) return null;
+  return p.n === 1 ? i18n.t(`subscription.unit.${p.unit}`) : duration(p.n, p.unit);
 }
 
 /** "$4.99 / month" (or just the price when the period is unknown). */
 export function priceWithPeriod(product) {
   const period = formatPeriod(product?.subscriptionPeriod);
-  return period ? `${product.priceString} / ${period}` : product?.priceString ?? '';
+  return period
+    ? i18n.t('subscription.priceWithPeriod', { price: product.priceString, period })
+    : product?.priceString ?? '';
 }
 
 /** Whole-percent saving of the annual plan over twelve months, or null. */
@@ -50,18 +57,24 @@ export function introOfferText(product) {
   if (!intro) return null;
   const unit = RC_UNITS[intro.periodUnit] ?? null;
   const units = intro.periodNumberOfUnits || 1;
-  const span = unit ? formatPeriod(`P${units}${unit}`) : null;
-  if (!span) return null;
-  if (intro.price === 0) return `Try ${units === 1 ? `1 ${span}` : span} free`;
+  const period = unit ? formatPeriod(`P${units}${unit}`) : null;
+  if (!period) return null;
+  const word = UNIT_KEYS[unit];
+  const price = intro.priceString;
+  if (intro.price === 0) return i18n.t('subscription.intro.freeTrial', { duration: duration(units, word) });
   const cycles = intro.cycles || 1;
   if (cycles > 1) {
     const total = formatPeriod(`P${units * cycles}${unit}`);
-    return `${intro.priceString} / ${span} for ${total}`;
+    return i18n.t('subscription.intro.repeating', { price, period, total });
   }
-  return `${intro.priceString} for the first ${span}`;
+  // "first month" / "first 3 months": its own key, since languages put the
+  // ordinal and the count in different places.
+  const span = i18n.t(`subscription.firstSpan.${word}`, { count: units });
+  return i18n.t('subscription.intro.first', { price, span });
 }
 
-const STORE_NAMES = { app_store: 'the App Store', mac_app_store: 'the App Store', play_store: 'Google Play' };
+// Store ids → `subscription.store.*` keys ("the App Store").
+const STORE_NAMES = { app_store: 'appStore', mac_app_store: 'appStore', play_store: 'playStore' };
 
 /** Billed by Apple / Google (so managed and cancelled in their settings). */
 export const isStoreBilled = (plan) =>
@@ -82,13 +95,15 @@ export function planTitle(plan, included) {
  * "nothing found".
  */
 export function restoreOutcome(result) {
-  if (result?.plan?.active) return { message: 'Purchases restored', done: true };
-  if (result?.synced === false) return { message: 'Restored — it may take a minute to show up', done: true };
-  return { message: 'No purchases found to restore', done: false };
+  const message = (key) => i18n.t(`subscription.restoreOutcome.${key}`);
+  if (result?.plan?.active) return { message: message('restored'), done: true };
+  if (result?.synced === false) return { message: message('pending'), done: true };
+  return { message: message('none'), done: false };
 }
 
 /** Where the subscription is billed, for copy ("the App Store"). */
-export const storeName = (store) => STORE_NAMES[store] ?? 'your app store';
+export const storeName = (store) =>
+  i18n.t(`subscription.store.${Object.prototype.hasOwnProperty.call(STORE_NAMES, store) ? STORE_NAMES[store] : 'unknown'}`);
 
 // In English the renewal date keeps the device's English region, as it did
 // before i18n ('1 Dec 2026' on en-GB, 'Dec 1, 2026' on en-US); a non-English

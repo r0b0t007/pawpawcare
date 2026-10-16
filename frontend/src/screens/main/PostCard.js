@@ -6,11 +6,13 @@ import { useInFlight } from '../../hooks/useInFlight';
 import { resolveAsset } from '../../config';
 import { ui, type, motion, pairFor } from '../../theme';
 import { Card, ConfirmDialog, showToast } from '../../components';
+import { useTranslation } from '../../i18n';
 
 // One post in the Community feed: paws, comments (loaded on expand), report.
 // Every control is icon + count, so each carries a label, role and state for
 // screen readers rather than the icon glyph and a bare number.
 export default function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment, reportPost, unreportPost }) {
+  const { t } = useTranslation();
   const hasPawed = !!post.pawedByMe;
   const paws = post.paws ?? 0; // partial payloads (UPDATE_POST, optimistic adds) may lack it
   const pair = pairFor(post.authorName);
@@ -41,15 +43,15 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
       <Card style={styles.hiddenCard}>
         <MaterialCommunityIcons name="flag-outline" size={18} color={ui.subtle} />
         <Text style={styles.hiddenText}>
-          Post hidden — thanks for the report. Our team reviews within 24 hours.
+          {t('community.card.hidden')}
         </Text>
         <Pressable
           onPress={() => unreportPost(post.id)}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Undo report"
+          accessibilityLabel={t('community.card.undoReport')}
         >
-          <Text style={styles.hiddenUndo}>Undo</Text>
+          <Text style={styles.hiddenUndo}>{t('common.undo')}</Text>
         </Pressable>
       </Card>
     );
@@ -77,7 +79,7 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
       // A quiet reload only stays silent when the thread loaded before;
       // otherwise the list holds just our own comment and must say so.
       setLoadFailed(true);
-      AccessibilityInfo.announceForAccessibility?.("Couldn't load comments");
+      AccessibilityInfo.announceForAccessibility?.(t('community.card.commentsLoadFailed'));
     }
   };
 
@@ -109,12 +111,12 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
 
   const removeComment = async (id) => {
     if (!(await deleteComment(post.id, id))) {
-      showToast("Couldn't delete the comment. Try again.");
+      showToast(t('community.card.deleteCommentFailed'));
       return;
     }
     setComments((prev) => (prev || []).filter((c) => c.id !== id));
     loadComments({ quiet: true }); // a reload from before the delete can't bring it back
-    showToast('Comment deleted');
+    showToast(t('community.card.commentDeleted'));
   };
 
   const commentCount = comments ? comments.length : post.comments;
@@ -135,7 +137,7 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
             onPress={() => setConfirmReport(true)}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel={post.authorName ? `Report ${post.authorName}'s post` : 'Report this post'}
+            accessibilityLabel={post.authorName ? t('community.card.reportA11y', { name: post.authorName }) : t('community.card.reportThis')}
           >
             <MaterialCommunityIcons name="dots-horizontal" size={20} color={ui.subtle} />
           </Pressable>
@@ -149,12 +151,12 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
         <Pressable
           style={styles.actionBtn}
           onPress={() => run('paw', async () => {
-            if ((await onPaw()) === false) showToast("Couldn't update the paw. Try again.");
+            if ((await onPaw()) === false) showToast(t('community.card.pawFailed'));
           })}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel={`${paws} ${paws === 1 ? 'paw' : 'paws'}`}
-          accessibilityHint={hasPawed ? 'Takes back your paw' : 'Gives this post a paw'}
+          accessibilityLabel={t('community.card.paws', { count: paws })}
+          accessibilityHint={t(hasPawed ? 'community.card.pawTakeBack' : 'community.card.pawGive')}
           accessibilityState={{ selected: hasPawed, busy: isBusy('paw') }}
         >
           <MaterialCommunityIcons
@@ -169,8 +171,8 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
           onPress={toggleComments}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel={`${commentCount} ${commentCount === 1 ? 'comment' : 'comments'}`}
-          accessibilityHint={expanded ? 'Hides the comments' : 'Shows the comments'}
+          accessibilityLabel={t('community.card.comments', { count: commentCount })}
+          accessibilityHint={t(expanded ? 'community.card.commentsHide' : 'community.card.commentsShow')}
           accessibilityState={{ expanded }}
         >
           <MaterialCommunityIcons
@@ -193,13 +195,13 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
               style={styles.loadFailedRow}
             >
               <MaterialCommunityIcons name="alert-circle-outline" size={15} color={ui.dangerText} />
-              <Text style={styles.loadFailedText}>Couldn't load comments. Tap to retry.</Text>
+              <Text style={styles.loadFailedText}>{t('community.card.loadFailedRetry')}</Text>
             </Pressable>
           )}
           {loading && comments === null ? (
-            <Text style={styles.commentEmpty} accessibilityLiveRegion="polite">Loading comments…</Text>
+            <Text style={styles.commentEmpty} accessibilityLiveRegion="polite">{t('community.card.loadingComments')}</Text>
           ) : comments && comments.length === 0 ? (
-            <Text style={styles.commentEmpty}>No comments yet — say something nice!</Text>
+            <Text style={styles.commentEmpty}>{t('community.card.noComments')}</Text>
           ) : (
             (comments || []).map((c) => {
               const cPair = pairFor(c.author_name);
@@ -221,7 +223,7 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                       accessibilityRole="button"
                       // A deleted author's name comes back empty.
-                      accessibilityLabel={c.author_name ? `Delete ${c.author_name}'s comment` : 'Delete this comment'}
+                      accessibilityLabel={c.author_name ? t('community.card.deleteCommentA11y', { name: c.author_name }) : t('community.card.deleteThisComment')}
                     >
                       <MaterialCommunityIcons name="close" size={14} color={ui.subtle} />
                     </Pressable>
@@ -233,9 +235,9 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
           <View style={styles.commentInputRow}>
             <TextInput
               style={styles.commentInput}
-              placeholder="Add a comment…"
+              placeholder={t('community.card.addCommentPlaceholder')}
               placeholderTextColor={ui.placeholder}
-              accessibilityLabel="Add a comment"
+              accessibilityLabel={t('community.card.addComment')}
               value={draft}
               onChangeText={setDraft}
               multiline
@@ -246,7 +248,7 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
               onPress={submit}
               disabled={sendDisabled}
               accessibilityRole="button"
-              accessibilityLabel="Send comment"
+              accessibilityLabel={t('community.card.sendComment')}
             >
               <MaterialCommunityIcons name="send" size={15} color={ui.onAccent} />
             </Pressable>
@@ -256,9 +258,9 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
 
       <ConfirmDialog
         visible={!!confirm}
-        title="Delete comment?"
-        message="This comment will be removed for everyone."
-        confirmLabel="Delete"
+        title={t('community.card.deleteTitle')}
+        message={t('community.card.deleteMessage')}
+        confirmLabel={t('common.delete')}
         destructive
         onCancel={() => setConfirm(null)}
         onConfirm={() => { const c = confirm; setConfirm(null); if (c) removeComment(c.id); }}
@@ -266,9 +268,9 @@ export default function PostCard({ post, userId, onPaw, getComments, addComment,
 
       <ConfirmDialog
         visible={confirmReport}
-        title="Report this post?"
-        message="It's hidden for you right away, and our team reviews every report within 24 hours."
-        confirmLabel="Report"
+        title={t('community.card.reportTitle')}
+        message={t('community.card.reportMessage')}
+        confirmLabel={t('community.card.reportConfirm')}
         destructive
         onCancel={() => setConfirmReport(false)}
         onConfirm={() => { setConfirmReport(false); reportPost(post.id); }}

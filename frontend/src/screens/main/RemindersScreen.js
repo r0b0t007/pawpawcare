@@ -12,7 +12,7 @@ import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHead
 import { useInFlight } from '../../hooks/useInFlight';
 import { petById } from '../../utils/pets';
 import { fmtDate } from '../../utils/dates';
-import { useLocale } from '../../i18n';
+import i18n, { useLocale, useTranslation } from '../../i18n';
 import { EASE_OUT_CSS } from '../../components/motion';
 
 const ROW_OUT = FadeOut.duration(150);
@@ -32,18 +32,27 @@ function formatWhen(iso) {
   }) || '—';
 }
 
+// "Weekly at 09:00" — recurrence is daily | weekly | monthly (server enum).
 function scheduleSummary(r) {
   if (r.schedule_type === 'recurring') {
-    const freq = (r.recurrence || 'daily').replace(/^\w/, (c) => c.toUpperCase());
-    return `${freq} at ${r.time_of_day || '09:00'}`;
+    const rec = r.recurrence || 'daily';
+    const time = r.time_of_day || '09:00';
+    return i18n.t(`reminders.schedule.${rec}`, {
+      time,
+      defaultValue: i18n.t('reminders.schedule.other', {
+        recurrence: rec.replace(/^\w/, (c) => c.toUpperCase()),
+        time,
+      }),
+    });
   }
-  return r.next_fire_at ? formatWhen(r.next_fire_at) : 'One-time';
+  return r.next_fire_at ? formatWhen(r.next_fire_at) : i18n.t('reminders.schedule.oneTime');
 }
 
 export default function RemindersScreen({ navigation }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
+  const { t } = useTranslation();
   const { reminders, pets, addReminder, updateReminder, deleteReminder } = useData();
   // A reminder tied to a pet shows that pet's face — recognised before read.
   const petOf = (r) => petById(pets, r.pet_id) || null;
@@ -70,12 +79,12 @@ export default function RemindersScreen({ navigation }) {
         lead_time_days: 0,
       });
       if (!saved) {
-        showToast("Couldn't add the reminder. Try again.");
+        showToast(t('reminders.toast.addFailed'));
         return;
       }
       setTitle('');
       setWhen(defaultWhen());
-      showToast('Reminder added');
+      showToast(t('reminders.toast.added'));
     });
   };
 
@@ -84,20 +93,20 @@ export default function RemindersScreen({ navigation }) {
     setPendingDelete(null);
     if (!r) return;
     deleteReminder(r.id).then((ok) =>
-      showToast(ok ? 'Reminder deleted' : "Couldn't delete the reminder. Try again."));
+      showToast(ok ? t('reminders.toast.deleted') : t('reminders.toast.deleteFailed')));
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScreenHeader title="Reminders" onBack={() => navigation.goBack()} />
+      <ScreenHeader title={t('reminders.title')} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* Add custom reminder */}
         <Card padded style={styles.formCard}>
-          <Text style={styles.formLabel}>New reminder</Text>
+          <Text style={styles.formLabel}>{t('reminders.form.title')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. Give Rex his heartworm pill"
+            placeholder={t('reminders.form.placeholder')}
             placeholderTextColor={ui.placeholder}
             value={title}
             onChangeText={setTitle}
@@ -111,7 +120,7 @@ export default function RemindersScreen({ navigation }) {
             <MaterialCommunityIcons name="pencil-outline" size={15} color={ui.faint} />
           </Pressable>
           <Button
-            label="Add reminder"
+            label={t('reminders.form.add')}
             icon="bell-plus-outline"
             onPress={onSave}
             disabled={!canSave || saving}
@@ -150,13 +159,13 @@ export default function RemindersScreen({ navigation }) {
         )}
 
         {/* Existing reminders */}
-        <Text style={styles.sectionLabel}>Your reminders</Text>
+        <Text style={styles.sectionLabel}>{t('reminders.listTitle')}</Text>
         {reminders.length === 0 ? (
           <EmptyState
             compact
             photo={photos.emptyKitten}
-            title="No reminders yet"
-            body="Vaccination reminders are added automatically. Add your own above for anything else."
+            title={t('reminders.empty.title')}
+            body={t('reminders.empty.body')}
             style={{ marginTop: 8 }}
           />
         ) : (
@@ -187,15 +196,15 @@ export default function RemindersScreen({ navigation }) {
                     {r.title}
                   </Animated.Text>
                   <Text style={styles.rSummary}>
-                    {pet ? `${pet.name} · ` : ''}{scheduleSummary(r)}
+                    {pet ? t('reminders.petSummary', { pet: pet.name, schedule: scheduleSummary(r) }) : scheduleSummary(r)}
                   </Text>
                 </View>
                 <Toggle
                   value={!!r.enabled}
                   onValueChange={(v) => updateReminder(r.id, { enabled: v })}
-                  accessibilityLabel={`${r.title} reminder`}
+                  accessibilityLabel={t('reminders.toggleA11y', { title: r.title })}
                 />
-                <DeleteButton label={`Delete ${r.title}`} onPress={() => setPendingDelete(r)} style={styles.delBtn} />
+                <DeleteButton label={t('reminders.deleteA11y', { title: r.title })} onPress={() => setPendingDelete(r)} style={styles.delBtn} />
               </Animated.View>
               );
             })}
@@ -205,9 +214,9 @@ export default function RemindersScreen({ navigation }) {
 
       <ConfirmDialog
         visible={!!pendingDelete}
-        title="Delete reminder?"
-        message={pendingDelete ? `"${pendingDelete.title}" will no longer fire. This can't be undone.` : ''}
-        confirmLabel="Delete"
+        title={t('reminders.confirmDelete.title')}
+        message={pendingDelete ? t('reminders.confirmDelete.message', { title: pendingDelete.title }) : ''}
+        confirmLabel={t('reminders.confirmDelete.confirm')}
         destructive
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}

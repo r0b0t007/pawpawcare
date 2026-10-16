@@ -1,10 +1,11 @@
 // Rollout switch for device-language detection (CHW-187).
 //
-// While only part of the app is translated, following the device language
-// would hand every fr/es-device install a mixed-language app the moment this
-// ships over the air. So until the remaining screens land, the app starts in
-// English and only switches when the user picks Français or Español in
-// Profile → Language (the "Device default" choice is hidden).
+// On since CHW-191, which translated every screen: the app follows the device
+// language (fr/es; anything else gets English) and Profile → Language offers
+// "Device default" (the default) next to an explicit English / Français /
+// Español override.
 //
-// Flip to true in the PR that finishes the CHW-187 screen migrations.
-export const FOLLOW_DEVICE_LANGUAGE = false;
+// Off, the app starts in English and only switches when the user picks a
+// language ("Device default" hidden). That path stays tested: it is the kill
+// switch if a translation problem ever needs pulling over the air.
+export const FOLLOW_DEVICE_LANGUAGE = true;

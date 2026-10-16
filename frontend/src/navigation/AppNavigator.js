@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../context/AuthContext';
 import { ui } from '../theme';
+import { useTranslation } from '../i18n';
 
 import WelcomeScreen from '../screens/auth/WelcomeScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
@@ -119,6 +120,7 @@ function MainTabs() {
   // The bar grows by the device's bottom inset (home indicator, Android's
   // gesture or 3-button bar) so labels never sit under system UI; a fixed
   // height would override React Navigation's own inset handling.
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 10);
   return (
@@ -150,11 +152,11 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardStack} options={{ tabBarLabel: 'Home' }} />
-      <Tab.Screen name="Pets" component={PetsStack} options={{ tabBarLabel: 'Pets' }} />
-      <Tab.Screen name="Health" component={HealthStack} options={{ tabBarLabel: 'Health' }} />
-      <Tab.Screen name="Community" component={CommunityStack} options={{ tabBarLabel: 'Community' }} />
-      <Tab.Screen name="Profile" component={ProfileStack} options={{ tabBarLabel: 'Profile' }} />
+      <Tab.Screen name="Dashboard" component={DashboardStack} options={{ tabBarLabel: t('nav.tabs.home') }} />
+      <Tab.Screen name="Pets" component={PetsStack} options={{ tabBarLabel: t('nav.tabs.pets') }} />
+      <Tab.Screen name="Health" component={HealthStack} options={{ tabBarLabel: t('nav.tabs.health') }} />
+      <Tab.Screen name="Community" component={CommunityStack} options={{ tabBarLabel: t('nav.tabs.community') }} />
+      <Tab.Screen name="Profile" component={ProfileStack} options={{ tabBarLabel: t('nav.tabs.profile') }} />
     </Tab.Navigator>
   );
 }

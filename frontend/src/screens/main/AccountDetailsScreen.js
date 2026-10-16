@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../i18n';
 import { ui, type, radii, motion } from '../../theme';
 import { Button, ConfirmDialog, showToast, FormScrollView, ScreenHeader } from '../../components';
 import { isRenewingStoreSubscription, storeName } from '../../utils/subscription';
@@ -19,6 +20,7 @@ import { isRenewingStoreSubscription, storeName } from '../../utils/subscription
 // backend has no password-change endpoint yet.
 
 export default function AccountDetailsScreen({ navigation }) {
+  const { t } = useTranslation();
   const { user, updateUser, deleteAccount } = useAuth();
   // Deleting the account doesn't stop store billing — say so before it happens.
   const renewingSubscription = isRenewingStoreSubscription(user?.plan);
@@ -36,10 +38,10 @@ export default function AccountDetailsScreen({ navigation }) {
     const saved = await updateUser({ name: trimmed });
     setSaving(false);
     if (!saved) {
-      showToast("Couldn't save your name. Try again.");
+      showToast(t('account.saveFailed'));
       return; // stay, with the typed name, so it can be retried
     }
-    showToast('Saved');
+    showToast(t('account.saved'));
     navigation.goBack();
   };
 
@@ -52,29 +54,29 @@ export default function AccountDetailsScreen({ navigation }) {
       // so no toast would be visible here.
     } catch (_) {
       setDeleting(false);
-      showToast("Couldn't delete your account — try again");
+      showToast(t('account.deleteFailed'));
     }
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
-        <ScreenHeader title="Account details" onBack={() => navigation.goBack()} flush />
+        <ScreenHeader title={t('account.title')} onBack={() => navigation.goBack()} flush />
 
         <View style={styles.avatarWrap}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{(user?.name || 'U')[0].toUpperCase()}</Text>
+            <Text style={styles.avatarText}>{(user?.name || t('account.avatarFallback'))[0].toUpperCase()}</Text>
           </View>
         </View>
 
         <View style={styles.form}>
           <View>
-            <Text style={[type.sectionLabel, styles.fieldLabel]}>Name</Text>
+            <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('account.nameLabel')}</Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder="Your name"
+              placeholder={t('account.namePlaceholder')}
               placeholderTextColor={ui.placeholder}
               autoCapitalize="words"
               autoCorrect={false}
@@ -84,48 +86,47 @@ export default function AccountDetailsScreen({ navigation }) {
           </View>
 
           <View>
-            <Text style={[type.sectionLabel, styles.fieldLabel]}>Email</Text>
+            <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('account.emailLabel')}</Text>
             <View style={[styles.input, styles.inputReadOnly]}>
               <Text style={styles.readOnlyValue}>{user?.email}</Text>
               <MaterialCommunityIcons name="lock-outline" size={16} color={ui.faint} />
             </View>
-            <Text style={styles.readOnlyHint}>Contact support to change your email.</Text>
+            <Text style={styles.readOnlyHint}>{t('account.emailHint')}</Text>
           </View>
 
-          <Button label="Save changes" onPress={handleSave} disabled={!canSave} />
+          <Button label={t('account.save')} onPress={handleSave} disabled={!canSave} />
         </View>
 
         <View style={styles.dangerZone}>
-          <Text style={[type.sectionLabel, styles.dangerLabel]}>Danger zone</Text>
+          <Text style={[type.sectionLabel, styles.dangerLabel]}>{t('account.dangerZone')}</Text>
           <Pressable
             style={({ pressed }) => [styles.dangerRow, pressed && { opacity: motion.pressOpacity }]}
             onPress={() => setConfirmDelete(true)}
             disabled={deleting}
             accessibilityRole="button"
-            accessibilityLabel="Delete account"
+            accessibilityLabel={t('account.delete')}
           >
             <MaterialCommunityIcons name="trash-can-outline" size={19} color={ui.danger} />
             <Text style={styles.dangerRowText}>
-              {deleting ? 'Deleting account…' : 'Delete account'}
+              {deleting ? t('account.deleting') : t('account.delete')}
             </Text>
           </Pressable>
           <Text style={styles.dangerHint}>
-            Your account is deactivated right away and permanently deleted after 30
-            days. Log back in before then to cancel.
+            {t('account.deleteHint')}
           </Text>
         </View>
       </FormScrollView>
 
       <ConfirmDialog
         visible={confirmDelete}
-        title="Delete your account?"
+        title={t('account.confirmTitle')}
         message={
-          'Your account will be deactivated now and permanently deleted in 30 days — pets, records, photos and posts included. Logging back in before then cancels the deletion.' +
+          t('account.confirmMessage') +
           (renewingSubscription
-            ? ` Your PawPawCare Plus subscription keeps billing through ${storeName(user.plan.store)} — cancel it there too.`
+            ? ` ${t('account.confirmBilling', { store: storeName(user.plan.store) })}`
             : '')
         }
-        confirmLabel="Delete account"
+        confirmLabel={t('account.delete')}
         destructive
         onConfirm={handleDelete}
         onCancel={() => setConfirmDelete(false)}

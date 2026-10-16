@@ -9,7 +9,7 @@ import { ui, type, photos } from '../../theme';
 import { Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, FormScrollView } from '../../components';
 import LostPetCard from './LostPetCard';
 import { useInFlight } from '../../hooks/useInFlight';
-import { useLocale } from '../../i18n';
+import { useLocale, useTranslation } from '../../i18n';
 
 // Redesign: this pushed screen is now the report/manage surface — the board
 // itself lives inline in Community's "Lost pets" section. Report form on top,
@@ -19,6 +19,7 @@ export default function LostPetsScreen({ navigation }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
+  const { t } = useTranslation();
   const {
     pets, lostPets, myReports, refreshLostPets, reportPetLost, resolveLostPet,
   } = useData();
@@ -44,7 +45,7 @@ export default function LostPetsScreen({ navigation }) {
 
   const selectPet = (pet) => {
     if (reportedPetIds.has(pet.id)) {
-      showToast(`${pet.name} is already on the board`);
+      showToast(t('lostPets.alreadyOnBoard', { name: pet.name }));
       return;
     }
     setSelectedPetId((prev) => (prev === pet.id ? null : pet.id));
@@ -67,24 +68,24 @@ export default function LostPetsScreen({ navigation }) {
         contactPhone: phone.trim(),
       });
       if (!saved) {
-        showToast(`Couldn't post ${pet?.name || 'your pet'}. Check your connection and try again.`);
+        showToast(pet?.name ? t('lostPets.postFailed', { name: pet.name }) : t('lostPets.postFailedNoName'));
         return;
       }
       setSelectedPetId(null);
       setLastSeen('');
       setNote('');
       setPhone('');
-      showToast(`${pet?.name || 'Your pet'} posted to the board`);
+      showToast(pet?.name ? t('lostPets.posted', { name: pet.name }) : t('lostPets.postedNoName'));
     });
   };
 
   const handleMarkFound = (report) => setConfirm({
-    title: 'Mark as found?',
-    message: `Has ${report.petName} been found safe?`,
-    confirmLabel: 'Found!',
+    title: t('lostPets.markFound.title'),
+    message: t('lostPets.markFound.message', { name: report.petName }),
+    confirmLabel: t('lostPets.markFound.confirm'),
     action: async () => {
-      if (await resolveLostPet(report.id)) showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' });
-      else showToast("Couldn't mark them found. Try again.");
+      if (await resolveLostPet(report.id)) showToast(t('lostPets.markFound.success'), { celebrate: true, actionType: 'lost_pet_found' });
+      else showToast(t('lostPets.markFound.failed'));
     },
   });
 
@@ -95,17 +96,17 @@ export default function LostPetsScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {/* Header */}
-        <ScreenHeader title="Report missing pet" onBack={() => navigation.goBack()} flush style={{ paddingBottom: 8 }} />
+        <ScreenHeader title={t('lostPets.title')} onBack={() => navigation.goBack()} flush style={{ paddingBottom: 8 }} />
         <Text style={styles.intro}>
-          Your report is shared with owners nearby. Most pets are reunited within 48 hours.
+          {t('lostPets.intro')}
         </Text>
 
         {/* Report form */}
         <View style={styles.form}>
           <View>
-            <Text style={styles.fieldLabel}>Which pet?</Text>
+            <Text style={styles.fieldLabel}>{t('lostPets.whichPet')}</Text>
             {pets.length === 0 ? (
-              <Text style={styles.noPets}>Add a pet to your profile first, then report it here.</Text>
+              <Text style={styles.noPets}>{t('lostPets.noPets')}</Text>
             ) : (
               <View style={styles.petChips}>
                 {pets.map((pet) => {
@@ -133,10 +134,10 @@ export default function LostPetsScreen({ navigation }) {
           </View>
 
           <View>
-            <Text style={styles.fieldLabel}>Last seen</Text>
+            <Text style={styles.fieldLabel}>{t('lostPets.lastSeen')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Marina Park, near the fountain"
+              placeholder={t('lostPets.lastSeenPlaceholder')}
               placeholderTextColor={ui.placeholder}
               value={lastSeen}
               onChangeText={setLastSeen}
@@ -144,10 +145,10 @@ export default function LostPetsScreen({ navigation }) {
           </View>
 
           <View>
-            <Text style={styles.fieldLabel}>Anything helpers should know</Text>
+            <Text style={styles.fieldLabel}>{t('lostPets.notes')}</Text>
             <TextInput
               style={[styles.input, styles.inputMultiline]}
-              placeholder="Collar color, temperament, responds to…"
+              placeholder={t('lostPets.notesPlaceholder')}
               placeholderTextColor={ui.placeholder}
               value={note}
               onChangeText={setNote}
@@ -156,10 +157,10 @@ export default function LostPetsScreen({ navigation }) {
           </View>
 
           <View>
-            <Text style={styles.fieldLabel}>Contact number</Text>
+            <Text style={styles.fieldLabel}>{t('lostPets.contact')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="So helpers can reach you"
+              placeholder={t('lostPets.contactPlaceholder')}
               placeholderTextColor={ui.placeholder}
               value={phone}
               onChangeText={setPhone}
@@ -168,7 +169,7 @@ export default function LostPetsScreen({ navigation }) {
           </View>
 
           <Button
-            label={submitting ? 'Posting…' : 'Post to the board'}
+            label={submitting ? t('lostPets.posting') : t('lostPets.submit')}
             onPress={handleSubmit}
             disabled={!selectedPetId || submitting}
           />
@@ -177,7 +178,7 @@ export default function LostPetsScreen({ navigation }) {
         {/* Your active reports */}
         {activeReports.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Your active reports</Text>
+            <Text style={styles.sectionLabel}>{t('lostPets.yourReports')}</Text>
             {activeReports.map((r) => (
               <LostPetCard key={r.id} report={r} mine onFound={() => handleMarkFound(r)} />
             ))}
@@ -186,13 +187,13 @@ export default function LostPetsScreen({ navigation }) {
 
         {/* Other reports */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Reported nearby</Text>
+          <Text style={styles.sectionLabel}>{t('lostPets.nearby')}</Text>
           {otherReports.length === 0 ? (
             <EmptyState
               compact
               photo={photos.communityPals}
-              title="No pets reported lost"
-              body="Good news — every pet in the community is home safe."
+              title={t('lostPets.emptyTitle')}
+              body={t('lostPets.emptyBody')}
               style={{ paddingVertical: 12 }}
             />
           ) : (
@@ -205,7 +206,7 @@ export default function LostPetsScreen({ navigation }) {
                 onSeen={r.contactPhone
                   ? () => Linking.openURL(`tel:${r.contactPhone}`).catch(() => {})
                   : undefined}
-                seenLabel="Contact owner"
+                seenLabel={t('lostPets.contactOwner')}
                 seenIcon="phone"
               />
             ))

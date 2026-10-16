@@ -1,4 +1,5 @@
 import { convertWeight, weightInsight } from '../weight';
+import i18n from '../../i18n';
 
 const pt = (value, loggedAt) => ({ id: loggedAt, value, loggedAt });
 
@@ -85,5 +86,23 @@ describe('weightInsight', () => {
     const i = weightInsight([pt(0, '2026-01-01'), pt(4.0, '2026-02-01')], 'kg');
     expect(i.changePct).toBe(0);
     expect(i.direction).toBe('stable');
+  });
+
+  describe('in the app language (formal fr / es-ES drafts)', () => {
+    afterEach(() => i18n.changeLanguage('en'));
+
+    it('builds the French summary', async () => {
+      await i18n.changeLanguage('fr');
+      expect(weightInsight([pt(4.0, '2026-01-01'), pt(4.8, '2026-04-01')], 'kg').summary)
+        .toBe('En hausse de 0.8 kg (20 %) sur 3 mois');
+      expect(weightInsight([pt(4.0, '2026-01-01'), pt(4.0, '2026-01-02')], 'kg').summary)
+        .toBe('Stable sur 1 jour');
+    });
+
+    it('builds the Spanish summary', async () => {
+      await i18n.changeLanguage('es');
+      expect(weightInsight([pt(5.0, '2026-01-01'), pt(4.5, '2026-02-26')], 'kg').summary)
+        .toBe('Ha bajado 0.5 kg (10 %) en 8 semanas');
+    });
   });
 });
