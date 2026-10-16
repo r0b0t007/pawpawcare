@@ -27,3 +27,4 @@ export { REMINDER_ICON, reminderIcon } from './reminderTypes';
 export { ToastHost, showToast } from './Toast';
 export { PET_STATUS, SPECIES_ICON, speciesIcon, petHealthStatus } from './petStatus';
 export { default as FormScrollView } from './FormScrollView';
+export { default as FitText } from './FitText';

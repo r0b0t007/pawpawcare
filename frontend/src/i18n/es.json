@@ -1643,7 +1643,8 @@
       "pets": "Mascotas",
       "health": "Salud",
       "community": "Comunidad",
-      "profile": "Perfil"
+      "profile": "Perfil",
+      "a11yPosition": "{{label}}, pestaña, {{index}} de {{count}}"
     }
   },
   "common": {

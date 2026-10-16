@@ -1584,7 +1584,8 @@
       "pets": "Pets",
       "health": "Health",
       "community": "Community",
-      "profile": "Profile"
+      "profile": "Profile",
+      "a11yPosition": "{{label}}, tab, {{index}} of {{count}}"
     }
   },
   "common": {
