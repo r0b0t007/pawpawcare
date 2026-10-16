@@ -86,7 +86,7 @@ return [
         'vaccination_status' => [
             'upcoming' => 'à venir',
             'overdue' => 'en retard',
-            'completed' => 'effectuée',
+            'completed' => 'effectué',
         ],
         'appointment_status' => [
             'scheduled' => 'prévu',

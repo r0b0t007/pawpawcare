@@ -176,7 +176,7 @@ See [Dates and units](#dates-and-units). In short: use a decimal comma, 24-hour 
 | Mark as administered (vaccine) | Marquer comme administré | Marcar como administrada | none | |
 | Try again / Retry (button) | Réessayer | Reintentar | es: *Intentar de nuevo* (`auth.reconnect.retry`, `paywall.retry`, `errors.crash.retry`) | Inside a sentence: fr "Veuillez réessayer." / es "Inténtelo de nuevo." |
 | Couldn't … (error) | Impossible de … | No se ha podido … | es: *No se pudo / No se pudieron* (22 keys: `home.vaccinesFailed*`, `home.toast.*Failed`, `health.toast.*Failed`, `vaccines.toast.*Failed`, `reminders.toast.*Failed`, `records.openFailed`, `records.toast.*`, `records.delete.*.failed`, `records.doc.pickFailed`, `records.clinic.saveFailed`, `records.visit.saveFailed`, `records.extract.applyFailed`) | |
-| Log (a dose, weight or visit) | Enregistrer | Registrar | fr: *Noter / notée* (`home.today.log`, `petProfile.medication.log`, `records.logVisit`, `gamification.streak.loggedYesterday`) | |
+| Log (a dose, weight or visit) | Noter (button); enregistré(e) (done) | Registrar | none | fr keeps *Noter* for the action: *Enregistrer* is already Save, and a Log tap records at once with no confirm step. |
 | Upload | Importer / import | Subir / subida | fr: *envoyer / envoi* when it means upload (`addPet.uploadFailed`, `editPet.uploadFailed`, `editPet.uploadingA11y`, `community.attachFailed`, `common.errors.imageUploadFailed`, `common.errors.documentUploadFailed`) | |
 | Share | Partager | Compartir | none | |
 | Schedule / Reschedule | Programmer / Reprogrammer | Programar / Reprogramar | none | |
@@ -199,7 +199,7 @@ See [Dates and units](#dates-and-units). In short: use a decimal comma, 24-hour 
 | Due soon (pill) | Échéance proche (count: {{count}} échéance(s) proche(s)) | Vence pronto | fr: *Bientôt* (`status.dueSoon`, `home.more.dueSoon_*`), *Bientôt dû* (`petProfile.vaxStatus.dueSoon`) | French *dû* is a financial word, and "Bientôt" alone is ambiguous on a pill. "échéance" is already used in `home.status.dueSoon_*` and `home.more.moreDueSoon_*`. |
 | Overdue | En retard | Atrasada (agrees with vacuna); generic: Atrasado | es: *Vencida* (`petProfile.vaxStatus.overdue`, `export.php` values.vaccination_status.overdue) | "Overdue · 3 days" is fr "En retard · 3 jours" / es "Atrasado · 3 días". |
 | Upcoming | À venir | Próxima(s) | none | The export cell is lowercase: "à venir" / "próxima". |
-| Completed (vaccine status) | effectuée (agrees with vaccination) | administrada | es: *Completada* (`share.php` completed) | The given date is fr "Administré(e) le :date" / es "Administrada el :date". |
+| Completed (vaccine status) | effectué (agrees with vaccin, as on the app, the share page and the export) | administrada | es: *Completada* (`share.php` completed) | The given date is fr "Administré(e) le :date" / es "Administrada el :date". |
 | Scheduled (appointment or vaccine status) | Prévu(e) | Programada | fr: *Planifié* (`petProfile.vaxStatus.scheduled`) | A reminder or notification scheduled on the device stays fr "Programmé(e)" / es "Programada". |
 | Completed / Cancelled (appointment) | Effectué / Annulé | Realizada / Cancelada | none | Export cells are lowercase. |
 | All good / Up to date | Tout va bien / Tout est à jour | Todo bien / Todo al día | none | |
@@ -250,7 +250,7 @@ The vet share page (`share.php`) and the PDF/CSV export (`export.php` `values.*`
 | category `imaging` | Imagerie / imagerie | Imagen / imagen | es `share.php`: *Diagnóstico por imagen* becomes *Imagen*. |
 | category `insurance` | Assurance / assurance | Seguro / seguro | none |
 | category `other` | Autre / autre | Otro / otro | none |
-| vaccination status `completed` | Effectuée / effectuée | Administrada / administrada | es `share.php`: *Completada* becomes *Administrada*. |
+| vaccination status `completed` | Effectué / effectué | Administrada / administrada | es `share.php`: *Completada* becomes *Administrada*. |
 | vaccination status `overdue` | — / en retard | — / atrasada | es `export.php`: *vencida* becomes *atrasada*. |
 | vaccination status `upcoming` | — / à venir | — / próxima | none |
 | pet type, sex | identical | identical | none |
@@ -304,7 +304,7 @@ Fix these in one PR per language, after native review. Change values only. Some 
 - "Medication: :medication" *Medicación* becomes **Medicamento**.
 - "This caretaker link has been revoked." *enlace de cuidador* becomes **enlace para cuidadores**.
 - "This share link has been revoked." *enlace para compartir* becomes **enlace compartido**.
-- ":pet — :vaccine is due :date": *fecha prevista* becomes **:vaccine vence el :date**. "Vaccination due: :vaccine" stays **Vacuna pendiente: :vaccine** (*Vencimiento de vacuna* reads as "vaccine expiry").
+- ":pet — :vaccine is due :date": *fecha prevista* becomes **:vaccine vence el :date**, the app-wide due-date verb. "Vaccination due: :vaccine" stays **Vacuna pendiente: :vaccine**: the bare noun *Vencimiento de vacuna* reads as "vaccine expiry". Native reviewer: confirm *vence (el)* for due dates app-wide (about 20 strings), or pick one replacement for all of them.
 
 **`backend/lang/fr/*.php`**
 - `share.php`: categories.lab *Analyses* becomes **Analyse**, categories.vaccination *Vaccination* becomes **Vaccin**, and medications/no_medications *Traitement(s)* become **Médicament(s)**.

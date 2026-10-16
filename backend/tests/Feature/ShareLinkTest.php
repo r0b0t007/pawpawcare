@@ -325,7 +325,7 @@ class ShareLinkTest extends TestCase
         $res->assertSee('<html lang="fr">', false);
         $res->assertSee('Luna — Dossier médical');
         $res->assertSee('Chat · Maine Coon'); // type translated, typed breed as entered
-        $res->assertSee('Administrée le '.Carbon::today()->subMonth()->locale('fr')->isoFormat('D MMM YYYY'));
+        $res->assertSee('Administré le '.Carbon::today()->subMonth()->locale('fr')->isoFormat('D MMM YYYY'));
         $res->assertSee('Médicaments en cours');
         $res->assertSee("En hausse de 0,2 kg (4,3\u{00A0}%) sur les 2 derniers mois");
         $res->assertSee('4,8 kg');

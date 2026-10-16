@@ -19,9 +19,9 @@ return [
     'no' => 'Non',
 
     'vaccinations' => 'Vaccinations',
-    'given' => 'Administrée le :date',
-    'completed' => 'Effectuée',
-    'due' => 'Prévue le :date',
+    'given' => 'Administré le :date',
+    'completed' => 'Effectué',
+    'due' => 'Prévu le :date',
     'no_vaccinations' => 'Aucune vaccination enregistrée.',
 
     'medications' => 'Médicaments en cours',

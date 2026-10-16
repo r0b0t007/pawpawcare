@@ -184,7 +184,7 @@ class ExportRecordsLocaleTest extends TestCase
         // th/h3 are uppercased by CSS, so the text layer holds capitals.
         $this->assertStringContainsString('MÉDICAMENTS', $text);
         $this->assertStringContainsString('ÉCHÉANCE', $text);
-        $this->assertStringContainsString('effectuée', $text);   // vaccination status
+        $this->assertMatchesRegularExpression('/effectué(?!e)/u', $text);   // vaccination status (masculine, agrees with vaccin)
         $this->assertStringContainsString('effectué', $text);    // appointment status
         $this->assertStringContainsString('au besoin', $text);   // frequency
         $this->assertStringContainsString('analyse', $text);     // document category
