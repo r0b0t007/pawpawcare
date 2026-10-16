@@ -1,5 +1,13 @@
 document.documentElement.classList.add('js');
 
+// The few words this script writes, in the page's language (<html lang>).
+var TEXT = {
+  en: { openMenu: 'Open menu', closeMenu: 'Close menu', joining: 'Joining…' },
+  fr: { openMenu: 'Ouvrir le menu', closeMenu: 'Fermer le menu', joining: 'Inscription…' },
+  es: { openMenu: 'Abrir el menú', closeMenu: 'Cerrar el menú', joining: 'Enviando…' },
+}[(document.documentElement.lang || 'en').slice(0, 2)] || null;
+if (!TEXT) TEXT = { openMenu: 'Open menu', closeMenu: 'Close menu', joining: 'Joining…' };
+
 // Sticky header shadow once the page scrolls
 var header = document.getElementById('site-header');
 var onScroll = function () {
@@ -14,7 +22,7 @@ if (navToggle && header) {
   var setNav = function (open) {
     header.classList.toggle('nav-open', open);
     navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    navToggle.setAttribute('aria-label', open ? TEXT.closeMenu : TEXT.openMenu);
   };
   navToggle.addEventListener('click', function () {
     setNav(!header.classList.contains('nav-open'));
@@ -57,7 +65,7 @@ document.querySelectorAll('form[name="waitlist"]').forEach(function (form) {
     var btn = form.querySelector('button[type="submit"]');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Joining…';
+      btn.textContent = TEXT.joining;
     }
   });
 });

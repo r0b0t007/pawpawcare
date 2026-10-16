@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Calendario de vacunas para cachorros y gatitos (2026), con calculadora de fechas</title>
+  <meta name="description" content="Un calendario de vacunas para cachorros y gatitos explicado con claridad, con las edades habituales de las vacunas esenciales y una calculadora gratuita que convierte la fecha de nacimiento de su mascota en las próximas fechas de vacunación.">
+  <link rel="canonical" href="https://pawpawcare.app/es/vaccine-schedule/">
+  <link rel="alternate" hreflang="en" href="https://pawpawcare.app/vaccine-schedule/">
+  <link rel="alternate" hreflang="fr" href="https://pawpawcare.app/fr/vaccine-schedule/">
+  <link rel="alternate" hreflang="es" href="https://pawpawcare.app/es/vaccine-schedule/">
+  <link rel="alternate" hreflang="x-default" href="https://pawpawcare.app/vaccine-schedule/">
+
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="PawPawCare">
+  <meta property="og:locale" content="es_ES">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:locale:alternate" content="fr_FR">
+  <meta property="og:title" content="Calendario de vacunas para cachorros y gatitos (2026), con calculadora de fechas">
+  <meta property="og:description" content="Las edades habituales de las vacunas esenciales para cachorros y gatitos, y una calculadora gratuita que convierte una fecha de nacimiento en las próximas fechas de vacunación.">
+  <meta property="og:url" content="https://pawpawcare.app/es/vaccine-schedule/">
+  <meta property="og:image" content="https://pawpawcare.app/og-image.webp">
+  <meta property="og:image:type" content="image/webp">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://pawpawcare.app/og-image.webp">
+
+  <meta name="theme-color" content="#fff8f4">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/style.css?v=76659a278a">
+  <script src="/script.js?v=9acbec862d" defer></script>
+  <script src="/analytics.js?v=7250edbaf3" defer></script>
+
+  <!-- Note: general pet-health info written by the founder, not a veterinarian.
+       A DVM review would further strengthen E-E-A-T — if one happens, add a
+       "reviewedBy" Person to the Article JSON-LD below. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Calendario de vacunas para cachorros y gatitos (2026)",
+    "description": "Las edades habituales de las vacunas esenciales para cachorros y gatitos, con una calculadora que convierte una fecha de nacimiento en las próximas fechas de vacunación.",
+    "inLanguage": "es",
+    "author": { "@id": "https://ahmedchioua.com/#person" },
+    "about": ["Calendario de vacunas para cachorros", "Calendario de vacunas para gatitos", "Vacunación de mascotas"],
+    "isPartOf": { "@id": "https://pawpawcare.app/#website" },
+    "publisher": { "@id": "https://pawpawcare.app/#org" },
+    "mainEntityOfPage": "https://pawpawcare.app/es/vaccine-schedule/"
+  }
+  </script>
+
+  <style>
+    .vx { max-width: 820px; }
+    .vx h1 { font-size: clamp(2rem, 4.5vw, 2.9rem); }
+    .vx .lede { font-size: 1.12rem; color: var(--ink-soft); max-width: 40em; }
+    .vx-tool {
+      background: var(--card);
+      border: 1.5px solid var(--outline);
+      border-radius: var(--r-xl);
+      padding: clamp(20px, 4vw, 30px);
+      box-shadow: var(--shadow-card);
+      margin: 8px 0 28px;
+    }
+    .vx-controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+    .vx-controls .field { flex: 1 1 180px; }
+    .vx-controls label { display: block; font-size: 0.85rem; font-weight: 700; color: var(--ink-soft); margin-bottom: 5px; }
+    .vx-controls select, .vx-controls input {
+      width: 100%; font: inherit; color: var(--ink); background: var(--card);
+      border: 1.5px solid var(--outline); border-radius: var(--r-lg); padding: 12px 14px; min-height: 48px;
+    }
+    .vx-results { margin-top: 22px; }
+    .vx-results:empty { display: none; }
+    .vx-row { display: flex; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--surface-high); }
+    .vx-row:first-child { border-top: 0; }
+    .vx-vac { font-weight: 700; color: var(--ink); }
+    .vx-age { font-size: 0.85rem; color: var(--ink-soft); }
+    .vx-date { font-weight: 700; color: var(--bark); white-space: nowrap; text-align: right; }
+    .vx-date.past { color: var(--ink-soft); font-weight: 600; }
+    table.vx-table { width: 100%; border-collapse: collapse; margin: 10px 0 8px; }
+    table.vx-table caption { text-align: left; font-weight: 800; color: var(--bark); padding: 8px 0; }
+    table.vx-table th, table.vx-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--surface-high); font-size: 0.96rem; }
+    table.vx-table th { color: var(--ink-soft); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .vx-tables-wrap { overflow-x: auto; }
+    .vx-cta { background: var(--surface-low); border: 1.5px solid var(--peach); border-radius: var(--r-2xl); padding: clamp(24px, 4vw, 40px); text-align: center; margin-top: 32px; }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Saltar al contenido</a>
+
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <a class="wordmark" href="/es/" aria-label="PawPawCare — inicio">
+        <img class="paw" src="/logo-mark.png" width="26" height="26" alt="" aria-hidden="true">
+        PawPawCare
+      </a>
+      <nav aria-label="Principal" id="primary-nav">
+        <ul class="nav-links">
+          <li><a href="/es/#features">Funciones</a></li>
+          <li><a href="/es/#how">Cómo funciona</a></li>
+          <li><a href="/es/#faq">Preguntas frecuentes</a></li>
+          <li><a href="/es/vaccine-schedule/" aria-current="page">Calendario de vacunas</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <nav class="lang-switch" aria-label="Idioma"><a href="/vaccine-schedule/" lang="en" hreflang="en">English</a><a href="/fr/vaccine-schedule/" lang="fr" hreflang="fr">Français</a><a href="/es/vaccine-schedule/" lang="es" hreflang="es" aria-current="true">Español</a></nav>
+        <a class="btn btn-primary btn-sm" href="/es/#waitlist"><span class="cta-long">Acceso anticipado</span><span class="cta-short">Unirse</span></a>
+        <button class="nav-toggle" type="button" aria-label="Abrir el menú" aria-expanded="false" aria-controls="primary-nav">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="section" aria-labelledby="vx-title">
+      <div class="container vx">
+        <p class="tag-chip">Guía</p>
+        <h1 id="vx-title">Calendario de vacunas para cachorros y gatitos</h1>
+        <p class="lede">Las vacunas esenciales que necesitan la mayoría de los cachorros y gatitos, a las edades en que suelen ponerse, y una calculadora que convierte la fecha de nacimiento de su mascota en fechas orientativas que puede llevar al veterinario.</p>
+
+        <p class="disclaimer">Esta información es general y no constituye consejo veterinario. Los calendarios reales varían según la región, la raza, el estilo de vida y la normativa local, y es su veterinario quien establece el plan adecuado para su mascota. Use las fechas de abajo como punto de partida para esa conversación, no como sustituto de ella.</p>
+
+        <!-- ===== Calculator ===== -->
+        <h2>Calculadora de fechas de vacunación</h2>
+        <div class="vx-tool">
+          <div class="vx-controls">
+            <div class="field">
+              <label for="vx-species">Mascota</label>
+              <select id="vx-species">
+                <option value="dog">Cachorro (perro)</option>
+                <option value="cat">Gatito (gato)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="vx-dob">Fecha de nacimiento</label>
+              <input id="vx-dob" type="date">
+            </div>
+          </div>
+          <div class="vx-results" id="vx-results" aria-live="polite"></div>
+        </div>
+
+        <!-- ===== Reference tables ===== -->
+        <h2>Edades habituales de las vacunas esenciales</h2>
+        <div class="vx-tables-wrap">
+          <table class="vx-table">
+            <caption>Cachorros: vacunas esenciales</caption>
+            <thead><tr><th scope="col">Vacuna</th><th scope="col">Protege contra</th><th scope="col">Edad habitual</th></tr></thead>
+            <tbody>
+              <tr><td>Polivalente (DHPPi), 1.ª dosis</td><td>Moquillo, hepatitis (adenovirus), parvovirus, parainfluenza</td><td>6–8 semanas</td></tr>
+              <tr><td>Polivalente (DHPPi), 2.ª dosis</td><td>La misma combinación, segunda dosis</td><td>10–12 semanas</td></tr>
+              <tr><td>Polivalente (DHPPi), 3.ª dosis</td><td>La misma combinación, tercera dosis</td><td>14–16 semanas</td></tr>
+              <tr><td>Rabia</td><td>Rabia (a menudo obligatoria por ley)</td><td>12–16 semanas</td></tr>
+              <tr><td>Refuerzo de la polivalente</td><td>Primer refuerzo de adulto</td><td>~12 meses</td></tr>
+            </tbody>
+          </table>
+          <table class="vx-table">
+            <caption>Gatitos: vacunas esenciales</caption>
+            <thead><tr><th scope="col">Vacuna</th><th scope="col">Protege contra</th><th scope="col">Edad habitual</th></tr></thead>
+            <tbody>
+              <tr><td>Trivalente felina, 1.ª dosis</td><td>Rinotraqueítis viral felina, calicivirus, panleucopenia</td><td>6–8 semanas</td></tr>
+              <tr><td>Trivalente felina, 2.ª dosis</td><td>La misma combinación, segunda dosis</td><td>10–12 semanas</td></tr>
+              <tr><td>Trivalente felina, 3.ª dosis</td><td>La misma combinación, tercera dosis</td><td>14–16 semanas</td></tr>
+              <tr><td>Rabia</td><td>Rabia (a menudo obligatoria por ley)</td><td>12–16 semanas</td></tr>
+              <tr><td>Refuerzo de la trivalente felina</td><td>Primer refuerzo de adulto</td><td>~12 meses</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="vx-age">Las vacunas no esenciales (p. ej. Bordetella, enfermedad de Lyme, leptospirosis, leucemia felina [FeLV]) dependen de dónde viva y de cómo pase el día su mascota: pregunte a su veterinario si alguna le corresponde.</p>
+
+        <p style="margin-top:22px;" class="vx-age">Escrito por <a href="https://ahmedchioua.com" rel="author">Ahmed Chioua</a>, fundador de PawPawCare. Esta información es general y no constituye consejo veterinario personalizado: es su veterinario quien establece el calendario adecuado para su mascota.</p>
+
+        <!-- ===== CTA back to product ===== -->
+        <div class="vx-cta">
+          <h2 style="margin-top:0;">Deje que PawPawCare recuerde las fechas por usted.</h2>
+          <p style="color:var(--ink-soft);">Añada a su mascota una sola vez y PawPawCare registra cada dosis, le avisa antes de cada vencimiento y archiva los documentos del veterinario, para que nunca más tenga que rehacer este calendario a mano.</p>
+          <p style="margin-bottom:0;"><a class="btn btn-primary" href="/es/#waitlist">Únase gratis a la lista de espera</a></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p class="wordmark wordmark-footer">
+        <img class="paw" src="/logo-mark.png" width="26" height="26" alt="" aria-hidden="true">
+        PawPawCare
+      </p>
+      <p class="footer-tagline">Para las personas con las que cuentan las mascotas.</p>
+      <nav aria-label="Pie de página">
+        <ul class="nav-links">
+          <li><a href="/es/#features">Funciones</a></li>
+          <li><a href="/es/vaccine-schedule/">Calendario de vacunas</a></li>
+          <li><a href="/es/#waitlist">Lista de espera</a></li>
+          <li><a href="/privacy/">Privacidad (en inglés)</a></li>
+          <li><a href="/terms/">Condiciones (en inglés)</a></li>
+          <li><a href="#" data-cookie-settings>Configuración de cookies</a></li>
+        </ul>
+      </nav>
+      <nav class="lang-switch lang-switch-footer" aria-label="Idioma"><a href="/vaccine-schedule/" lang="en" hreflang="en">English</a><a href="/fr/vaccine-schedule/" lang="fr" hreflang="fr">Français</a><a href="/es/vaccine-schedule/" lang="es" hreflang="es" aria-current="true">Español</a></nav>
+      <p class="footer-legal">© 2026 PawPawCare · Creado por <a href="https://ahmedchioua.com" rel="author">Ahmed Chioua</a></p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var SCHEDULES = {
+        dog: [
+          { v: 'Polivalente (DHPPi), 1.ª dosis', age: '6–8 semanas', lo: 6, hi: 8 },
+          { v: 'Polivalente (DHPPi), 2.ª dosis', age: '10–12 semanas', lo: 10, hi: 12 },
+          { v: 'Polivalente (DHPPi), 3.ª dosis', age: '14–16 semanas', lo: 14, hi: 16 },
+          { v: 'Rabia', age: '12–16 semanas', lo: 12, hi: 16 },
+          { v: 'Refuerzo de la polivalente', age: '~12 meses', lo: 52, hi: 52 }
+        ],
+        cat: [
+          { v: 'Trivalente felina, 1.ª dosis', age: '6–8 semanas', lo: 6, hi: 8 },
+          { v: 'Trivalente felina, 2.ª dosis', age: '10–12 semanas', lo: 10, hi: 12 },
+          { v: 'Trivalente felina, 3.ª dosis', age: '14–16 semanas', lo: 14, hi: 16 },
+          { v: 'Rabia', age: '12–16 semanas', lo: 12, hi: 16 },
+          { v: 'Refuerzo de la trivalente felina', age: '~12 meses', lo: 52, hi: 52 }
+        ]
+      };
+      var species = document.getElementById('vx-species');
+      var dob = document.getElementById('vx-dob');
+      var out = document.getElementById('vx-results');
+      if (!species || !dob || !out) return;
+
+      var fmt = new Intl.DateTimeFormat('es-ES', { month: 'short', day: 'numeric', year: 'numeric' });
+      function addWeeks(date, w) { var d = new Date(date.getTime()); d.setDate(d.getDate() + w * 7); return d; }
+
+      function render() {
+        out.innerHTML = '';
+        var val = dob.value;
+        if (!val) return;
+        var birth = new Date(val + 'T00:00:00');
+        if (isNaN(birth.getTime())) return;
+        var today = new Date(); today.setHours(0, 0, 0, 0);
+        SCHEDULES[species.value].forEach(function (item) {
+          var start = addWeeks(birth, item.lo);
+          var end = addWeeks(birth, item.hi);
+          var when = item.lo === item.hi ? fmt.format(start) : fmt.format(start) + ' – ' + fmt.format(end);
+          var past = end < today;
+          var row = document.createElement('div');
+          row.className = 'vx-row';
+          row.innerHTML = '<span><span class="vx-vac">' + item.v + '</span><br><span class="vx-age">Edad habitual: ' + item.age + '</span></span>' +
+            '<span class="vx-date' + (past ? ' past' : '') + '">' + when + (past ? ' · seguramente ya puesta' : '') + '</span>';
+          out.appendChild(row);
+        });
+        var note = document.createElement('p');
+        note.className = 'vx-age';
+        note.style.marginTop = '14px';
+        note.textContent = 'Fechas estimadas a partir de las franjas de edad habituales indicadas arriba: confirme las fechas exactas con su veterinario.';
+        out.appendChild(note);
+      }
+      species.addEventListener('change', render);
+      dob.addEventListener('change', render);
+      dob.addEventListener('input', render);
+    })();
+  </script>
+</body>
+</html>

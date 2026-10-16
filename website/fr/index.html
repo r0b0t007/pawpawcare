@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>PawPawCare — Carnet de santé et rappels de vaccins pour vos animaux</title>
+  <meta name="description" content="Vaccins, médicaments, évolution du poids et dossiers vétérinaires de tous vos animaux, réunis dans un endroit serein. Inscrivez-vous gratuitement sur la liste d'attente pour découvrir PawPawCare en avant-première.">
+
+  <!-- Absolute URLs — swap the domain here when a custom domain lands -->
+  <link rel="canonical" href="https://pawpawcare.app/fr/">
+  <link rel="alternate" hreflang="en" href="https://pawpawcare.app/">
+  <link rel="alternate" hreflang="fr" href="https://pawpawcare.app/fr/">
+  <link rel="alternate" hreflang="es" href="https://pawpawcare.app/es/">
+  <link rel="alternate" hreflang="x-default" href="https://pawpawcare.app/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PawPawCare">
+  <meta property="og:locale" content="fr_FR">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:locale:alternate" content="es_ES">
+  <meta property="og:title" content="PawPawCare — Toute la santé de votre animal, réunie dans un endroit serein">
+  <meta property="og:description" content="Vaccins, médicaments, évolution du poids et dossiers vétérinaires pour toute la famille à poils. Inscrivez-vous gratuitement sur la liste d'attente de l'avant-première.">
+  <meta property="og:url" content="https://pawpawcare.app/fr/">
+  <meta property="og:image" content="https://pawpawcare.app/og-image.webp">
+  <meta property="og:image:type" content="image/webp">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PawPawCare — suivi de la santé de vos animaux, avec rappels de vaccins et de médicaments">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PawPawCare — Toute la santé de votre animal, réunie dans un endroit serein">
+  <meta name="twitter:description" content="Vaccins, médicaments, évolution du poids et dossiers vétérinaires pour toute la famille à poils. Inscrivez-vous gratuitement sur la liste d'attente de l'avant-première.">
+  <meta name="twitter:image" content="https://pawpawcare.app/og-image.webp">
+  <meta name="twitter:image:alt" content="PawPawCare — suivi de la santé de vos animaux, avec rappels de vaccins et de médicaments">
+
+  <meta name="theme-color" content="#fff8f4">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <link rel="preload" href="/fonts/plus-jakarta-sans-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/baloo2-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/images/hero-puppy.webp" as="image" imagesrcset="/images/hero-puppy-560.webp 560w, /images/hero-puppy.webp 960w" imagesizes="320px" media="(min-width: 821px)" fetchpriority="high">
+  <link rel="stylesheet" href="/style.css?v=76659a278a">
+  <script src="/script.js?v=9acbec862d" defer></script>
+  <script src="/analytics.js?v=7250edbaf3" defer></script>
+
+  <!-- Structured data. TODO(owner): once the brand's own LinkedIn / Product Hunt /
+       Crunchbase pages exist (SEO task H3), add their URLs to Organization.sameAs. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://pawpawcare.app/#website",
+        "url": "https://pawpawcare.app/",
+        "name": "PawPawCare",
+        "publisher": { "@id": "https://pawpawcare.app/#org" }
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://pawpawcare.app/#org",
+        "name": "PawPawCare",
+        "url": "https://pawpawcare.app/",
+        "logo": "https://pawpawcare.app/apple-touch-icon.png",
+        "email": "privacy@pawpawcare.app",
+        "founder": {
+          "@type": "Person",
+          "@id": "https://ahmedchioua.com/#person",
+          "name": "Ahmed Chioua",
+          "jobTitle": "Fondateur",
+          "url": "https://ahmedchioua.com",
+          "sameAs": ["https://ahmedchioua.com", "https://www.linkedin.com/in/ahmedchioua/"]
+        },
+        "sameAs": []
+      },
+      {
+        "@type": "MobileApplication",
+        "@id": "https://pawpawcare.app/fr/#app",
+        "name": "PawPawCare",
+        "inLanguage": "fr",
+        "description": "Application de suivi de la santé des animaux de compagnie : rappels de vaccins, calendrier des médicaments, analyse de l'évolution du poids, coffre médical avec lecture des documents par IA, liens de partage pour le vétérinaire, mode gardien et communauté de propriétaires d'animaux.",
+        "applicationCategory": "HealthApplication",
+        "operatingSystem": "iOS, Android",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "url": "https://pawpawcare.app/fr/",
+        "publisher": { "@id": "https://pawpawcare.app/#org" },
+        "featureList": [
+          "Suivi des vaccinations avec rappels avant l'échéance",
+          "Calendrier des médicaments et suivi des prises",
+          "Évolution du poids expliquée en langage clair",
+          "Coffre médical avec lecture des documents par IA",
+          "Liens de partage en lecture seule pour le vétérinaire",
+          "Mode gardien pour les personnes qui gardent vos animaux",
+          "Partage en famille pour les foyers à plusieurs animaux",
+          "Fil de la communauté et alertes Animaux perdus"
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://pawpawcare.app/fr/#faq",
+        "url": "https://pawpawcare.app/fr/",
+        "inLanguage": "fr",
+        "isPartOf": { "@id": "https://pawpawcare.app/#website" },
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Qu'est-ce que PawPawCare ?",
+            "acceptedAnswer": { "@type": "Answer", "text": "PawPawCare est une application gratuite de suivi de la santé animale pour iOS et Android, qui réunit les vaccinations, les médicaments, l'évolution du poids et les dossiers vétérinaires de chacun de vos animaux dans un endroit serein. Fini les carnets papier éparpillés, les photos et les alertes d'agenda : chaque animal a son profil, avec des rappels avant l'échéance des vaccins, un calendrier des médicaments avec suivi des prises et une analyse du poids en langage clair. Le coffre médical conserve les visites chez le vétérinaire et les documents ; sa lecture par IA analyse la photo d'un certificat de vaccination, d'une ordonnance ou d'une facture et en extrait les informations, que vous vérifiez avant tout enregistrement. Vous pouvez partager un lien en lecture seule avec votre vétérinaire ou votre gardien, devenir copropriétaire de vos animaux avec votre famille et suivre le fil d'une communauté de propriétaires d'animaux. L'application est pensée pour les foyers à plusieurs animaux et se trouve actuellement en avant-première gratuite, avant son lancement sur les boutiques d'applications." }
+          },
+          {
+            "@type": "Question",
+            "name": "PawPawCare est-il gratuit ?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Oui. L'avant-première est entièrement gratuite, sans carte bancaire et sans période d'essai qui expire. Inscrivez-vous sur la liste d'attente, recevez votre invitation et vous avez accès à toute l'application : profils pour plusieurs animaux, suivi des vaccins et des médicaments, évolution du poids, coffre médical avec lecture par IA, partage avec le vétérinaire et le gardien, et fil de la communauté. Lors du lancement public de PawPawCare, le suivi essentiel sur lequel vous comptez (vaccins, médicaments, poids et rappels) restera gratuit. Certaines fonctionnalités avancées pourront rejoindre plus tard une offre payante facultative, mais nous indiquerons toujours clairement ce qui est inclus avant tout changement, et les membres de l'avant-première seront prévenus bien à l'avance." }
+          },
+          {
+            "@type": "Question",
+            "name": "Quand l'application sera-t-elle lancée ?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Nous accueillons dès maintenant les inscrits de la liste d'attente par petits groupes, avant le lancement sur les boutiques d'applications. Inscrivez-vous sur la liste d'attente et votre invitation arrivera avec le prochain groupe." }
+          },
+          {
+            "@type": "Question",
+            "name": "L'application est-elle disponible sur iOS ou sur Android ?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Les deux. L'avant-première fonctionne sur iOS et sur Android." }
+          },
+          {
+            "@type": "Question",
+            "name": "Les données de mon animal restent-elles privées ?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Oui. Les dossiers de votre animal vous appartiennent, et nous ne vendons jamais vos données. PawPawCare ne fait appel à aucun courtier en données ni à aucune régie publicitaire. Le partage est toujours une option que vous activez vous-même : les liens de partage pour le vétérinaire et les pages de garde sont en lecture seule, expirent selon le délai que vous choisissez et peuvent être révoqués à tout moment. Les documents que vous scannez sont traités uniquement pour en extraire les informations que vous vérifiez, et ne servent pas à entraîner des modèles d'IA. Les données transitent par des connexions HTTPS chiffrées, les mots de passe ne sont conservés que sous forme d'empreintes sécurisées et les sessions utilisent des jetons de courte durée." }
+          },
+          {
+            "@type": "Question",
+            "name": "Que contient l'avant-première gratuite ?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Toute l'application : profils pour plusieurs animaux, suivi des vaccinations et des médicaments, évolution du poids, coffre médical avec lecture par IA, partage avec le vétérinaire et le gardien, et fil de la communauté." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Aller au contenu</a>
+
+  <header class="site-header" id="site-header">
+    <div class="container header-inner">
+      <a class="wordmark" href="#top" aria-label="PawPawCare — retour en haut de la page">
+        <img class="paw" src="/logo-mark.png" width="26" height="26" alt="" aria-hidden="true">
+        PawPawCare
+      </a>
+      <nav aria-label="Navigation principale" id="primary-nav">
+        <ul class="nav-links">
+          <li><a href="#features">Fonctionnalités</a></li>
+          <li><a href="#how">Comment ça marche</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="/fr/vaccine-schedule/">Calendrier des vaccins</a></li>
+        </ul>
+      </nav>
+      <div class="header-actions">
+        <nav class="lang-switch" aria-label="Langue"><a href="/" lang="en" hreflang="en">English</a><a href="/fr/" lang="fr" hreflang="fr" aria-current="true">Français</a><a href="/es/" lang="es" hreflang="es">Español</a></nav>
+        <a class="btn btn-primary btn-sm" href="#waitlist"><span class="cta-long">Obtenir l'accès anticipé</span><span class="cta-short">S'inscrire</span></a>
+        <button class="nav-toggle" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="primary-nav">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ============ Hero ============ -->
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="tag-chip">Accès anticipé · Avant-première gratuite</p>
+          <h1 id="hero-title">Toute la santé de votre animal, réunie dans un&nbsp;endroit&nbsp;serein.</h1>
+          <p class="lede">PawPawCare est le carnet de santé qui n'oublie aucun vaccin, aucune dose, aucun gramme : rappels de vaccins, calendrier des médicaments, évolution du poids et dossiers vétérinaires pour toute la famille à poils. Vous, vous recevez simplement le rappel au bon moment.</p>
+
+          <form class="waitlist-form" name="waitlist" method="POST" action="/api/waitlist">
+            <input type="hidden" name="lang" value="fr">
+            <p class="hp-field" aria-hidden="true">
+              <label>Ne remplissez pas ce champ : <input name="bot-field" tabindex="-1" autocomplete="off"></label>
+            </p>
+            <div class="form-row">
+              <div class="field">
+                <label for="email">Adresse e-mail</label>
+                <input id="email" type="email" name="email" required autocomplete="email" inputmode="email" placeholder="vous@exemple.fr">
+              </div>
+              <button class="btn btn-primary" type="submit">Recevoir l'avant-première</button>
+            </div>
+            <p class="form-note">Accès anticipé gratuit. Aucun spam : seulement votre e-mail de bienvenue et votre invitation.</p>
+          </form>
+        </div>
+
+        <div class="hero-visual">
+          <!-- Photo: Taylor Sondgeroth on Unsplash (Unsplash License). -->
+          <div class="hero-photo">
+            <img src="/images/hero-puppy.webp" srcset="/images/hero-puppy-560.webp 560w, /images/hero-puppy.webp 960w" sizes="(max-width: 820px) min(312px, calc(71vw - 28px)), 320px" alt="Un chiot golden retriever, le menton posé sur un canapé, un œil fermé" width="960" height="1200" decoding="async">
+          </div>
+          <div class="hero-ground" aria-hidden="true"></div>
+          <div class="phone phone-hero">
+            <div class="phone-frame">
+              <span class="phone-island" aria-hidden="true"></span>
+              <img src="/images/dashboard.ef1b5bd3.webp" srcset="/images/dashboard-480.webp 480w, /images/dashboard.ef1b5bd3.webp 780w" sizes="(max-width: 820px) min(194px, calc(44vw - 18px)), 210px" alt="Écran d'accueil de PawPawCare : un rappel de vaccin à venir, les profils des animaux et le programme de la semaine" width="780" height="1688" loading="lazy" decoding="async">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Social strip ============ -->
+    <div class="container">
+      <div class="pack-strip reveal">
+        <ul class="pet-chips" role="list">
+          <li class="pet-chip" style="--chip:#ffddb8">Biscuit</li>
+          <li class="pet-chip" style="--chip:#c5e7ff">Luna</li>
+          <li class="pet-chip" style="--chip:#d8e2ff">Mochi</li>
+          <li class="pet-chip" style="--chip:#b2f2d4">Pepper</li>
+          <li class="pet-chip" style="--chip:#ffd6e7">Nala</li>
+        </ul>
+        <p>Pensé pour les foyers où plus d'une boule de poils a son mot à dire.</p>
+      </div>
+    </div>
+
+    <div class="trail" aria-hidden="true">
+      <svg viewBox="0 0 200 90" focusable="false">
+        <path class="trail-path" d="M20 10 C 60 40, 140 20, 180 78"/>
+        <g class="trail-paw" transform="translate(58 30) rotate(35) scale(0.55)"><use href="#pawprint"/></g>
+        <g class="trail-paw" transform="translate(132 44) rotate(55) scale(0.55)"><use href="#pawprint"/></g>
+      </svg>
+    </div>
+
+    <!-- ============ Core features ============ -->
+    <section class="section" id="features" aria-labelledby="features-title">
+      <div class="container">
+        <p class="tag-chip">Fonctionnalités</p>
+        <h2 id="features-title">Les tâches fastidieuses, on s'en charge.</h2>
+        <div class="feature-grid">
+          <article class="feature-card reveal">
+            <div class="shot">
+              <img src="/images/vaccinations.cb9f0ca4.webp" alt="Espace santé de PawPawCare : une étiquette sur chaque rappel indique que chaque vaccin et chaque visite vétérinaire est programmé sur cet appareil, avec un rappel de vaccin en retard à marquer comme fait" width="780" height="1688" loading="lazy" decoding="async">
+            </div>
+            <h3>Plus aucun rappel de vaccin oublié</h3>
+            <p>Chaque vaccin sur une frise, avec un rappel à l'approche de l'échéance. Marquez-le comme fait chez le vétérinaire et n'y pensez plus, jusqu'à ce qu'on vous le rappelle l'année suivante.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="shot">
+              <img src="/images/health.0c40cbca.webp" alt="Profil d'un animal dans PawPawCare : graphique mensuel de l'évolution du poids, puce électronique, allergies et équipe de soins partagée" width="780" height="1688" loading="lazy" decoding="async">
+            </div>
+            <h3>L'évolution du poids, en langage clair</h3>
+            <p>«&nbsp;+0,8&nbsp;kg (20&nbsp;%) sur les 3&nbsp;derniers mois.&nbsp;» Pas un graphique à déchiffrer, mais une phrase concrète, et un petit signal quand un changement mérite d'en parler à votre vétérinaire.</p>
+          </article>
+          <article class="feature-card reveal">
+            <div class="shot shot-family" aria-hidden="true">
+              <div class="family-cluster">
+                <span class="avatar" style="--chip:#ffddb8">B</span>
+                <span class="avatar" style="--chip:#c5e7ff">L</span>
+                <span class="avatar" style="--chip:#b2f2d4">P</span>
+                <span class="avatar avatar-add">+</span>
+              </div>
+            </div>
+            <h3>Tous vos animaux, une seule maison</h3>
+            <p>Un profil pour chaque membre de la bande : chiens, chats, et même le perroquet qui se prend pour un chien. Passez de l'un à l'autre d'un simple geste.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <div class="trail trail-flip" aria-hidden="true">
+      <svg viewBox="0 0 200 90" focusable="false">
+        <path class="trail-path" d="M20 10 C 60 40, 140 20, 180 78"/>
+        <g class="trail-paw" transform="translate(58 30) rotate(35) scale(0.55)"><use href="#pawprint"/></g>
+        <g class="trail-paw" transform="translate(132 44) rotate(55) scale(0.55)"><use href="#pawprint"/></g>
+      </svg>
+    </div>
+
+    <!-- ============ Records / AI intake ============ -->
+    <section class="section" id="records" aria-labelledby="records-title">
+      <div class="container split">
+        <div class="split-copy">
+          <p class="tag-chip">Dossiers</p>
+          <h2 id="records-title">Photographiez un document vétérinaire. On classe le reste.</h2>
+          <p>Prenez en photo un certificat de vaccination, une ordonnance ou une facture. PawPawCare le lit et en extrait les vaccins, les médicaments, le poids et les montants, puis vous montre exactement ce qu'il a trouvé.</p>
+          <p><strong>Rien n'est enregistré sans votre accord.</strong> Chaque élément extrait a sa case à cocher : c'est vous qui gardez le dernier mot sur le dossier de votre animal.</p>
+          <p class="disclaimer">PawPawCare vous aide à organiser les dossiers de santé de votre animal : l'application ne pose pas de diagnostic et ne remplace pas les soins d'un vétérinaire. Vérifiez toujours les informations extraites par l'IA en les comparant au document original, et demandez l'avis de votre vétérinaire avant d'agir sur la base d'un rappel ou d'une tendance.</p>
+        </div>
+        <div class="split-visual reveal" aria-hidden="true">
+          <div class="scan-card">
+            <p class="scan-title">Trouvé dans votre document</p>
+            <ul role="list">
+              <li><span class="check">✓</span> Rappel antirabique — prévu en mars 2027</li>
+              <li><span class="check">✓</span> Amoxicilline 50&nbsp;mg · 2 fois par jour</li>
+              <li><span class="check">✓</span> Poids : 12,4&nbsp;kg</li>
+            </ul>
+            <span class="scan-apply">Appliquer 3 éléments</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Sharing ============ -->
+    <section class="section section-tinted" id="sharing" aria-labelledby="sharing-title">
+      <div class="container">
+        <p class="tag-chip">Partage</p>
+        <h2 id="sharing-title">Confiez les soins sans confier votre téléphone.</h2>
+        <div class="share-grid">
+          <article class="share-card reveal">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 14a5 5 0 0 0 7.07 0l3.18-3.18a5 5 0 1 0-7.07-7.07L11.5 5.4"/><path d="M14 10a5 5 0 0 0-7.07 0l-3.18 3.18a5 5 0 1 0 7.07 7.07l1.68-1.65"/></svg>
+            <h3>Partage avec le vétérinaire</h3>
+            <p>Un lien en lecture seule avec les vaccins, les médicaments et l'historique du poids. Votre vétérinaire l'ouvre dans son navigateur, sans application ni compte. Le lien expire quand vous le décidez.</p>
+          </article>
+          <article class="share-card reveal">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M12 17.8s-3.2-1.9-3.2-4a1.9 1.9 0 0 1 3.2-1.4 1.9 1.9 0 0 1 3.2 1.4c0 2.1-3.2 4-3.2 4Z"/></svg>
+            <h3>Mode gardien</h3>
+            <p>Vous partez ? Donnez à votre gardien une seule page avec les consignes d'alimentation, le calendrier des médicaments et votre contact d'urgence. Elle s'efface d'elle-même après votre voyage.</p>
+          </article>
+          <article class="share-card reveal">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M15.5 15.2c2.4.2 4.3 1.8 4.9 4.8"/></svg>
+            <h3>Partage en famille</h3>
+            <p>Devenez copropriétaires de vos animaux avec tout le foyer. Chacun note les promenades et les repas ; plus personne ne donne deux fois son médicament au chien.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ Community ============ -->
+    <section class="section" id="community" aria-labelledby="community-title">
+      <div class="container split split-reverse">
+        <div class="split-copy">
+          <p class="tag-chip">Communauté</p>
+          <h2 id="community-title">Un voisinage qui veille sur votre animal.</h2>
+          <p>Partagez les petites victoires, posez les questions qui vous gênent et échangez avec des propriétaires qui vous comprennent.</p>
+          <p>Et si un animal disparaît, les alertes Animaux perdus préviennent en quelques secondes les propriétaires à proximité : les meilleurs renforts pour les recherches, ce sont ceux qui sont déjà dehors en promenade.</p>
+        </div>
+        <div class="split-visual reveal">
+          <div class="phone phone-sm">
+            <div class="phone-frame">
+              <span class="phone-island" aria-hidden="true"></span>
+              <img src="/images/community.6bfb4b4b.webp" alt="Fil de la communauté PawPawCare, avec des publications de propriétaires d'animaux du quartier" width="780" height="1688" loading="lazy" decoding="async">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="trail" aria-hidden="true">
+      <svg viewBox="0 0 200 90" focusable="false">
+        <path class="trail-path" d="M20 10 C 60 40, 140 20, 180 78"/>
+        <g class="trail-paw" transform="translate(58 30) rotate(35) scale(0.55)"><use href="#pawprint"/></g>
+        <g class="trail-paw" transform="translate(132 44) rotate(55) scale(0.55)"><use href="#pawprint"/></g>
+      </svg>
+    </div>
+
+    <!-- ============ Comment ça marche ============ -->
+    <section class="section" id="how" aria-labelledby="how-title">
+      <div class="container">
+        <p class="tag-chip">Comment ça marche</p>
+        <h2 id="how-title">Trois étapes vers des soins plus sereins.</h2>
+        <ol class="steps">
+          <li class="step reveal">
+            <span class="step-mark" aria-hidden="true">1</span>
+            <h3>Rejoignez la liste d'attente</h3>
+            <p>Laissez votre adresse e-mail ci-dessous. C'est tout le formulaire.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-mark" aria-hidden="true">2</span>
+            <h3>Recevez votre invitation</h3>
+            <p>Nous ouvrons l'accès par petits groupes, pour que les premiers retours façonnent vraiment l'application.</p>
+          </li>
+          <li class="step reveal">
+            <span class="step-mark" aria-hidden="true">3</span>
+            <h3>Ajoutez vos animaux</h3>
+            <p>Un profil se crée en une minute. Scannez vos documents vétérinaires et tout est à jour.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============ About / trust (E-E-A-T) ============ -->
+    <section class="section section-tinted" id="about" aria-labelledby="about-title">
+      <div class="container container-narrow">
+        <p class="tag-chip">À propos</p>
+        <h2 id="about-title">Qui se cache derrière PawPawCare.</h2>
+        <p>PawPawCare est conçu par un propriétaire d'animaux lassé de perdre les carnets de vaccination et de douter des dates de traitement. L'objectif est simple : rendre faciles les aspects de la santé animale qu'on oublie si vite, sans que les données de votre animal ne deviennent l'affaire de quelqu'un d'autre.</p>
+        <p><strong>Fondateur :</strong> Ahmed Chioua. J'ai créé PawPawCare par amour pour les animaux qui partagent ma maison. Après un « Attendez, c'était pour quand, ce rappel ? » de trop, j'ai voulu que chaque animal soit entouré du même soin et de la même attention qu'il nous offre en retour : rien d'oublié, rien d'enfoui au fond d'un tiroir. <a href="https://ahmedchioua.com" rel="author">Pour en savoir plus sur moi, rendez-vous sur ahmedchioua.com</a> ou <a href="https://www.linkedin.com/in/ahmedchioua/">retrouvez-moi sur LinkedIn</a>.</p>
+        <p>PawPawCare organise les dossiers et les rappels de votre animal ; votre vétérinaire reste la référence pour tout avis médical.</p>
+        <p>Une question ou une remarque ? Écrivez-nous à <a href="mailto:privacy@pawpawcare.app">privacy@pawpawcare.app</a>.</p>
+      </div>
+    </section>
+
+    <!-- ============ FAQ ============ -->
+    <section class="section" id="faq" aria-labelledby="faq-title">
+      <div class="container container-narrow">
+        <p class="tag-chip">FAQ</p>
+        <h2 id="faq-title">Vos questions, nos réponses.</h2>
+        <details>
+          <summary>Qu'est-ce que PawPawCare ?</summary>
+          <p>PawPawCare est une application gratuite de suivi de la santé animale pour iOS et Android, qui réunit les vaccinations, les médicaments, l'évolution du poids et les dossiers vétérinaires de chacun de vos animaux dans un endroit serein. Fini les carnets papier éparpillés, les photos et les alertes d'agenda : chaque animal a son profil, avec des rappels avant l'échéance des vaccins, un calendrier des médicaments avec suivi des prises et une analyse du poids en langage clair. Le coffre médical conserve les visites chez le vétérinaire et les documents ; sa lecture par IA analyse la photo d'un certificat de vaccination, d'une ordonnance ou d'une facture et en extrait les informations, que vous vérifiez avant tout enregistrement. Vous pouvez partager un lien en lecture seule avec votre vétérinaire ou votre gardien, devenir copropriétaire de vos animaux avec votre famille et suivre le fil d'une communauté de propriétaires d'animaux. L'application est pensée pour les foyers à plusieurs animaux (chiens, chats et tous les autres) et se trouve actuellement en avant-première gratuite, avant son lancement sur les boutiques d'applications.</p>
+        </details>
+        <details>
+          <summary>PawPawCare est-il gratuit ?</summary>
+          <p>Oui. L'avant-première est entièrement gratuite, sans carte bancaire et sans période d'essai qui expire. Inscrivez-vous sur la liste d'attente, recevez votre invitation et vous avez accès à toute l'application : profils pour plusieurs animaux, suivi des vaccins et des médicaments, évolution du poids, coffre médical avec lecture par IA, partage avec le vétérinaire et le gardien, et fil de la communauté. Lors du lancement public de PawPawCare, le suivi essentiel sur lequel vous comptez (vaccins, médicaments, poids et rappels) restera gratuit. Certaines fonctionnalités avancées pourront rejoindre plus tard une offre payante facultative, mais nous indiquerons toujours clairement ce qui est inclus avant tout changement, et les membres de l'avant-première seront prévenus bien à l'avance. Nous préférons mériter votre abonnement avec des fonctionnalités qui en valent la peine plutôt que de verrouiller l'essentiel pour garder votre animal en bonne santé.</p>
+        </details>
+        <details>
+          <summary>Quand l'application sera-t-elle lancée ?</summary>
+          <p>Nous accueillons dès maintenant les inscrits de la liste d'attente par petits groupes, avant le lancement sur les boutiques d'applications. Inscrivez-vous sur la liste d'attente et votre invitation arrivera avec le prochain groupe.</p>
+        </details>
+        <details>
+          <summary>L'application est-elle disponible sur iOS ou sur Android ?</summary>
+          <p>Les deux. L'avant-première fonctionne sur iOS et sur Android.</p>
+        </details>
+        <details>
+          <summary>Les données de mon animal restent-elles privées ?</summary>
+          <p>Oui. Les dossiers de votre animal vous appartiennent, et nous ne vendons jamais vos données. PawPawCare ne fait appel à aucun courtier en données ni à aucune régie publicitaire. Le partage est toujours une option que vous activez vous-même : les liens de partage pour le vétérinaire et les pages de garde sont en lecture seule, expirent selon le délai que vous choisissez et peuvent être révoqués à tout moment. Les documents que vous scannez sont traités uniquement pour en extraire les informations que vous vérifiez, et ne servent pas à entraîner des modèles d'IA. Les données transitent par des connexions HTTPS chiffrées, les mots de passe ne sont conservés que sous forme d'empreintes sécurisées et les sessions utilisent des jetons de courte durée. Sur ce site, les outils de mesure d'audience ne se chargent que si vous acceptez le bandeau cookies : si vous refusez, aucun cookie n'est déposé. Vous trouverez tous les détails, ainsi que la marche à suivre pour supprimer votre compte et toutes les données qui y sont liées, dans notre <a href="/privacy/">politique de confidentialité (en anglais)</a>.</p>
+        </details>
+        <details>
+          <summary>Que contient l'avant-première gratuite ?</summary>
+          <p>Toute l'application : profils pour plusieurs animaux, suivi des vaccinations et des médicaments, évolution du poids, coffre médical avec lecture par IA, partage avec le vétérinaire et le gardien, et fil de la communauté.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ============ Waitlist CTA ============ -->
+    <section class="section" id="waitlist" aria-labelledby="waitlist-title">
+      <div class="container">
+        <svg class="paw cta-paw-bg a" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pawprint"/></svg>
+        <svg class="paw cta-paw-bg b" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pawprint"/></svg>
+        <div class="cta-panel reveal">
+          <svg class="paw paw-cta" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#pawprint"/></svg>
+          <h2 id="waitlist-title">Soyez parmi les premiers à découvrir l'avant-première.</h2>
+          <p>Inscrivez-vous sur la liste d'attente : votre invitation arrivera avec le prochain groupe.</p>
+          <form class="waitlist-form waitlist-form-center" name="waitlist" method="POST" action="/api/waitlist">
+            <input type="hidden" name="lang" value="fr">
+            <p class="hp-field" aria-hidden="true">
+              <label>Ne remplissez pas ce champ : <input name="bot-field" tabindex="-1" autocomplete="off"></label>
+            </p>
+            <div class="form-row">
+              <div class="field">
+                <label for="email-cta">Adresse e-mail</label>
+                <input id="email-cta" type="email" name="email" required autocomplete="email" inputmode="email" placeholder="vous@exemple.fr">
+              </div>
+              <button class="btn btn-primary" type="submit">Recevoir l'avant-première</button>
+            </div>
+            <p class="form-note">Accès anticipé gratuit. Un e-mail de bienvenue et votre invitation, rien d'autre.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p class="wordmark wordmark-footer">
+        <img class="paw" src="/logo-mark.png" width="26" height="26" alt="" aria-hidden="true">
+        PawPawCare
+      </p>
+      <p class="footer-tagline">Pensé pour celles et ceux sur qui nos animaux comptent.</p>
+      <nav aria-label="Pied de page">
+        <ul class="nav-links">
+          <li><a href="#features">Fonctionnalités</a></li>
+          <li><a href="#how">Comment ça marche</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="#waitlist">Liste d'attente</a></li>
+          <li><a href="/privacy/">Confidentialité (en anglais)</a></li>
+          <li><a href="/terms/">Conditions d'utilisation (en anglais)</a></li>
+          <li><a href="#" data-cookie-settings>Paramètres des cookies</a></li>
+        </ul>
+      </nav>
+      <nav class="lang-switch lang-switch-footer" aria-label="Langue"><a href="/" lang="en" hreflang="en">English</a><a href="/fr/" lang="fr" hreflang="fr" aria-current="true">Français</a><a href="/es/" lang="es" hreflang="es">Español</a></nav>
+      <p class="footer-legal">© 2026 PawPawCare · Créé par <a href="https://ahmedchioua.com" rel="author">Ahmed Chioua</a></p>
+    </div>
+  </footer>
+
+  <!-- Shared paw-print symbol -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <g id="pawprint">
+        <ellipse cx="12" cy="15.5" rx="5.2" ry="4.6"/>
+        <ellipse cx="5.4" cy="10.6" rx="2.1" ry="2.7" transform="rotate(-20 5.4 10.6)"/>
+        <ellipse cx="9.5" cy="6.9" rx="2.1" ry="2.8" transform="rotate(-8 9.5 6.9)"/>
+        <ellipse cx="14.5" cy="6.9" rx="2.1" ry="2.8" transform="rotate(8 14.5 6.9)"/>
+        <ellipse cx="18.6" cy="10.6" rx="2.1" ry="2.7" transform="rotate(20 18.6 10.6)"/>
+      </g>
+    </defs>
+  </svg>
+</body>
+</html>

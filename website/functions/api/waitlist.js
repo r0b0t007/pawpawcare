@@ -15,27 +15,29 @@
 //                     From of the welcome email
 //   WAITLIST_TO     - inbox that receives each new signup notification
 
-import {
-  CONTACT_EMAIL,
-  LIST_UNSUBSCRIBE,
-  WELCOME_HTML,
-  WELCOME_SUBJECT,
-  WELCOME_TEXT,
-} from "../_lib/welcome-email.js";
+import { CONTACT_EMAIL, LANGUAGES, LIST_UNSUBSCRIBE, welcomeEmail } from "../_lib/welcome-email.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function onRequestPost({ request, env, waitUntil }) {
   const origin = new URL(request.url).origin;
-  const thanksUrl = `${origin}/thanks.html`;
-  const homeUrl = `${origin}/`;
 
   let form;
   try {
     form = await request.formData();
   } catch {
-    return Response.redirect(homeUrl, 303);
+    return Response.redirect(`${origin}/`, 303);
   }
+
+  // The page's language (a hidden field on /fr/ and /es/; absent on English
+  // pages): the visitor lands on that language's pages and gets that
+  // language's welcome email. Anything unknown is English.
+  const posted = String(form.get("lang") || "");
+  const lang = LANGUAGES.includes(posted) ? posted : "en";
+  const base = lang === "en" ? origin : `${origin}/${lang}`;
+  const thanksUrl = `${base}/thanks.html`;
+  const homeUrl = `${base}/`;
+  const welcome = welcomeEmail(lang);
 
   // Honeypot: real visitors never see or fill this CSS-hidden field. If it
   // has a value, pretend success so the bot doesn't learn it was caught.
@@ -66,7 +68,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   // within 24h of someone's signup would otherwise 409 their resubmit).
   // Spraying many different addresses is throttled by a Cloudflare
   // rate-limiting rule on /api/waitlist (see docs/deploy-website-cloudflare.md).
-  const welcomeKey = `waitlist-welcome/${await welcomeVersion()}/${await sha256Hex(email)}`;
+  const welcomeKey = `waitlist-welcome/${await welcomeVersion(lang)}/${await sha256Hex(email)}`;
 
   // Neither send changes the response, so don't make the visitor wait on
   // Resend: redirect now and let the sends finish in the background.
@@ -76,7 +78,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       to: env.WAITLIST_TO,
       reply_to: email,
       subject: "New PawPawCare waitlist signup",
-      text: `${email} joined the PawPawCare waitlist at ${new Date().toISOString()}.`,
+      text: `${email} joined the PawPawCare waitlist at ${new Date().toISOString()} (language: ${lang}).`,
     }),
     sendEmail(
       env,
@@ -85,9 +87,9 @@ export async function onRequestPost({ request, env, waitUntil }) {
         from: env.WAITLIST_FROM,
         to: email,
         reply_to: CONTACT_EMAIL,
-        subject: WELCOME_SUBJECT,
-        html: WELCOME_HTML,
-        text: WELCOME_TEXT,
+        subject: welcome.subject,
+        html: welcome.html,
+        text: welcome.text,
         headers: { "List-Unsubscribe": LIST_UNSUBSCRIBE },
       },
       welcomeKey,
@@ -124,10 +126,14 @@ async function sendEmail(env, label, payload, idempotencyKey) {
   }
 }
 
-let welcomeVersionPromise;
-function welcomeVersion() {
-  welcomeVersionPromise ??= sha256Hex(WELCOME_SUBJECT + WELCOME_HTML + WELCOME_TEXT).then((h) => h.slice(0, 12));
-  return welcomeVersionPromise;
+// Per language: each one is a different payload, so a different key.
+const welcomeVersions = new Map();
+function welcomeVersion(lang) {
+  if (!welcomeVersions.has(lang)) {
+    const { subject, html, text } = welcomeEmail(lang);
+    welcomeVersions.set(lang, sha256Hex(lang + subject + html + text).then((h) => h.slice(0, 12)));
+  }
+  return welcomeVersions.get(lang);
 }
 
 async function sha256Hex(value) {
