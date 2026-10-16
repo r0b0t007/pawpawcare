@@ -11,7 +11,7 @@ import {
   restoreOutcome,
   storeName,
 } from '../../utils/subscription';
-import { useLocale } from '../../i18n';
+import { useLocale, useTranslation } from '../../i18n';
 import { ui, type } from '../../theme';
 import { Card, ListRow, StatusPill, Button, showToast, ScreenHeader } from '../../components';
 
@@ -23,6 +23,7 @@ export default function SubscriptionScreen({ navigation }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
+  const { t } = useTranslation();
   const { plan, included, canPurchase } = usePlan();
   const restore = useRestore();
   const status = planStatus(plan);
@@ -30,8 +31,8 @@ export default function SubscriptionScreen({ navigation }) {
 
   const openManagement = async () => {
     const url = await getManagementUrl();
-    if (url) Linking.openURL(url).catch(() => showToast("Couldn't open the store — try from its settings"));
-    else showToast('Manage it from your app store settings');
+    if (url) Linking.openURL(url).catch(() => showToast(t('subscription.openStoreFailed')));
+    else showToast(t('subscription.manageInStore'));
   };
 
   // A double tap before isPending re-renders must not restore twice.
@@ -42,7 +43,7 @@ export default function SubscriptionScreen({ navigation }) {
     try {
       showToast(restoreOutcome(await restore.mutateAsync()).message);
     } catch (_) {
-      showToast("Couldn't restore purchases — try again");
+      showToast(t('subscription.restoreFailed'));
     } finally {
       inFlight.current = false;
     }
@@ -51,7 +52,7 @@ export default function SubscriptionScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <ScreenHeader title="Subscription" onBack={() => navigation.goBack()} />
+        <ScreenHeader title={t('subscription.title')} onBack={() => navigation.goBack()} />
 
         <Card style={styles.planCard}>
           <Text style={[type.cardTitle, styles.ink]}>{planTitle(plan, included)}</Text>
@@ -59,27 +60,27 @@ export default function SubscriptionScreen({ navigation }) {
           <Text style={[type.body, styles.sub]}>
             {plan.active
               ? plan.billing_issue
-                ? `${storeName(plan.store)} couldn't charge your payment method. Update it there to keep Plus.`
-                : 'Thanks for supporting PawPawCare.'
+                ? t('subscription.body.billingIssue', { store: storeName(plan.store) })
+                : t('subscription.body.thanks')
               : plan.grandfathered
-                ? 'As an early member, Plus features are included for you.'
-                : 'Your pets, records and exports are free forever.'}
+                ? t('subscription.body.earlyMember')
+                : t('subscription.body.free')}
           </Text>
           {!included && canPurchase ? (
-            <Button label="See PawPawCare Plus" onPress={() => navigation.navigate('Paywall')} />
+            <Button label={t('subscription.seePlus')} onPress={() => navigation.navigate('Paywall')} />
           ) : null}
         </Card>
 
         {storeBilled || canPurchase ? (
         <Card style={styles.sectionCard}>
           {plan.billing_issue && storeBilled ? (
-            <ListRow icon="credit-card-outline" title="Update payment method" chevron onPress={openManagement} />
+            <ListRow icon="credit-card-outline" title={t('subscription.updatePayment')} chevron onPress={openManagement} />
           ) : null}
           {storeBilled ? (
             <ListRow
               icon="cog-outline"
-              title="Manage subscription"
-              subtitle={`Change or cancel in ${storeName(plan.store)}`}
+              title={t('subscription.manage')}
+              subtitle={t('subscription.manageSubtitle', { store: storeName(plan.store) })}
               chevron
               onPress={openManagement}
               last={!canPurchase}
@@ -88,8 +89,8 @@ export default function SubscriptionScreen({ navigation }) {
           {canPurchase ? (
             <ListRow
               icon="restore"
-              title={restore.isPending ? 'Restoring…' : 'Restore purchases'}
-              subtitle="Bought on another device or account"
+              title={restore.isPending ? t('subscription.restoring') : t('subscription.restore')}
+              subtitle={t('subscription.restoreSubtitle')}
               onPress={restore.isPending ? undefined : handleRestore}
               last
             />
@@ -99,7 +100,7 @@ export default function SubscriptionScreen({ navigation }) {
 
         {isRenewingStoreSubscription(plan) ? (
           <Text style={[type.secondary, styles.caption]}>
-            Deleting your PawPawCare account doesn't cancel billing — cancel in {storeName(plan.store)} first.
+            {t('subscription.deleteCaption', { store: storeName(plan.store) })}
           </Text>
         ) : null}
       </ScrollView>

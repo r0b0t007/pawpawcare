@@ -13,6 +13,7 @@ import {
   priceWithPeriod,
   restoreOutcome,
 } from '../../utils/subscription';
+import { useTranslation } from '../../i18n';
 import { ui, type, radii, motion } from '../../theme';
 import { Card, ListRow, SegmentedControl, StatusPill, Button, Skeleton, showToast } from '../../components';
 
@@ -24,43 +25,34 @@ import { Card, ListRow, SegmentedControl, StatusPill, Button, Skeleton, showToas
 const TERMS_URL = 'https://pawpawcare.app/terms/';
 const PRIVACY_URL = 'https://pawpawcare.app/privacy/';
 
-// Why a gated feature sent the user here (keys match the server's gates).
-const FEATURE_REASONS = {
-  ai_extraction: 'Reading vet documents with AI is part of Plus.',
-  care_links: 'Caretaker links are part of Plus.',
-};
+// Why a gated feature sent the user here (keys match the server's gates):
+// `paywall.reason.<feature>`.
+const FEATURE_REASONS = new Set(['ai_extraction', 'care_links']);
 
 const BENEFITS = [
-  { icon: 'file-document-outline', title: 'Read vet documents with AI', subtitle: 'Snap a record — vaccines, meds and weights fill in for you' },
-  { icon: 'link-variant', title: 'Caretaker links', subtitle: 'Share a care guide with sitters, no app needed' },
-  { icon: 'heart-outline', title: 'Keep PawPawCare independent', subtitle: 'No ads, no selling data — ever' },
+  { id: 'ai', icon: 'file-document-outline' },
+  { id: 'links', icon: 'link-variant' },
+  { id: 'independent', icon: 'heart-outline' },
 ];
 
-const STORE = Platform.select({ ios: 'Apple ID', android: 'Google Play account', default: 'store account' });
-const STORE_SETTINGS = Platform.select({ ios: 'App Store', android: 'Google Play', default: 'store' });
+// `paywall.storeAccount.*` / `paywall.storeSettings.*`: "Apple ID", "App Store".
+const STORE_KEY = Platform.select({ ios: 'ios', android: 'android', default: 'default' });
 
-const PURCHASE_ERRORS = {
-  already_owned: `Your ${STORE} already has Plus — tap Restore purchases to use it here`,
-  network: 'No connection — check it and try again',
-  unavailable: "Purchases aren't available right now — try again later",
-  other: "Couldn't complete the purchase — try again",
-};
+// purchaseErrorKind → `paywall.errors.*`.
+const PURCHASE_ERRORS = new Set(['already_owned', 'network', 'unavailable', 'other']);
 
 /** Apple 3.1.2 disclosure for what's being bought. */
-function legalText(renewing, freeTrial, hasIntro) {
-  if (!renewing) {
-    return `Payment is charged to your ${STORE} when you confirm. This is a one-time purchase — it never renews.`;
-  }
-  const trial = freeTrial
-    ? ' Your free trial becomes a paid subscription unless you cancel at least 24 hours before it ends.'
-    : hasIntro
-      ? ' The introductory price applies for the period shown, then the regular price.'
-      : '';
-  return (
-    `Payment is charged to your ${STORE} when you confirm.${trial} The subscription renews automatically at ` +
-    'the same price unless you cancel at least 24 hours before the end of the current period. Manage or ' +
-    `cancel anytime in your ${STORE_SETTINGS} settings.`
-  );
+function legalText(t, renewing, freeTrial, hasIntro) {
+  const store = t(`paywall.storeAccount.${STORE_KEY}`);
+  if (!renewing) return t('paywall.legal.oneTime', { store });
+  const trial = freeTrial ? t('paywall.legal.trial') : hasIntro ? t('paywall.legal.intro') : null;
+  return [
+    t('paywall.legal.charged', { store }),
+    trial,
+    t('paywall.legal.renews', { settings: t(`paywall.storeSettings.${STORE_KEY}`) }),
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 /** A full-width explanation card (states where nothing can be bought). */
@@ -75,6 +67,7 @@ function StateCard({ title, message, action }) {
 }
 
 export default function PaywallScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const feature = route?.params?.feature;
   const { plan, visible, included, canPurchase, availability } = usePlan();
   const offerings = useOfferings(!included); // nothing to sell to Plus / early members
@@ -144,15 +137,16 @@ export default function PaywallScreen({ navigation, route }) {
         const result = await purchase.mutateAsync(selected);
         if (result.status === 'cancelled') return;
         if (result.status === 'pending') {
-          showToast('Purchase pending — it will unlock once approved');
+          showToast(t('paywall.toast.pending'));
         } else if (result.plan?.active) {
-          showToast('Welcome to Plus!');
+          showToast(t('paywall.toast.welcome'));
         } else {
-          showToast('Purchase complete — it may take a minute to show up');
+          showToast(t('paywall.toast.complete'));
         }
         close();
       } catch (err) {
-        showToast(PURCHASE_ERRORS[purchaseErrorKind(err)]);
+        const kind = purchaseErrorKind(err);
+        showToast(t(`paywall.errors.${PURCHASE_ERRORS.has(kind) ? kind : 'other'}`, { store: t(`paywall.storeAccount.${STORE_KEY}`) }));
       }
     });
 
@@ -163,7 +157,7 @@ export default function PaywallScreen({ navigation, route }) {
         showToast(message);
         if (done) close();
       } catch (_) {
-        showToast("Couldn't restore purchases — try again");
+        showToast(t('paywall.restoreFailed'));
       }
     });
 
@@ -171,41 +165,41 @@ export default function PaywallScreen({ navigation, route }) {
   if (plan.active) {
     body = (
       <StateCard
-        title="You're on Plus"
-        message="Thanks for supporting PawPawCare. Manage it from Profile → Subscription."
-        action={<Button label="Done" onPress={close} />}
+        title={t('paywall.states.plusTitle')}
+        message={t('paywall.states.plusMessage')}
+        action={<Button label={t('paywall.done')} onPress={close} />}
       />
     );
   } else if (included) {
     body = (
       <StateCard
-        title="Plus features are included for you"
-        message="As an early member you already have them — nothing to buy."
-        action={<Button label="Done" onPress={close} />}
+        title={t('paywall.states.includedTitle')}
+        message={t('paywall.states.includedMessage')}
+        action={<Button label={t('paywall.done')} onPress={close} />}
       />
     );
   } else if (!visible) {
     body = (
       <StateCard
-        title="Plus isn't available yet"
-        message="Everything you use today stays free."
-        action={<Button label="Close" variant="ghost" onPress={close} />}
+        title={t('paywall.states.hiddenTitle')}
+        message={t('paywall.states.staysFree')}
+        action={<Button label={t('paywall.close')} variant="ghost" onPress={close} />}
       />
     );
   } else if (availability === 'no_module') {
     body = (
       <StateCard
-        title="Update the app to subscribe"
-        message="Subscriptions need the latest version of PawPawCare. Everything you use today stays free."
-        action={<Button label="Close" variant="ghost" onPress={close} />}
+        title={t('paywall.states.updateTitle')}
+        message={t('paywall.states.updateMessage')}
+        action={<Button label={t('paywall.close')} variant="ghost" onPress={close} />}
       />
     );
   } else if (!canPurchase) {
     body = (
       <StateCard
-        title="Subscriptions aren't available on this device yet"
-        message="Everything you use today stays free."
-        action={<Button label="Close" variant="ghost" onPress={close} />}
+        title={t('paywall.states.deviceTitle')}
+        message={t('paywall.states.staysFree')}
+        action={<Button label={t('paywall.close')} variant="ghost" onPress={close} />}
       />
     );
   } else if (offerings.isLoading) {
@@ -218,9 +212,9 @@ export default function PaywallScreen({ navigation, route }) {
   } else if (offerings.isError || !selected) {
     body = (
       <StateCard
-        title="Plans aren't available right now"
-        message="Check your connection and try again in a moment."
-        action={<Button label="Try again" variant="ghost" onPress={() => offerings.refetch()} />}
+        title={t('paywall.states.plansErrorTitle')}
+        message={t('paywall.states.plansErrorMessage')}
+        action={<Button label={t('paywall.retry')} variant="ghost" onPress={() => offerings.refetch()} />}
       />
     );
   } else {
@@ -229,7 +223,7 @@ export default function PaywallScreen({ navigation, route }) {
         {choices.length > 1 && (
           <SegmentedControl
             role="radio"
-            segments={choices.map((p) => ({ value: p.packageType, label: p.packageType === 'ANNUAL' ? 'Annual' : 'Monthly' }))}
+            segments={choices.map((p) => ({ value: p.packageType, label: p.packageType === 'ANNUAL' ? t('paywall.annual') : t('paywall.monthly') }))}
             value={selected.packageType}
             onChange={(value) => {
               if (!busy) setChoice(value); // never switch what's being charged
@@ -238,15 +232,23 @@ export default function PaywallScreen({ navigation, route }) {
         )}
         <View style={styles.priceRow}>
           <Text style={[type.cardTitle, styles.ink]}>
-            {renewing ? priceWithPeriod(selected.product) : `${selected.product.priceString} · one-time`}
+            {renewing ? priceWithPeriod(selected.product) : t('paywall.oneTimePrice', { price: selected.product.priceString })}
           </Text>
-          {selected.packageType === 'ANNUAL' && savings ? <StatusPill status="ok" label={`Save ${savings}%`} /> : null}
+          {selected.packageType === 'ANNUAL' && savings ? <StatusPill status="ok" label={t('paywall.save', { percent: savings })} /> : null}
         </View>
         {renewing && intro ? (
-          <Text style={[type.secondary, styles.sub]}>{intro}, then {priceWithPeriod(selected.product)}</Text>
+          <Text style={[type.secondary, styles.sub]}>{t('paywall.introThen', { intro, price: priceWithPeriod(selected.product) })}</Text>
         ) : null}
         <Button
-          label={purchase.isPending ? 'Processing…' : !renewing ? 'Buy' : freeTrial ? 'Start free trial' : 'Subscribe'}
+          label={
+            purchase.isPending
+              ? t('paywall.processing')
+              : !renewing
+                ? t('paywall.buy')
+                : freeTrial
+                  ? t('paywall.startTrial')
+                  : t('paywall.subscribe')
+          }
           onPress={handlePurchase}
           disabled={busy}
         />
@@ -260,33 +262,39 @@ export default function PaywallScreen({ navigation, route }) {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={[type.screenTitle, styles.ink, { flex: 1 }]}>PawPawCare Plus</Text>
+          <Text style={[type.screenTitle, styles.ink, { flex: 1 }]}>{t('paywall.title')}</Text>
           <Pressable
             style={({ pressed }) => [styles.closeBtn, pressed && { opacity: motion.pressOpacity }, busy && styles.dim]}
             onPress={close}
             disabled={busy}
             accessibilityRole="button"
-            accessibilityLabel="Close"
+            accessibilityLabel={t('paywall.close')}
             accessibilityState={{ disabled: busy }}
           >
             <MaterialCommunityIcons name="close" size={19} color={ui.ink} />
           </Pressable>
         </View>
 
-        {feature && FEATURE_REASONS[feature] ? (
-          <Text style={[type.body, styles.sub, styles.reason]}>{FEATURE_REASONS[feature]}</Text>
+        {feature && FEATURE_REASONS.has(feature) ? (
+          <Text style={[type.body, styles.sub, styles.reason]}>{t(`paywall.reason.${feature}`)}</Text>
         ) : null}
 
         <Card style={styles.promise}>
           <MaterialCommunityIcons name="shield-check-outline" size={22} color={ui.success} />
           <Text style={[type.rowTitle, styles.ink, { flex: 1 }]}>
-            Your pets, records and exports stay free forever.
+            {t('paywall.promise')}
           </Text>
         </Card>
 
         <Card>
           {BENEFITS.map((b, i) => (
-            <ListRow key={b.title} icon={b.icon} title={b.title} subtitle={b.subtitle} last={i === BENEFITS.length - 1} />
+            <ListRow
+              key={b.id}
+              icon={b.icon}
+              title={t(`paywall.benefits.${b.id}Title`)}
+              subtitle={t(`paywall.benefits.${b.id}Subtitle`)}
+              last={i === BENEFITS.length - 1}
+            />
           ))}
         </Card>
 
@@ -300,17 +308,17 @@ export default function PaywallScreen({ navigation, route }) {
               style={({ pressed }) => [styles.restore, pressed && { opacity: motion.pressOpacity }]}
               accessibilityRole="button"
             >
-              <Text style={[type.rowTitle, styles.link]}>{restore.isPending ? 'Restoring…' : 'Restore purchases'}</Text>
+              <Text style={[type.rowTitle, styles.link]}>{restore.isPending ? t('paywall.restoring') : t('paywall.restore')}</Text>
             </Pressable>
 
-            <Text style={[type.secondary, styles.legal]}>{legalText(renewing, freeTrial, !!intro)}</Text>
+            <Text style={[type.secondary, styles.legal]}>{legalText(t, renewing, freeTrial, !!intro)}</Text>
             <View style={styles.legalLinks}>
               <Text style={[type.secondary, styles.link]} onPress={() => Linking.openURL(TERMS_URL)} accessibilityRole="link">
-                Terms of Use
+                {t('paywall.terms')}
               </Text>
               <Text style={[type.secondary, styles.legal]}>·</Text>
               <Text style={[type.secondary, styles.link]} onPress={() => Linking.openURL(PRIVACY_URL)} accessibilityRole="link">
-                Privacy Policy
+                {t('paywall.privacy')}
               </Text>
             </View>
           </>

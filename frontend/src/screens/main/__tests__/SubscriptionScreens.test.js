@@ -167,3 +167,36 @@ test('a double tap on Restore restores once', async () => {
 
   expect(mockRestore.mutateAsync).toHaveBeenCalledTimes(1);
 });
+
+describe('in French', () => {
+  const i18n = require('../../../i18n').default;
+  beforeEach(async () => {
+    await act(async () => { await i18n.changeLanguage('fr'); });
+  });
+  afterEach(async () => {
+    await act(async () => { await i18n.changeLanguage('en'); });
+  });
+
+  it('the Subscription screen names the store in French', async () => {
+    mockPlanState = { plan: { active: true, will_renew: true, store: 'app_store', expires_at: '2026-12-01T00:00:00Z' }, visible: true, canPurchase: true };
+    const tree = await render(SubscriptionScreen);
+    expect(rowTitled(tree, "Gérer l'abonnement").props.subtitle).toBe("Modifiez-le ou résiliez-le dans l'App Store");
+  });
+
+  it('the delete-account warning is in French', async () => {
+    mockUser = { ...mockUser, plan: { active: true, will_renew: true, is_lifetime: false, store: 'play_store' } };
+    const tree = await render(AccountDetailsScreen);
+    expect(tree.root.findByType(ConfirmDialog).props.title).toBe('Supprimer votre compte\u00a0?');
+    expect(tree.root.findByType(ConfirmDialog).props.message).toMatch(/facturé via Google Play/);
+  });
+});
+
+test('the delete-account warning reads exactly as before i18n', async () => {
+  mockUser = { ...mockUser, plan: { active: true, will_renew: true, is_lifetime: false, store: 'app_store' } };
+  const tree = await render(AccountDetailsScreen);
+  expect(tree.root.findByType(ConfirmDialog).props.message).toBe(
+    'Your account will be deactivated now and permanently deleted in 30 days — pets, records, photos and posts ' +
+      'included. Logging back in before then cancels the deletion. Your PawPawCare Plus subscription keeps billing ' +
+      'through the App Store — cancel it there too.',
+  );
+});

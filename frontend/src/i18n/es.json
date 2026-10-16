@@ -127,6 +127,318 @@
       "active": "Activo",
       "ends": "Finaliza el {{date}}",
       "endsSoon": "Finaliza pronto"
+    },
+    "title": "Suscripción",
+    "seePlus": "Ver PawPawCare Plus",
+    "body": {
+      "billingIssue": "{{store}} no ha podido cobrar en su método de pago. Actualícelo allí para conservar Plus.",
+      "thanks": "Gracias por apoyar PawPawCare.",
+      "earlyMember": "Como miembro pionero, tiene incluidas las funciones Plus.",
+      "free": "Sus mascotas, historiales y exportaciones son gratis para siempre."
+    },
+    "updatePayment": "Actualizar método de pago",
+    "manage": "Gestionar suscripción",
+    "manageSubtitle": "Cámbiela o cancélela en {{store}}",
+    "restore": "Restaurar compras",
+    "restoring": "Restaurando…",
+    "restoreSubtitle": "Comprado en otro dispositivo o cuenta",
+    "deleteCaption": "Eliminar su cuenta de PawPawCare no cancela la facturación: cancélela primero en {{store}}.",
+    "openStoreFailed": "No se ha podido abrir la tienda: inténtelo desde sus ajustes",
+    "manageInStore": "Gestiónela desde los ajustes de su tienda de aplicaciones",
+    "restoreFailed": "No se han podido restaurar las compras: inténtelo de nuevo",
+    "restoreOutcome": {
+      "restored": "Compras restauradas",
+      "pending": "Restaurado: puede tardar un minuto en aparecer",
+      "none": "No se han encontrado compras para restaurar"
+    },
+    "store": {
+      "appStore": "la App Store",
+      "playStore": "Google Play",
+      "unknown": "su tienda de aplicaciones"
+    },
+    "unit": {
+      "day": "día",
+      "week": "semana",
+      "month": "mes",
+      "year": "año"
+    },
+    "duration": {
+      "day_one": "{{count}} día",
+      "day_many": "{{count}} de días",
+      "day_other": "{{count}} días",
+      "week_one": "{{count}} semana",
+      "week_many": "{{count}} de semanas",
+      "week_other": "{{count}} semanas",
+      "month_one": "{{count}} mes",
+      "month_many": "{{count}} de meses",
+      "month_other": "{{count}} meses",
+      "year_one": "{{count}} año",
+      "year_many": "{{count}} de años",
+      "year_other": "{{count}} años"
+    },
+    "firstSpan": {
+      "day_one": "el {{count}}.er día",
+      "day_many": "los {{count}} primeros días",
+      "day_other": "los {{count}} primeros días",
+      "week_one": "la {{count}}.ª semana",
+      "week_many": "las {{count}} primeras semanas",
+      "week_other": "las {{count}} primeras semanas",
+      "month_one": "el {{count}}.er mes",
+      "month_many": "los {{count}} primeros meses",
+      "month_other": "los {{count}} primeros meses",
+      "year_one": "el {{count}}.er año",
+      "year_many": "los {{count}} primeros años",
+      "year_other": "los {{count}} primeros años"
+    },
+    "priceWithPeriod": "{{price}} / {{period}}",
+    "intro": {
+      "freeTrial": "Pruebe {{duration}} gratis",
+      "repeating": "{{price}} / {{period}} durante {{total}}",
+      "first": "{{price}} durante {{span}}"
+    }
+  },
+  "auth": {
+    "emailLabel": "Correo electrónico",
+    "emailPlaceholder": "usted@ejemplo.com",
+    "passwordLabel": "Contraseña",
+    "confirmPasswordLabel": "Confirmar contraseña",
+    "reactivated": "Bienvenido de nuevo: se ha cancelado la eliminación de su cuenta.",
+    "welcome": {
+      "heroA11y": "Un gatito y un cachorro mirándose",
+      "brandTagline": "La salud de sus mascotas, con cariño",
+      "headline": "Cada colita y cada bigote,\nbien cuidados.",
+      "tagline": "Vacunas, medicamentos y rutinas diarias de todas sus mascotas, en un lugar tranquilo.",
+      "getStarted": "Empezar",
+      "haveAccount": "Ya tengo una cuenta"
+    },
+    "login": {
+      "title": "Bienvenido de nuevo",
+      "subtitle": "Su manada le echaba de menos.",
+      "passwordPlaceholder": "Su contraseña",
+      "pasteHint": "Pegar desde su gestor de contraseñas siempre funciona",
+      "forgot": "¿Ha olvidado su contraseña?",
+      "missingFields": "Introduzca su correo electrónico y su contraseña para iniciar sesión.",
+      "submit": "Iniciar sesión",
+      "submitting": "Iniciando sesión…",
+      "toSignup": "¿Es nuevo? Cree una cuenta"
+    },
+    "signup": {
+      "title": "Cree su cuenta",
+      "subtitle": "Los historiales de su manada, seguros en un solo lugar.",
+      "nameLabel": "Su nombre",
+      "namePlaceholder": "p. ej., Ahmed",
+      "minChars": "Mínimo {{min}} caracteres",
+      "confirmPlaceholder": "Repita la contraseña",
+      "rulesMatch": "Las contraseñas coinciden",
+      "ruleDone": "{{rule}}, hecho",
+      "missingFields": "Rellene todos los campos para crear su cuenta.",
+      "mismatch": "Las dos contraseñas aún no coinciden. Vuelva a escribirlas.",
+      "tooShort": "Utilice al menos {{min}} caracteres para su contraseña.",
+      "submit": "Crear cuenta",
+      "submitting": "Creando cuenta…",
+      "toLogin": "¿Ya tiene una cuenta? Inicie sesión"
+    },
+    "forgot": {
+      "title": "Restablecer su contraseña",
+      "subtitle": "Introduzca el correo electrónico de su cuenta y le enviaremos un código de 6 dígitos.",
+      "missingEmail": "Introduzca su correo electrónico.",
+      "send": "Enviar código",
+      "sending": "Enviando…",
+      "codeResent": "Nuevo código enviado",
+      "checkTitle": "Revise su bandeja de entrada",
+      "checkBody": "Hemos enviado un código de 6 dígitos a {{email}}. Es válido durante 30 minutos.",
+      "codeLabel": "Código de 6 dígitos",
+      "newPasswordLabel": "Nueva contraseña",
+      "newPasswordPlaceholder": "Al menos 8 caracteres",
+      "showPassword": "Mostrar contraseña",
+      "hidePassword": "Ocultar contraseña",
+      "confirmPlaceholder": "La misma contraseña otra vez",
+      "badCode": "Introduzca el código de 6 dígitos de su correo.",
+      "tooShort": "Su nueva contraseña necesita al menos 8 caracteres.",
+      "mismatch": "Las contraseñas no coinciden.",
+      "submit": "Restablecer contraseña",
+      "submitting": "Actualizando…",
+      "updated": "Contraseña actualizada: inicie sesión",
+      "resend": "¿No lo ha recibido? Enviar de nuevo"
+    },
+    "reconnect": {
+      "title": "No se puede conectar con PawPawCare",
+      "offline": "Su sesión sigue iniciada. Compruebe su conexión e inténtelo de nuevo.",
+      "serverDown": "Su sesión sigue iniciada. Nuestro servidor no responde en este momento: inténtelo de nuevo en un instante.",
+      "retry": "Intentar de nuevo",
+      "signOut": "Cerrar sesión"
+    },
+    "social": {
+      "divider": "o continúe con",
+      "google": "Continuar con Google",
+      "googleFailed": "No se ha podido iniciar sesión con Google",
+      "appleFailed": "No se ha podido iniciar sesión con Apple"
+    }
+  },
+  "account": {
+    "title": "Datos de la cuenta",
+    "avatarFallback": "U",
+    "nameLabel": "Nombre",
+    "namePlaceholder": "Su nombre",
+    "emailLabel": "Correo electrónico",
+    "emailHint": "Póngase en contacto con soporte para cambiar su correo electrónico.",
+    "save": "Guardar cambios",
+    "saved": "Guardado",
+    "saveFailed": "No se ha podido guardar su nombre. Inténtelo de nuevo.",
+    "dangerZone": "Zona de peligro",
+    "delete": "Eliminar cuenta",
+    "deleting": "Eliminando cuenta…",
+    "deleteHint": "Su cuenta se desactiva de inmediato y se elimina definitivamente pasados 30 días. Vuelva a iniciar sesión antes de esa fecha para cancelarlo.",
+    "deleteFailed": "No se ha podido eliminar su cuenta: inténtelo de nuevo",
+    "confirmTitle": "¿Eliminar su cuenta?",
+    "confirmMessage": "Su cuenta se desactivará ahora y se eliminará definitivamente dentro de 30 días, con mascotas, historiales, fotos y publicaciones incluidos. Si vuelve a iniciar sesión antes, se cancela la eliminación.",
+    "confirmBilling": "Su suscripción a PawPawCare Plus se sigue cobrando a través de {{store}}: cancélela también allí."
+  },
+  "paywall": {
+    "title": "PawPawCare Plus",
+    "close": "Cerrar",
+    "done": "Listo",
+    "retry": "Intentar de nuevo",
+    "reason": {
+      "ai_extraction": "La lectura de documentos veterinarios con IA forma parte de Plus.",
+      "care_links": "Los enlaces para cuidadores forman parte de Plus."
+    },
+    "promise": "Sus mascotas, historiales y exportaciones siguen siendo gratis para siempre.",
+    "benefits": {
+      "aiTitle": "Leer documentos veterinarios con IA",
+      "aiSubtitle": "Fotografíe un documento: las vacunas, los medicamentos y los pesos se rellenan solos",
+      "linksTitle": "Enlaces para cuidadores",
+      "linksSubtitle": "Comparta una guía de cuidados con los cuidadores, sin necesidad de la app",
+      "independentTitle": "Mantenga PawPawCare independiente",
+      "independentSubtitle": "Sin anuncios y sin vender datos, nunca"
+    },
+    "storeAccount": {
+      "ios": "ID de Apple",
+      "android": "cuenta de Google Play",
+      "default": "cuenta de la tienda"
+    },
+    "storeSettings": {
+      "ios": "App Store",
+      "android": "Google Play",
+      "default": "la tienda"
+    },
+    "errors": {
+      "already_owned": "Su {{store}} ya tiene Plus: toque Restaurar compras para usarlo aquí",
+      "network": "Sin conexión: compruébela e inténtelo de nuevo",
+      "unavailable": "Las compras no están disponibles en este momento: inténtelo más tarde",
+      "other": "No se ha podido completar la compra: inténtelo de nuevo"
+    },
+    "legal": {
+      "oneTime": "El pago se carga en su {{store}} al confirmar. Es una compra única: nunca se renueva.",
+      "charged": "El pago se carga en su {{store}} al confirmar.",
+      "trial": "Su prueba gratuita se convierte en una suscripción de pago salvo que la cancele al menos 24 horas antes de que termine.",
+      "intro": "El precio de lanzamiento se aplica durante el periodo indicado y, después, el precio habitual.",
+      "renews": "La suscripción se renueva automáticamente al mismo precio salvo que la cancele al menos 24 horas antes del final del periodo en curso. Gestiónela o cancélela cuando quiera en los ajustes de {{settings}}."
+    },
+    "states": {
+      "plusTitle": "Ya tiene Plus",
+      "plusMessage": "Gracias por apoyar PawPawCare. Gestiónelo desde Perfil → Suscripción.",
+      "includedTitle": "Tiene incluidas las funciones Plus",
+      "includedMessage": "Como miembro pionero ya las tiene: no hay nada que comprar.",
+      "hiddenTitle": "Plus aún no está disponible",
+      "staysFree": "Todo lo que usa hoy sigue siendo gratis.",
+      "updateTitle": "Actualice la app para suscribirse",
+      "updateMessage": "Las suscripciones necesitan la última versión de PawPawCare. Todo lo que usa hoy sigue siendo gratis.",
+      "deviceTitle": "Las suscripciones aún no están disponibles en este dispositivo",
+      "plansErrorTitle": "Los planes no están disponibles en este momento",
+      "plansErrorMessage": "Compruebe su conexión e inténtelo de nuevo en un momento."
+    },
+    "annual": "Anual",
+    "monthly": "Mensual",
+    "oneTimePrice": "{{price}} · pago único",
+    "save": "Ahorre un {{percent}} %",
+    "introThen": "{{intro}}, después {{price}}",
+    "processing": "Procesando…",
+    "buy": "Comprar",
+    "startTrial": "Empezar la prueba gratuita",
+    "subscribe": "Suscribirse",
+    "restore": "Restaurar compras",
+    "restoring": "Restaurando…",
+    "restoreFailed": "No se han podido restaurar las compras: inténtelo de nuevo",
+    "terms": "Condiciones de uso",
+    "privacy": "Política de privacidad",
+    "toast": {
+      "pending": "Compra pendiente: se desbloqueará cuando se apruebe",
+      "welcome": "¡Bienvenido a Plus!",
+      "complete": "Compra completada: puede tardar un minuto en aparecer"
+    }
+  },
+  "invites": {
+    "title": "Invitaciones",
+    "verify": {
+      "title": "Confirme su correo electrónico",
+      "intro": "Las mascotas se comparten por correo electrónico. Confirme que {{email}} es suyo y las invitaciones enviadas a esa dirección aparecerán aquí.",
+      "codeSentBody": "Hemos enviado un código de 6 dígitos a {{email}}. Es válido durante 30 minutos.",
+      "alreadyConfirmed": "Su correo electrónico ya está confirmado",
+      "codeSent": "Código enviado: revise su correo",
+      "sendFailed": "No se ha podido enviar el código: inténtelo de nuevo.",
+      "badCode": "Introduzca el código de 6 dígitos de su correo.",
+      "codeFailed": "Ese código no ha funcionado: inténtelo de nuevo.",
+      "confirmed": "Correo electrónico confirmado",
+      "send": "Enviar código",
+      "sending": "Enviando…",
+      "confirm": "Confirmar",
+      "confirming": "Confirmando…",
+      "resend": "Enviar un código nuevo"
+    },
+    "emptyTitle": "No hay invitaciones pendientes",
+    "emptyBody": "Cuando alguien comparta una mascota con usted, la invitación aparecerá aquí.",
+    "invitedYou": "{{inviter}} le ha invitado a ser copropietario de {{pet}}",
+    "accept": "Aceptar",
+    "decline": "Rechazar",
+    "accepted": "Ahora cuida de {{pet}}",
+    "acceptFailed": "No se ha podido aceptar la invitación para {{pet}}. Inténtelo de nuevo.",
+    "declined": "Invitación rechazada",
+    "declineFailed": "No se ha podido rechazar la invitación. Inténtelo de nuevo.",
+    "declineTitle": "¿Rechazar la invitación?",
+    "declineMessage": "{{inviter}} tendrá que volver a invitarle si cambia de opinión."
+  },
+  "support": {
+    "title": "Ayuda y comentarios",
+    "guides": "Guías",
+    "soon": "Pronto",
+    "guide": {
+      "gettingStarted": "Primeros pasos",
+      "reminders": "Recordatorios y notificaciones",
+      "sharing": "Compartir con su familia y su veterinario"
+    },
+    "messageTeam": "Escriba a nuestro equipo",
+    "category": {
+      "feedback": "Comentario",
+      "problem": "Problema",
+      "idea": "Idea",
+      "question": "Pregunta"
+    },
+    "placeholder": {
+      "feedback": "¿Qué funciona y qué no? Leemos cada mensaje.",
+      "problem": "Cuéntenos qué ocurre: cuantos más detalles, antes podremos ayudarle.",
+      "idea": "¿Qué haría que PawPawCare fuera mejor para usted y sus mascotas?",
+      "question": "Pregúntenos lo que quiera sobre la app.",
+      "none": "¿En qué podemos ayudarle? Haga una pregunta, informe de un problema o comparta una idea."
+    },
+    "messageA11y": "Su mensaje",
+    "send": "Enviar mensaje",
+    "sending": "Enviando…",
+    "captionReply": "Solo nuestro equipo lo lee y nunca se publica. Respondemos en un plazo de 2 días laborables.",
+    "captionNote": "Solo nuestro equipo lo lee y nunca se publica. Leemos cada mensaje.",
+    "sentReply": "Enviado: le responderemos en un plazo de 2 días laborables",
+    "sentNote": "Gracias: leemos cada mensaje",
+    "sendFailed": "No se ha podido enviar: inténtelo de nuevo"
+  },
+  "errors": {
+    "generic": "Algo ha salido mal: inténtelo de nuevo.",
+    "signupFailed": "Algo ha salido mal. Inténtelo de nuevo.",
+    "loginFailed": "Correo electrónico o contraseña incorrectos.",
+    "socialFailed": "No se ha podido iniciar sesión. Inténtelo de nuevo.",
+    "crash": {
+      "title": "Algo ha salido mal",
+      "body": "La app ha encontrado un error inesperado. Sus mascotas e historiales están a salvo: inténtelo de nuevo y, si sigue ocurriendo, escriba a {{email}}.",
+      "retry": "Intentar de nuevo"
     }
   }
 }

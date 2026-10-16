@@ -3,6 +3,7 @@ import { View, Text, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import EmptyState from '../../components/EmptyState';
+import { useTranslation } from '../../i18n';
 import { ui, type, motion, photos } from '../../theme';
 
 // Shown at launch when a saved session couldn't be checked: no connection, or
@@ -10,6 +11,7 @@ import { ui, type, motion, photos } from '../../theme';
 // valid, so this is "try again", never the Welcome screen — which would read
 // as being signed out. Signing out stays available as a quiet escape hatch.
 export default function ReconnectScreen() {
+  const { t } = useTranslation();
   const { retryRestore, logout, restoreOffline } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -27,13 +29,9 @@ export default function ReconnectScreen() {
     >
       <EmptyState
         photo={photos.emptyBlanket}
-        title="Can't reach PawPawCare"
-        body={
-          restoreOffline
-            ? "You're still signed in. Check your connection and try again."
-            : "You're still signed in. Our server isn't answering right now — try again in a moment."
-        }
-        actionLabel="Try again"
+        title={t('auth.reconnect.title')}
+        body={restoreOffline ? t('auth.reconnect.offline') : t('auth.reconnect.serverDown')}
+        actionLabel={t('auth.reconnect.retry')}
         actionIcon="refresh"
         onAction={retryRestore}
       />
@@ -43,7 +41,7 @@ export default function ReconnectScreen() {
         hitSlop={{ top: 6, bottom: 6, left: 12, right: 12 }}
         style={({ pressed }) => [{ alignSelf: 'center', padding: 8 }, pressed && { opacity: motion.pressOpacity }]}
       >
-        <Text style={[type.body, { color: ui.sub }]}>Sign out</Text>
+        <Text style={[type.body, { color: ui.sub }]}>{t('auth.reconnect.signOut')}</Text>
       </Pressable>
     </View>
   );

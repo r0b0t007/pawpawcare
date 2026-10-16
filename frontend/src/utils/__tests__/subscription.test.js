@@ -142,3 +142,31 @@ describe('review round 2', () => {
     expect(restoreOutcome({ synced: true, plan: { active: false } })).toEqual({ message: 'No purchases found to restore', done: false });
   });
 });
+
+describe('paywall copy in French and Spanish', () => {
+  afterEach(() => i18n.changeLanguage('en'));
+
+  it('periods, intro offers, stores and restore messages', async () => {
+    await i18n.changeLanguage('fr');
+    expect(formatPeriod('P1M')).toBe('mois');
+    expect(formatPeriod('P3M')).toBe('3 mois');
+    expect(priceWithPeriod({ priceString: '4,99 €', subscriptionPeriod: 'P1Y' })).toBe('4,99 € / an');
+    expect(introOfferText({ introPrice: { price: 0, priceString: '0,00 €', periodUnit: 'WEEK', periodNumberOfUnits: 1 } })).toBe('Essai gratuit de 1 semaine');
+    expect(introOfferText({ introPrice: { price: 0.99, priceString: '0,99 €', periodUnit: 'MONTH', periodNumberOfUnits: 1 } })).toBe('0,99 € pour le 1er mois');
+    expect(introOfferText({ introPrice: { price: 0.99, priceString: '0,99 €', periodUnit: 'MONTH', periodNumberOfUnits: 3 } })).toBe('0,99 € pour les 3 premiers mois');
+    expect(storeName('app_store')).toBe("l'App Store");
+    expect(restoreOutcome({ plan: { active: true } }).message).toBe('Achats restaurés');
+
+    await i18n.changeLanguage('es');
+    expect(introOfferText({ introPrice: { price: 0, priceString: '0,00 €', periodUnit: 'DAY', periodNumberOfUnits: 7 } })).toBe('Pruebe 7 días gratis');
+    expect(introOfferText({ introPrice: { price: 1.99, priceString: '1,99 €', periodUnit: 'WEEK', periodNumberOfUnits: 1 } })).toBe('1,99 € durante la 1.ª semana');
+    expect(storeName(null)).toBe('su tienda de aplicaciones');
+  });
+
+  it('English intro offers read exactly as before i18n', () => {
+    expect(introOfferText({ introPrice: { price: 0.99, priceString: '$0.99', periodUnit: 'MONTH', periodNumberOfUnits: 3 } })).toBe('$0.99 for the first 3 months');
+    expect(introOfferText({ introPrice: { price: 0, priceString: '$0.00', periodUnit: 'YEAR', periodNumberOfUnits: 1 } })).toBe('Try 1 year free');
+    expect(storeName('mac_app_store')).toBe('the App Store');
+    expect(storeName('constructor')).toBe('your app store');
+  });
+});

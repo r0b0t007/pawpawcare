@@ -14,7 +14,7 @@ import { track } from '../services/analytics';
 import { identify, resetIdentity } from '../services/identity';
 import { cancelPendingReview } from '../services/storeReview';
 import { showToast } from '../components/Toast';
-import { currentLocale } from '../i18n';
+import i18n, { currentLocale } from '../i18n';
 
 const PUSH_TOKEN_KEY = '@pawpawcare/push_token';
 
@@ -244,7 +244,7 @@ export function AuthProvider({ children }) {
       syncDevice();
       return true;
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || 'Something went wrong. Please try again.' });
+      dispatch({ type: 'SET_ERROR', payload: err.message || i18n.t('errors.signupFailed') });
       return false;
     }
   };
@@ -256,7 +256,7 @@ export function AuthProvider({ children }) {
       await storeTokens(tokens.access_token, tokens.refresh_token);
       // Logging in during the deletion grace period cancels the deletion.
       if (tokens.reactivated) {
-        showToast('Welcome back — your account deletion was cancelled.');
+        showToast(i18n.t('auth.reactivated'));
       }
       const user = await get('/users/me');
       applyUser(user);
@@ -264,7 +264,7 @@ export function AuthProvider({ children }) {
       syncDevice();
       return true;
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || 'Invalid email or password.' });
+      dispatch({ type: 'SET_ERROR', payload: err.message || i18n.t('errors.loginFailed') });
       return false;
     }
   };
@@ -279,7 +279,7 @@ export function AuthProvider({ children }) {
       await storeTokens(tokens.access_token, tokens.refresh_token);
       // Signing back in during the deletion grace period cancels the deletion.
       if (tokens.reactivated) {
-        showToast('Welcome back — your account deletion was cancelled.');
+        showToast(i18n.t('auth.reactivated'));
       }
       const user = await get('/users/me');
       applyUser(user);
@@ -292,7 +292,7 @@ export function AuthProvider({ children }) {
       syncDevice();
       return true;
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || 'Could not sign in. Please try again.' });
+      dispatch({ type: 'SET_ERROR', payload: err.message || i18n.t('errors.socialFailed') });
       return false;
     }
   };

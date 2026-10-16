@@ -6,13 +6,18 @@ import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
+import { useTranslation } from '../../i18n';
 import { ui, type, motion, photos, scrim } from '../../theme';
+
+// The brand name is never translated.
+const BRAND = 'PawPawCare';
 
 // Logged-out landing screen ("Lively & Light"): a real cat and dog sharing a
 // moment carries the first second (aesthetic-usability), then one message and
 // one filled button in the thumb zone. Returning users get a quiet text link,
 // so there is never a 50/50 choice.
 export default function WelcomeScreen({ navigation }) {
+  const { t } = useTranslation();
   // TTI: entry screen for logged-out sessions — static, interactive on mount.
   const { markInteractive } = useObserve();
   useEffect(() => {
@@ -38,7 +43,7 @@ export default function WelcomeScreen({ navigation }) {
             resizeMode="cover"
             accessibilityIgnoresInvertColors
             accessible
-            accessibilityLabel="A kitten and a puppy looking at each other"
+            accessibilityLabel={t('auth.welcome.heroA11y')}
           />
           <LinearGradient
             colors={scrim.top}
@@ -50,16 +55,16 @@ export default function WelcomeScreen({ navigation }) {
           <View style={styles.brandRow}>
             <Image source={require('../../../assets/logo-mark.png')} style={styles.logo} resizeMode="contain" />
             <View>
-              <Text style={styles.brand}>PawPawCare</Text>
-              <Text style={styles.brandSub}>Pet health, made gentle</Text>
+              <Text style={styles.brand}>{BRAND}</Text>
+              <Text style={styles.brandSub}>{t('auth.welcome.brandTagline')}</Text>
             </View>
           </View>
 
           <Text style={styles.headline} accessibilityRole="header">
-            Every wag and whisker,{'\n'}cared for.
+            {t('auth.welcome.headline')}
           </Text>
           <Text style={styles.tagline}>
-            Vaccines, meds and daily routines for all your pets, in one calm place.
+            {t('auth.welcome.tagline')}
           </Text>
 
           <View style={{ flex: 1, minHeight: 12 }} />
@@ -69,7 +74,7 @@ export default function WelcomeScreen({ navigation }) {
             onPress={() => navigation.navigate('Signup')}
             accessibilityRole="button"
           >
-            <Text style={styles.primaryBtnText}>Get started</Text>
+            <Text style={styles.primaryBtnText}>{t('auth.welcome.getStarted')}</Text>
             <MaterialCommunityIcons name="arrow-right" size={18} color={ui.onAccent} />
           </Pressable>
 
@@ -79,7 +84,7 @@ export default function WelcomeScreen({ navigation }) {
             hitSlop={{ top: 6, bottom: 6, left: 12, right: 12 }}
             accessibilityRole="link"
           >
-            <Text style={styles.loginLinkText}>I already have an account</Text>
+            <Text style={styles.loginLinkText}>{t('auth.welcome.haveAccount')}</Text>
           </Pressable>
         </View>
       </ScrollView>

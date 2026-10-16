@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { post } from '../../services/api';
+import { useTranslation } from '../../i18n';
 import { ui, type, radii, motion, photos } from '../../theme';
 import { Button, showToast, FormScrollView, ScreenHeader, PhotoBand } from '../../components';
 
@@ -17,6 +18,7 @@ import { Button, showToast, FormScrollView, ScreenHeader, PhotoBand } from '../.
 // answers 200 to the send, so step 2 shows for any address — no enumeration.
 
 export default function ForgotPasswordScreen({ navigation }) {
+  const { t } = useTranslation();
   const [step, setStep] = useState('email'); // 'email' | 'code'
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -37,7 +39,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   const sendCode = async ({ again = false } = {}) => {
     const trimmed = email.trim();
     if (!trimmed) {
-      setError('Please enter your email.');
+      setError(t('auth.forgot.missingEmail'));
       return;
     }
     setError(null);
@@ -45,12 +47,12 @@ export default function ForgotPasswordScreen({ navigation }) {
     try {
       await post('/auth/forgot-password', { email: trimmed }, { skipAuth: true });
       if (again) {
-        showToast('New code sent');
+        showToast(t('auth.forgot.codeResent'));
       } else {
         setStep('code');
       }
     } catch (e) {
-      setError(e?.message || 'Something went wrong — try again.');
+      setError(e?.message || t('errors.generic'));
     } finally {
       setSending(false);
     }
@@ -58,15 +60,15 @@ export default function ForgotPasswordScreen({ navigation }) {
 
   const handleReset = async () => {
     if (code.trim().length !== 6) {
-      setError('Enter the 6-digit code from your email.');
+      setError(t('auth.forgot.badCode'));
       return;
     }
     if (password.length < 8) {
-      setError('Your new password needs at least 8 characters.');
+      setError(t('auth.forgot.tooShort'));
       return;
     }
     if (password !== confirm) {
-      setError("Those passwords don't match.");
+      setError(t('auth.forgot.mismatch'));
       return;
     }
     setError(null);
@@ -77,10 +79,10 @@ export default function ForgotPasswordScreen({ navigation }) {
         { email: email.trim(), code: code.trim(), password },
         { skipAuth: true },
       );
-      showToast('Password updated — log in');
+      showToast(t('auth.forgot.updated'));
       navigation.navigate('Login');
     } catch (e) {
-      setError(e?.message || 'Something went wrong — try again.');
+      setError(e?.message || t('errors.generic'));
       setResetting(false);
     }
   };
@@ -117,17 +119,17 @@ export default function ForgotPasswordScreen({ navigation }) {
 
         {step === 'email' ? (
           <>
-            <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">Reset your password</Text>
+            <Text style={[type.screenTitle, styles.title]} accessibilityRole="header">{t('auth.forgot.title')}</Text>
             <Text style={styles.subtitle}>
-              Enter your account email and we'll send you a 6-digit code.
+              {t('auth.forgot.subtitle')}
             </Text>
 
             <View style={styles.form}>
               <View>
-                <Text style={[type.sectionLabel, styles.fieldLabel]}>Email</Text>
+                <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('auth.emailLabel')}</Text>
                 <TextInput
                   style={[styles.input, focused === 'email' && styles.inputFocused]}
-                  placeholder="you@example.com"
+                  placeholder={t('auth.emailPlaceholder')}
                   placeholderTextColor={ui.placeholder}
                   value={email}
                   onChangeText={onChange(setEmail)}
@@ -145,7 +147,7 @@ export default function ForgotPasswordScreen({ navigation }) {
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <Button
-              label={sending ? 'Sending…' : 'Send code'}
+              label={sending ? t('auth.forgot.sending') : t('auth.forgot.send')}
               onPress={() => sendCode()}
               disabled={sending}
               style={styles.submitBtn}
@@ -157,15 +159,15 @@ export default function ForgotPasswordScreen({ navigation }) {
               <MaterialCommunityIcons name="email-check-outline" size={30} color={ui.accent} />
             </View>
             <Text style={[type.screenTitle, styles.title, { marginTop: 18 }]} accessibilityRole="header">
-              Check your inbox
+              {t('auth.forgot.checkTitle')}
             </Text>
             <Text style={styles.subtitle}>
-              We sent a 6-digit code to {email.trim()}. It's valid for 30 minutes.
+              {t('auth.forgot.checkBody', { email: email.trim() })}
             </Text>
 
             <View style={styles.form}>
               <View>
-                <Text style={[type.sectionLabel, styles.fieldLabel]}>6-digit code</Text>
+                <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('auth.forgot.codeLabel')}</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -186,11 +188,11 @@ export default function ForgotPasswordScreen({ navigation }) {
               </View>
 
               <View>
-                <Text style={[type.sectionLabel, styles.fieldLabel]}>New password</Text>
+                <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('auth.forgot.newPasswordLabel')}</Text>
                 <View style={[styles.inputRow, focused === 'password' && styles.inputFocused]}>
                   <TextInput
                     style={styles.inputInner}
-                    placeholder="At least 8 characters"
+                    placeholder={t('auth.forgot.newPasswordPlaceholder')}
                     placeholderTextColor={ui.placeholder}
                     value={password}
                     onChangeText={onChange(setPassword)}
@@ -204,7 +206,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                     onPress={() => setShowPwd(!showPwd)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityRole="button"
-                    accessibilityLabel={showPwd ? 'Hide password' : 'Show password'}
+                    accessibilityLabel={showPwd ? t('auth.forgot.hidePassword') : t('auth.forgot.showPassword')}
                   >
                     <MaterialCommunityIcons
                       name={showPwd ? 'eye-off-outline' : 'eye-outline'}
@@ -216,10 +218,10 @@ export default function ForgotPasswordScreen({ navigation }) {
               </View>
 
               <View>
-                <Text style={[type.sectionLabel, styles.fieldLabel]}>Confirm password</Text>
+                <Text style={[type.sectionLabel, styles.fieldLabel]}>{t('auth.confirmPasswordLabel')}</Text>
                 <TextInput
                   style={[styles.input, focused === 'confirm' && styles.inputFocused]}
-                  placeholder="Same password again"
+                  placeholder={t('auth.forgot.confirmPlaceholder')}
                   placeholderTextColor={ui.placeholder}
                   value={confirm}
                   onChangeText={onChange(setConfirm)}
@@ -235,7 +237,7 @@ export default function ForgotPasswordScreen({ navigation }) {
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
             <Button
-              label={resetting ? 'Updating…' : 'Reset password'}
+              label={resetting ? t('auth.forgot.submitting') : t('auth.forgot.submit')}
               onPress={handleReset}
               disabled={resetting}
               style={styles.submitBtn}
@@ -248,7 +250,7 @@ export default function ForgotPasswordScreen({ navigation }) {
               hitSlop={{ top: 4, bottom: 4, left: 12, right: 12 }}
             >
               <Text style={[styles.resendLinkText, sending && { opacity: 0.5 }]}>
-                {sending ? 'Sending…' : "Didn't get it? Send again"}
+                {sending ? t('auth.forgot.sending') : t('auth.forgot.resend')}
               </Text>
             </Pressable>
           </>
