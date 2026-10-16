@@ -95,6 +95,9 @@ export default function SegmentedControl({ segments, value, onChange, style, rol
             }}
           >
             <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
               style={{
                 fontFamily: 'PlusJakartaSans_700Bold',
                 fontSize: 13,

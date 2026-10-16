@@ -594,7 +594,7 @@ export default function DashboardScreen({ navigation }) {
                       <Text style={[styles.rowTitle, row.done && { color: ui.sub }]} numberOfLines={1}>
                         {t('home.today.medTitle', { pet: row.pet.name, med: row.med.name })}
                       </Text>
-                      <Text style={styles.rowSub} numberOfLines={1}>
+                      <Text style={styles.rowSub} numberOfLines={2}>
                         {[
                           row.times.map(fmtTime).filter(Boolean).join(', ') || t('home.today.anyTime'),
                           row.med.dosage,

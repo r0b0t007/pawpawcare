@@ -710,7 +710,7 @@
     },
     "form": {
       "title": "Nuevo recordatorio",
-      "placeholder": "p. ej. dar a Rex su pastilla contra el gusano del corazón",
+      "placeholder": "p. ej. antiparasitario de Rex",
       "add": "Añadir recordatorio"
     },
     "listTitle": "Sus recordatorios",

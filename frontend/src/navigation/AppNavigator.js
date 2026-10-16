@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -108,6 +108,18 @@ function ProfileStack() {
   );
 }
 
+// Tab labels shrink (down to 80%) rather than truncate: "Communauté" is too
+// wide for a five-tab bar at 11px. The string stays the accessibility label.
+const TAB_LABEL_STYLE = { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, lineHeight: 14, marginTop: 2 };
+const tabLabel = (text) => ({
+  tabBarAccessibilityLabel: text,
+  tabBarLabel: ({ color }) => (
+    <Text style={[TAB_LABEL_STYLE, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+      {text}
+    </Text>
+  ),
+});
+
 const TAB_ICONS = {
   Dashboard: { active: 'home', inactive: 'home-outline' },
   Pets: { active: 'paw', inactive: 'paw-outline' },
@@ -140,23 +152,17 @@ function MainTabs() {
         tabBarActiveTintColor: ui.accent,
         // ui.sub, not a lighter beige: inactive labels must still pass AA.
         tabBarInactiveTintColor: ui.sub,
-        tabBarLabelStyle: {
-          fontFamily: 'PlusJakartaSans_700Bold',
-          fontSize: 11,
-          lineHeight: 14,
-          marginTop: 2,
-        },
         tabBarIcon: ({ focused, color }) => {
           const { active, inactive } = TAB_ICONS[route.name] || { active: 'help', inactive: 'help-circle-outline' };
           return <MaterialCommunityIcons name={focused ? active : inactive} size={24} color={color} />;
         },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardStack} options={{ tabBarLabel: t('nav.tabs.home') }} />
-      <Tab.Screen name="Pets" component={PetsStack} options={{ tabBarLabel: t('nav.tabs.pets') }} />
-      <Tab.Screen name="Health" component={HealthStack} options={{ tabBarLabel: t('nav.tabs.health') }} />
-      <Tab.Screen name="Community" component={CommunityStack} options={{ tabBarLabel: t('nav.tabs.community') }} />
-      <Tab.Screen name="Profile" component={ProfileStack} options={{ tabBarLabel: t('nav.tabs.profile') }} />
+      <Tab.Screen name="Dashboard" component={DashboardStack} options={tabLabel(t('nav.tabs.home'))} />
+      <Tab.Screen name="Pets" component={PetsStack} options={tabLabel(t('nav.tabs.pets'))} />
+      <Tab.Screen name="Health" component={HealthStack} options={tabLabel(t('nav.tabs.health'))} />
+      <Tab.Screen name="Community" component={CommunityStack} options={tabLabel(t('nav.tabs.community'))} />
+      <Tab.Screen name="Profile" component={ProfileStack} options={tabLabel(t('nav.tabs.profile'))} />
     </Tab.Navigator>
   );
 }

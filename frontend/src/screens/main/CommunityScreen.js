@@ -307,7 +307,7 @@ export default function CommunityScreen({ navigation }) {
                     <MaterialCommunityIcons name={GROUP_ICONS[idx % GROUP_ICONS.length]} size={24} color={pair.fg} />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.groupName} numberOfLines={1}>{group.name}</Text>
+                    <Text style={styles.groupName} numberOfLines={2}>{group.name}</Text>
                     <Text style={styles.groupMembers}>{t('community.members', { count: group.members })}</Text>
                   </View>
                   <Pressable
