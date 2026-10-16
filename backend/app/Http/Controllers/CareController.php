@@ -6,6 +6,7 @@ use App\Models\CareProfile;
 use App\Models\Pet;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\Subscriptions\Entitlements;
+use App\Support\PublicPageLocale;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -77,10 +78,11 @@ class CareController extends Controller
 
         $expiresIn = $data['expires_in'] ?? '7d';
         $expiresAt = now()->addMinutes(self::EXPIRIES[$expiresIn]);
+        // Signed-in creator's language, inside the signature (none for English).
         $url = URL::temporarySignedRoute('pets.care', $expiresAt, [
             'pet' => $pet->id,
             't' => $pet->care_token,
-        ]);
+        ] + PublicPageLocale::linkParams());
 
         $analytics->capture($request->user(), 'server_care_link_created', ['expires_in' => $expiresIn]);
 
@@ -104,6 +106,9 @@ class CareController extends Controller
      */
     public function page(Request $request, string $petId)
     {
+        // The link's signed `lang` (English when absent or unsupported).
+        PublicPageLocale::apply($request);
+
         $pet = Pet::with([
             'careProfile',
             'medications' => fn ($q) => $q->where('active', true)->orderBy('name'),
