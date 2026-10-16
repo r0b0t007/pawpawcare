@@ -35,7 +35,7 @@
                     {{ ucfirst($label('pet_type', $pet->type) ?? __('export.pdf.pet_fallback')) }}@if($pet->breed) &middot; {{ $pet->breed }}@endif
                     @if($pet->gender) &middot; {{ ucfirst($label('gender', $pet->gender)) }}@endif
                     @if($pet->birthday) &middot; {{ __('export.pdf.born', ['date' => $date($pet->birthday)]) }}@endif
-                    @if($pet->weight !== null) &middot; {{ $pet->weight }} {{ $pet->weight_unit }}@endif
+                    @if($pet->weight !== null) &middot; {{ $decimal($pet->weight) }} {{ $pet->weight_unit }}@endif
                     &middot; {{ __('export.pdf.microchipped', ['answer' => $pet->microchipped ? __('export.yes') : __('export.no')]) }}
                 </p>
             </div>
@@ -123,7 +123,7 @@
                     @foreach ($entry['weights'] as $w)
                         <tr>
                             <td>{{ $date($w->logged_at) }}</td>
-                            <td>{{ $w->weight }} {{ $w->unit }}</td>
+                            <td>{{ $decimal($w->weight) }} {{ $w->unit }}</td>
                             <td>{{ $w->notes ?? '—' }}</td>
                         </tr>
                     @endforeach

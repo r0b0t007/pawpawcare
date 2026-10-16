@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Pet;
 use App\Services\Analytics\ProductAnalytics;
+use App\Support\PublicPageLocale;
 use Carbon\CarbonInterface;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -217,6 +218,9 @@ class ExportController extends Controller
             // export language; ids without one, and every id in English,
             // print as stored.
             'label' => fn (string $group, ?string $value) => self::label($group, $value),
+            // A stored decimal (12.5) with the export language's decimal mark;
+            // English keeps the '.' it always printed.
+            'decimal' => fn (mixed $value) => PublicPageLocale::decimal($value),
         ])->render();
 
         $options = new Options;

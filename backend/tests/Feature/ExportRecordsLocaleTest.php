@@ -174,6 +174,9 @@ class ExportRecordsLocaleTest extends TestCase
         $this->assertStringContainsString('¿Toño?', $text);
         $this->assertStringContainsString('Chien · Golden Retriever · Femelle · Né(e) le 3 sept. 2020', $text);
         $this->assertStringContainsString('Pucé : oui', $text);
+        // Stored decimals take the language's decimal mark (pet and weight log).
+        $this->assertSame(2, substr_count($text, '12,5 kg'));
+        $this->assertStringNotContainsString('12.5', $text);
         // th/h3 are uppercased by CSS, so the text layer holds capitals.
         $this->assertStringContainsString('MÉDICAMENTS', $text);
         $this->assertStringContainsString('ÉCHÉANCE', $text);
@@ -205,6 +208,7 @@ class ExportRecordsLocaleTest extends TestCase
         $this->assertStringContainsString('Exportado el '.$this->today('es', 'D [de] MMMM [de] YYYY'), $text);
         $this->assertStringContainsString('Perro · Golden Retriever · Hembra · Nacido/a el 3 sep. 2020', $text);
         $this->assertStringContainsString('Microchip: sí', $text);
+        $this->assertSame(2, substr_count($text, '12,5 kg'));
         $this->assertStringContainsString('AÑADIDO EL', $text);
         $this->assertStringContainsString('administrada', $text);
         $this->assertStringContainsString('según necesidad', $text);
@@ -224,6 +228,7 @@ class ExportRecordsLocaleTest extends TestCase
         $this->assertStringContainsString('Prepared for Zoé Núñez · Exported '.now()->format('F j, Y'), $text);
         $this->assertStringContainsString('Dog · Golden Retriever · Female · Born Sep 3, 2020', $text);
         $this->assertStringContainsString('Microchipped: yes', $text);
+        $this->assertSame(2, substr_count($text, '12.5 kg'));
         $this->assertStringContainsString('completed', $text);
         $this->assertStringContainsString('as_needed', $text);
         $this->assertStringContainsString('Mar 1, 2024', $text);
