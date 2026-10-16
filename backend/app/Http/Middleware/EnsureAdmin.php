@@ -15,7 +15,7 @@ class EnsureAdmin
     public function handle(Request $request, Closure $next): Response
     {
         if (! $request->user()?->is_admin) {
-            return response()->json(['detail' => 'Forbidden'], 403);
+            return response()->json(['detail' => __('Forbidden')], 403);
         }
 
         return $next($request);

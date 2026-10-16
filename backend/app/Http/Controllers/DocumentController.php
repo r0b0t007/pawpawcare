@@ -58,11 +58,11 @@ class DocumentController extends Controller
         // Linked appointment/clinic, if given, must belong to the same pet.
         if (! empty($data['appointment_id'])
             && ! Appointment::where('id', $data['appointment_id'])->where('pet_id', $petId)->exists()) {
-            abort(422, 'Appointment not found for this pet');
+            abort(422, __('Appointment not found for this pet'));
         }
         if (! empty($data['clinic_id'])
             && ! Clinic::where('id', $data['clinic_id'])->where('pet_id', $petId)->exists()) {
-            abort(422, 'Clinic not found for this pet');
+            abort(422, __('Clinic not found for this pet'));
         }
 
         $file = $request->file('file');
@@ -98,7 +98,7 @@ class DocumentController extends Controller
 
         $doc = Document::where('id', $documentId)->where('pet_id', $petId)->first();
         if (! $doc) {
-            abort(404, 'Document not found');
+            abort(404, __('Document not found'));
         }
 
         $url = URL::temporarySignedRoute('documents.raw', now()->addMinutes(5), ['document' => $doc->id]);
@@ -120,7 +120,7 @@ class DocumentController extends Controller
     {
         $doc = Document::find($documentId);
         if (! $doc) {
-            abort(404, 'Document not found');
+            abort(404, __('Document not found'));
         }
 
         $disk = Uploads::privateDisk();
@@ -129,7 +129,7 @@ class DocumentController extends Controller
 
         if (Uploads::privateDiskName() === 'local') {
             if (! $disk->exists($doc->file_path)) {
-                abort(404, 'Document not found');
+                abort(404, __('Document not found'));
             }
 
             return $disk->response($doc->file_path, $name, ['Content-Type' => $type]);
@@ -177,19 +177,19 @@ class DocumentController extends Controller
 
         $doc = Document::where('id', $documentId)->where('pet_id', $petId)->first();
         if (! $doc) {
-            abort(404, 'Document not found');
+            abort(404, __('Document not found'));
         }
 
         if ($doc->extraction_status === 'done' && $doc->extraction) {
             return response()->json($doc->toApi());
         }
         if ($doc->extraction_status === 'pending') {
-            abort(409, 'Extraction already in progress');
+            abort(409, __('Extraction already in progress'));
         }
         // Capability gate before any tokens are spent — e.g. OpenAI-compatible
         // providers read images but not PDFs (no rasterization step).
         if (! $extractor->supports($doc)) {
-            abort(422, 'The configured AI provider cannot read this document type.');
+            abort(422, __('The configured AI provider cannot read this document type.'));
         }
         // Plan gate (inert unless PAYWALL_ENABLED + GATE_AI_EXTRACTION): 402
         // upgrade_required. The pet owner's plan covers co-owners; without a
@@ -221,7 +221,7 @@ class DocumentController extends Controller
                 $entitlements->refund($request->user(), 'ai_extraction', $pet);
             }
             $track('failed');
-            abort(502, 'Could not read the document. Please try again.');
+            abort(502, __('Could not read the document. Please try again.'));
         }
 
         $doc->forceFill([
@@ -247,10 +247,10 @@ class DocumentController extends Controller
 
         $doc = Document::where('id', $documentId)->where('pet_id', $petId)->first();
         if (! $doc) {
-            abort(404, 'Document not found');
+            abort(404, __('Document not found'));
         }
         if ($doc->extraction_status !== 'done') {
-            abort(409, 'Extract the document before applying');
+            abort(409, __('Extract the document before applying'));
         }
 
         $data = $request->validate([
@@ -432,7 +432,7 @@ class DocumentController extends Controller
 
         $doc = Document::where('id', $documentId)->where('pet_id', $petId)->first();
         if (! $doc) {
-            abort(404, 'Document not found');
+            abort(404, __('Document not found'));
         }
         $doc->delete(); // model hook removes the stored file
 
@@ -458,7 +458,7 @@ class DocumentController extends Controller
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         return $pet;

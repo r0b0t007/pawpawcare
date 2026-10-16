@@ -43,7 +43,7 @@ class HealthController extends Controller
     public function __invoke(Request $request): JsonResponse
     {
         if ($this->throttled($request)) {
-            return response()->json(['detail' => 'Too many requests.'], 429);
+            return response()->json(['detail' => __('Too many requests.')], 429);
         }
 
         $failed = array_keys(array_filter([
@@ -52,6 +52,8 @@ class HealthController extends Controller
             'storage' => ! $this->storageWritable(),
         ]));
 
+        // The status body below is for monitors (the deploy check, Sentry
+        // uptime) matching on fixed values, so it's never translated.
         if ($failed === []) {
             return response()->json(['status' => 'ok', 'version' => self::VERSION]);
         }

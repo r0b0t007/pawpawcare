@@ -96,11 +96,11 @@ class LostPetController extends Controller
             ->first();
 
         if (! $report) {
-            abort(404, 'Report not found');
+            abort(404, __('Report not found'));
         }
 
         if ($report->status !== 'active') {
-            abort(409, 'Report already resolved');
+            abort(409, __('Report already resolved'));
         }
 
         if ($report->post_id) {
@@ -140,7 +140,7 @@ class LostPetController extends Controller
     {
         $pet = Pet::accessibleBy($request->user()->id)->where('id', $petId)->first();
         if (! $pet) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         return $pet;

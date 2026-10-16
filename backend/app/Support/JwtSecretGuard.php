@@ -78,6 +78,6 @@ class JwtSecretGuard
             .self::MIN_LENGTH.' characters in .env (e.g. `openssl rand -base64 48`), then run `php artisan config:cache`.',
             self::REPORT_EVERY_SECONDS);
 
-        abort(503, 'Sign-in is temporarily unavailable.');
+        abort(503, __('Sign-in is temporarily unavailable.'));
     }
 }

@@ -44,14 +44,16 @@ class AuthController extends Controller
         ]);
 
         if (User::where('email', $data['email'])->exists()) {
-            abort(409, 'Email already registered');
+            abort(409, __('Email already registered'));
         }
 
-        $user = User::create([
+        $user = new User([
             'name' => $data['name'],
             'email' => $data['email'],
             'hashed_password' => Hash::make($data['password']),
         ]);
+        $user->locale = User::requestLocale();
+        $user->save();
 
         return response()->json($this->issueTokens($user), 201);
     }
@@ -72,7 +74,7 @@ class AuthController extends Controller
         // The attempt is counted BEFORE the (slow) bcrypt check, so a parallel
         // burst can't all pass the check at once; a success clears it.
         $failKey = self::loginFailKey($data['email']);
-        $locked = 'Too many failed sign-in attempts for this account. Try again in 15 minutes or reset your password.';
+        $locked = __('Too many failed sign-in attempts for this account. Try again in 15 minutes or reset your password.');
         if (RateLimiter::tooManyAttempts($failKey, self::LOGIN_FAILURES_PER_WINDOW)) {
             abort(429, $locked);
         }
@@ -83,7 +85,7 @@ class AuthController extends Controller
         $user = User::where('email', $data['email'])->first();
 
         if (! $user || ! Hash::check($data['password'], $user->hashed_password)) {
-            abort(401, 'Invalid email or password');
+            abort(401, __('Invalid email or password'));
         }
 
         RateLimiter::clear($failKey);
@@ -160,7 +162,7 @@ class AuthController extends Controller
         // native request, so the token's `nonce` claim must equal SHA-256(raw).
         // Always enforced — a token whose nonce we can't match is rejected.
         if (! hash_equals(hash('sha256', $data['raw_nonce']), (string) ($payload['nonce'] ?? ''))) {
-            abort(401, 'Invalid identity token');
+            abort(401, __('Invalid identity token'));
         }
 
         [$user, $reactivated] = $this->loginSocialUser(
@@ -188,7 +190,7 @@ class AuthController extends Controller
         $payload = JwtService::decode($data['refresh_token']);
 
         if (! $payload || ($payload['type'] ?? null) !== 'refresh') {
-            abort(401, 'Invalid refresh token');
+            abort(401, __('Invalid refresh token'));
         }
 
         $stored = RefreshToken::where('token', $data['refresh_token'])
@@ -196,14 +198,14 @@ class AuthController extends Controller
             ->first();
 
         if (! $stored || $stored->expires_at->isPast()) {
-            abort(401, 'Refresh token expired or revoked');
+            abort(401, __('Refresh token expired or revoked'));
         }
 
         // Consume atomically: of two parallel refreshes with one token, only
         // the request that flips `revoked` gets a new pair.
         $consumed = RefreshToken::where('id', $stored->id)->where('revoked', false)->update(['revoked' => true]);
         if ($consumed !== 1) {
-            abort(401, 'Refresh token expired or revoked');
+            abort(401, __('Refresh token expired or revoked'));
         }
 
         $userId = $payload['sub'];
@@ -214,7 +216,7 @@ class AuthController extends Controller
         // token minted before User::revokeAllSessions() is dead too, even if
         // it slipped past the refresh-token delete.
         if (! $user || ! $user->is_active || (int) ($payload['ver'] ?? 0) !== (int) $user->token_version) {
-            abort(401, 'Invalid refresh token');
+            abort(401, __('Invalid refresh token'));
         }
 
         return response()->json($this->issueTokens($user));
@@ -331,12 +333,12 @@ class AuthController extends Controller
             : 0;
 
         if ($reserved !== 1 || ! Hash::check($data['code'], $record->code_hash)) {
-            abort(400, 'Invalid or expired code');
+            abort(400, __('Invalid or expired code'));
         }
 
         // Single-use: only the request that marks it used resets the password.
         if (PasswordResetCode::where('id', $record->id)->whereNull('used_at')->update(['used_at' => now()]) !== 1) {
-            abort(400, 'Invalid or expired code');
+            abort(400, __('Invalid or expired code'));
         }
         $user->update(['hashed_password' => Hash::make($data['password'])]);
 
@@ -347,7 +349,7 @@ class AuthController extends Controller
         // in with the new password.
         if (! $user->is_active && $user->deletion_requested_at !== null
             && ! $user->cancelPendingDeletion('password_reset')) {
-            abort(400, 'Invalid or expired code'); // purged meanwhile
+            abort(400, __('Invalid or expired code')); // purged meanwhile
         }
 
         // Kill every existing session: stolen refresh tokens, live access
@@ -371,7 +373,7 @@ class AuthController extends Controller
             // Missing config would make `aud` effectively unchecked — refuse
             // rather than accept a token minted for any other app.
             Log::error('Social login attempted without a configured audience', ['jwks' => $jwksUrl]);
-            abort(503, 'Social login is not configured');
+            abort(503, __('Social login is not configured'));
         }
 
         // `JWT::$leeway` is a process-global static shared with the app's own
@@ -394,7 +396,7 @@ class AuthController extends Controller
                 // signature against a known key). Refetching won't help, so fail
                 // fast — this stops a flood of invalid tokens from hammering the
                 // provider's JWKS endpoint on every request.
-                abort(401, 'Invalid identity token');
+                abort(401, __('Invalid identity token'));
             } catch (\UnexpectedValueException $e) {
                 // A plain UnexpectedValueException here means the token's `kid`
                 // isn't in our cached key set — the signing key likely rotated.
@@ -404,22 +406,22 @@ class AuthController extends Controller
                     Cache::put($cacheKey, $jwks, now()->addHours(6));
                     $payload = $decode($jwks);
                 } catch (\Throwable $e2) {
-                    abort(401, 'Invalid identity token');
+                    abort(401, __('Invalid identity token'));
                 }
             } catch (\Throwable $e) {
                 // Malformed token / any other decode failure.
-                abort(401, 'Invalid identity token');
+                abort(401, __('Invalid identity token'));
             }
 
             if (! in_array($payload['iss'] ?? '', $issuers, true)) {
-                abort(401, 'Invalid identity token');
+                abort(401, __('Invalid identity token'));
             }
 
             // `aud` is a string, but the spec allows an array of audiences.
             $aud = $payload['aud'] ?? null;
             $audMatches = is_array($aud) ? in_array($audience, $aud, true) : $aud === $audience;
             if (! $audMatches) {
-                abort(401, 'Invalid identity token');
+                abort(401, __('Invalid identity token'));
             }
 
             return $payload;
@@ -437,9 +439,9 @@ class AuthController extends Controller
             // after the attempts are exhausted — translate both to a clean 503.
             $res = Http::timeout(5)->retry(2, 200)->get($url);
         } catch (RequestException|ConnectionException $e) {
-            abort(503, 'Identity provider unavailable');
+            abort(503, __('Identity provider unavailable'));
         }
-        abort_unless($res->successful(), 503, 'Identity provider unavailable');
+        abort_unless($res->successful(), 503, __('Identity provider unavailable'));
 
         return $res->json();
     }
@@ -462,12 +464,12 @@ class AuthController extends Controller
         }
 
         if ($user->deletion_requested_at === null) {
-            abort(403, 'Account is disabled');
+            abort(403, __('Account is disabled'));
         }
 
         // False only if the account was purged (or changed) meanwhile.
         if (! $user->cancelPendingDeletion($method)) {
-            abort(401, 'This account has been deleted');
+            abort(401, __('This account has been deleted'));
         }
 
         return true;
@@ -512,14 +514,14 @@ class AuthController extends Controller
             if ($existing) {
                 if ($existing->provider === $provider && $existing->provider_id !== $providerId) {
                     // Already bound to a *different* identity from this provider.
-                    abort(409, 'This email is linked to a different account');
+                    abort(409, __('This email is linked to a different account'));
                 }
                 // Authorize before mutating: a disabled account must not have its
                 // password nulled and sessions revoked as a side effect of a
                 // sign-in it isn't allowed to complete. (A pending self-deletion
                 // is reactivated further down, after the link succeeds.)
                 if (! $existing->is_active && $existing->deletion_requested_at === null) {
-                    abort(403, 'Account is disabled');
+                    abort(403, __('Account is disabled'));
                 }
                 // Linking kills any existing password on the account. Signup never
                 // verifies email ownership, so a matching password row may have
@@ -547,7 +549,7 @@ class AuthController extends Controller
         if (! $user) {
             $useEmail = $email && $emailVerified && ! User::where('email', $email)->exists();
             try {
-                $created = User::create([
+                $created = new User([
                     'name' => $name ?: 'PawPaw friend',
                     'email' => $useEmail ? $email : $provider.'_'.$providerId.'@users.noreply.pawpawcare.app',
                     'hashed_password' => null,
@@ -558,6 +560,8 @@ class AuthController extends Controller
                     // below would otherwise see null and 403 every new sign-in.
                     'is_active' => true,
                 ]);
+                $created->locale = User::requestLocale();
+                $created->save();
                 if ($useEmail) {
                     // The provider vouched for this address.
                     $created->forceFill(['email_verified_at' => now()])->save();

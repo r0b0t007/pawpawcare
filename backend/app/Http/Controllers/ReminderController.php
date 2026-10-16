@@ -47,7 +47,7 @@ class ReminderController extends Controller
 
         if (! empty($data['pet_id'])
             && ! Pet::accessibleBy($user->id)->where('id', $data['pet_id'])->exists()) {
-            abort(404, 'Pet not found');
+            abort(404, __('Pet not found'));
         }
 
         $isOneTime = $data['schedule_type'] === 'one_time';
@@ -124,7 +124,7 @@ class ReminderController extends Controller
             ->first();
 
         if (! $reminder) {
-            abort(404, 'Reminder not found');
+            abort(404, __('Reminder not found'));
         }
 
         return $reminder;

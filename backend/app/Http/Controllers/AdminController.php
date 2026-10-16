@@ -111,7 +111,7 @@ class AdminController extends Controller
     {
         $post = Post::find($postId);
         if (! $post) {
-            abort(404, 'Post not found');
+            abort(404, __('Post not found'));
         }
 
         return $post;

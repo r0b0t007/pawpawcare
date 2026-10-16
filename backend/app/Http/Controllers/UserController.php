@@ -9,6 +9,7 @@ use App\Services\Subscriptions\Entitlements;
 use App\Support\Uploads;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
@@ -24,6 +25,8 @@ class UserController extends Controller
             'bio' => 'sometimes|nullable|string|max:1000',
             'avatar_url' => ['sometimes', 'nullable', 'string', 'max:2048', 'regex:#^(https?://|/(?!/))#i'],
             'timezone' => 'sometimes|nullable|string|max:64',
+            // `required`: an empty value is rejected, never stored.
+            'locale' => ['sometimes', 'required', 'string', Rule::in(User::LOCALES)],
             'engagement_pushes_enabled' => 'sometimes|boolean',
             // `required`: an empty value must never silently re-enable analytics,
             // independent of the global ConvertEmptyStringsToNull middleware.
@@ -46,6 +49,9 @@ class UserController extends Controller
         }
         if (array_key_exists('analytics_opt_out', $data)) {
             $user->analytics_opt_out = (bool) $data['analytics_opt_out'];
+        }
+        if (array_key_exists('locale', $data)) {
+            $user->locale = $data['locale'];
         }
 
         // Timezone is validated against the IANA list before applying.

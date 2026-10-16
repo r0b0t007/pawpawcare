@@ -57,10 +57,10 @@ class CommunityController extends Controller
     {
         $post = Post::find($postId);
         if (! $post) {
-            abort(404, 'Post not found');
+            abort(404, __('Post not found'));
         }
         if ($post->author_id !== $request->user()->id) {
-            abort(403, 'Not your post');
+            abort(403, __('Not your post'));
         }
         $post->delete();
 
@@ -71,7 +71,7 @@ class CommunityController extends Controller
     {
         $post = Post::with(['author', 'pawedBy'])->withCount('comments')->find($postId);
         if (! $post) {
-            abort(404, 'Post not found');
+            abort(404, __('Post not found'));
         }
 
         $userId = $request->user()->id;
@@ -165,12 +165,12 @@ class CommunityController extends Controller
     {
         $comment = Comment::where('id', $commentId)->where('post_id', $postId)->first();
         if (! $comment) {
-            abort(404, 'Comment not found');
+            abort(404, __('Comment not found'));
         }
         // The comment's author, or the post's owner, may delete it.
         $post = Post::find($postId);
         if ($comment->author_id !== $request->user()->id && $post?->author_id !== $request->user()->id) {
-            abort(403, 'Not allowed');
+            abort(403, __('Not allowed'));
         }
         $comment->delete();
 
@@ -181,7 +181,7 @@ class CommunityController extends Controller
     {
         $post = Post::find($postId);
         if (! $post) {
-            abort(404, 'Post not found');
+            abort(404, __('Post not found'));
         }
 
         return $post;
@@ -202,7 +202,7 @@ class CommunityController extends Controller
     {
         $group = Group::with('members')->find($groupId);
         if (! $group) {
-            abort(404, 'Group not found');
+            abort(404, __('Group not found'));
         }
 
         $userId = $request->user()->id;

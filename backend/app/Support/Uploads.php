@@ -145,7 +145,7 @@ class Uploads
         $owned = $path && Upload::where('path', $path)->whereIn('user_id', $uploaderIds)->exists();
 
         if (! $owned) {
-            throw ValidationException::withMessages([$field => 'That image is not one of your uploads.']);
+            throw ValidationException::withMessages([$field => __('That image is not one of your uploads.')]);
         }
     }
 
@@ -320,7 +320,7 @@ class Uploads
     {
         $image = @imagecreatefromstring((string) file_get_contents($file->getRealPath()));
         if ($image === false) {
-            abort(422, 'The file could not be read as an image.');
+            abort(422, __('The file could not be read as an image.'));
         }
         imagepalettetotruecolor($image);
 
@@ -360,7 +360,7 @@ class Uploads
     {
         $bytes = (string) file_get_contents($file->getRealPath());
         if (! str_starts_with($bytes, '%PDF-')) {
-            abort(422, 'The file is not a valid PDF.');
+            abort(422, __('The file is not a valid PDF.'));
         }
 
         return $bytes;

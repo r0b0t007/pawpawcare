@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\DeviceToken;
+use App\Models\User;
 use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class DeviceController extends Controller
 {
@@ -15,6 +17,9 @@ class DeviceController extends Controller
             'token' => 'required|string|max:255',
             'platform' => 'sometimes|nullable|string|max:10',
             'timezone' => 'sometimes|nullable|string|max:64',
+            // The app's current language, so pushes can follow it. Optional:
+            // older app builds don't send it, and the stored locale stays.
+            'locale' => ['sometimes', 'nullable', 'string', Rule::in(User::LOCALES)],
         ]);
 
         $user = $request->user();
@@ -37,6 +42,11 @@ class DeviceController extends Controller
             $user->timezone = $tz;
             $user->save();
             ReminderScheduler::recomputeForUser($user);
+        }
+
+        if (! empty($data['locale']) && $user->locale !== $data['locale']) {
+            $user->locale = $data['locale'];
+            $user->save();
         }
 
         return response()->json(['status' => 'ok']);

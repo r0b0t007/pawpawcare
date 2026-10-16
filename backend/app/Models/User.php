@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\App;
 
 class User extends Model implements AuthenticatableContract
 {
@@ -22,6 +23,25 @@ class User extends Model implements AuthenticatableContract
      * window logging back in cancels the deletion (GDPR-style grace period).
      */
     public const DELETION_GRACE_DAYS = 30;
+
+    /**
+     * Languages the API speaks (`users.locale`, SetLocale middleware, lang/).
+     * The first one is the default and the fallback for anything else.
+     */
+    public const LOCALES = ['en', 'fr', 'es'];
+
+    /**
+     * The locale a new account starts with: the language this request is
+     * already answered in (SetLocale, from Accept-Language), so a user who
+     * signs up on a French device doesn't flip to English once signed in.
+     * The app can still change it via PATCH /users/me or POST /devices.
+     */
+    public static function requestLocale(): string
+    {
+        $locale = App::getLocale();
+
+        return in_array($locale, self::LOCALES, true) ? $locale : self::LOCALES[0];
+    }
 
     protected $keyType = 'string';
 
@@ -38,6 +58,9 @@ class User extends Model implements AuthenticatableContract
         });
     }
 
+    // `locale` is deliberately absent: UserController::update,
+    // DeviceController::store and new accounts (requestLocale()) assign it
+    // explicitly, always to one of LOCALES.
     protected $fillable = [
         'name', 'email', 'hashed_password', 'avatar_url', 'bio', 'is_active', 'timezone',
         'provider', 'provider_id',
@@ -233,6 +256,7 @@ class User extends Model implements AuthenticatableContract
             'is_admin' => (bool) $this->is_admin,
             'engagement_pushes_enabled' => (bool) $this->engagement_pushes_enabled,
             'analytics_opt_out' => (bool) $this->analytics_opt_out,
+            'locale' => $this->locale ?? self::LOCALES[0],
             'email_verified' => $this->hasVerifiedEmail(),
             // Subscription state + server-side switches (paywall, visibility,
             // which features would ask this user to upgrade).

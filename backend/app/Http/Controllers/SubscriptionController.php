@@ -19,10 +19,10 @@ class SubscriptionController extends Controller
         $user = $request->user();
 
         if (! $sync->configured()) {
-            return response()->json(['detail' => 'Subscriptions are not configured'], 503);
+            return response()->json(['detail' => __('Subscriptions are not configured')], 503);
         }
         if (! $sync->sync($user)) {
-            return response()->json(['detail' => 'Could not reach the subscription service. Please try again.'], 503);
+            return response()->json(['detail' => __('Could not reach the subscription service. Please try again.')], 503);
         }
 
         return response()->json([
