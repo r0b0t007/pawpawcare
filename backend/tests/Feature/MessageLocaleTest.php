@@ -161,6 +161,24 @@ class MessageLocaleTest extends TestCase
         );
     }
 
+    public function test_email_translations_are_escaped_as_text(): void
+    {
+        // A future translation with markup in it must not become live HTML.
+        app('translator')->addLines([
+            '*.Hi,' => '<a href="https://evil.example">Bonjour</a> & bienvenue,',
+            '*.— The PawPawCare team' => "L'équipe <b>PawPawCare</b>",
+        ], 'fr');
+
+        foreach ([new EmailVerificationCodeMail('123456'), new PasswordResetCodeMail('654321')] as $mail) {
+            $html = $mail->locale('fr')->render();
+
+            $this->assertStringNotContainsString('<a href', $html);
+            $this->assertStringNotContainsString('<b>', $html);
+            $this->assertStringContainsString('<p>&lt;a href="https://evil.example"&gt;Bonjour&lt;/a&gt; &amp; bienvenue,</p>', $html);
+            $this->assertStringContainsString("<p>L'équipe &lt;b&gt;PawPawCare&lt;/b&gt;</p>", $html);
+        }
+    }
+
     // ── Reminders: stored as templates, rendered per reader ─────────────────
 
     public function test_generated_reminders_store_a_template_and_keep_english_text(): void
@@ -214,6 +232,26 @@ class MessageLocaleTest extends TestCase
             $this->assertSame($title, $byToken[$tokens[$locale]]['title'], $locale);
             $this->assertSame($body, $byToken[$tokens[$locale]]['body'], $locale);
         }
+    }
+
+    public function test_a_first_of_the_month_due_date_uses_the_french_ordinal(): void
+    {
+        $this->travelTo('2026-12-25 10:00:00'); // the reminder fires 7 days before Jan 1
+
+        [$user] = $this->actingUser('fr');
+        $this->withDevice($user);
+        ReminderScheduler::syncVaccinationReminder($this->vaccinationFor($user, due: '2027-01-01'));
+
+        $this->artisan('reminders:send')->assertSuccessful();
+
+        $this->assertSame('Luna — Rabies à faire le 1er janvier 2027', $this->pushes()[0]['body']);
+
+        // Only the 1st takes the ordinal in French; Spanish and English never do.
+        $this->assertSame('1er mars 2027', ReminderText::dueDate('2027-03-01', 'fr'));
+        $this->assertSame('2 mars 2027', ReminderText::dueDate('2027-03-02', 'fr'));
+        $this->assertSame('21 mars 2027', ReminderText::dueDate('2027-03-21', 'fr'));
+        $this->assertSame('1 de enero de 2027', ReminderText::dueDate('2027-01-01', 'es'));
+        $this->assertSame('Jan 1, 2027', ReminderText::dueDate('2027-01-01', 'en'));
     }
 
     public function test_medication_push_without_dosage_is_just_the_pet_name(): void

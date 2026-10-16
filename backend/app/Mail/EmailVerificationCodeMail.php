@@ -22,12 +22,14 @@ class EmailVerificationCodeMail extends Mailable
     public function content(): Content
     {
         $code = e($this->code);
-        // Translations are our own lang/*.json strings (trusted HTML text);
-        // only the code is user-adjacent, and it is escaped above.
-        $hi = __('Hi,');
-        $intro = __('Use this code to confirm your email address in PawPawCare:');
-        $expiry = __("The code expires in 30 minutes. If you didn't request this, you can safely ignore this email.");
-        $signoff = __('— The PawPawCare team');
+        // Translations are escaped too: lang/*.json is plain text, never
+        // markup, so a stray '<' or '&' in a future translation shows as
+        // text instead of live HTML. ENT_NOQUOTES because every string sits
+        // in element text, where quotes are inert; it keeps today's bytes.
+        $hi = self::plain(__('Hi,'));
+        $intro = self::plain(__('Use this code to confirm your email address in PawPawCare:'));
+        $expiry = self::plain(__("The code expires in 30 minutes. If you didn't request this, you can safely ignore this email."));
+        $signoff = self::plain(__('— The PawPawCare team'));
 
         return new Content(htmlString: <<<HTML
             <p>{$hi}</p>
@@ -36,5 +38,10 @@ class EmailVerificationCodeMail extends Mailable
             <p>{$expiry}</p>
             <p>{$signoff}</p>
             HTML);
+    }
+
+    private static function plain(string $translated): string
+    {
+        return htmlspecialchars($translated, ENT_NOQUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
     }
 }
