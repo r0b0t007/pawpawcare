@@ -5,6 +5,7 @@ import { resolveAsset } from '../../config';
 import { dayDiff, timeAgo } from '../../utils/dates';
 import { ui, type, petPair } from '../../theme';
 import { Card, Button, speciesIcon } from '../../components';
+import i18n, { useTranslation } from '../../i18n';
 
 // One lost-pet report as a warm, actionable card — shared by Community (top
 // of the feed + the Lost pets section) and the LostPets screen. Urgent but
@@ -17,19 +18,19 @@ import { Card, Button, speciesIcon } from '../../components';
 // "1 day" the next morning, like every other day count in the app.
 export function missingFor(lastSeenAt, reportedAt, today = new Date()) {
   const since = new Date(lastSeenAt || reportedAt || NaN);
-  if (Number.isNaN(since.getTime())) return 'Missing';
+  if (Number.isNaN(since.getTime())) return i18n.t('lostPets.card.missing');
   const days = Math.max(0, -dayDiff(since, today));
-  if (days < 1) return 'Missing today';
-  return `Missing ${days} day${days === 1 ? '' : 's'}`;
+  if (days < 1) return i18n.t('lostPets.card.missingToday');
+  return i18n.t('lostPets.card.missingDays', { count: days });
 }
 
 // Shares only what's already public on the board — never the contact phone.
 export function shareLostPet(report) {
   const parts = [
-    `Have you seen ${report.petName}?`,
+    i18n.t('lostPets.card.haveYouSeen', { name: report.petName }),
     report.description || null,
-    report.lastSeenLocation ? `Last seen near ${report.lastSeenLocation}.` : null,
-    'Shared from the PawPawCare lost-pet board.',
+    report.lastSeenLocation ? i18n.t('lostPets.card.shareLastSeen', { location: report.lastSeenLocation }) : null,
+    i18n.t('lostPets.card.shareFooter'),
   ].filter(Boolean);
   Share.share({ message: parts.join(' ') }).catch(() => {});
 }
@@ -40,11 +41,12 @@ export default function LostPetCard({
   showReporter,
   elevated,
   onSeen, // omit to hide the primary action (e.g. no contact number)
-  seenLabel = "I've seen them",
+  seenLabel,
   seenIcon = 'eye-outline',
   onFound,
   style,
 }) {
+  const { t } = useTranslation();
   const pair = petPair(report.petColor);
   const photo = report.photoUrl ? resolveAsset(report.photoUrl) : null;
 
@@ -56,7 +58,7 @@ export default function LostPetCard({
             source={{ uri: photo }}
             style={styles.photo}
             resizeMode="cover"
-            accessibilityLabel={`Photo of ${report.petName}`}
+            accessibilityLabel={t('lostPets.card.photoOf', { name: report.petName })}
           />
         ) : (
           <MaterialCommunityIcons name={speciesIcon(report.petType)} size={64} color={pair.fg} />
@@ -69,20 +71,20 @@ export default function LostPetCard({
 
       <View style={styles.body}>
         <Text style={[type.cardTitle, { color: ui.ink }]}>
-          {mine ? `${report.petName} is on the board` : `Have you seen ${report.petName}?`}
+          {t(mine ? 'lostPets.card.onBoard' : 'lostPets.card.haveYouSeen', { name: report.petName })}
         </Text>
         {report.description ? <Text style={styles.desc}>{report.description}</Text> : null}
         {report.lastSeenLocation ? (
           <View style={styles.metaRow}>
             <MaterialCommunityIcons name="map-marker-outline" size={15} color={ui.subtle} />
-            <Text style={styles.metaText}>Last seen near {report.lastSeenLocation}</Text>
+            <Text style={styles.metaText}>{t('lostPets.card.lastSeenNear', { location: report.lastSeenLocation })}</Text>
           </View>
         ) : null}
         {showReporter && !mine ? (
           <View style={styles.metaRow}>
             <MaterialCommunityIcons name="account-outline" size={15} color={ui.subtle} />
             <Text style={styles.metaText}>
-              Reported by {report.reporterName || 'someone'} · {timeAgo(report.createdAt)}
+              {t('lostPets.card.reportedBy', { name: report.reporterName || t('lostPets.card.someone'), time: timeAgo(report.createdAt) })}
             </Text>
           </View>
         ) : null}
@@ -92,17 +94,17 @@ export default function LostPetCard({
             <Button
               variant="soft"
               icon="home-heart"
-              label="Mark as found"
+              label={t('lostPets.card.markFound')}
               onPress={onFound}
               style={{ flex: 1.4, backgroundColor: ui.successTint }}
             />
           ) : onSeen ? (
-            <Button icon={seenIcon} label={seenLabel} onPress={onSeen} style={{ flex: 1.4 }} />
+            <Button icon={seenIcon} label={seenLabel ?? t('lostPets.card.seenThem')} onPress={onSeen} style={{ flex: 1.4 }} />
           ) : null}
           <Button
             variant="ghost"
             icon="share-variant"
-            label="Share"
+            label={t('common.share')}
             onPress={() => shareLostPet(report)}
             style={{ flex: 1 }}
           />

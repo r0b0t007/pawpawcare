@@ -19,7 +19,7 @@ import {
 } from '../../components';
 import LostPetCard from './LostPetCard';
 import PostCard from './PostCard';
-import { useLocale } from '../../i18n';
+import { useLocale, useTranslation } from '../../i18n';
 
 // One screen, three peer sections (Feed / Lost pets / Groups) on a segmented
 // control. A lost pet from someone else always tops the feed — the
@@ -30,16 +30,13 @@ import { useLocale } from '../../i18n';
 
 const GROUP_ICONS = ['dog', 'cat', 'bird', 'rabbit', 'paw'];
 
-const SECTIONS = [
-  { value: 'feed', label: 'Feed' },
-  { value: 'lost', label: 'Lost pets' },
-  { value: 'groups', label: 'Groups' },
-];
+const SECTIONS = ['feed', 'lost', 'groups'];
 
 export default function CommunityScreen({ navigation }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const {
     posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets,
@@ -79,7 +76,7 @@ export default function CommunityScreen({ navigation }) {
     const res = await pickAndUploadImage({ aspect: [4, 3] });
     setAttaching(false);
     if (res.url) { setDraftImage(res.url); setAttachFailed(null); }
-    else if (res.error === 'permission') Alert.alert('Permission needed', 'Allow photo access to attach a picture.');
+    else if (res.error === 'permission') Alert.alert(t('community.permissionTitle'), t('community.permissionBody'));
     else if (res.error) {
       // The draft is untouched; show the failure inline instead of an alert
       // and keep the picked file for a one-tap retry.
@@ -117,14 +114,14 @@ export default function CommunityScreen({ navigation }) {
     Keyboard.dismiss();
     return run('post', async () => {
       if (!(await addPost(draft.trim(), draftImage))) {
-        showToast("Couldn't share that. Try again.");
+        showToast(t('community.postFailed'));
         return;
       }
       setDraft('');
       setDraftImage(null);
       setAttachFailed(null);
       setComposerOpen(false);
-      showToast('Shared with the pack');
+      showToast(t('community.posted'));
     });
   };
 
@@ -138,19 +135,19 @@ export default function CommunityScreen({ navigation }) {
   const handleToggleGroup = (group) =>
     run(`group-${group.id}`, async () => {
       if (await toggleGroupMembership(group.id)) {
-        showToast(group.isJoined ? `Left ${group.name}` : `Joined ${group.name}`);
+        showToast(t(group.isJoined ? 'community.groupLeft' : 'community.groupJoined', { name: group.name }));
       } else {
-        showToast(`Couldn't ${group.isJoined ? 'leave' : 'join'} ${group.name}. Try again.`);
+        showToast(t(group.isJoined ? 'community.leaveFailed' : 'community.joinFailed', { name: group.name }));
       }
     });
 
   const handleMarkFound = (report) => setConfirm({
-    title: 'Mark as found?',
-    message: `Has ${report.petName} been found safe?`,
-    confirmLabel: 'Found!',
+    title: t('lostPets.markFound.title'),
+    message: t('lostPets.markFound.message', { name: report.petName }),
+    confirmLabel: t('lostPets.markFound.confirm'),
     action: async () => {
-      if (await resolveLostPet(report.id)) showToast('Welcome home!', { celebrate: true, actionType: 'lost_pet_found' });
-      else showToast("Couldn't mark them found. Try again.");
+      if (await resolveLostPet(report.id)) showToast(t('lostPets.markFound.success'), { celebrate: true, actionType: 'lost_pet_found' });
+      else showToast(t('lostPets.markFound.failed'));
     },
   });
 
@@ -170,10 +167,10 @@ export default function CommunityScreen({ navigation }) {
       <FormScrollView
         contentContainerStyle={styles.scroll}
       >
-        <Text style={styles.title}>Community</Text>
+        <Text style={styles.title}>{t('community.title')}</Text>
 
         <SegmentedControl
-          segments={SECTIONS}
+          segments={SECTIONS.map((value) => ({ value, label: t(`community.sections.${value}`) }))}
           value={section}
           onChange={setSection}
           style={styles.segmented}
@@ -197,7 +194,7 @@ export default function CommunityScreen({ navigation }) {
                     style={({ pressed }) => [styles.moreLost, pressed && { opacity: motion.pressOpacity }]}
                   >
                     <Text style={styles.moreLostText}>
-                      See all {othersLost.length} lost pets
+                      {t('community.seeAllLost', { count: othersLost.length })}
                     </Text>
                     <MaterialCommunityIcons name="chevron-right" size={18} color={ui.accent} />
                   </Pressable>
@@ -210,21 +207,21 @@ export default function CommunityScreen({ navigation }) {
                 style={({ pressed }) => [styles.composerCollapsed, pressed && { borderColor: ui.faint }]}
                 onPress={() => setComposerOpen(true)}
                 accessibilityRole="button"
-                accessibilityLabel="Share a moment"
+                accessibilityLabel={t('community.shareMoment')}
               >
                 <View style={[styles.composerAvatar, { backgroundColor: userPair.bg }]}>
                   <Text style={[styles.composerAvatarText, { color: userPair.fg }]}>{(user?.name || 'U')[0]}</Text>
                 </View>
-                <Text style={styles.composerPlaceholder}>Share a moment…</Text>
+                <Text style={styles.composerPlaceholder}>{t('community.shareMomentPlaceholder')}</Text>
                 <MaterialCommunityIcons name="camera-outline" size={19} color={ui.accent} />
               </Pressable>
             ) : (
               <Card style={styles.composerCard}>
                 <TextInput
                   style={styles.composerInput}
-                  placeholder="What's your pack up to?"
+                  placeholder={t('community.composerPlaceholder')}
                   placeholderTextColor={ui.placeholder}
-                  accessibilityLabel="New post"
+                  accessibilityLabel={t('community.newPost')}
                   value={draft}
                   onChangeText={setDraft}
                   multiline
@@ -238,7 +235,7 @@ export default function CommunityScreen({ navigation }) {
                       onPress={() => setDraftImage(null)}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                       accessibilityRole="button"
-                      accessibilityLabel="Remove photo"
+                      accessibilityLabel={t('community.removePhoto')}
                     >
                       <MaterialCommunityIcons name="close" size={15} color="#ffffff" />
                     </Pressable>
@@ -247,7 +244,7 @@ export default function CommunityScreen({ navigation }) {
                 {attachFailed && !attaching && (
                   <Pressable onPress={retryAttach} hitSlop={6} style={styles.attachFailedRow} accessibilityRole="button">
                     <MaterialCommunityIcons name="alert-circle-outline" size={15} color={ui.dangerText} />
-                    <Text style={styles.attachFailedText}>Image upload failed — tap to retry</Text>
+                    <Text style={styles.attachFailedText}>{t('community.attachFailed')}</Text>
                   </Pressable>
                 )}
                 <View style={styles.composerActions}>
@@ -256,7 +253,7 @@ export default function CommunityScreen({ navigation }) {
                     disabled={attaching}
                     hitSlop={8}
                     accessibilityRole="button"
-                    accessibilityLabel="Add a photo"
+                    accessibilityLabel={t('community.addPhoto')}
                     accessibilityState={{ busy: attaching }}
                   >
                     {attaching
@@ -265,9 +262,9 @@ export default function CommunityScreen({ navigation }) {
                   </Pressable>
                   <View style={{ flex: 1 }} />
                   <Pressable onPress={closeComposer} hitSlop={8} style={styles.cancelBtn} accessibilityRole="button">
-                    <Text style={styles.cancelText}>Cancel</Text>
+                    <Text style={styles.cancelText}>{t('common.cancel')}</Text>
                   </Pressable>
-                  <Button pill label="Post" onPress={handlePost} disabled={!draft.trim() || isBusy('post')} />
+                  <Button pill label={t('community.post')} onPress={handlePost} disabled={!draft.trim() || isBusy('post')} />
                 </View>
               </Card>
             )}
@@ -289,8 +286,8 @@ export default function CommunityScreen({ navigation }) {
               {posts.length === 0 && (
                 <EmptyState
                   photo={photos.communityPals}
-                  title="No posts yet"
-                  body="Be the first to share a moment with your pet!"
+                  title={t('community.emptyFeedTitle')}
+                  body={t('community.emptyFeedBody')}
                   style={styles.emptyState}
                 />
               )}
@@ -311,15 +308,15 @@ export default function CommunityScreen({ navigation }) {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.groupName} numberOfLines={1}>{group.name}</Text>
-                    <Text style={styles.groupMembers}>{group.members} members</Text>
+                    <Text style={styles.groupMembers}>{t('community.members', { count: group.members })}</Text>
                   </View>
                   <Pressable
                     onPress={() => handleToggleGroup(group)}
                     accessibilityRole="button"
                     // Starts with the visible word, so voice control's
                     // "tap Joined" matches; the hint says what a tap does.
-                    accessibilityLabel={`${joined ? 'Joined' : 'Join'} ${group.name}`}
-                    accessibilityHint={joined ? 'Leaves the group' : 'Joins the group'}
+                    accessibilityLabel={t(joined ? 'community.joinedA11y' : 'community.joinA11y', { name: group.name })}
+                    accessibilityHint={t(joined ? 'community.leaveHint' : 'community.joinHint')}
                     style={({ pressed }) => [
                       styles.joinBtn,
                       joined && styles.joinBtnJoined,
@@ -327,7 +324,7 @@ export default function CommunityScreen({ navigation }) {
                     ]}
                   >
                     <Text style={[styles.joinBtnText, joined && styles.joinBtnTextJoined]}>
-                      {joined ? 'Joined' : 'Join'}
+                      {t(joined ? 'community.joined' : 'community.join')}
                     </Text>
                   </Pressable>
                 </Card>
@@ -336,8 +333,8 @@ export default function CommunityScreen({ navigation }) {
             {groups.length === 0 && (
               <View style={styles.empty}>
                 <MaterialCommunityIcons name="account-group-outline" size={32} color={ui.faint} />
-                <Text style={styles.emptyTitle}>No groups yet</Text>
-                <Text style={styles.emptyText}>Groups will appear here as the community grows.</Text>
+                <Text style={styles.emptyTitle}>{t('community.emptyGroupsTitle')}</Text>
+                <Text style={styles.emptyText}>{t('community.emptyGroupsBody')}</Text>
               </View>
             )}
           </View>
@@ -362,8 +359,8 @@ export default function CommunityScreen({ navigation }) {
               <EmptyState
                 compact
                 photo={photos.communityPals}
-                title="No pets reported lost"
-                body="Good news — every pet in the community is home safe."
+                title={t('lostPets.emptyTitle')}
+                body={t('lostPets.emptyBody')}
                 style={styles.emptyState}
               />
             )}
@@ -373,7 +370,7 @@ export default function CommunityScreen({ navigation }) {
               accessibilityRole="button"
             >
               <MaterialCommunityIcons name="bullhorn-outline" size={19} color={ui.accent} />
-              <Text style={styles.reportBtnText}>Report a missing pet</Text>
+              <Text style={styles.reportBtnText}>{t('community.reportMissing')}</Text>
             </Pressable>
           </View>
         )}

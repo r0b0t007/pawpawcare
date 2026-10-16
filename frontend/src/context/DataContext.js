@@ -15,6 +15,7 @@ import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
 import { useTickAt } from '../hooks/useTickAt';
 import { petsKeys, gamificationKeys } from '../hooks/queryKeys';
+import i18n from '../i18n';
 
 const DataContext = createContext(null);
 
@@ -130,7 +131,7 @@ export const toPet = (apiPet, opts = {}) => {
 const toPost = (p) => ({
   id: p.id,
   authorId: p.author_id,
-  authorName: p.author_name || 'Unknown',
+  authorName: p.author_name || i18n.t('common.unknown'),
   content: p.content,
   paws: p.paw_count ?? 0,
   pawedBy: p.pawed_by_me ? ['me'] : [],
@@ -155,7 +156,7 @@ const toGroup = (g) => ({
 const toLostPet = (r) => ({
   id: r.id,
   petId: r.pet_id,
-  petName: r.pet_name || 'A pet',
+  petName: r.pet_name || i18n.t('common.aPet'),
   petType: r.pet_type,
   petColor: r.pet_color,
   status: r.status,
@@ -173,11 +174,11 @@ const toLostPet = (r) => ({
 const toInvite = (i) => ({
   id: i.id,
   petId: i.pet_id,
-  petName: i.pet?.name || 'a pet',
+  petName: i.pet?.name || i18n.t('common.aPetLower'),
   petType: i.pet?.type || null,
   petColor: i.pet?.color || null,
   email: i.email,
-  inviterName: i.inviter?.name || 'Someone',
+  inviterName: i.inviter?.name || i18n.t('common.someone'),
   inviterEmail: i.inviter?.email || null,
   createdAt: i.created_at,
 });

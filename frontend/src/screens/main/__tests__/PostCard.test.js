@@ -234,3 +234,15 @@ test('a double tap on paw sends one toggle, not paw-then-unpaw', async () => {
   await press('1 paw');
   expect(props.onPaw).toHaveBeenCalledTimes(2);
 });
+
+test('the card speaks French, keeping the author name as typed', async () => {
+  const i18n = require('../../../i18n').default;
+  await act(async () => { await i18n.changeLanguage('fr'); });
+  try {
+    await render();
+    expect(host('1 patte')).toBeDefined();
+    expect(host('Signaler la publication de Sam')).toBeDefined();
+  } finally {
+    await act(async () => { await i18n.changeLanguage('en'); });
+  }
+});

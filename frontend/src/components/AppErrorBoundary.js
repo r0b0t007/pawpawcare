@@ -5,6 +5,7 @@ import { ErrorBoundary } from '../services/sentry';
 import { ui, type } from '../theme';
 import Card from './Card';
 import Button from './Button';
+import { useTranslation } from '../i18n';
 
 // Last-resort screen when rendering throws. Sentry's ErrorBoundary reports
 // the crash (through the scrubber) and "Try again" remounts the tree.
@@ -13,6 +14,7 @@ import Button from './Button';
 // live outside the tree (React Query). Navigation-free and context-free: it
 // renders when everything below it is gone.
 export function CrashFallback({ resetError }) {
+  const { t } = useTranslation();
   return (
     <View
       style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: ui.background }}
@@ -21,13 +23,12 @@ export function CrashFallback({ resetError }) {
       <Card padded style={{ gap: 14, alignItems: 'center' }}>
         <MaterialCommunityIcons name="paw-off-outline" size={36} color={ui.accent} />
         <Text style={[type.cardTitle, { color: ui.ink, textAlign: 'center' }]}>
-          Something went wrong
+          {t('common.crash.title')}
         </Text>
         <Text style={[type.body, { color: ui.sub, textAlign: 'center' }]}>
-          The app hit an unexpected error. Your pets and records are safe — try again, and
-          if it keeps happening, email hello@pawpawcare.app.
+          {t('common.crash.body')}
         </Text>
-        <Button label="Try again" onPress={resetError} style={{ alignSelf: 'stretch' }} />
+        <Button label={t('common.tryAgain')} onPress={resetError} style={{ alignSelf: 'stretch' }} />
       </Card>
     </View>
   );
