@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { get } from '../services/api';
 import { gamificationKeys } from './queryKeys';
+import i18n from '../i18n';
 
 // Weekly care streaks + milestone badges, nightly-computed server-side.
 // Read-only domain: there are no client writes, so nothing lives in
@@ -43,25 +44,25 @@ export function useGamificationRecap(enabled = true) {
   });
 }
 
-// Human copy for milestone keys. Falls back to null for unknown keys so a
-// newer server never renders raw identifiers in the UI.
+// Human copy for milestone keys (i18n keys under gamification.milestones).
+// Falls back to null for unknown keys so a newer server never renders raw
+// identifiers in the UI.
 const MILESTONE_LABELS = {
-  first_record: 'First health record',
-  records_10: '10 health records',
-  records_25: '25 health records',
-  records_100: '100 health records',
-  weights_5: '5 weight entries',
-  weights_20: '20 weight entries',
-  weights_50: '50 weight entries',
-  vax_complete: 'Vaccinations all caught up',
+  first_record: 'gamification.milestones.firstRecord',
+  records_10: 'gamification.milestones.records10',
+  records_25: 'gamification.milestones.records25',
+  records_100: 'gamification.milestones.records100',
+  weights_5: 'gamification.milestones.weights5',
+  weights_20: 'gamification.milestones.weights20',
+  weights_50: 'gamification.milestones.weights50',
+  vax_complete: 'gamification.milestones.vaxComplete',
 };
 
 export function milestoneLabel(key) {
-  if (MILESTONE_LABELS[key]) return MILESTONE_LABELS[key];
+  if (Object.prototype.hasOwnProperty.call(MILESTONE_LABELS, key)) return i18n.t(MILESTONE_LABELS[key]);
   const anniversary = /^anniversary_(\d+)$/.exec(key || '');
   if (anniversary) {
-    const n = Number(anniversary[1]);
-    return `${n} year${n === 1 ? '' : 's'} together`;
+    return i18n.t('gamification.milestones.anniversary', { count: Number(anniversary[1]) });
   }
   return null;
 }

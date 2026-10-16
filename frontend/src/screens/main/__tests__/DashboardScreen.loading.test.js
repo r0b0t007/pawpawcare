@@ -134,6 +134,7 @@ test('switching the language re-renders Coming up dates and times at once', asyn
       await i18n.changeLanguage('fr');
     });
     expect(texts(tree)).toContain('Biscuit · 17 oct., 9:00');
+    expect(texts(tree)).toContain('À venir');
   } finally {
     await act(async () => {
       await i18n.changeLanguage('en');

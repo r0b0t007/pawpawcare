@@ -7,6 +7,7 @@ import Card from './Card';
 import Button from './Button';
 import StatusPill from './StatusPill';
 import StatusRing from './StatusRing';
+import { useTranslation } from '../i18n';
 
 // Home hero: the single most urgent item, with its two actions — the one
 // elevated card on Home. Status shows once (the pill); the avatar ring is the
@@ -20,6 +21,7 @@ const SWAP_IN = FadeIn.duration(200);
 const SWAP_OUT = FadeOut.duration(150);
 
 export default function UpNextCard({ item, onDone, onReschedule, busy, style }) {
+  const { t } = useTranslation();
   if (!item) {
     return (
       <Animated.View key="caught-up" entering={SWAP_IN} exiting={SWAP_OUT}>
@@ -43,9 +45,9 @@ export default function UpNextCard({ item, onDone, onReschedule, busy, style }) 
             <MaterialCommunityIcons name="check-circle" size={24} color={ui.success} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[type.cardTitleSm, { color: ui.ink }]}>All caught up</Text>
+            <Text style={[type.cardTitleSm, { color: ui.ink }]}>{t('home.upNext.caughtUpTitle')}</Text>
             <Text style={{ fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, color: ui.sub, marginTop: 2 }}>
-              Nothing needs attention right now
+              {t('home.upNext.caughtUpBody')}
             </Text>
           </View>
         </Card>
@@ -72,8 +74,8 @@ export default function UpNextCard({ item, onDone, onReschedule, busy, style }) 
           </View>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Button label="Mark done" icon="check" onPress={onDone} disabled={busy} style={{ flex: 1.3 }} />
-          <Button label="Reschedule" variant="ghost" onPress={onReschedule} style={{ flex: 1 }} />
+          <Button label={t('home.upNext.markDone')} icon="check" onPress={onDone} disabled={busy} style={{ flex: 1.3 }} />
+          <Button label={t('home.upNext.reschedule')} variant="ghost" onPress={onReschedule} style={{ flex: 1 }} />
         </View>
       </Card>
     </Animated.View>
