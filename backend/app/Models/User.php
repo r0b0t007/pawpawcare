@@ -7,6 +7,7 @@ use App\Services\Analytics\ProductAnalytics;
 use App\Services\Subscriptions\Entitlements;
 use App\Support\Uploads;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\App;
 
-class User extends Model implements AuthenticatableContract
+class User extends Model implements AuthenticatableContract, HasLocalePreference
 {
     use HasUuids;
 
@@ -41,6 +42,17 @@ class User extends Model implements AuthenticatableContract
         $locale = App::getLocale();
 
         return in_array($locale, self::LOCALES, true) ? $locale : self::LOCALES[0];
+    }
+
+    /**
+     * The language to write to this user in when no request is in play:
+     * emails, reminder and engagement pushes. Their saved locale, or English
+     * for anything unsupported. Laravel's mailer and notifications also pick
+     * this up for Mail::to($user).
+     */
+    public function preferredLocale(): string
+    {
+        return in_array($this->locale, self::LOCALES, true) ? $this->locale : self::LOCALES[0];
     }
 
     protected $keyType = 'string';

@@ -46,8 +46,8 @@ class ReminderDelivery extends Model
             // Denormalized reminder context for rendering without an extra fetch:
             'type' => $this->reminder?->type,
             'pet_id' => $this->reminder?->pet_id,
-            'title' => $this->reminder?->title,
-            'body' => $this->reminder?->body,
+            'title' => $this->reminder?->localizedTitle(),
+            'body' => $this->reminder?->localizedBody(),
         ];
     }
 }

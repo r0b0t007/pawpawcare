@@ -88,6 +88,25 @@ class ReminderController extends Controller
             'enabled' => 'sometimes|boolean',
         ]);
 
+        // Rewriting the text of an auto-generated reminder makes it the
+        // user's own words: freeze what they were reading (this request's
+        // language) and drop the template, so their edit is never
+        // re-translated. Sending back the text unchanged keeps the template.
+        if ($reminder->template) {
+            $edited = (isset($data['title']) && $data['title'] !== $reminder->localizedTitle())
+                || (isset($data['body']) && $data['body'] !== $reminder->localizedBody());
+            if ($edited) {
+                // Column widths (150/255): a translation can run longer than the English.
+                $reminder->title = mb_substr($reminder->localizedTitle(), 0, 150);
+                $body = $reminder->localizedBody();
+                $reminder->body = $body === null ? null : mb_substr($body, 0, 255);
+                $reminder->template = null;
+                $reminder->template_params = null;
+            } else {
+                unset($data['title'], $data['body']);
+            }
+        }
+
         foreach (['title', 'body', 'time_of_day', 'lead_time_days', 'recurrence'] as $field) {
             if (array_key_exists($field, $data) && $data[$field] !== null) {
                 $reminder->{$field} = $data[$field];

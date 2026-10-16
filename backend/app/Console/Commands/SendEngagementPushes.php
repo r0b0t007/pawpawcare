@@ -24,6 +24,8 @@ use Illuminate\Console\Command;
  *
  * Server pushes only — deliberately outside scheduleLocalReminders, so the
  * app's cancel-all-then-reschedule local pipeline is never disturbed.
+ *
+ * Every text is written in the user's own language (users.locale).
  */
 class SendEngagementPushes extends Command
 {
@@ -84,9 +86,20 @@ class SendEngagementPushes extends Command
                 }
 
                 $years = max(0, $localNow->year - $date->year);
+                // In the user's language; the pet name is interpolated, never translated.
+                $locale = $user->preferredLocale();
+                $name = ['pet' => $pet->name];
                 [$title, $body] = $kind === 'birthday'
-                    ? ["Happy birthday, {$pet->name}!", $years > 0 ? "{$pet->name} turns {$years} today." : "It's {$pet->name}'s day."]
-                    : ['Gotcha day!', $years === 1 ? "One year with {$pet->name} today." : "{$years} years with {$pet->name} today."];
+                    ? [
+                        __('Happy birthday, :pet!', $name, $locale),
+                        $years > 0
+                            ? trans_choice(':pet turns :count today.', $years, $name, $locale)
+                            : __("It's :pet's day.", $name, $locale),
+                    ]
+                    : [
+                        __('Gotcha day!', [], $locale),
+                        trans_choice('{1} One year with :pet today.|[2,*] :count years with :pet today.', $years, $name, $locale),
+                    ];
 
                 $sent += $this->deliver($user, $pet->id, $kind, $localNow, $title, $body, $push);
             }
@@ -116,11 +129,16 @@ class SendEngagementPushes extends Command
         }
 
         $petCount = count($recap['per_pet']);
+        $locale = $user->preferredLocale();
+        // Two counts in one sentence: each noun phrase is its own plural.
         $body = $actions > 0
-            ? "{$actions} care action".($actions === 1 ? '' : 's')." across {$petCount} pet".($petCount === 1 ? '' : 's').' this week.'
-            : 'Some vaccinations could use a look.';
+            ? __(':actions across :pets this week.', [
+                'actions' => trans_choice(':count care action|:count care actions', $actions, [], $locale),
+                'pets' => trans_choice(':count pet|:count pets', $petCount, [], $locale),
+            ], $locale)
+            : __('Some vaccinations could use a look.', [], $locale);
 
-        return $this->deliver($user, null, 'weekly_recap', $localNow, 'Your week in care', $body, $push);
+        return $this->deliver($user, null, 'weekly_recap', $localNow, __('Your week in care', [], $locale), $body, $push);
     }
 
     /** Idempotent send: the unique ledger row is claimed before pushing. */
