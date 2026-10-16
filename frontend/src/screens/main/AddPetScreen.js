@@ -16,6 +16,7 @@ import { track } from '../../services/analytics';
 import { useInFlight } from '../../hooks/useInFlight';
 import { fmtFull, parseDay } from '../../utils/dates';
 import { useLocale, useTranslation } from '../../i18n';
+import { breedLabel, breedValue } from '../../utils/pets';
 import { resolveAsset } from '../../config';
 import { ui, radii, type, motion, petPair, photos, scrim, PET_COLOR_PAIRS } from '../../theme';
 import { Button, Card, Chip, StepProgress, Toggle, showToast, speciesIcon } from '../../components';
@@ -45,12 +46,14 @@ const SPECIES_CARDS = [
 ];
 const OTHER_TYPES = PET_TYPES.filter((pt) => pt.id !== 'dog' && pt.id !== 'cat');
 
-// [stored value, i18n key under addPet.breeds]
+// Stored (English) values; utils/pets breedLabel shows them in the app
+// language. The breed field holds what the user sees — a chip fills it with
+// the translated label — and breedValue maps that back to the stored value.
 const BREED_SUGGESTIONS = {
-  dog: [['Golden Retriever', 'goldenRetriever'], ['Labrador', 'labrador'], ['Mixed', 'mixed']],
-  cat: [['Domestic Shorthair', 'domesticShorthair'], ['Siamese', 'siamese'], ['Mixed', 'mixed']],
-  rabbit: [['Mini Lop', 'miniLop'], ['Netherland Dwarf', 'netherlandDwarf'], ['Mixed', 'mixed']],
-  bird: [['Budgie', 'budgie'], ['Cockatiel', 'cockatiel'], ['Parrot', 'parrot']],
+  dog: ['Golden Retriever', 'Labrador', 'Mixed'],
+  cat: ['Domestic Shorthair', 'Siamese', 'Mixed'],
+  rabbit: ['Mini Lop', 'Netherland Dwarf', 'Mixed'],
+  bird: ['Budgie', 'Cockatiel', 'Parrot'],
   other: [],
 };
 
@@ -153,7 +156,7 @@ export default function AddPetScreen({ navigation }) {
   const buildData = (skipDetails = false) => ({
     name: form.name.trim(),
     type: form.type,
-    breed: form.breed.trim(),
+    breed: breedValue(form.breed),
     birthday: skipDetails ? null : form.birthday || null,
     adoptedOn: skipDetails ? null : form.adoptedOn || null,
     age: skipDetails ? 0 : parseInt(form.age) || 0,
@@ -254,18 +257,19 @@ export default function AddPetScreen({ navigation }) {
 
   const renderBreed = () => {
     const suggestions = BREED_SUGGESTIONS[form.type] || [];
+    const chosen = breedValue(form.breed);
     return (
       <View style={styles.field}>
         <Text style={styles.fieldLabel}>{t('addPet.breedOptional')}</Text>
         {suggestions.length > 0 && (
           <View style={styles.chipWrap}>
-            {suggestions.map(([b, key]) => (
+            {suggestions.map((b) => (
               <Chip
                 key={b}
-                label={t(`addPet.breeds.${key}`)}
-                active={form.breed === b}
+                label={breedLabel(b)}
+                active={chosen === b}
                 accessibilityRole="radio"
-                onPress={() => set('breed', form.breed === b ? '' : b)}
+                onPress={() => set('breed', chosen === b ? '' : breedLabel(b))}
               />
             ))}
           </View>

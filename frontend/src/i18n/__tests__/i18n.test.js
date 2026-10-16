@@ -157,3 +157,12 @@ describe('with detection switched off (FOLLOW_DEVICE_LANGUAGE false, the kill sw
     expect(appStateListener).toBeNull();
   });
 });
+
+// CHW-191 review: French birthday line ("fête ses 1 an" was ungrammatical).
+test.each([
+  [1, "Luna a 1 an aujourd'hui"],
+  [3, "Luna a 3 ans aujourd'hui"],
+])('French birthday line for %i', (count, expected) => {
+  const { default: i18n } = load({ device: 'fr' });
+  expect(i18n.t('home.celebration.turns', { name: 'Luna', count })).toBe(expected);
+});

@@ -9,6 +9,7 @@ import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { resolveAsset } from '../../config';
 import { useTranslation } from '../../i18n';
+import { breedLabel, breedValue } from '../../utils/pets';
 import { ui, radii, type, PET_COLOR_PAIRS } from '../../theme';
 import { Button, ConfirmDialog, showToast, ScreenHeader, FormScrollView } from '../../components';
 
@@ -41,7 +42,8 @@ export default function EditPetScreen({ navigation, route }) {
   const [form, setForm] = useState({
     name: pet?.name || '',
     type: pet?.type || 'dog',
-    breed: pet?.breed || '',
+    // A suggested breed shows in the app language; breedValue stores it back in English.
+    breed: breedLabel(pet?.breed),
     color: pet?.color || PET_COLOR_PAIRS[0].bg,
     avatarUrl: pet?.avatarUrl || null,
   });
@@ -86,7 +88,7 @@ export default function EditPetScreen({ navigation, route }) {
       const saved = await updatePet(petId, {
         name: form.name.trim(),
         type: form.type,
-        breed: form.breed.trim(),
+        breed: breedValue(form.breed),
         color: form.color,
         avatarUrl: form.avatarUrl,
       });

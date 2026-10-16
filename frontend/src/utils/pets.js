@@ -1,4 +1,5 @@
 import { resolveAsset } from '../config';
+import i18n from '../i18n';
 import { photos } from '../theme';
 
 // The user's own photo for a pet, resolved to a full URL — undefined when
@@ -15,11 +16,53 @@ export const emptyPhotoFor = (pet, catPhoto) => (pet?.type === 'cat' ? catPhoto 
 export const petById = (pets, id) =>
   id == null ? undefined : (pets || []).find((p) => String(p.id) === String(id));
 
-// 'Golden Retriever · 4 y' — breed (or species) and age, whichever exist.
+// The breed suggestions AddPet offers as chips: stored value (always English,
+// whatever the app language) -> i18n key under addPet.breeds. Breeds the user
+// typed are their own data and are never translated.
+export const BREED_KEYS = {
+  'Golden Retriever': 'goldenRetriever',
+  Labrador: 'labrador',
+  Mixed: 'mixed',
+  'Domestic Shorthair': 'domesticShorthair',
+  Siamese: 'siamese',
+  'Mini Lop': 'miniLop',
+  'Netherland Dwarf': 'netherlandDwarf',
+  Budgie: 'budgie',
+  Cockatiel: 'cockatiel',
+  Parrot: 'parrot',
+};
+
+/** A stored breed as shown in the app language: suggestions translated, typed breeds as-is. */
+export const breedLabel = (breed) => {
+  const key = breed ? BREED_KEYS[breed] : null;
+  return key ? i18n.t(`addPet.breeds.${key}`) : breed || '';
+};
+
+/**
+ * The value to store for breed text shown in (or typed into) a breed field:
+ * a suggestion's label in the app language maps back to its English stored
+ * value, so 'Croisé' is saved as 'Mixed'. Anything else is kept as typed.
+ */
+export const breedValue = (text) => {
+  const typed = (text || '').trim();
+  if (!typed) return '';
+  const folded = typed.toLocaleLowerCase();
+  const stored = Object.keys(BREED_KEYS).find(
+    (value) => value.toLocaleLowerCase() === folded || breedLabel(value).toLocaleLowerCase() === folded,
+  );
+  return stored ?? typed;
+};
+
+/** A species id ('dog') in the app language ('Chien'), capitalised id for an unknown one. */
+export const speciesLabel = (type) =>
+  type ? i18n.t(`pets.types.${type}`, { defaultValue: type.charAt(0).toUpperCase() + type.slice(1) }) : null;
+
+// 'Golden Retriever · 4 y' — breed (or species) and age, whichever exist, in
+// the app language ('Chien · 4 ans').
 export const petMeta = (pet) =>
   [
-    pet.breed || (pet.type ? pet.type.charAt(0).toUpperCase() + pet.type.slice(1) : null),
-    pet.age ? `${pet.age} y` : null,
+    pet.breed ? breedLabel(pet.breed) : speciesLabel(pet.type),
+    pet.age ? i18n.t('pets.ageShort', { count: Number(pet.age) }) : null,
   ]
     .filter(Boolean)
     .join(' · ');

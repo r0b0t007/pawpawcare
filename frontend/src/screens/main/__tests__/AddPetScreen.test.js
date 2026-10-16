@@ -11,7 +11,8 @@ jest.mock('@expo/ui/community/datetime-picker', () => () => null);
 jest.mock('@react-navigation/native', () => ({ useIsFocused: () => true }));
 jest.mock('../../../services/imagePicker', () => ({ pickAndUploadImage: jest.fn() }));
 jest.mock('../../../services/analytics', () => ({ track: jest.fn() }));
-jest.mock('../../../context/DataContext', () => ({ useData: () => ({ addPet: jest.fn() }) }));
+const mockAddPet = jest.fn(() => Promise.resolve({ id: 1, name: 'Luna' }));
+jest.mock('../../../context/DataContext', () => ({ useData: () => ({ addPet: mockAddPet }) }));
 
 import React from 'react';
 import { Text, TextInput } from 'react-native';
@@ -45,7 +46,7 @@ test('English copy is unchanged', () => {
   act(() => tree.unmount());
 });
 
-test('French: chrome translated; a breed chip shows French but stores English', async () => {
+test('French: chrome translated; a breed chip shows French in the field but stores English', async () => {
   await act(async () => {
     await i18n.changeLanguage('fr');
   });
@@ -55,8 +56,32 @@ test('French: chrome translated; a breed chip shows French but stores English', 
   ]));
 
   act(() => pressable(tree, 'Continuer').props.onPress());
+  const input = (label) => tree.root.findAllByType(TextInput).find((n) => n.props.accessibilityLabel === label);
+  act(() => input(i18n.t('addPet.nameA11y')).props.onChangeText('Luna'));
   act(() => pressable(tree, 'Croisé').props.onPress());
-  const breed = tree.root.findAllByType(TextInput).find((n) => n.props.accessibilityLabel === 'Race');
-  expect(breed.props.value).toBe('Mixed');
+  expect(input('Race').props.value).toBe('Croisé');
+  expect(pressable(tree, 'Croisé').props.active).toBe(true);
+
+  act(() => pressable(tree, 'Continuer').props.onPress());
+  mockAddPet.mockClear();
+  await act(async () => {
+    await pressable(tree, i18n.t('addPet.addNamed', { name: 'Luna' })).props.onPress();
+  });
+  expect(mockAddPet).toHaveBeenCalledWith(expect.objectContaining({ name: 'Luna', breed: 'Mixed' }));
+  act(() => tree.unmount());
+});
+
+test('French: a typed breed is kept as typed; typing a suggestion label selects that suggestion', async () => {
+  await act(async () => {
+    await i18n.changeLanguage('fr');
+  });
+  const tree = render();
+  const input = (label) => tree.root.findAllByType(TextInput).find((n) => n.props.accessibilityLabel === label);
+  act(() => pressable(tree, 'Continuer').props.onPress());
+  act(() => input('Race').props.onChangeText('croisé'));
+  expect(pressable(tree, 'Croisé').props.active).toBe(true);
+  act(() => input('Race').props.onChangeText('Berger des Shetland'));
+  expect(pressable(tree, 'Croisé').props.active).toBe(false);
+  expect(input('Race').props.value).toBe('Berger des Shetland');
   act(() => tree.unmount());
 });

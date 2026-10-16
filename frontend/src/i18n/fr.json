@@ -491,9 +491,9 @@
       "gotchaDay_one": "Jour d'adoption — {{count}} an avec {{name}}",
       "gotchaDay_many": "Jour d'adoption — {{count}} ans avec {{name}}",
       "gotchaDay_other": "Jour d'adoption — {{count}} ans avec {{name}}",
-      "turns_one": "{{name}} fête ses {{count}} an aujourd'hui",
-      "turns_many": "{{name}} fête ses {{count}} ans aujourd'hui",
-      "turns_other": "{{name}} fête ses {{count}} ans aujourd'hui",
+      "turns_one": "{{name}} a {{count}} an aujourd'hui",
+      "turns_many": "{{name}} a {{count}} ans aujourd'hui",
+      "turns_other": "{{name}} a {{count}} ans aujourd'hui",
       "dismiss": "Fermer"
     },
     "upNext": {
@@ -726,6 +726,7 @@
   },
   "notifications": {
     "title": "Notifications",
+    "channelName": "Rappels",
     "when": {
       "snoozed": "Reporté",
       "snoozeEnded": "Report terminé",
@@ -1031,6 +1032,9 @@
       "male": "Mâle",
       "female": "Femelle"
     },
+    "ageShort_one": "{{count}} an",
+    "ageShort_many": "{{count}} ans",
+    "ageShort_other": "{{count}} ans",
     "colors": {
       "peach": "Pêche",
       "skyBlue": "Bleu ciel",

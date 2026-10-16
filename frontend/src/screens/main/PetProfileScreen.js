@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { petPhoto } from '../../utils/pets';
+import { breedLabel, petPhoto } from '../../utils/pets';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
@@ -469,7 +469,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const heroFg = photoUri ? ui.onAccent : ui.ink;
   const speciesLabel = [
     pet.type ? t(`pets.types.${pet.type}`, { defaultValue: cap(pet.type) }) : t('petProfile.hero.pet'),
-    pet.breed || null,
+    pet.breed ? breedLabel(pet.breed) : null,
   ].filter(Boolean).join(' · ');
   const heroMeta = [
     pet.age ? t('petProfile.hero.age', { count: pet.age }) : null,

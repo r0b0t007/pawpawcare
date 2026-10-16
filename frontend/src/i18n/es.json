@@ -726,6 +726,7 @@
   },
   "notifications": {
     "title": "Notificaciones",
+    "channelName": "Recordatorios",
     "when": {
       "snoozed": "Pospuesta",
       "snoozeEnded": "Aplazamiento terminado",
@@ -1031,6 +1032,9 @@
       "male": "Macho",
       "female": "Hembra"
     },
+    "ageShort_one": "{{count}} año",
+    "ageShort_many": "{{count}} años",
+    "ageShort_other": "{{count}} años",
     "colors": {
       "peach": "Melocotón",
       "skyBlue": "Azul cielo",

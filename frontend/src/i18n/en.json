@@ -699,6 +699,7 @@
   },
   "notifications": {
     "title": "Notifications",
+    "channelName": "Reminders",
     "when": {
       "snoozed": "Snoozed",
       "snoozeEnded": "Snooze ended",
@@ -989,6 +990,8 @@
       "male": "Male",
       "female": "Female"
     },
+    "ageShort_one": "{{count}} y",
+    "ageShort_other": "{{count}} y",
     "colors": {
       "peach": "Peach",
       "skyBlue": "Sky blue",

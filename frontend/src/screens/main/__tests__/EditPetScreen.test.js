@@ -8,16 +8,18 @@ jest.mock('react-native-safe-area-context', () => {
   return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
 jest.mock('../../../services/imagePicker', () => ({ pickAndUploadImage: jest.fn() }));
+let mockPets = [];
+const mockUpdatePet = jest.fn((id, updates) => Promise.resolve({ id, ...updates }));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
-    pets: [{ id: 'p1', name: 'Luna', type: 'cat', breed: '', color: '#ffddb8' }],
-    updatePet: jest.fn(),
+    pets: mockPets,
+    updatePet: mockUpdatePet,
     deletePet: jest.fn(),
   }),
 }));
 
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, TextInput } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import i18n from '../../../i18n';
 import EditPetScreen from '../EditPetScreen';
@@ -35,6 +37,11 @@ function render() {
   });
   return tree;
 }
+
+beforeEach(() => {
+  mockPets = [{ id: 'p1', name: 'Luna', type: 'cat', breed: '', color: '#ffddb8' }];
+  mockUpdatePet.mockClear();
+});
 
 afterEach(async () => {
   await act(async () => {
@@ -58,5 +65,22 @@ test('French: chrome and species labels translated, the name kept as typed', asy
   expect(texts(tree)).toEqual(expect.arrayContaining([
     'Modifier Luna', "Voici comment Luna apparaîtra dans l'application.", 'Chat', 'Supprimer Luna',
   ]));
+  act(() => tree.unmount());
+});
+
+test('French: a suggested breed shows in French and is saved back in English', async () => {
+  mockPets = [{ id: 'p1', name: 'Luna', type: 'cat', breed: 'Mixed', color: '#ffddb8' }];
+  await act(async () => {
+    await i18n.changeLanguage('fr');
+  });
+  const tree = render();
+  const breed = () => tree.root.findAllByType(TextInput).find((n) => n.props.value !== undefined && n.props.placeholder === i18n.t('editPet.breedPlaceholder'));
+  expect(breed().props.value).toBe('Croisé');
+
+  const save = tree.root.find((n) => n.props.label === i18n.t('editPet.saveChanges') && typeof n.props.onPress === 'function');
+  await act(async () => {
+    await save.props.onPress();
+  });
+  expect(mockUpdatePet).toHaveBeenCalledWith('p1', expect.objectContaining({ breed: 'Mixed' }));
   act(() => tree.unmount());
 });
