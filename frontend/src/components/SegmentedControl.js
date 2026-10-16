@@ -101,6 +101,7 @@ export default function SegmentedControl({ segments, value, onChange, style, rol
               style={{
                 fontFamily: 'PlusJakartaSans_700Bold',
                 fontSize: 13,
+                textAlign: 'center',
                 // sub, not subtle: unselected labels sit on the track (AA).
                 color: on ? ui.ink : ui.sub,
               }}

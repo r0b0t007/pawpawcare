@@ -109,10 +109,10 @@ function ProfileStack() {
 }
 
 // Tab labels shrink (down to 80%) rather than truncate: "Communauté" is too
-// wide for a five-tab bar at 11px. The string stays the accessibility label.
-const TAB_LABEL_STYLE = { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, lineHeight: 14, marginTop: 2 };
+// wide for a five-tab bar at 11px. No tabBarAccessibilityLabel: React Navigation's
+// default ("Home, tab, 1 of 5" on iOS) must stay.
+const TAB_LABEL_STYLE = { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, lineHeight: 14, marginTop: 2, textAlign: 'center' };
 const tabLabel = (text) => ({
-  tabBarAccessibilityLabel: text,
   tabBarLabel: ({ color }) => (
     <Text style={[TAB_LABEL_STYLE, { color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
       {text}
