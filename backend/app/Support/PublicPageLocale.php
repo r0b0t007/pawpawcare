@@ -118,7 +118,7 @@ final class PublicPageLocale
      */
     public static function lookup(string $prefix, mixed $value): ?string
     {
-        if (! is_string($value) || ! preg_match('/^[a-z_]{1,40}z/', $value)) {
+        if (! is_string($value) || ! preg_match('/^[a-z_]{1,40}\z/', $value)) {
             return null;
         }
 
