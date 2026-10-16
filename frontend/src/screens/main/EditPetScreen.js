@@ -8,23 +8,32 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { resolveAsset } from '../../config';
+import { useTranslation } from '../../i18n';
 import { ui, radii, type, PET_COLOR_PAIRS } from '../../theme';
 import { Button, ConfirmDialog, showToast, ScreenHeader, FormScrollView } from '../../components';
 
 // Edit pet: name, type, breed, identity color and photo. Deleting the pet
 // lives here — behind a danger zone + ConfirmDialog — never on the browse path.
 
+// Labels come from i18n (`pets.types.*`); the ids are what gets stored.
 const PET_TYPES = [
-  { id: 'dog', label: 'Dog', icon: 'dog' },
-  { id: 'cat', label: 'Cat', icon: 'cat' },
-  { id: 'bird', label: 'Bird', icon: 'bird' },
-  { id: 'rabbit', label: 'Rabbit', icon: 'rabbit' },
-  { id: 'other', label: 'Other', icon: 'paw' },
+  { id: 'dog', icon: 'dog' },
+  { id: 'cat', icon: 'cat' },
+  { id: 'bird', icon: 'bird' },
+  { id: 'rabbit', icon: 'rabbit' },
+  { id: 'other', icon: 'paw' },
 ];
+
+// i18n key for a theme color pair's name ('Sky blue' -> 'skyBlue').
+const colorKey = (name) => name.replace(/ (\w)/g, (_, c) => c.toUpperCase()).replace(/^\w/, (c) => c.toLowerCase());
+
+// Stands in for the pet name in the preview sentence (see previewBefore).
+const NAME_MARK = '\u0000';
 
 const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
 
 export default function EditPetScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const { petId } = route.params;
   const { pets, updatePet, deletePet } = useData();
   const pet = pets.find((p) => p.id === petId);
@@ -49,7 +58,7 @@ export default function EditPetScreen({ navigation, route }) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={[type.body, { color: ui.sub }]}>Pet not found.</Text>
+          <Text style={[type.body, { color: ui.sub }]}>{t('editPet.notFound')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -60,16 +69,16 @@ export default function EditPetScreen({ navigation, route }) {
     const res = await pickAndUploadImage({ aspect: [1, 1] });
     setUploading(false);
     if (res.url) { set('avatarUrl', res.url); setLocalPreview(null); }
-    else if (res.error === 'permission') showToast('Allow photo access to set a pet photo');
+    else if (res.error === 'permission') showToast(t('editPet.photoPermission'));
     else if (res.error) {
       if (res.uri) setLocalPreview(res.uri);
-      showToast('Could not upload that image — try again');
+      showToast(t('editPet.uploadFailed'));
     }
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      showToast('Give your pet a name first');
+      showToast(t('editPet.nameRequired'));
       return;
     }
     setSaving(true);
@@ -82,15 +91,19 @@ export default function EditPetScreen({ navigation, route }) {
         avatarUrl: form.avatarUrl,
       });
       if (!saved) {
-        showToast("Couldn't save the changes. Try again.");
+        showToast(t('editPet.saveFailed'));
         return;
       }
-      showToast('Saved');
+      showToast(t('editPet.saved'));
       navigation.goBack();
     } finally {
       setSaving(false);
     }
   };
+
+  // The preview sentence wraps the (bold) pet name: split the translation
+  // around a marker so each language keeps its own word order.
+  const [previewBefore, previewAfter = ''] = t('editPet.preview', { name: NAME_MARK }).split(NAME_MARK);
 
   const handleRemove = () => {
     setConfirmRemove(false);
@@ -99,20 +112,20 @@ export default function EditPetScreen({ navigation, route }) {
     navigation.popToTop();
     const name = pet.name;
     deletePet(petId).then((ok) =>
-      showToast(ok ? `${name} removed` : `Couldn't remove ${name}. Try again.`));
+      showToast(ok ? t('editPet.removed', { name }) : t('editPet.removeFailed', { name })));
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView contentContainerStyle={styles.scroll}>
         {/* Header */}
-        <ScreenHeader title={`Edit ${pet.name}`} onBack={() => navigation.goBack()} flush style={{ paddingBottom: 20 }} />
+        <ScreenHeader title={t('editPet.title', { name: pet.name })} onBack={() => navigation.goBack()} flush style={{ paddingBottom: 20 }} />
 
         {/* Photo */}
         <View style={styles.avatarArea}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={uploading ? 'Uploading photo' : `Change ${pet.name}'s photo`}
+            accessibilityLabel={uploading ? t('editPet.uploadingA11y') : t('editPet.changePhotoA11y', { name: pet.name })}
             accessibilityState={{ busy: uploading }}
             onPress={pickAvatar}
             disabled={uploading}
@@ -135,15 +148,15 @@ export default function EditPetScreen({ navigation, route }) {
               <MaterialCommunityIcons name="camera" size={14} color="#fff" />
             </View>
           </Pressable>
-          <Text style={styles.avatarHint}>{form.avatarUrl ? 'Tap to change photo' : 'Tap to add a photo'}</Text>
+          <Text style={styles.avatarHint}>{form.avatarUrl ? t('editPet.tapToChange') : t('editPet.tapToAdd')}</Text>
         </View>
 
         {/* Name */}
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Name</Text>
+          <Text style={styles.fieldLabel}>{t('editPet.name')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. Luna"
+            placeholder={t('editPet.namePlaceholder')}
             placeholderTextColor={ui.placeholder}
             value={form.name}
             onChangeText={(v) => set('name', v)}
@@ -152,20 +165,20 @@ export default function EditPetScreen({ navigation, route }) {
 
         {/* Type */}
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Type</Text>
+          <Text style={styles.fieldLabel}>{t('editPet.type')}</Text>
           <View style={styles.chipWrap}>
-            {PET_TYPES.map((t) => {
-              const on = form.type === t.id;
+            {PET_TYPES.map((pt) => {
+              const on = form.type === pt.id;
               return (
                 <Pressable
-                  key={t.id}
+                  key={pt.id}
                   style={[styles.typeChip, on && styles.typeChipOn]}
-                  onPress={() => set('type', t.id)}
+                  onPress={() => set('type', pt.id)}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: on }}
                 >
-                  <MaterialCommunityIcons name={t.icon} size={16} color={on ? ui.background : ui.ink} />
-                  <Text style={[styles.typeChipText, on && { color: ui.background }]}>{t.label}</Text>
+                  <MaterialCommunityIcons name={pt.icon} size={16} color={on ? ui.background : ui.ink} />
+                  <Text style={[styles.typeChipText, on && { color: ui.background }]}>{t(`pets.types.${pt.id}`)}</Text>
                 </Pressable>
               );
             })}
@@ -174,10 +187,10 @@ export default function EditPetScreen({ navigation, route }) {
 
         {/* Breed */}
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Breed (optional)</Text>
+          <Text style={styles.fieldLabel}>{t('editPet.breed')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="e.g. Golden Retriever"
+            placeholder={t('editPet.breedPlaceholder')}
             placeholderTextColor={ui.placeholder}
             value={form.breed}
             onChangeText={(v) => set('breed', v)}
@@ -186,7 +199,7 @@ export default function EditPetScreen({ navigation, route }) {
 
         {/* Profile color */}
         <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Profile color</Text>
+          <Text style={styles.fieldLabel}>{t('editPet.profileColor')}</Text>
           <View style={styles.swatchRow}>
             {PET_COLOR_PAIRS.map((c) => {
               const on = form.color === c.bg;
@@ -196,7 +209,7 @@ export default function EditPetScreen({ navigation, route }) {
                   style={[styles.swatchRing, on && { borderColor: ui.accent }]}
                   onPress={() => set('color', c.bg)}
                   accessibilityRole="radio"
-                  accessibilityLabel={`${c.name} profile color`}
+                  accessibilityLabel={t('pets.colorA11y', { color: t(`pets.colors.${colorKey(c.name)}`, { defaultValue: c.name }) })}
                   accessibilityState={{ checked: on }}
                 >
                   <View style={[styles.swatch, { backgroundColor: c.bg }]}>
@@ -220,37 +233,37 @@ export default function EditPetScreen({ navigation, route }) {
             )}
           </View>
           <Text style={styles.previewText}>
-            This is how <Text style={styles.previewName}>{form.name.trim() || pet.name}</Text> will appear across the app.
+            {previewBefore}<Text style={styles.previewName}>{form.name.trim() || pet.name}</Text>{previewAfter}
           </Text>
         </View>
 
         <Button
-          label={saving ? 'Saving…' : 'Save changes'}
+          label={saving ? t('editPet.saving') : t('editPet.saveChanges')}
           onPress={handleSave}
           disabled={saving || uploading}
         />
 
         {/* Danger zone */}
         <View style={styles.dangerZone}>
-          <Text style={styles.dangerLabel}>Danger zone</Text>
+          <Text style={styles.dangerLabel}>{t('editPet.dangerZone')}</Text>
           <Text style={styles.dangerHint}>
-            Removing {pet.name} deletes their records for everyone they're shared with.
+            {t('editPet.dangerHint', { name: pet.name })}
           </Text>
           <Pressable accessibilityRole="button"
             style={({ pressed }) => [styles.removeBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
             onPress={() => setConfirmRemove(true)}
           >
             <MaterialCommunityIcons name="delete-outline" size={17} color={ui.danger} />
-            <Text style={styles.removeBtnText}>Remove {pet.name}</Text>
+            <Text style={styles.removeBtnText}>{t('editPet.remove', { name: pet.name })}</Text>
           </Pressable>
         </View>
       </FormScrollView>
 
       <ConfirmDialog
         visible={confirmRemove}
-        title={`Remove ${pet.name}?`}
-        message="This deletes all records permanently. This can't be undone."
-        confirmLabel="Remove"
+        title={t('editPet.confirmTitle', { name: pet.name })}
+        message={t('editPet.confirmMessage')}
+        confirmLabel={t('editPet.confirmLabel')}
         destructive
         onConfirm={handleRemove}
         onCancel={() => setConfirmRemove(false)}

@@ -100,3 +100,32 @@ test("doesn't call a pet all good when its vaccinations didn't load", () => {
   expect(texts(tree)).toContain("Couldn't load vaccines");
   act(() => tree.unmount());
 });
+
+// CHW-191: the profile's strings come from i18n. English stays exactly as it
+// was; in French the chrome is translated while the pet's name (user data)
+// is shown as typed.
+test('renders its chrome in the app language, never translating the pet name', async () => {
+  const i18n = require('../../../i18n').default;
+  let tree;
+  mockPets = [{ ...LUNA, type: 'cat', age: 3, microchipped: true }];
+  act(() => {
+    tree = TestRenderer.create(<PetProfileScreen {...props} />);
+  });
+  expect(texts(tree)).toEqual(expect.arrayContaining([
+    'Nothing to give today', 'WEIGHT — 4.2 KG', '3 yrs · Male · Microchipped', 'Cat',
+  ]));
+
+  try {
+    await act(async () => {
+      await i18n.changeLanguage('fr');
+    });
+    expect(texts(tree)).toEqual(expect.arrayContaining([
+      'Luna', "Rien à donner aujourd'hui", 'POIDS — 4.2 KG', '3 ans · Mâle · Pucé', 'Chat',
+    ]));
+  } finally {
+    await act(async () => {
+      await i18n.changeLanguage('en');
+    });
+    act(() => tree.unmount());
+  }
+});
