@@ -39,3 +39,26 @@ test('shows the crash screen on a render error and recovers on "Try again"', () 
   expect(onReset).toHaveBeenCalledTimes(1);
   spy.mockRestore();
 });
+
+test('the crash screen speaks French when the app does', async () => {
+  const i18n = require('../../i18n').default;
+  await i18n.changeLanguage('fr');
+  const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  shouldThrow = true;
+  let tree;
+  try {
+    act(() => {
+      tree = TestRenderer.create(
+        <AppErrorBoundary>
+          <Screen />
+        </AppErrorBoundary>,
+      );
+    });
+    expect(texts(tree)).toContain('Une erreur est survenue');
+    expect(texts(tree).join(' ')).toContain('hello@pawpawcare.app');
+  } finally {
+    act(() => tree?.unmount());
+    spy.mockRestore();
+    await i18n.changeLanguage('en');
+  }
+});

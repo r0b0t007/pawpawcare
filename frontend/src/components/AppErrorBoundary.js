@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ErrorBoundary } from '../services/sentry';
+import i18n from '../i18n';
 import { ui, type } from '../theme';
 import Card from './Card';
 import Button from './Button';
@@ -11,8 +12,11 @@ import Button from './Button';
 // It wraps the auth/data providers too, so a retry reloads their state instead
 // of re-rendering the same bad data; callers pass onReset to clear caches that
 // live outside the tree (React Query). Navigation-free and context-free: it
-// renders when everything below it is gone.
+// renders when everything below it is gone, so it reads i18n directly.
+const SUPPORT_EMAIL = 'hello@pawpawcare.app';
+
 export function CrashFallback({ resetError }) {
+  const t = (key, options) => i18n.t(key, options);
   return (
     <View
       style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: ui.background }}
@@ -21,13 +25,12 @@ export function CrashFallback({ resetError }) {
       <Card padded style={{ gap: 14, alignItems: 'center' }}>
         <MaterialCommunityIcons name="paw-off-outline" size={36} color={ui.accent} />
         <Text style={[type.cardTitle, { color: ui.ink, textAlign: 'center' }]}>
-          Something went wrong
+          {t('errors.crash.title')}
         </Text>
         <Text style={[type.body, { color: ui.sub, textAlign: 'center' }]}>
-          The app hit an unexpected error. Your pets and records are safe — try again, and
-          if it keeps happening, email hello@pawpawcare.app.
+          {t('errors.crash.body', { email: SUPPORT_EMAIL })}
         </Text>
-        <Button label="Try again" onPress={resetError} style={{ alignSelf: 'stretch' }} />
+        <Button label={t('errors.crash.retry')} onPress={resetError} style={{ alignSelf: 'stretch' }} />
       </Card>
     </View>
   );

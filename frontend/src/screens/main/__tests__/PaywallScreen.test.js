@@ -331,3 +331,25 @@ describe('review round 2', () => {
     expect(mockOfferingsWanted).toBe(true);
   });
 });
+
+test('the renewal disclosure reads exactly as before i18n', async () => {
+  const tree = await render();
+  expect(texts(tree)).toContain(
+    'Payment is charged to your Apple ID when you confirm. The subscription renews automatically at the same price ' +
+      'unless you cancel at least 24 hours before the end of the current period. Manage or cancel anytime in your ' +
+      'App Store settings.',
+  );
+});
+
+test('speaks French when the app does', async () => {
+  const i18n = require('../../../i18n').default;
+  await act(async () => { await i18n.changeLanguage('fr'); });
+  try {
+    const tree = await render();
+    expect(hasText(tree, /restent gratuits pour toujours/)).toBe(true);
+    expect(hasText(tree, /39,99|39\.99/)).toBe(true);
+    expect(button(tree, "S'abonner")).toBeTruthy();
+  } finally {
+    await act(async () => { await i18n.changeLanguage('en'); });
+  }
+});

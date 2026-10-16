@@ -75,3 +75,16 @@ test('on the email step, back leaves the screen as usual', async () => {
   });
   expect(listeners.beforeRemove).toBeUndefined();
 });
+
+test('speaks French when the app does', async () => {
+  const i18n = require('../../../i18n').default;
+  await act(async () => { await i18n.changeLanguage('fr'); });
+  try {
+    await act(async () => {
+      tree = TestRenderer.create(<ForgotPasswordScreen navigation={navigation} />);
+    });
+    expect(texts(tree)).toContain('Réinitialiser votre mot de passe');
+  } finally {
+    await act(async () => { await i18n.changeLanguage('en'); });
+  }
+});

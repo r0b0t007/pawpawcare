@@ -93,3 +93,54 @@ describe('Invitations', () => {
     expect(showToast).not.toHaveBeenCalledWith('Invitation declined');
   });
 });
+
+describe('in French', () => {
+  const i18n = require('../../../i18n').default;
+  const { Text } = require('react-native');
+  const flat = (node) => [].concat(node.props.children).map((c) => (typeof c === 'string' ? c : flat(c))).join('');
+  beforeEach(async () => {
+    await act(async () => { await i18n.changeLanguage('fr'); });
+  });
+  afterEach(async () => {
+    await act(async () => { await i18n.changeLanguage('en'); });
+  });
+
+  it('Account details is titled in French', async () => {
+    Object.assign(mockAuth, { user: { name: 'Sam', email: 'sam@example.test' }, updateUser: jest.fn(), deleteAccount: jest.fn() });
+    await act(async () => {
+      tree = TestRenderer.create(<AccountDetailsScreen navigation={navigation} />);
+    });
+    expect(button(tree, 'Enregistrer les modifications')).toBeTruthy();
+  });
+
+  it('an invitation reads in French, with the names as written', async () => {
+    Object.assign(mockAuth, { user: { email: 'me@example.test', email_verified: true } });
+    Object.assign(mockData, {
+      invites: [{ id: 'i1', petName: 'Bella <3', inviterName: 'Sam', role: 'family' }],
+      refreshInvites: jest.fn(),
+      acceptInvite: jest.fn(() => Promise.resolve(true)),
+    });
+    await act(async () => {
+      tree = TestRenderer.create(<InvitesScreen navigation={navigation} />);
+    });
+    const lines = tree.root.findAllByType(Text).map(flat);
+    expect(lines).toContain('Sam vous invite à devenir copropriétaire de Bella <3');
+    await act(async () => button(tree, 'Accepter').props.onPress());
+    expect(showToast).toHaveBeenCalledWith('Vous prenez désormais soin de Bella <3');
+  });
+});
+
+test('an invitation reads exactly as before i18n, names in bold', async () => {
+  const { Text } = require('react-native');
+  Object.assign(mockAuth, { user: { email: 'me@example.test', email_verified: true } });
+  Object.assign(mockData, { invites: [{ id: 'i1', petName: 'Bella', inviterName: 'Sam' }], refreshInvites: jest.fn() });
+  await act(async () => {
+    tree = TestRenderer.create(<InvitesScreen navigation={navigation} />);
+  });
+  const line = tree.root.findAll(
+    (n) => n.type === Text && [].concat(n.props.children).some((c) => c?.props?.children === 'Bella'),
+  )[0];
+  const parts = [].concat(line.props.children);
+  expect(parts.map((c) => (typeof c === 'string' ? c : c.props.children)).join('')).toBe('Sam invited you to co-own Bella');
+  expect(parts.filter((c) => typeof c !== 'string').map((c) => c.props.children)).toEqual(['Sam', 'Bella']);
+});

@@ -6,6 +6,7 @@ import * as Crypto from 'expo-crypto';
 import { useAuth } from '../context/AuthContext';
 import { showToast } from './Toast';
 import { GOOGLE_WEB_CLIENT_ID } from '../config';
+import { useTranslation } from '../i18n';
 import { ui, radii, motion } from '../theme';
 
 // Guarded require (the codebase's defensive native-module pattern): a static
@@ -52,6 +53,7 @@ function GoogleG({ size = 18 }) {
 // iOS. Both hand the provider's token to AuthContext.socialLogin, which the
 // backend verifies before issuing our own session.
 export default function SocialAuthButtons() {
+  const { t } = useTranslation();
   const { socialLogin } = useAuth();
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busy, setBusy] = useState(null); // 'google' | 'apple' | null
@@ -87,7 +89,7 @@ export default function SocialAuthButtons() {
       ) {
         return;
       }
-      showToast("Couldn't sign in with Google");
+      showToast(t('auth.social.googleFailed'));
     } finally {
       setBusy(null);
     }
@@ -130,7 +132,7 @@ export default function SocialAuthButtons() {
       });
     } catch (e) {
       if (e?.code === 'ERR_REQUEST_CANCELED') return;
-      showToast("Couldn't sign in with Apple");
+      showToast(t('auth.social.appleFailed'));
     } finally {
       setBusy(null);
     }
@@ -150,7 +152,7 @@ export default function SocialAuthButtons() {
     <View style={styles.wrap}>
       <View style={styles.dividerRow}>
         <View style={styles.hairline} />
-        <Text style={styles.dividerText}>or continue with</Text>
+        <Text style={styles.dividerText}>{t('auth.social.divider')}</Text>
         <View style={styles.hairline} />
       </View>
 
@@ -159,7 +161,7 @@ export default function SocialAuthButtons() {
           onPress={handleGoogle}
           disabled={!!busy}
           accessibilityRole="button"
-          accessibilityLabel="Continue with Google"
+          accessibilityLabel={t('auth.social.google')}
           style={({ pressed }) => [
             styles.googleBtn,
             busy && { opacity: 0.6 },
@@ -171,7 +173,7 @@ export default function SocialAuthButtons() {
           ) : (
             <>
               <GoogleG size={18} />
-              <Text style={styles.googleText}>Continue with Google</Text>
+              <Text style={styles.googleText}>{t('auth.social.google')}</Text>
             </>
           )}
         </Pressable>

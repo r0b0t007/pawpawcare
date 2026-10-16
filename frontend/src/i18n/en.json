@@ -120,6 +120,310 @@
       "active": "Active",
       "ends": "Ends {{date}}",
       "endsSoon": "Ends soon"
+    },
+    "title": "Subscription",
+    "seePlus": "See PawPawCare Plus",
+    "body": {
+      "billingIssue": "{{store}} couldn't charge your payment method. Update it there to keep Plus.",
+      "thanks": "Thanks for supporting PawPawCare.",
+      "earlyMember": "As an early member, Plus features are included for you.",
+      "free": "Your pets, records and exports are free forever."
+    },
+    "updatePayment": "Update payment method",
+    "manage": "Manage subscription",
+    "manageSubtitle": "Change or cancel in {{store}}",
+    "restore": "Restore purchases",
+    "restoring": "Restoring…",
+    "restoreSubtitle": "Bought on another device or account",
+    "deleteCaption": "Deleting your PawPawCare account doesn't cancel billing — cancel in {{store}} first.",
+    "openStoreFailed": "Couldn't open the store — try from its settings",
+    "manageInStore": "Manage it from your app store settings",
+    "restoreFailed": "Couldn't restore purchases — try again",
+    "restoreOutcome": {
+      "restored": "Purchases restored",
+      "pending": "Restored — it may take a minute to show up",
+      "none": "No purchases found to restore"
+    },
+    "store": {
+      "appStore": "the App Store",
+      "playStore": "Google Play",
+      "unknown": "your app store"
+    },
+    "unit": {
+      "day": "day",
+      "week": "week",
+      "month": "month",
+      "year": "year"
+    },
+    "duration": {
+      "day_one": "{{count}} day",
+      "day_other": "{{count}} days",
+      "week_one": "{{count}} week",
+      "week_other": "{{count}} weeks",
+      "month_one": "{{count}} month",
+      "month_other": "{{count}} months",
+      "year_one": "{{count}} year",
+      "year_other": "{{count}} years"
+    },
+    "firstSpan": {
+      "day_one": "first day",
+      "day_other": "first {{count}} days",
+      "week_one": "first week",
+      "week_other": "first {{count}} weeks",
+      "month_one": "first month",
+      "month_other": "first {{count}} months",
+      "year_one": "first year",
+      "year_other": "first {{count}} years"
+    },
+    "priceWithPeriod": "{{price}} / {{period}}",
+    "intro": {
+      "freeTrial": "Try {{duration}} free",
+      "repeating": "{{price}} / {{period}} for {{total}}",
+      "first": "{{price}} for the {{span}}"
+    }
+  },
+  "auth": {
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "passwordLabel": "Password",
+    "confirmPasswordLabel": "Confirm password",
+    "reactivated": "Welcome back — your account deletion was cancelled.",
+    "welcome": {
+      "heroA11y": "A kitten and a puppy looking at each other",
+      "brandTagline": "Pet health, made gentle",
+      "headline": "Every wag and whisker,\ncared for.",
+      "tagline": "Vaccines, meds and daily routines for all your pets, in one calm place.",
+      "getStarted": "Get started",
+      "haveAccount": "I already have an account"
+    },
+    "login": {
+      "title": "Welcome back",
+      "subtitle": "The pack missed you.",
+      "passwordPlaceholder": "Your password",
+      "pasteHint": "Paste from your password manager always works",
+      "forgot": "Forgot password?",
+      "missingFields": "Add your email and password to log in.",
+      "submit": "Log in",
+      "submitting": "Logging in…",
+      "toSignup": "New here? Create an account"
+    },
+    "signup": {
+      "title": "Create your account",
+      "subtitle": "Your pack's records, safe in one place.",
+      "nameLabel": "Your name",
+      "namePlaceholder": "e.g. Ahmed",
+      "minChars": "{{min}}+ characters",
+      "confirmPlaceholder": "Repeat password",
+      "rulesMatch": "Passwords match",
+      "ruleDone": "{{rule}}, done",
+      "missingFields": "Fill in each field to create your account.",
+      "mismatch": "The two passwords don't match yet. Try typing them again.",
+      "tooShort": "Use at least {{min}} characters for your password.",
+      "submit": "Create account",
+      "submitting": "Creating account…",
+      "toLogin": "Already have an account? Log in"
+    },
+    "forgot": {
+      "title": "Reset your password",
+      "subtitle": "Enter your account email and we'll send you a 6-digit code.",
+      "missingEmail": "Please enter your email.",
+      "send": "Send code",
+      "sending": "Sending…",
+      "codeResent": "New code sent",
+      "checkTitle": "Check your inbox",
+      "checkBody": "We sent a 6-digit code to {{email}}. It's valid for 30 minutes.",
+      "codeLabel": "6-digit code",
+      "newPasswordLabel": "New password",
+      "newPasswordPlaceholder": "At least 8 characters",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "confirmPlaceholder": "Same password again",
+      "badCode": "Enter the 6-digit code from your email.",
+      "tooShort": "Your new password needs at least 8 characters.",
+      "mismatch": "Those passwords don't match.",
+      "submit": "Reset password",
+      "submitting": "Updating…",
+      "updated": "Password updated — log in",
+      "resend": "Didn't get it? Send again"
+    },
+    "reconnect": {
+      "title": "Can't reach PawPawCare",
+      "offline": "You're still signed in. Check your connection and try again.",
+      "serverDown": "You're still signed in. Our server isn't answering right now — try again in a moment.",
+      "retry": "Try again",
+      "signOut": "Sign out"
+    },
+    "social": {
+      "divider": "or continue with",
+      "google": "Continue with Google",
+      "googleFailed": "Couldn't sign in with Google",
+      "appleFailed": "Couldn't sign in with Apple"
+    }
+  },
+  "account": {
+    "title": "Account details",
+    "avatarFallback": "U",
+    "nameLabel": "Name",
+    "namePlaceholder": "Your name",
+    "emailLabel": "Email",
+    "emailHint": "Contact support to change your email.",
+    "save": "Save changes",
+    "saved": "Saved",
+    "saveFailed": "Couldn't save your name. Try again.",
+    "dangerZone": "Danger zone",
+    "delete": "Delete account",
+    "deleting": "Deleting account…",
+    "deleteHint": "Your account is deactivated right away and permanently deleted after 30 days. Log back in before then to cancel.",
+    "deleteFailed": "Couldn't delete your account — try again",
+    "confirmTitle": "Delete your account?",
+    "confirmMessage": "Your account will be deactivated now and permanently deleted in 30 days — pets, records, photos and posts included. Logging back in before then cancels the deletion.",
+    "confirmBilling": "Your PawPawCare Plus subscription keeps billing through {{store}} — cancel it there too."
+  },
+  "paywall": {
+    "title": "PawPawCare Plus",
+    "close": "Close",
+    "done": "Done",
+    "retry": "Try again",
+    "reason": {
+      "ai_extraction": "Reading vet documents with AI is part of Plus.",
+      "care_links": "Caretaker links are part of Plus."
+    },
+    "promise": "Your pets, records and exports stay free forever.",
+    "benefits": {
+      "aiTitle": "Read vet documents with AI",
+      "aiSubtitle": "Snap a record — vaccines, meds and weights fill in for you",
+      "linksTitle": "Caretaker links",
+      "linksSubtitle": "Share a care guide with sitters, no app needed",
+      "independentTitle": "Keep PawPawCare independent",
+      "independentSubtitle": "No ads, no selling data — ever"
+    },
+    "storeAccount": {
+      "ios": "Apple ID",
+      "android": "Google Play account",
+      "default": "store account"
+    },
+    "storeSettings": {
+      "ios": "App Store",
+      "android": "Google Play",
+      "default": "store"
+    },
+    "errors": {
+      "already_owned": "Your {{store}} already has Plus — tap Restore purchases to use it here",
+      "network": "No connection — check it and try again",
+      "unavailable": "Purchases aren't available right now — try again later",
+      "other": "Couldn't complete the purchase — try again"
+    },
+    "legal": {
+      "oneTime": "Payment is charged to your {{store}} when you confirm. This is a one-time purchase — it never renews.",
+      "charged": "Payment is charged to your {{store}} when you confirm.",
+      "trial": "Your free trial becomes a paid subscription unless you cancel at least 24 hours before it ends.",
+      "intro": "The introductory price applies for the period shown, then the regular price.",
+      "renews": "The subscription renews automatically at the same price unless you cancel at least 24 hours before the end of the current period. Manage or cancel anytime in your {{settings}} settings."
+    },
+    "states": {
+      "plusTitle": "You're on Plus",
+      "plusMessage": "Thanks for supporting PawPawCare. Manage it from Profile → Subscription.",
+      "includedTitle": "Plus features are included for you",
+      "includedMessage": "As an early member you already have them — nothing to buy.",
+      "hiddenTitle": "Plus isn't available yet",
+      "staysFree": "Everything you use today stays free.",
+      "updateTitle": "Update the app to subscribe",
+      "updateMessage": "Subscriptions need the latest version of PawPawCare. Everything you use today stays free.",
+      "deviceTitle": "Subscriptions aren't available on this device yet",
+      "plansErrorTitle": "Plans aren't available right now",
+      "plansErrorMessage": "Check your connection and try again in a moment."
+    },
+    "annual": "Annual",
+    "monthly": "Monthly",
+    "oneTimePrice": "{{price}} · one-time",
+    "save": "Save {{percent}}%",
+    "introThen": "{{intro}}, then {{price}}",
+    "processing": "Processing…",
+    "buy": "Buy",
+    "startTrial": "Start free trial",
+    "subscribe": "Subscribe",
+    "restore": "Restore purchases",
+    "restoring": "Restoring…",
+    "restoreFailed": "Couldn't restore purchases — try again",
+    "terms": "Terms of Use",
+    "privacy": "Privacy Policy",
+    "toast": {
+      "pending": "Purchase pending — it will unlock once approved",
+      "welcome": "Welcome to Plus!",
+      "complete": "Purchase complete — it may take a minute to show up"
+    }
+  },
+  "invites": {
+    "title": "Invitations",
+    "verify": {
+      "title": "Confirm your email",
+      "intro": "Pets are shared by email. Confirm {{email}} is yours and invitations sent to it will appear here.",
+      "codeSentBody": "We sent a 6-digit code to {{email}}. It's valid for 30 minutes.",
+      "alreadyConfirmed": "Your email is already confirmed",
+      "codeSent": "Code sent — check your email",
+      "sendFailed": "Could not send the code — try again.",
+      "badCode": "Enter the 6-digit code from your email.",
+      "codeFailed": "That code didn’t work — try again.",
+      "confirmed": "Email confirmed",
+      "send": "Send code",
+      "sending": "Sending…",
+      "confirm": "Confirm",
+      "confirming": "Confirming…",
+      "resend": "Send a new code"
+    },
+    "emptyTitle": "No pending invitations",
+    "emptyBody": "When someone shares a pet with you, the invite will appear here.",
+    "invitedYou": "{{inviter}} invited you to co-own {{pet}}",
+    "accept": "Accept",
+    "decline": "Decline",
+    "accepted": "You're now caring for {{pet}}",
+    "acceptFailed": "Couldn't accept the invite for {{pet}}. Try again.",
+    "declined": "Invitation declined",
+    "declineFailed": "Couldn't decline the invitation. Try again.",
+    "declineTitle": "Decline invitation?",
+    "declineMessage": "{{inviter}} will need to invite you again if you change your mind."
+  },
+  "support": {
+    "title": "Help & feedback",
+    "guides": "Guides",
+    "soon": "Soon",
+    "guide": {
+      "gettingStarted": "Getting started",
+      "reminders": "Reminders & notifications",
+      "sharing": "Sharing with family & your vet"
+    },
+    "messageTeam": "Message our team",
+    "category": {
+      "feedback": "Feedback",
+      "problem": "Problem",
+      "idea": "Idea",
+      "question": "Question"
+    },
+    "placeholder": {
+      "feedback": "What's working, and what isn't? Every note is read.",
+      "problem": "Tell us what's going on — the more detail, the faster we can help.",
+      "idea": "What would make PawPawCare better for you and your pets?",
+      "question": "Ask us anything about the app.",
+      "none": "How can we help? Ask a question, report a problem or share an idea."
+    },
+    "messageA11y": "Your message",
+    "send": "Send message",
+    "sending": "Sending…",
+    "captionReply": "Only our team reads this, and it's never posted publicly. We reply within 2 business days.",
+    "captionNote": "Only our team reads this, and it's never posted publicly. We read every note.",
+    "sentReply": "Sent — we'll reply within 2 business days",
+    "sentNote": "Thanks — we read every note",
+    "sendFailed": "Could not send — try again"
+  },
+  "errors": {
+    "generic": "Something went wrong — try again.",
+    "signupFailed": "Something went wrong. Please try again.",
+    "loginFailed": "Invalid email or password.",
+    "socialFailed": "Could not sign in. Please try again.",
+    "crash": {
+      "title": "Something went wrong",
+      "body": "The app hit an unexpected error. Your pets and records are safe — try again, and if it keeps happening, email {{email}}.",
+      "retry": "Try again"
     }
   }
 }
