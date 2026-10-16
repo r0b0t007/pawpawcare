@@ -97,8 +97,7 @@ class WeightInsight
     private static function humanizeSpan(int $days, ?string $locale): string
     {
         if ($days < 14) {
-            // Choice on the raw count: same-day logs (0) keep the original
-            // English "1 days" via the {0} form; other languages say "1 day".
+            // Two logs on the same day (0 days) read as "1 day".
             return trans_choice('weight.days', $days, ['count' => max($days, 1)], $locale);
         }
         if ($days < 60) {

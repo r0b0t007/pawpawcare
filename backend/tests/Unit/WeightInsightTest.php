@@ -133,7 +133,7 @@ class WeightInsightTest extends TestCase
 
     // ── Localized summaries (vet share page in the link's language) ──────────
 
-    public function test_english_summaries_are_unchanged_including_one_day_spans(): void
+    public function test_english_summaries_including_one_day_spans(): void
     {
         $up = WeightInsight::for([$this->log(4.0, 'kg', '2026-01-01'), $this->log(4.8, 'kg', '2026-04-01')], 'kg', 'en');
         $oneDay = WeightInsight::for([$this->log(4.0, 'kg', '2026-01-01'), $this->log(4.0, 'kg', '2026-01-02')], 'kg', 'en');
@@ -141,8 +141,8 @@ class WeightInsightTest extends TestCase
 
         $this->assertSame('Up 0.8 kg (20%) over the last 3 months', $up['summary']);
         $this->assertSame('Stable over the last 1 day', $oneDay['summary']);
-        // Historical wording for same-day logs, kept byte-identical.
-        $this->assertSame('Stable over the last 1 days', $sameDay['summary']);
+        // Same-day logs read as one day, singular.
+        $this->assertSame('Stable over the last 1 day', $sameDay['summary']);
     }
 
     public function test_the_locale_argument_only_changes_the_wording(): void
