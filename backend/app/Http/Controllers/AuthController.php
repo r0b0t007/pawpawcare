@@ -184,7 +184,7 @@ class AuthController extends Controller
         JwtSecretGuard::enforce(); // before any side effect: no half-made accounts on a bad key
 
         $data = $request->validate([
-            'refresh_token' => 'required|string',
+            'refresh_token' => 'required|string|max:'.JwtService::MAX_TOKEN_LENGTH,
         ]);
 
         $payload = JwtService::decode($data['refresh_token']);
@@ -225,7 +225,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'refresh_token' => 'required|string|max:512',
+            'refresh_token' => 'required|string|max:'.JwtService::MAX_TOKEN_LENGTH,
             'device_token' => 'sometimes|nullable|string|max:255',
         ]);
 

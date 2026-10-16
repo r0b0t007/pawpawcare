@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\JwtSecretGuard;
+use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Illuminate\Support\Carbon;
@@ -66,6 +67,52 @@ class JwtService
         ], self::secret(), self::algo());
 
         return [$token, $exp];
+    }
+
+    /** Longest token the API accepts; real ones are well under it. */
+    public const MAX_TOKEN_LENGTH = 512;
+
+    /** How long after expiry a refresh token we signed still counts as ours. */
+    public const EXPIRED_REFRESH_GRACE_DAYS = 7;
+
+    /**
+     * The rate-limit identity of a refresh token we signed — "<user>|<token
+     * version>" — or null when it isn't one. The rate limiter uses it to tell
+     * "ours" (count it against its user, then 401 if it is no good) apart
+     * from "made up" (shared junk bucket). JWT::decode checks the signature
+     * before the expiry, so an ExpiredException payload is genuine.
+     *
+     * - The token version is part of the key, so a password reset or "sign
+     *   out everywhere" (which bumps it) leaves every older token outside the
+     *   user's live bucket: a leaked old token can't block their refreshes.
+     * - An expired token counts as ours only for a short grace period (users
+     *   coming back just after their session lapsed get a clean 401); after
+     *   that it is treated as made up, so a leaked token goes stale for good.
+     * - Accepted: a token revoked by one logout, or already rotated, still
+     *   counts against its user until it expires — only its own device ever
+     *   held it.
+     */
+    public static function refreshSubject(string $token): ?string
+    {
+        if (mb_strlen($token) > self::MAX_TOKEN_LENGTH) {
+            return null;
+        }
+        try {
+            $claims = (array) JWT::decode($token, new Key(self::secret(), self::algo()));
+        } catch (ExpiredException $e) {
+            $claims = (array) $e->getPayload();
+            if ((int) ($claims['exp'] ?? 0) < now()->subDays(self::EXPIRED_REFRESH_GRACE_DAYS)->timestamp) {
+                return null;
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (($claims['type'] ?? null) !== 'refresh' || ! is_string($claims['sub'] ?? null)) {
+            return null;
+        }
+
+        return $claims['sub'].'|'.(int) ($claims['ver'] ?? 0);
     }
 
     /**
