@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Pet;
 use App\Services\Analytics\ProductAnalytics;
+use Carbon\CarbonInterface;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Lang;
 
 /**
  * Health-records export center. Every record a user (or their co-owned pets)
@@ -25,6 +28,10 @@ class ExportController extends Controller
         ]);
 
         $user = $request->user();
+
+        // The export speaks the account's saved language (users.locale) —
+        // the same one its emails and pushes use — whatever the device sent.
+        App::setLocale($user->preferredLocale());
 
         // Same scoping as every pet route: own pets + pets shared with me.
         // An id outside that set 404s exactly like a nonexistent one, so the
@@ -103,18 +110,27 @@ class ExportController extends Controller
             fputcsv($out, $safe, escape: '\\');
         };
 
-        $row(['PawPawCare — Health records export']);
-        $row(['Owner', $ownerName]);
-        $row(['Exported', now()->format('Y-m-d')]);
+        // Headers and section titles follow the locale; dates stay ISO and
+        // stored ids (type, status, frequency, category) stay as stored, so
+        // the file reads the same into a spreadsheet in every language.
+        // What the user typed is never translated.
+        $t = fn (string $key, array $replace = []) => __('export.csv.'.$key, $replace);
+        $col = fn (string ...$keys) => array_map(fn ($key) => __('export.csv.col.'.$key), $keys);
+        // trans(): a group-file key (lang/{locale}/export.php), not a JSON string key.
+        $yesNo = fn ($value) => $value ? trans('export.yes') : trans('export.no');
+
+        $row([$t('title')]);
+        $row([$t('owner'), $ownerName]);
+        $row([$t('exported'), now()->format('Y-m-d')]);
 
         foreach ($bundle as $entry) {
             $pet = $entry['pet'];
 
             $row([]);
-            $row(['=== PET: '.$pet->name.' ===']);
+            $row([$t('pet', ['name' => $pet->name])]);
 
-            $row(['PROFILE']);
-            $row(['Name', 'Type', 'Breed', 'Gender', 'Birthday', 'Age', 'Weight', 'Microchipped']);
+            $row([$t('profile')]);
+            $row($col('name', 'type', 'breed', 'gender', 'birthday', 'age', 'weight', 'microchipped'));
             $row([
                 $pet->name,
                 $pet->type,
@@ -123,52 +139,52 @@ class ExportController extends Controller
                 $pet->birthday?->format('Y-m-d'),
                 $pet->age,
                 $pet->weight !== null ? $pet->weight.' '.$pet->weight_unit : null,
-                $pet->microchipped ? 'yes' : 'no',
+                $yesNo($pet->microchipped),
             ]);
 
             $row([]);
-            $row(['VACCINATIONS']);
-            $row(['Name', 'Status', 'Due date', 'Administered', 'Notes']);
+            $row([$t('vaccinations')]);
+            $row($col('name', 'status', 'due_date', 'administered', 'notes'));
             foreach ($entry['vaccinations'] as $v) {
                 $row([$v->name, $v->status, $v->due_date?->format('Y-m-d'), $v->administered_date?->format('Y-m-d'), $v->notes]);
             }
 
             $row([]);
-            $row(['MEDICATIONS']);
-            $row(['Name', 'Dosage', 'Frequency', 'Times', 'Start', 'End', 'Active', 'Notes']);
+            $row([$t('medications')]);
+            $row($col('name', 'dosage', 'frequency', 'times', 'start', 'end', 'active', 'notes'));
             foreach ($entry['medications'] as $m) {
                 $row([
                     $m->name, $m->dosage, $m->frequency,
                     implode(' ', is_array($m->times) ? $m->times : []),
                     $m->start_date?->format('Y-m-d'), $m->end_date?->format('Y-m-d'),
-                    $m->active ? 'yes' : 'no', $m->notes,
+                    $yesNo($m->active), $m->notes,
                 ]);
             }
 
             $row([]);
-            $row(['APPOINTMENTS']);
-            $row(['Title', 'Clinic', 'Scheduled at', 'Status', 'Notes']);
+            $row([$t('appointments')]);
+            $row($col('title', 'clinic', 'scheduled_at', 'status', 'notes'));
             foreach ($entry['appointments'] as $a) {
                 $row([$a->title, $a->clinic?->name, $a->scheduled_at?->format('Y-m-d H:i'), $a->status, $a->notes]);
             }
 
             $row([]);
-            $row(['CLINICS']);
-            $row(['Name', 'Vet', 'Phone', 'Email', 'Address', 'Notes']);
+            $row([$t('clinics')]);
+            $row($col('name', 'vet', 'phone', 'email', 'address', 'notes'));
             foreach ($entry['clinics'] as $c) {
                 $row([$c->name, $c->vet_name, $c->phone, $c->email, $c->address, $c->notes]);
             }
 
             $row([]);
-            $row(['WEIGHT HISTORY']);
-            $row(['Date', 'Weight', 'Unit', 'Notes']);
+            $row([$t('weights')]);
+            $row($col('date', 'weight', 'unit', 'notes'));
             foreach ($entry['weights'] as $w) {
                 $row([$w->logged_at?->format('Y-m-d'), $w->weight, $w->unit, $w->notes]);
             }
 
             $row([]);
-            $row(['DOCUMENTS (index — files stay in your vault)']);
-            $row(['Title', 'Category', 'Added on']);
+            $row([$t('documents')]);
+            $row($col('title', 'category', 'added_on'));
             foreach ($entry['documents'] as $d) {
                 $row([$d->title, $d->category, $d->created_at?->format('Y-m-d')]);
             }
@@ -185,10 +201,22 @@ class ExportController extends Controller
 
     private function buildPdf(string $ownerName, Collection $bundle): string
     {
+        $locale = App::getLocale();
+
         $html = view('export', [
             'ownerName' => $ownerName,
             'bundle' => $bundle,
-            'exportedOn' => now()->format('F j, Y'),
+            'locale' => $locale,
+            'exportedOn' => self::formatDate(now(), 'date_long'),
+            // A date in the export language ('date' or 'datetime' pattern);
+            // null stays null so the view's '—' fallbacks keep working.
+            'date' => fn (?CarbonInterface $value, string $pattern = 'date') => $value
+                ? self::formatDate($value, $pattern)
+                : null,
+            // The display word for a stored id (pet type, status...) in the
+            // export language; ids without one, and every id in English,
+            // print as stored.
+            'label' => fn (string $group, ?string $value) => self::label($group, $value),
         ])->render();
 
         $options = new Options;
@@ -200,5 +228,23 @@ class ExportController extends Controller
         $dompdf->render();
 
         return $dompdf->output();
+    }
+
+    /** A date in the current locale, with that locale's export.formats pattern. */
+    private static function formatDate(CarbonInterface $value, string $pattern): string
+    {
+        return $value->copy()->locale(App::getLocale())->isoFormat(__('export.formats.'.$pattern));
+    }
+
+    private static function label(string $group, ?string $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        $key = 'export.values.'.$group.'.'.$value;
+        $translated = Lang::has($key) ? __($key) : null;
+
+        return is_string($translated) ? $translated : $value;
     }
 }
