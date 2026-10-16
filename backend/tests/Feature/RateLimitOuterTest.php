@@ -90,16 +90,43 @@ class RateLimitOuterTest extends TestCase
         }
         $this->refresh('junk-new')->assertStatus(429);
 
-        // … a token we signed that has since expired still gets its user's
-        // own budget, so the app sees 401 (sign in again), not 429 (retry).
+        // … a token we signed that expired recently (within the grace
+        // period) still gets its user's own budget, so the app sees 401
+        // (sign in again), not 429 (retry).
         $user = $this->account();
-        $this->travel(-40)->days();
+        $this->travel(-((int) config('jwt.refresh_ttl') + 2))->days();
         $expired = $this->refreshTokenFor($user);
         $this->travelBack();
         $this->refresh($expired)->assertStatus(401);
 
+        // Long past the grace period it counts as made up: a leaked token
+        // goes stale for good (here the network's junk bucket is full).
+        $this->travel(-((int) config('jwt.refresh_ttl') + JwtService::EXPIRED_REFRESH_GRACE_DAYS + 2))->days();
+        $stale = $this->refreshTokenFor($user);
+        $this->travelBack();
+        $this->refresh($stale)->assertStatus(429);
+
         // A live token from the same network refreshes as usual.
         $this->refresh($this->refreshTokenFor($this->account()))->assertOk();
+    }
+
+    public function test_a_token_from_before_a_password_reset_cannot_block_the_new_session(): void
+    {
+        // An old token (version 0) replayed from another network uses up
+        // its own bucket …
+        $user = $this->account();
+        [$old] = JwtService::createRefreshToken($user->id, 0);
+        for ($i = 0; $i < 10; $i++) {
+            $this->refresh($old, '198.51.100.40')->assertStatus(401);
+        }
+        $this->refresh($old, '198.51.100.40')->assertStatus(429);
+
+        // … but after a reset bumps the version, the user's current session
+        // has a bucket of its own and refreshes normally.
+        $user->forceFill(['token_version' => 1])->save();
+        [$current, $expiresAt] = JwtService::createRefreshToken($user->id, 1);
+        RefreshToken::create(['user_id' => $user->id, 'token' => $current, 'expires_at' => $expiresAt, 'revoked' => false]);
+        $this->refresh($current)->assertOk();
     }
 
     public function test_made_up_tokens_share_one_bucket_per_network_and_long_ones_are_refused(): void

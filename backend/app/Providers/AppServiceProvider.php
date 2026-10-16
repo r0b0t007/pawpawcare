@@ -7,8 +7,8 @@ use App\Services\Extraction\AnthropicDriver;
 use App\Services\Extraction\ExtractionClient;
 use App\Services\Extraction\OpenAiCompatibleDriver;
 use App\Services\JwtService;
-use App\Support\ClientNetwork;
 use App\Support\Backups;
+use App\Support\ClientNetwork;
 use App\Support\MailDelivery;
 use App\Support\ReportOnce;
 use App\Support\UploadsBackup;
@@ -137,7 +137,8 @@ class AppServiceProvider extends ServiceProvider
         // Token refresh and logout (CHW-184): a per-IP cap would make every
         // app behind one carrier NAT address share 20 a minute (each user
         // refreshes about hourly). So a refresh token we signed — the
-        // signature checked first, cheap (HS256), expired ones included —
+        // signature checked first, cheap (HS256); see
+        // JwtService::refreshSubject for token versions and expiry grace —
         // counts against its USER: chaining refreshes (each answer is a new
         // token) can't escape it, and it is one cache key per user. Anything
         // else shares ONE small bucket per network: keying made-up strings
@@ -204,5 +205,4 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
     }
-
 }
