@@ -3,6 +3,8 @@
 // unit-testable. `sel` is the editable working copy the sheet builds from a
 // document's stored extraction.
 
+import { parseDecimal } from './numbers';
+
 // A typed date is only sent if it's a valid YYYY-MM-DD; anything else → null
 // (the user fills it in later rather than the request being blocked).
 export const dateOrNull = (s) => (/^\d{4}-\d{2}-\d{2}$/.test((s || '').trim()) ? s.trim() : null);
@@ -11,8 +13,8 @@ export const dateOrNull = (s) => (/^\d{4}-\d{2}-\d{2}$/.test((s || '').trim()) ?
 export const extractionCount = (sel) =>
   sel.vaccinations.filter((v) => v.included && v.name.trim()).length +
   sel.medications.filter((m) => m.included && m.name.trim()).length +
-  (sel.weight?.included && parseFloat(sel.weight.value) > 0 ? 1 : 0) +
-  (sel.expense?.included && parseFloat(sel.expense.amount) > 0 ? 1 : 0) +
+  (sel.weight?.included && parseDecimal(sel.weight.value) > 0 ? 1 : 0) +
+  (sel.expense?.included && parseDecimal(sel.expense.amount) > 0 ? 1 : 0) +
   (sel.clinic?.included && sel.clinic.name.trim() ? 1 : 0);
 
 // Build the apply request from the user's edited, approved subset. Only
@@ -43,11 +45,11 @@ export const buildExtractionPayload = (sel) => {
     }));
   }
 
-  if (sel.weight?.included && parseFloat(sel.weight.value) > 0) {
-    p.weight = { value: parseFloat(sel.weight.value), unit: sel.weight.unit, date: dateOrNull(sel.weight.date) };
+  if (sel.weight?.included && parseDecimal(sel.weight.value) > 0) {
+    p.weight = { value: parseDecimal(sel.weight.value), unit: sel.weight.unit, date: dateOrNull(sel.weight.date) };
   }
-  if (sel.expense?.included && parseFloat(sel.expense.amount) > 0) {
-    p.expense = { amount: parseFloat(sel.expense.amount), date: dateOrNull(sel.expense.date) };
+  if (sel.expense?.included && parseDecimal(sel.expense.amount) > 0) {
+    p.expense = { amount: parseDecimal(sel.expense.amount), date: dateOrNull(sel.expense.date) };
   }
   if (sel.clinic?.included && sel.clinic.name.trim()) {
     p.clinic = { name: sel.clinic.name.trim(), phone: sel.clinic.phone.trim() || null };

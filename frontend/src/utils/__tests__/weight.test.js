@@ -94,7 +94,7 @@ describe('weightInsight', () => {
     it('builds the French summary', async () => {
       await i18n.changeLanguage('fr');
       expect(weightInsight([pt(4.0, '2026-01-01'), pt(4.8, '2026-04-01')], 'kg').summary)
-        .toBe('En hausse de 0.8 kg (20 %) sur 3 mois');
+        .toBe('En hausse de 0,8 kg (20 %) sur 3 mois');
       expect(weightInsight([pt(4.0, '2026-01-01'), pt(4.0, '2026-01-02')], 'kg').summary)
         .toBe('Stable sur 1 jour');
     });
@@ -102,7 +102,7 @@ describe('weightInsight', () => {
     it('builds the Spanish summary', async () => {
       await i18n.changeLanguage('es');
       expect(weightInsight([pt(5.0, '2026-01-01'), pt(4.5, '2026-02-26')], 'kg').summary)
-        .toBe('Ha bajado 0.5 kg (10 %) en 8 semanas');
+        .toBe('Ha bajado 0,5 kg (10 %) en 8 semanas');
     });
   });
 });

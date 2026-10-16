@@ -544,7 +544,7 @@
       "daily": "Daily reminder",
       "weekly": "Weekly reminder",
       "monthly": "Monthly reminder",
-      "other": "{{recurrence}} reminder"
+      "other": "Repeating reminder"
     },
     "wasDue": "{{pet}} · was due {{date}}",
     "sections": {
@@ -666,10 +666,14 @@
   "reminders": {
     "title": "Reminders",
     "schedule": {
-      "daily": "Daily at {{time}}",
-      "weekly": "Weekly at {{time}}",
-      "monthly": "Monthly at {{time}}",
-      "other": "{{recurrence}} at {{time}}",
+      "daily_one": "Daily at {{time}}",
+      "daily_other": "Daily at {{time}}",
+      "weekly_one": "Weekly at {{time}}",
+      "weekly_other": "Weekly at {{time}}",
+      "monthly_one": "Monthly at {{time}}",
+      "monthly_other": "Monthly at {{time}}",
+      "other_one": "Repeats at {{time}}",
+      "other_other": "Repeats at {{time}}",
       "oneTime": "One-time"
     },
     "toast": {

@@ -570,7 +570,7 @@
       "daily": "Recordatorio diario",
       "weekly": "Recordatorio semanal",
       "monthly": "Recordatorio mensual",
-      "other": "Recordatorio ({{recurrence}})"
+      "other": "Recordatorio periódico"
     },
     "wasDue": "{{pet}} · vencía el {{date}}",
     "sections": {
@@ -693,10 +693,18 @@
   "reminders": {
     "title": "Recordatorios",
     "schedule": {
-      "daily": "Cada día a las {{time}}",
-      "weekly": "Cada semana a las {{time}}",
-      "monthly": "Cada mes a las {{time}}",
-      "other": "{{recurrence}} a las {{time}}",
+      "daily_one": "Cada día a la {{time}}",
+      "daily_many": "Cada día a las {{time}}",
+      "daily_other": "Cada día a las {{time}}",
+      "weekly_one": "Cada semana a la {{time}}",
+      "weekly_many": "Cada semana a las {{time}}",
+      "weekly_other": "Cada semana a las {{time}}",
+      "monthly_one": "Cada mes a la {{time}}",
+      "monthly_many": "Cada mes a las {{time}}",
+      "monthly_other": "Cada mes a las {{time}}",
+      "other_one": "Periódicamente a la {{time}}",
+      "other_many": "Periódicamente a las {{time}}",
+      "other_other": "Periódicamente a las {{time}}",
       "oneTime": "Una sola vez"
     },
     "toast": {
@@ -1300,14 +1308,14 @@
     },
     "weight": {
       "title": "Registrar el peso de {{name}}",
-      "placeholder": "p. ej. 22.5",
+      "placeholder": "p. ej. 22,5",
       "hint": "Se registra en {{unit}}: cambie la unidad en Editar mascota.",
       "submit": "Registrar peso"
     },
     "expense": {
       "title": "Añadir gasto para {{name}}",
       "category": "Categoría",
-      "amountPlaceholder": "Importe (p. ej. 45.00)",
+      "amountPlaceholder": "Importe (p. ej. 45,00)",
       "notePlaceholder": "Nota (opcional)",
       "submit": "Añadir gasto"
     },

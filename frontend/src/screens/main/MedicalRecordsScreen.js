@@ -13,6 +13,7 @@ import { buildExtractionPayload, extractionCount } from '../../utils/extraction'
 import { fmtClock, fmtDay, fmtFull, relativeDay } from '../../utils/dates';
 import i18n, { useLocale, useTranslation } from '../../i18n';
 import { petById, emptyPhotoFor } from '../../utils/pets';
+import { formatDecimal } from '../../utils/numbers';
 import { useInFlight } from '../../hooks/useInFlight';
 import { ui, type, radii, motion, photos, vaultColors } from '../../theme';
 import {
@@ -67,7 +68,7 @@ const fmtSize = (bytes) => {
   if (!bytes) return '';
   if (bytes < 1024) return i18n.t('records.size.bytes', { n: bytes });
   if (bytes < 1024 * 1024) return i18n.t('records.size.kb', { n: Math.round(bytes / 1024) });
-  return i18n.t('records.size.mb', { n: (bytes / 1048576).toFixed(1) });
+  return i18n.t('records.size.mb', { n: formatDecimal(bytes / 1048576, 1) });
 };
 
 export default function MedicalRecordsScreen({ navigation, route }) {
@@ -814,11 +815,11 @@ function ExtractionSheet({ visible, doc, petName, onClose, onApply, onDone }) {
         frequency: m.frequency || null, start: m.start_date || '', end: m.end_date || '', notes: m.notes || '',
       })),
       weight: ex.weight
-        ? { included: true, value: String(ex.weight.value), unit: ex.weight.unit || 'kg', date: ex.weight.date || '' }
+        ? { included: true, value: formatDecimal(ex.weight.value, { min: 0, max: 2 }), unit: ex.weight.unit || 'kg', date: ex.weight.date || '' }
         : null,
       // Costs are opt-in — not everyone tracks expenses.
       expense: ex.total_cost
-        ? { included: false, amount: String(ex.total_cost), date: ex.document_date || '' }
+        ? { included: false, amount: formatDecimal(ex.total_cost, { min: 0, max: 2 }), date: ex.document_date || '' }
         : null,
       clinic: ex.clinic?.name
         ? { included: true, name: ex.clinic.name, phone: ex.clinic.phone || '' }

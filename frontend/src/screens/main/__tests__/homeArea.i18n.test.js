@@ -111,11 +111,11 @@ test('Reminders', async () => {
     { id: 'r1', title: 'Flea drops', enabled: true, schedule_type: 'recurring', recurrence: 'weekly', time_of_day: '09:00', pet_id: 'p1' },
   ];
   const shown = await render(<RemindersScreen navigation={navigation} />);
-  expect(shown).toContain('Biscuit · Weekly at 09:00');
+  expect(shown).toContain('Biscuit · Weekly at 9:00 AM');
   await inFrench(async () => {
     // The server's title is shown as-is; only the app's words change.
     expect(texts(tree)).toContain('Flea drops');
-    expect(texts(tree)).toContain('Biscuit · Toutes les semaines à 09:00');
+    expect(texts(tree)).toContain('Biscuit · Toutes les semaines à 9:00');
   });
 });
 

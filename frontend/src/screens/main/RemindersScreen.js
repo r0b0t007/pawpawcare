@@ -12,6 +12,7 @@ import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHead
 import { useInFlight } from '../../hooks/useInFlight';
 import { petById } from '../../utils/pets';
 import { fmtDate } from '../../utils/dates';
+import { recurringSummary } from '../../utils/reminders';
 import i18n, { useLocale, useTranslation } from '../../i18n';
 import { EASE_OUT_CSS } from '../../components/motion';
 
@@ -32,19 +33,9 @@ function formatWhen(iso) {
   }) || '—';
 }
 
-// "Weekly at 09:00" — recurrence is daily | weekly | monthly (server enum).
+// "Weekly at 9:00 AM" for a recurring reminder (utils/reminders), else its next date.
 function scheduleSummary(r) {
-  if (r.schedule_type === 'recurring') {
-    const rec = r.recurrence || 'daily';
-    const time = r.time_of_day || '09:00';
-    return i18n.t(`reminders.schedule.${rec}`, {
-      time,
-      defaultValue: i18n.t('reminders.schedule.other', {
-        recurrence: rec.replace(/^\w/, (c) => c.toUpperCase()),
-        time,
-      }),
-    });
-  }
+  if (r.schedule_type === 'recurring') return recurringSummary(r);
   return r.next_fire_at ? formatWhen(r.next_fire_at) : i18n.t('reminders.schedule.oneTime');
 }
 

@@ -218,10 +218,10 @@ See [Dates and units](#dates-and-units). In short: use a decimal comma, 24-hour 
 | short date | `D MMM YYYY`: 14 oct. 2026 | `D MMM YYYY`: 14 oct 2026 | none | Backend formats are in `share.php`/`export.php` `formats`/`date_format`. The app uses Intl with fr-FR / es-ES (`frontend/src/utils/dates.js`). |
 | long date | `D MMMM YYYY`: 14 octobre 2026 (first of the month: 1er octobre) | `D [de] MMMM [de] YYYY`: 14 de octubre de 2026 | none | `backend/lang/fr.json` uses `Do MMMM YYYY` to get "1er". |
 | day + month in a sentence | le {{day}} {{month}} | el {{day}} de {{month}} | none | Months and weekdays are lowercase. |
-| time | 24 h, `HH:mm`: 09:05; in prose "8 h", "18 h 30" | 24 h, `H:mm`: 9:05; in prose "a las 9:00" | es: `HH:mm` (`export.php` formats.datetime) | Never write AM/PM in fr or es. |
+| time | 24 h: 9:05 in the app (Intl, every screen), `HH:mm` 09:05 in the export; in prose "8 h", "18 h 30" | 24 h, `H:mm`: 9:05; in prose "a las 9:00" | es: `HH:mm` (`export.php` formats.datetime) | Never write AM/PM in fr or es. |
 | date + time | `D MMM YYYY [à] HH:mm` | `D MMM YYYY, H:mm` | none | |
 | relative | il y a 3 min / 3 h / 3 j; dans 3 jours | hace 3 min / 3 h / 3 d; dentro de 3 días | none | |
-| decimals | comma: 1,5 / 22,5 kg | comma: 1,5 / 22,5 kg | See the warning below | |
+| decimals | comma: 1,5 / 22,5 kg | comma: 1,5 / 22,5 kg | none | See the note below. |
 | thousands | U+202F narrow no-break space: 1 250 | period, from 5 digits up: 12.500 (no separator for 4 digits: 1250) | none | Set in `weight.php`. |
 | percent | 25 % (U+00A0) | 25 % (U+00A0) | es: ordinary space (`petProfile.weightInsight.up`, `petProfile.weightInsight.down`) | |
 | age | 1 an, 1,5 an, 2 ans (singular below 2) | 1 año, 1,5 años, 2 años | none | fr is handled by `share.php` `age_value` (`[*,1.9] … an|[2,*] … ans`). |
@@ -229,7 +229,7 @@ See [Dates and units](#dates-and-units). In short: use a decimal comma, 24-hour 
 | file sizes | o, Ko, Mo | B, KB, MB | none | |
 | "e.g." in placeholders | ex. | p. ej. | fr: *ex. :* (`health.sheet.namePlaceholder`, `vaccines.sheet.namePlaceholder`, `reminders.form.placeholder`, `records.doc.titlePlaceholder`, `records.clinic.namePlaceholder`, `records.visit.reasonPlaceholder`), *p. ex.* (`lostPets.lastSeenPlaceholder`). es: *p. ej.,* (`auth.signup.namePlaceholder` and the same six placeholder keys) | |
 
-> **Decimal comma: code caveat.** Weights and amounts are formatted in code with `toFixed()`, which prints a dot, and typed input is parsed with `parseFloat()`, which turns "22,5" into 22 (`PetProfileScreen.js`, `DataContext.js`). Until the code accepts and prints commas, **leave the numeric examples in placeholders as they are** ("ex. 22.5", "p. ej. 45.00"). Report the comma problem as a code bug, not as a translation fix. In prose and on backend pages (`weight.php`), use the comma.
+> **Decimal comma in code.** The app formats weights, amounts and sizes with `formatDecimal()` and reads typed numbers with `parseDecimal()` (`frontend/src/utils/numbers.js`, CHW-215): fr/es print a comma, and "22,5" and "22.5" both read as 22.5. Placeholders use the comma too ("ex. 22,5", "p. ej. 45,00"). Never add `toFixed()` or `parseFloat()` for a value the user sees or types.
 
 ---
 

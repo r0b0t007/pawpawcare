@@ -570,7 +570,7 @@
       "daily": "Rappel quotidien",
       "weekly": "Rappel hebdomadaire",
       "monthly": "Rappel mensuel",
-      "other": "Rappel ({{recurrence}})"
+      "other": "Rappel récurrent"
     },
     "wasDue": "{{pet}} · était prévu le {{date}}",
     "sections": {
@@ -693,10 +693,18 @@
   "reminders": {
     "title": "Rappels",
     "schedule": {
-      "daily": "Tous les jours à {{time}}",
-      "weekly": "Toutes les semaines à {{time}}",
-      "monthly": "Tous les mois à {{time}}",
-      "other": "{{recurrence}} à {{time}}",
+      "daily_one": "Tous les jours à {{time}}",
+      "daily_many": "Tous les jours à {{time}}",
+      "daily_other": "Tous les jours à {{time}}",
+      "weekly_one": "Toutes les semaines à {{time}}",
+      "weekly_many": "Toutes les semaines à {{time}}",
+      "weekly_other": "Toutes les semaines à {{time}}",
+      "monthly_one": "Tous les mois à {{time}}",
+      "monthly_many": "Tous les mois à {{time}}",
+      "monthly_other": "Tous les mois à {{time}}",
+      "other_one": "Régulièrement à {{time}}",
+      "other_many": "Régulièrement à {{time}}",
+      "other_other": "Régulièrement à {{time}}",
       "oneTime": "Ponctuel"
     },
     "toast": {
@@ -1300,14 +1308,14 @@
     },
     "weight": {
       "title": "Enregistrer le poids de {{name}}",
-      "placeholder": "ex. 22.5",
+      "placeholder": "ex. 22,5",
       "hint": "Enregistré en {{unit}} : modifiez l'unité dans « Modifier les informations ».",
       "submit": "Enregistrer le poids"
     },
     "expense": {
       "title": "Ajouter une dépense pour {{name}}",
       "category": "Catégorie",
-      "amountPlaceholder": "Montant (ex. 45.00)",
+      "amountPlaceholder": "Montant (ex. 45,00)",
       "notePlaceholder": "Note (facultatif)",
       "submit": "Ajouter la dépense"
     },
