@@ -35,7 +35,9 @@ class AnthropicDriver implements ExtractionClient
 
         $message = $this->client->messages->create(
             model: (string) config('services.anthropic.model'),
-            maxTokens: 4096,
+            // Adaptive thinking shares this budget with the JSON answer; a
+            // long multi-page record cut off here would be unparseable.
+            maxTokens: 16000,
             thinking: ['type' => 'adaptive'],
             system: $systemPrompt,
             messages: [[
@@ -46,12 +48,22 @@ class AnthropicDriver implements ExtractionClient
             requestOptions: ['timeout' => 90],
         );
 
+        // A cut-off or refused answer may not match the schema. Throw so the
+        // document is marked failed and can be retried, rather than storing
+        // an empty "nothing found" result as a success.
+        if (in_array($message->stopReason, ['max_tokens', 'refusal'], true)) {
+            throw new \RuntimeException("Extraction stopped early: {$message->stopReason}");
+        }
+
         foreach ($message->content as $content) {
             if ($content->type === 'text') {
-                return (array) json_decode($content->text, true);
+                $data = json_decode($content->text, true);
+                if (is_array($data)) {
+                    return $data;
+                }
             }
         }
 
-        return [];
+        throw new \RuntimeException('Extraction provider returned unparseable output');
     }
 }
