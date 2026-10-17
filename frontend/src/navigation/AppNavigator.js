@@ -31,6 +31,7 @@ import LostPetsScreen from '../screens/main/LostPetsScreen';
 import InvitesScreen from '../screens/main/InvitesScreen';
 import MedicalRecordsScreen from '../screens/main/MedicalRecordsScreen';
 import SupportScreen from '../screens/main/SupportScreen';
+import GuideScreen from '../screens/main/GuideScreen';
 import ModerationScreen from '../screens/main/ModerationScreen';
 import SubscriptionScreen from '../screens/main/SubscriptionScreen';
 import PaywallScreen from '../screens/main/PaywallScreen';
@@ -102,6 +103,9 @@ function ProfileStack() {
       <Stack.Screen name="ProfileHome" component={ProfileScreen} />
       <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} />
       <Stack.Screen name="Support" component={SupportScreen} />
+      <Stack.Screen name="Guide" component={GuideScreen} />
+      {/* Opened from the Reminders guide, so Back returns to the guide. */}
+      <Stack.Screen name="Reminders" component={RemindersScreen} />
       <Stack.Screen name="Moderation" component={ModerationScreen} />
       <Stack.Screen name="Invites" component={InvitesScreen} />
       <Stack.Screen name="Subscription" component={SubscriptionScreen} />

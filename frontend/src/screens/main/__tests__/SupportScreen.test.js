@@ -94,17 +94,23 @@ test('with no chip picked, the prompt is neutral rather than a problem report', 
   expect(input(tree).props.placeholder).toMatch(/how can we help/i);
 });
 
-// Placeholders until the real guides exist: labelled "Soon", nothing to tap.
-test('the placeholder guides read as coming soon, not as links', async () => {
+// Each guide row is a link (chevron) that opens its guide.
+test('the guide rows open their guides', async () => {
   const tree = await render();
   const rows = tree.root.findAll((n) => n.type === ListRow);
 
-  expect(rows.length).toBeGreaterThan(0);
+  expect(rows.map((row) => row.props.title)).toEqual([
+    'Getting started',
+    'Reminders & notifications',
+    'Sharing with family & your vet',
+  ]);
   rows.forEach((row) => {
-    expect(row.props.value).toBe('Soon');
-    expect(row.props.onPress).toBeUndefined();
-    expect(row.props.chevron).toBeFalsy();
+    expect(row.props.chevron).toBe(true);
+    expect(row.props.value).toBeUndefined();
   });
+
+  await act(async () => rows[1].props.onPress());
+  expect(navigation.navigate).toHaveBeenCalledWith('Guide', { id: 'reminders' });
 });
 
 test('the chips are announced as one choice in a set', async () => {

@@ -402,7 +402,6 @@
   "support": {
     "title": "Aide et commentaires",
     "guides": "Guides",
-    "soon": "Bientôt",
     "guide": {
       "gettingStarted": "Premiers pas",
       "reminders": "Rappels et notifications",
@@ -430,6 +429,80 @@
     "sentReply": "Envoyé : nous vous répondrons sous 2 jours ouvrés",
     "sentNote": "Merci : nous lisons chaque message",
     "sendFailed": "Envoi impossible : veuillez réessayer"
+  },
+  "guides": {
+    "messageUs": "Besoin d'aide ? Écrivez-nous",
+    "gettingStarted": {
+      "intro": "Créez le profil de votre animal en une minute, puis laissez PawPawCare suivre ce qui arrive à échéance.",
+      "cta": "Ajouter un animal",
+      "addPet": {
+        "title": "Ajoutez votre animal",
+        "body": "Touchez « Ajoutez votre premier animal » sur l'Accueil, ou « Ajouter un autre animal » dans l'onglet Animaux. Seul le nom est obligatoire.",
+        "step1": "Choisissez chien, chat, ou « Lapin, oiseau ou autre ».",
+        "step2": "Donnez-lui un nom. La photo, la race et la couleur sont facultatives.",
+        "step3": "Ajoutez sa date de naissance, son poids et le reste, ou touchez « Passer pour le moment ». Vous pourrez les compléter plus tard."
+      },
+      "records": {
+        "title": "Ajoutez vaccins et médicaments",
+        "body": "Ouvrez le profil de votre animal, puis Santé. Dans « Suivi des vaccins », touchez « Ajouter un vaccin » : un nom et une date d'échéance suffisent. « Ajouter un médicament » demande un nom, une dose, une fréquence et les heures de prise."
+      },
+      "home": {
+        "title": "Comprendre l'écran d'accueil",
+        "body": "Le titre vous indique ce qui demande votre attention : d'abord ce qui est en retard, puis les vaccins dus dans les 30 prochains jours. La première carte montre le vaccin le plus urgent, avec « Marquer comme fait » et « Reprogrammer ». « Aujourd'hui » liste les médicaments du jour, et « À venir » les 7 prochains jours. « Tout est à jour » signifie que rien n'est en retard ni bientôt dû, et qu'aucun médicament n'attend aujourd'hui."
+      },
+      "ai": {
+        "title": "Faites lire un document vétérinaire par l'IA",
+        "body": "Dans le « Coffre médical », importez la photo d'un document vétérinaire, puis touchez « Lire avec l'IA ». Elle propose vaccins, médicaments, poids, coût et coordonnées de la clinique. Rien n'est enregistré avant que vous ayez vérifié les propositions et touché « Appliquer »."
+      }
+    },
+    "reminders": {
+      "intro": "La plupart des rappels se créent tout seuls. Vous n'ajoutez que le reste.",
+      "cta": "Ouvrir les rappels",
+      "automatic": {
+        "title": "Des rappels qui se créent tout seuls",
+        "body": "Chaque vaccin ajouté reçoit un rappel 7 jours avant l'échéance, à 9 h. Chaque médicament en reçoit un à chaque heure de prise, répété au rythme du traitement ; les médicaments « Au besoin » n'en ont pas. Toutes les personnes qui partagent l'animal les reçoivent aussi, et marquer un vaccin comme fait annule son rappel."
+      },
+      "custom": {
+        "title": "Ajoutez les vôtres",
+        "body": "Pour tout le reste, comme une visite chez le vétérinaire ou un renouvellement d'ordonnance, ouvrez « Rappels » et ajoutez-en un avec une date et une heure. Dans la même liste, vous pouvez désactiver ou supprimer n'importe quel rappel."
+      },
+      "inbox": {
+        "title": "Votre boîte de notifications",
+        "body": "Toucher une notification ouvre votre boîte de notifications (la cloche sur l'Accueil), où vous pouvez reporter un rappel d'une heure ou l'ignorer."
+      },
+      "phone": {
+        "title": "Si les notifications n'arrivent pas",
+        "body": "Les rappels sont programmés sur votre téléphone : ils arrivent même hors connexion. Si aucun ne s'affiche, les notifications sont peut-être bloquées pour PawPawCare : autorisez-les dans les réglages de votre téléphone. Vérifiez aussi Profil → Notifications → « Rappels de soins », qui active ou désactive les rappels sur ce téléphone uniquement."
+      },
+      "doses": {
+        "title": "Notez chaque prise",
+        "body": "Touchez « Noter » quand vous donnez un médicament. La carte « Aujourd'hui » de l'Accueil indique alors combien de prises du jour ont été données."
+      }
+    },
+    "sharing": {
+      "intro": "Partagez les soins avec votre famille, votre vétérinaire ou un gardien, sans partager votre mot de passe.",
+      "cta": "Ouvrir Partage et invitations",
+      "invite": {
+        "title": "Invitez un proche à co-gérer un animal",
+        "body": "Sur le profil de votre animal, ouvrez « Équipe de soins » et envoyez une invitation à son adresse e-mail. Les co-propriétaires peuvent consulter et mettre à jour les dossiers ; supprimer l'animal ou gérer l'équipe de soins vous est réservé."
+      },
+      "accept": {
+        "title": "Acceptez une invitation",
+        "body": "Nous n'envoyons pas les invitations par e-mail : prévenez la personne d'ouvrir Profil → « Partage et invitations ». La première fois, elle confirme son adresse e-mail avec un code à 6 chiffres ; les invitations envoyées à cette adresse y apparaissent alors, prêtes à être acceptées."
+      },
+      "vet": {
+        "title": "Partagez avec votre vétérinaire",
+        "body": "« Partager avec le vétérinaire » crée un lien web en lecture seule vers les vaccins, médicaments, poids et documents récents. Choisissez 1 heure, 24 heures ou 7 jours ; votre vétérinaire n'a besoin ni d'application ni de compte. « Révoquer tous les liens actifs » les désactive tous d'un coup."
+      },
+      "sitter": {
+        "title": "Passez le relais à un gardien",
+        "body": "« Passation au gardien » regroupe l'alimentation, les consignes et un contact d'urgence, avec un lien à envoyer à votre gardien, valable de 1 jour à 2 semaines. Toute personne qui a le lien peut le lire : n'y mettez ni code de porte ni code d'alarme."
+      },
+      "export": {
+        "title": "Exportez vos dossiers",
+        "body": "Profil → « Exporter les dossiers de santé » crée un PDF ou un CSV des vaccins, médicaments, rendez-vous, poids et cliniques, pour n'importe lequel de vos animaux. C'est gratuit, pour toujours."
+      }
+    }
   },
   "errors": {
     "generic": "Une erreur est survenue : veuillez réessayer.",

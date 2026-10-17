@@ -78,10 +78,25 @@ async function render({ store, early }) {
   return texts(tree);
 }
 
-beforeEach(() => jest.clearAllMocks());
+// Pin "now" to the same morning useToday returns. Coming up drops anything
+// already past by the real clock, so the dated fixtures below (Oct 17, 09:00)
+// started failing once that moment arrived. Only Date is faked; timers stay
+// real for act().
+const NOW = new Date('2026-10-15T10:00:00');
+const REAL_TIMERS = [
+  'hrtime', 'nextTick', 'performance', 'queueMicrotask', 'requestAnimationFrame', 'cancelAnimationFrame',
+  'requestIdleCallback', 'cancelIdleCallback', 'setImmediate', 'clearImmediate',
+  'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout',
+];
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.useFakeTimers({ now: NOW, doNotFake: REAL_TIMERS });
+});
 afterEach(() => {
   act(() => tree?.unmount());
   tree = undefined;
+  jest.useRealTimers();
 });
 
 test('shows only placeholders before the pets list arrives', async () => {

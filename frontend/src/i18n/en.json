@@ -387,7 +387,6 @@
   "support": {
     "title": "Help & feedback",
     "guides": "Guides",
-    "soon": "Soon",
     "guide": {
       "gettingStarted": "Getting started",
       "reminders": "Reminders & notifications",
@@ -415,6 +414,80 @@
     "sentReply": "Sent — we'll reply within 2 business days",
     "sentNote": "Thanks — we read every note",
     "sendFailed": "Could not send — try again"
+  },
+  "guides": {
+    "messageUs": "Still need help? Message us",
+    "gettingStarted": {
+      "intro": "Set up your pet in a minute, then let PawPawCare keep track of what's due.",
+      "cta": "Add a pet",
+      "addPet": {
+        "title": "Add your pet",
+        "body": "Tap “Add your first pet” on Home, or “Add another pet” on the Pets tab. Only the name is required.",
+        "step1": "Choose dog, cat, or “Rabbit, bird or other”.",
+        "step2": "Give them a name. A photo, breed and color are optional.",
+        "step3": "Add their birthday, weight and more, or tap “Skip for now”. You can fill these in later."
+      },
+      "records": {
+        "title": "Add vaccines and medications",
+        "body": "Open your pet's profile and go to Health. In “Vaccination tracker”, tap “Add vaccine”: a name and a due date are all it needs. “Add medication” asks for a name, a dose, how often, and the times of day."
+      },
+      "home": {
+        "title": "Read your Home screen",
+        "body": "The headline tells you what needs you: anything overdue first, then vaccines due in the next 30 days. The first card shows the most urgent vaccine, with “Mark done” and “Reschedule”. “Today” lists today's medications, and “Coming up” the next 7 days. “All caught up” means nothing is overdue or due soon, and no medication is waiting for today."
+      },
+      "ai": {
+        "title": "Let AI read a vet document",
+        "body": "In the “Medical vault”, upload a photo of a vet record, then tap “Read with AI”. It suggests vaccines, medications, weight, cost and clinic details. Nothing is saved until you check the suggestions and tap “Apply”."
+      }
+    },
+    "reminders": {
+      "intro": "Most reminders set themselves up. You only add the extras.",
+      "cta": "Open reminders",
+      "automatic": {
+        "title": "Reminders that set themselves up",
+        "body": "Every vaccine you add gets a reminder 7 days before it's due, at 9:00. Every medication gets one at each dose time, repeating as often as the medication does; “As needed” medications get none. Everyone who shares the pet gets them too, and marking a vaccine done cancels its reminder."
+      },
+      "custom": {
+        "title": "Add your own",
+        "body": "For anything else, like a vet visit or a refill, open “Reminders” and add one with a date and a time. From the same list you can switch any reminder off, or delete it."
+      },
+      "inbox": {
+        "title": "Your notification inbox",
+        "body": "Tapping a notification opens your inbox (the bell on Home), where you can snooze a reminder for an hour or dismiss it."
+      },
+      "phone": {
+        "title": "If notifications don't arrive",
+        "body": "Reminders are scheduled on your phone, so they arrive even when you're offline. If none show up, notifications may be blocked for PawPawCare: allow them in your phone's settings. Also check Profile → Notifications → “Care reminders”, which turns reminders on or off on this phone only."
+      },
+      "doses": {
+        "title": "Log each dose",
+        "body": "Tap “Log” when you give a medication. The “Today” card on Home then shows how many of today's doses have been given."
+      }
+    },
+    "sharing": {
+      "intro": "Share the care with family, your vet or a sitter, without sharing your password.",
+      "cta": "Open pet sharing & invites",
+      "invite": {
+        "title": "Invite family to co-own a pet",
+        "body": "On your pet's profile, open “Care team” and send an invite to their email address. Co-owners can view and update records; only you can delete the pet or manage the care team."
+      },
+      "accept": {
+        "title": "Accept an invitation",
+        "body": "We don't email invitations, so let them know to open Profile → “Pet sharing & invites”. The first time, they confirm their email address with a 6-digit code; invitations sent to that address then appear there, ready to accept."
+      },
+      "vet": {
+        "title": "Share with your vet",
+        "body": "“Share with vet” creates a read-only web link to vaccinations, medications, weight and recent documents. Choose 1 hour, 24 hours or 7 days; your vet needs no app or account. “Revoke all active links” switches every link off at once."
+      },
+      "sitter": {
+        "title": "Hand over to a sitter",
+        "body": "“Caretaker handoff” holds feeding notes, instructions and an emergency contact, plus a link you can text to your sitter, valid from 1 day to 2 weeks. Anyone with the link can read it, so leave out door codes and alarm PINs."
+      },
+      "export": {
+        "title": "Export your records",
+        "body": "Profile → “Export health records” creates a PDF or CSV of vaccinations, medications, appointments, weights and clinics, for any of your pets. It's free, forever."
+      }
+    }
   },
   "errors": {
     "generic": "Something went wrong — try again.",
