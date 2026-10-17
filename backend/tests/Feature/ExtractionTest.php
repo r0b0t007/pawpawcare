@@ -257,6 +257,42 @@ class ExtractionTest extends TestCase
         $this->assertSame('Rabies', $doc['extraction']['vaccinations'][0]['name']);
     }
 
+    // ── Output schema (validated by the provider before the model runs) ─────
+
+    public function test_schema_never_pairs_a_type_array_with_type_specific_keywords(): void
+    {
+        $extractor = (new \ReflectionClass(DocumentExtractor::class))->newInstanceWithoutConstructor();
+        $schema = (new \ReflectionMethod(DocumentExtractor::class, 'schema'))->invoke($extractor);
+
+        // Anthropic rejected the whole request (400, every document) when an
+        // enum sat next to "type": ["string", "null"]. Nullable enums and
+        // objects must use anyOf; type arrays are only for bare scalars.
+        $offenders = [];
+        $walk = function (array $node, string $path) use (&$walk, &$offenders) {
+            if (is_array($node['type'] ?? null)) {
+                foreach (['enum', 'properties', 'items', 'required'] as $keyword) {
+                    if (array_key_exists($keyword, $node)) {
+                        $offenders[] = "{$path} ({$keyword})";
+                    }
+                }
+            }
+            if (array_key_exists('enum', $node)) {
+                $this->assertNotContains(null, $node['enum'], "{$path}: null belongs in an anyOf branch, not the enum");
+            }
+            foreach ($node as $key => $child) {
+                if (is_array($child)) {
+                    $walk($child, "{$path}.{$key}");
+                }
+            }
+        };
+        $walk($schema, '$');
+
+        $this->assertSame([], $offenders);
+        $frequency = $schema['properties']['medications']['items']['properties']['frequency'];
+        $this->assertSame(['type' => 'null'], $frequency['anyOf'][1]);
+        $this->assertSame(['daily', 'weekly', 'monthly', 'as_needed'], $frequency['anyOf'][0]['enum']);
+    }
+
     // ── Sanitization (model output is untrusted input) ───────────────────────
 
     public function test_sanitize_enforces_enums_dates_and_lengths(): void

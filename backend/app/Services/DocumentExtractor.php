@@ -150,6 +150,11 @@ class DocumentExtractor
     /** JSON schema for structured output — mirrors the app's model fields. */
     private function schema(): array
     {
+        // A type array (['string', 'null']) is fine for a bare scalar, but the
+        // API rejects one next to a type-specific keyword — "Enum value 'daily'
+        // does not match declared type ['string', 'null']" — so anything with
+        // an enum or properties is made nullable with anyOf instead.
+        $nullable = fn (array $schema) => ['anyOf' => [$schema, ['type' => 'null']]];
         $nullableString = ['type' => ['string', 'null']];
         $nullableDate = ['type' => ['string', 'null'], 'format' => 'date'];
 
@@ -159,8 +164,8 @@ class DocumentExtractor
                 'document_type' => ['type' => 'string', 'enum' => self::CATEGORIES],
                 'matches_pet' => ['type' => 'boolean'],
                 'document_date' => $nullableDate,
-                'clinic' => [
-                    'type' => ['object', 'null'],
+                'clinic' => $nullable([
+                    'type' => 'object',
                     'properties' => [
                         'name' => ['type' => 'string'],
                         'phone' => $nullableString,
@@ -168,7 +173,7 @@ class DocumentExtractor
                     ],
                     'required' => ['name', 'phone', 'address'],
                     'additionalProperties' => false,
-                ],
+                ]),
                 'vaccinations' => [
                     'type' => 'array',
                     'items' => [
@@ -190,7 +195,7 @@ class DocumentExtractor
                         'properties' => [
                             'name' => ['type' => 'string'],
                             'dosage' => $nullableString,
-                            'frequency' => ['type' => ['string', 'null'], 'enum' => [...self::FREQUENCIES, null]],
+                            'frequency' => $nullable(['type' => 'string', 'enum' => self::FREQUENCIES]),
                             'start_date' => $nullableDate,
                             'end_date' => $nullableDate,
                             'notes' => $nullableString,
@@ -199,8 +204,8 @@ class DocumentExtractor
                         'additionalProperties' => false,
                     ],
                 ],
-                'weight' => [
-                    'type' => ['object', 'null'],
+                'weight' => $nullable([
+                    'type' => 'object',
                     'properties' => [
                         'value' => ['type' => 'number'],
                         'unit' => ['type' => 'string', 'enum' => ['kg', 'lb']],
@@ -208,7 +213,7 @@ class DocumentExtractor
                     ],
                     'required' => ['value', 'unit', 'date'],
                     'additionalProperties' => false,
-                ],
+                ]),
                 'total_cost' => ['type' => ['number', 'null']],
                 'suggested_title' => ['type' => 'string'],
                 'notes_for_owner' => $nullableString,
