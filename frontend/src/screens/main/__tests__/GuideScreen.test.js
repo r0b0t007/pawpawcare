@@ -14,7 +14,7 @@ import Button from '../../../components/Button';
 import { GUIDES } from '../guides';
 import en from '../../../i18n/en.json';
 
-const navigation = { goBack: jest.fn(), navigate: jest.fn() };
+const navigation = { goBack: jest.fn(), navigate: jest.fn(), popTo: jest.fn() };
 
 async function render(id) {
   let tree;
@@ -83,12 +83,45 @@ test.each([
   expect(navigation.navigate).toHaveBeenCalledWith(...target);
 });
 
-test('"Message us" returns to the help form by name, wherever the guide was opened from', async () => {
+test('"Message us" pops back to the help form, keeping its params', async () => {
   const tree = await render('reminders');
 
   await act(async () => button(tree, 'Still need help? Message us').props.onPress());
-  expect(navigation.navigate).toHaveBeenCalledWith('Support');
+  expect(navigation.popTo).toHaveBeenCalledWith('Support', undefined, { merge: true });
+  expect(navigation.navigate).not.toHaveBeenCalled();
   expect(navigation.goBack).not.toHaveBeenCalled();
+});
+
+// The mock above only proves which method is called. This runs that action
+// through the real stack router (the one ProfileStack uses), so a router
+// change can't bring back the duplicate Support the emulator caught: since
+// React Navigation 7, navigate() pushes a second Support instead of going back.
+describe('the Profile stack after "Message us" (real StackRouter)', () => {
+  const { StackRouter, StackActions, CommonActions } = require('@react-navigation/routers');
+  const routeNames = ['ProfileHome', 'Support', 'Guide', 'Reminders', 'Invites'];
+  const router = StackRouter({});
+  const options = { routeNames, routeParamList: {}, routeGetIdList: {} };
+  const start = () => {
+    let state = router.getInitialState(options);
+    for (const [name, params] of [['Support', { category: 'question' }], ['Guide', { id: 'reminders' }]]) {
+      state = router.getStateForAction(state, CommonActions.navigate(name, params), options);
+    }
+    return state;
+  };
+  const names = (state) => state.routes.map((r) => r.name);
+
+  test('popTo returns to the one Support below the guide, params intact', () => {
+    const state = router.getStateForAction(start(), StackActions.popTo('Support', undefined, { merge: true }), options);
+
+    expect(names(state)).toEqual(['ProfileHome', 'Support']);
+    expect(state.routes[1].params).toEqual({ category: 'question' });
+  });
+
+  test('(why not navigate: it stacks a second Support on top of the guide)', () => {
+    const state = router.getStateForAction(start(), CommonActions.navigate('Support'), options);
+
+    expect(names(state)).toEqual(['ProfileHome', 'Support', 'Guide', 'Support']);
+  });
 });
 
 test('step numbers are hidden from screen readers (the list order already numbers them)', async () => {
