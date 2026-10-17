@@ -1505,6 +1505,7 @@
     "saveChanges": "Save changes",
     "dangerZone": "Danger zone",
     "dangerHint": "Removing {{name}} deletes their records for everyone they're shared with.",
+    "coOwnerNote": "Only the owner can remove {{name}}. To stop co-owning, open {{name}}'s profile and choose “Leave this pet” in the ••• menu.",
     "remove": "Remove {{name}}",
     "confirmTitle": "Remove {{name}}?",
     "confirmMessage": "This deletes all records permanently. This can't be undone.",

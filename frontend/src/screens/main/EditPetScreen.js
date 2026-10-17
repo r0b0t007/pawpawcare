@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { resolveAsset } from '../../config';
 import { useTranslation } from '../../i18n';
@@ -15,6 +16,8 @@ import { Button, ConfirmDialog, showToast, ScreenHeader, FormScrollView } from '
 
 // Edit pet: name, type, breed, identity color and photo. Deleting the pet
 // lives here — behind a danger zone + ConfirmDialog — never on the browse path.
+// Only the owner can delete (the API answers co-owners with 403), so a
+// co-owner sees a note pointing to "Leave this pet" instead (CHW-229).
 
 // Labels come from i18n (`pets.types.*`); the ids are what gets stored.
 const PET_TYPES = [
@@ -37,7 +40,10 @@ export default function EditPetScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { petId } = route.params;
   const { pets, updatePet, deletePet } = useData();
+  const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
+  // Same check as PetProfileScreen's owner-only actions.
+  const isOwner = !!pet && pet.ownerId === user?.id;
 
   const [form, setForm] = useState({
     name: pet?.name || '',
@@ -109,6 +115,7 @@ export default function EditPetScreen({ navigation, route }) {
 
   const handleRemove = () => {
     setConfirmRemove(false);
+    if (!isOwner) return;
     // Navigate away first so the pet vanishing from state can't flash a
     // "Pet not found" frame; the delete then completes in the background.
     navigation.popToTop();
@@ -245,24 +252,29 @@ export default function EditPetScreen({ navigation, route }) {
           disabled={saving || uploading}
         />
 
-        {/* Danger zone */}
-        <View style={styles.dangerZone}>
-          <Text style={styles.dangerLabel}>{t('editPet.dangerZone')}</Text>
-          <Text style={styles.dangerHint}>
-            {t('editPet.dangerHint', { name: pet.name })}
-          </Text>
-          <Pressable accessibilityRole="button"
-            style={({ pressed }) => [styles.removeBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
-            onPress={() => setConfirmRemove(true)}
-          >
-            <MaterialCommunityIcons name="delete-outline" size={17} color={ui.danger} />
-            <Text style={styles.removeBtnText}>{t('editPet.remove', { name: pet.name })}</Text>
-          </Pressable>
-        </View>
+        {/* Danger zone: the owner only. A co-owner's way out is "Leave this
+            pet" on the profile, so point there instead. */}
+        {isOwner ? (
+          <View style={styles.dangerZone}>
+            <Text style={styles.dangerLabel}>{t('editPet.dangerZone')}</Text>
+            <Text style={styles.dangerHint}>
+              {t('editPet.dangerHint', { name: pet.name })}
+            </Text>
+            <Pressable accessibilityRole="button"
+              style={({ pressed }) => [styles.removeBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
+              onPress={() => setConfirmRemove(true)}
+            >
+              <MaterialCommunityIcons name="delete-outline" size={17} color={ui.danger} />
+              <Text style={styles.removeBtnText}>{t('editPet.remove', { name: pet.name })}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Text style={styles.coOwnerNote}>{t('editPet.coOwnerNote', { name: pet.name })}</Text>
+        )}
       </FormScrollView>
 
       <ConfirmDialog
-        visible={confirmRemove}
+        visible={confirmRemove && isOwner}
         title={t('editPet.confirmTitle', { name: pet.name })}
         message={t('editPet.confirmMessage')}
         confirmLabel={t('editPet.confirmLabel')}
@@ -390,6 +402,7 @@ const styles = StyleSheet.create({
     color: ui.danger,
   },
   dangerHint: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12.5, lineHeight: 18, color: ui.sub },
+  coOwnerNote: { ...type.secondary, color: ui.sub, textAlign: 'center', marginTop: 24 },
   removeBtn: {
     flexDirection: 'row',
     alignItems: 'center',

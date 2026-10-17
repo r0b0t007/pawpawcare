@@ -9,14 +9,17 @@ jest.mock('react-native-safe-area-context', () => {
 });
 jest.mock('../../../services/imagePicker', () => ({ pickAndUploadImage: jest.fn() }));
 let mockPets = [];
+let mockUser = { id: 'u1' };
 const mockUpdatePet = jest.fn((id, updates) => Promise.resolve({ id, ...updates }));
+const mockDeletePet = jest.fn(() => Promise.resolve(true));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     pets: mockPets,
     updatePet: mockUpdatePet,
-    deletePet: jest.fn(),
+    deletePet: mockDeletePet,
   }),
 }));
+jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: mockUser }) }));
 
 import React from 'react';
 import { Text, TextInput } from 'react-native';
@@ -39,8 +42,11 @@ function render() {
 }
 
 beforeEach(() => {
-  mockPets = [{ id: 'p1', name: 'Luna', type: 'cat', breed: '', color: '#ffddb8' }];
+  // The signed-in user owns Luna unless a test says otherwise.
+  mockUser = { id: 'u1' };
+  mockPets = [{ id: 'p1', name: 'Luna', type: 'cat', breed: '', color: '#ffddb8', ownerId: 'u1' }];
   mockUpdatePet.mockClear();
+  mockDeletePet.mockClear();
 });
 
 afterEach(async () => {
@@ -83,4 +89,42 @@ test('French: a suggested breed shows in French and is saved back in English', a
   });
   expect(mockUpdatePet).toHaveBeenCalledWith('p1', expect.objectContaining({ breed: 'Mixed' }));
   act(() => tree.unmount());
+});
+
+// CHW-229: only the owner can delete a pet (the API answers co-owners with
+// 403), so a co-owner never gets the Remove button that can only fail.
+describe('removing the pet', () => {
+  const removeButton = (tree) => tree.root.findAll((n) => n.props.accessibilityRole === 'button'
+    && n.findAllByType(Text).some((t) => flat(t) === 'Remove Luna'));
+
+  test('the owner sees the danger zone with Remove', () => {
+    const tree = render();
+
+    expect(texts(tree)).toEqual(expect.arrayContaining(['Danger zone', 'Remove Luna']));
+    expect(removeButton(tree).length).toBeGreaterThan(0);
+    act(() => tree.unmount());
+  });
+
+  test('a co-owner gets no Remove button, just a pointer to "Leave this pet"', () => {
+    mockUser = { id: 'u2' };
+    const tree = render();
+    const all = texts(tree);
+
+    expect(all).not.toContain('Danger zone');
+    expect(removeButton(tree)).toHaveLength(0);
+    expect(all).toContain("Only the owner can remove Luna. To stop co-owning, open Luna's profile and choose “Leave this pet” in the ••• menu.");
+    act(() => tree.unmount());
+  });
+
+  test('a co-owner can never trigger the delete, even if the dialog were confirmed', () => {
+    mockUser = { id: 'u2' };
+    const tree = render();
+    const { ConfirmDialog } = require('../../../components');
+    const dialog = tree.root.findByType(ConfirmDialog);
+
+    expect(dialog.props.visible).toBe(false);
+    act(() => dialog.props.onConfirm());
+    expect(mockDeletePet).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
 });
