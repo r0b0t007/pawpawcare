@@ -60,6 +60,9 @@ class DocumentExtractor
     {
         $age = $pet->age !== null ? "{$pet->age}-year-old " : '';
         $breed = $pet->breed ? "{$pet->breed} " : '';
+        // The requester's language (SetLocale: saved preference, then
+        // Accept-Language), so the title and notes read naturally to them.
+        $language = ['fr' => 'French', 'es' => 'Spanish'][app()->getLocale()] ?? 'English';
 
         return <<<PROMPT
             You extract structured data from veterinary documents for a pet health app.
@@ -67,6 +70,9 @@ class DocumentExtractor
             Set matches_pet to false if the document clearly refers to a different animal.
             Extract only what is explicitly present in the document — never infer or invent
             values; use null when a field is absent or illegible. Dates must be YYYY-MM-DD.
+            Write suggested_title, notes_for_owner and any notes of your own in {$language}.
+            Copy names, products, dosages and clinic details exactly as they appear in the
+            document; never translate them. Use plain text, not HTML entities.
             PROMPT;
     }
 
@@ -76,7 +82,16 @@ class DocumentExtractor
      */
     private function sanitize(array $raw): array
     {
-        $str = fn ($v, int $max) => is_string($v) && trim($v) !== '' ? mb_substr(trim($v), 0, $max) : null;
+        // Plain text only: the model sometimes HTML-escapes ("Record &amp;
+        // Invoice"), which the app would show verbatim.
+        $str = function ($v, int $max): ?string {
+            // Unicode-aware trim: &nbsp; decodes to U+00A0, which trim() keeps.
+            $text = is_string($v)
+                ? (preg_replace('/^[\s\p{Z}]+|[\s\p{Z}]+$/u', '', html_entity_decode($v, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '')
+                : '';
+
+            return $text !== '' ? mb_substr($text, 0, $max) : null;
+        };
         // Structured outputs don't guarantee enum capitalisation ("Daily"),
         // so compare case-insensitively rather than drop a correct reading.
         $enum = fn ($v, array $allowed) => is_string($v) && in_array($l = strtolower(trim($v)), $allowed, true) ? $l : null;
