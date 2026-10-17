@@ -8,6 +8,7 @@ jest.mock('react-native-safe-area-context', () => {
   return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
 jest.mock('../../../services/imagePicker', () => ({ pickAndUploadImage: jest.fn() }));
+jest.mock('../../../components/Toast', () => ({ showToast: jest.fn(), ToastHost: () => null }));
 // The real dialog mounts a gesture-handler Sheet (native module); a stub keeps its props.
 jest.mock('../../../components/ConfirmDialog', () => function ConfirmDialog() { return null; });
 let mockPets = [];
@@ -54,6 +55,7 @@ beforeEach(() => {
   mockUpdatePet.mockClear();
   mockDeletePet.mockClear();
   mockLeavePet.mockClear();
+  require('../../../components/Toast').showToast.mockClear();
 });
 
 afterEach(async () => {
@@ -102,8 +104,10 @@ test('French: a suggested breed shows in French and is saved back in English', a
 // 403). The owner gets Remove; a co-owner gets Leave (the profile's action)
 // in the same place, so nobody sees a button that can only fail.
 describe('the danger zone', () => {
-  const dangerButton = (tree, label) => tree.root.findAll((n) => typeof n.type === 'string'
-    && n.props.accessibilityRole === 'button' && n.findAllByType(Text).some((x) => flat(x) === label))[0];
+  // The danger zone's Pressable (the element that owns onPress), by its label.
+  const dangerButton = (tree, label) => tree.root.findAll((n) => n.props.accessibilityRole === 'button'
+    && typeof n.props.onPress === 'function' && n.findAllByType(Text).some((x) => flat(x) === label))[0];
+  const { showToast } = require('../../../components/Toast');
   const { ConfirmDialog } = require('../../../components');
   const dialog = (tree) => tree.root.findByType(ConfirmDialog);
 
@@ -111,7 +115,7 @@ describe('the danger zone', () => {
     const tree = render();
 
     expect(dangerButton(tree, 'Leave this pet')).toBeUndefined();
-    act(() => dangerButton(tree, 'Remove Luna').props.onClick?.() ?? dangerButton(tree, 'Remove Luna').props.onPress?.());
+    act(() => dangerButton(tree, 'Remove Luna').props.onPress());
     expect(dialog(tree).props.visible).toBe(true);
     expect(dialog(tree).props.title).toBe('Remove Luna?');
 
@@ -128,13 +132,25 @@ describe('the danger zone', () => {
 
     expect(dangerButton(tree, 'Remove Luna')).toBeUndefined();
     expect(texts(tree)).toContain('Only the owner can remove Luna. You can stop being a co-owner instead; you\'ll lose access to their records.');
-    act(() => dangerButton(tree, 'Leave this pet').props.onPress?.() ?? dangerButton(tree, 'Leave this pet').props.onClick?.());
+    act(() => dangerButton(tree, 'Leave this pet').props.onPress());
     expect(dialog(tree).props.title).toBe('Leave pet?');
 
     await act(async () => dialog(tree).props.onConfirm());
     expect(mockNavigation.popToTop).toHaveBeenCalled();
     expect(mockLeavePet).toHaveBeenCalledWith('p1');
     expect(mockDeletePet).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled(); // success is the list without the pet
+    act(() => tree.unmount());
+  });
+
+  test('a failed leave says so (the user is already back on the list)', async () => {
+    mockUser = { id: 'u2' };
+    mockLeavePet.mockResolvedValueOnce(false);
+    const tree = render();
+
+    act(() => dangerButton(tree, 'Leave this pet').props.onPress());
+    await act(async () => dialog(tree).props.onConfirm());
+    expect(showToast).toHaveBeenCalledWith("Couldn't leave Luna. Try again.");
     act(() => tree.unmount());
   });
 

@@ -425,8 +425,16 @@ export default function PetProfileScreen({ navigation, route }) {
     confirmLabel: t('petProfile.confirm.leave'),
     destructive: true,
     // Navigate away first so the pet vanishing from state can't flash a
-    // "Pet not found" frame; the detach then completes in the background.
-    action: () => { setTeamSheet(false); navigation.goBack(); leavePet(petId); },
+    // "Pet not found" frame; the detach then completes in the background,
+    // and a failure says so (the user is already back on the list).
+    action: () => {
+      const name = pet.name;
+      setTeamSheet(false);
+      navigation.goBack();
+      leavePet(petId).then((ok) => {
+        if (!ok) showToast(t('petProfile.toast.leaveFailed', { name }));
+      });
+    },
   });
   const handleLeave = () => setTeamConfirm(leaveConfig());
 

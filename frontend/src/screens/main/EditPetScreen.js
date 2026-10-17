@@ -116,7 +116,7 @@ export default function EditPetScreen({ navigation, route }) {
   // their way out is leaving it, the same action as the profile's ••• menu.
   // Either way: navigate away first so the pet vanishing from state can't
   // flash a "Pet not found" frame; the request then completes in the
-  // background (leavePet reports its own failure).
+  // background, and a failure says so in a toast.
   const dangerAction = isOwner
     ? {
         hint: t('editPet.dangerHint', { name: pet.name }),
@@ -138,7 +138,12 @@ export default function EditPetScreen({ navigation, route }) {
         title: t('petProfile.confirm.leaveTitle'),
         message: t('petProfile.confirm.leaveMessage', { name: pet.name }),
         confirmLabel: t('petProfile.confirm.leave'),
-        run: () => leavePet(petId),
+        run: () => {
+          const name = pet.name;
+          leavePet(petId).then((ok) => {
+            if (!ok) showToast(t('petProfile.toast.leaveFailed', { name }));
+          });
+        },
       };
 
   const handleDangerConfirm = () => {

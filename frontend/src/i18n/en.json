@@ -1163,7 +1163,8 @@
       "inviteWithdrawFailed": "Couldn't withdraw the invite. Try again.",
       "shareLinksRevoked": "All share links revoked",
       "careLinksRevoked": "All caretaker links revoked",
-      "notesSaved": "Notes saved"
+      "notesSaved": "Notes saved",
+      "leaveFailed": "Couldn't leave {{name}}. Try again."
     },
     "confirm": {
       "remove": "Remove",
