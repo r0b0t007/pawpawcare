@@ -60,3 +60,18 @@ google-service-account.json
 # functions build` before every deploy — see docs/deploy-website-cloudflare.md)
 website/_worker.js/
 website/_routes.json
+
+# Local design working files (exports, source photos, fonts, design-tool
+# project): heavy binaries kept on the designer's machine, not in git. The
+# HTML screen designs and design/lively/ (boards + generator) stay tracked.
+# Matched at any depth under design/, so the outputs are ignored whether the
+# generator runs from a working folder (design/lively/README.md) or in place.
+design/build/
+design/**/exports/
+design/**/photos/
+design/**/Document Fonts/
+design/**/_mci.json
+design/**/*.designcraft
+
+# Local state left by the retired Netlify CLI setup (site moved to Cloudflare Pages)
+.netlify/

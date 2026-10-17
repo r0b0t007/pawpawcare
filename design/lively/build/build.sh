@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Rebuild the PawPawCare "Lively & Light" mockups in DesignCraft.
-# Usage (from repo root): bash design/build/build.sh
+# Usage: copy this build/ folder into a working folder that holds photos/,
+# "Document Fonts/" and _mci.json (see design/lively/README.md), then run
+# `bash build/build.sh` from that working folder. Outputs land next to build/.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CLI="${DESIGNCRAFT_CLI:-/c/Program Files/DesignCraft/designcraft-cli.exe}"
