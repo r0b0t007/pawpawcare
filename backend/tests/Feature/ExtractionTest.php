@@ -198,10 +198,10 @@ class ExtractionTest extends TestCase
 
     // ── Provider abstraction ─────────────────────────────────────────────────
 
-    /** A stub provider driver, configurable for capability and output. */
     /** The system prompt the stub driver last received. */
     public ?string $sentSystemPrompt = null;
 
+    /** A stub provider driver, configurable for capability and output. */
     private function bindStubClient(bool $supports = true, array $returns = []): void
     {
         $this->app->bind(ExtractionClient::class, fn () => new class($supports, $returns, $this) implements ExtractionClient
@@ -275,12 +275,22 @@ class ExtractionTest extends TestCase
         $this->withToken($token)->withHeader('Accept-Language', 'en-US')
             ->postJson("/pets/{$pet->id}/documents/{$docId}/extract")->assertOk();
         $this->assertStringContainsString('in Spanish', $this->sentSystemPrompt);
-        $this->assertStringContainsString('never translate them', $this->sentSystemPrompt);
+        $this->assertStringContainsString('never translated', preg_replace('/\s+/', ' ', $this->sentSystemPrompt));
 
         $owner->forceFill(['locale' => 'fr'])->save();
         Document::whereKey($docId)->update(['extraction_status' => 'none', 'extraction' => null]);
-        $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$docId}/extract")->assertOk();
+        $doc = $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$docId}/extract")->assertOk()->json();
         $this->assertStringContainsString('in French', $this->sentSystemPrompt);
+        $this->assertSame('fr', $doc['extraction']['_meta']['locale']);
+    }
+
+    public function test_every_app_locale_has_a_prompt_language(): void
+    {
+        $names = (new \ReflectionClassConstant(DocumentExtractor::class, 'LANGUAGE_NAMES'))->getValue();
+
+        // A locale added to User::LOCALES without a name here would silently
+        // get English titles and notes.
+        $this->assertEqualsCanonicalizing(User::LOCALES, array_keys($names));
     }
 
     public function test_the_model_writes_english_by_default(): void
@@ -388,14 +398,24 @@ class ExtractionTest extends TestCase
         $clean = $sanitize->invoke($extractor, [
             'suggested_title' => 'Vaccination Record &amp; Invoice',
             'clinic' => ['name' => 'Smith &#39;n&#39; Sons Vets'],
-            'notes_for_owner' => '&nbsp;',
-            'medications' => [['name' => ' Lévothyrox à ']],     // multibyte edges survive the trim
+            'notes_for_owner' => '&nbsp;&#8203;'."\u{FEFF}",       // only invisible characters → null
+            'document_type' => '&nbsp;Vaccination',             // enums get the same cleanup
+            'vaccinations' => [['name' => '0']],                // a real (if odd) name, not "missing"
+            'medications' => [
+                ['name' => ' Lévothyrox à ', 'frequency' => "daily\u{00A0}"], // multibyte edges survive the trim
+                ['name' => "Bad \xC3( byte"],                   // invalid UTF-8 is scrubbed, not dropped
+            ],
         ]);
 
         $this->assertSame('Vaccination Record & Invoice', $clean['suggested_title']);
         $this->assertSame("Smith 'n' Sons Vets", $clean['clinic']['name']);
         $this->assertNull($clean['notes_for_owner']);
         $this->assertSame('Lévothyrox à', $clean['medications'][0]['name']);
+        $this->assertSame('daily', $clean['medications'][0]['frequency']);
+        $this->assertSame('vaccination', $clean['document_type']);
+        $this->assertSame('0', $clean['vaccinations'][0]['name']);
+        $this->assertCount(2, $clean['medications']);
+        $this->assertStringStartsWith('Bad ', $clean['medications'][1]['name']);
     }
 
     public function test_sanitize_accepts_enum_values_in_any_capitalisation(): void
