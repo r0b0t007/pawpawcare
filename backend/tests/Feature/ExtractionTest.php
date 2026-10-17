@@ -257,6 +257,51 @@ class ExtractionTest extends TestCase
         $this->assertSame('Rabies', $doc['extraction']['vaccinations'][0]['name']);
     }
 
+    // ── Output schema (validated by the provider before the model runs) ─────
+
+    public function test_schema_uses_only_anyof_for_nullables_and_stays_under_the_union_cap(): void
+    {
+        $extractor = (new \ReflectionClass(DocumentExtractor::class))->newInstanceWithoutConstructor();
+        $schema = (new \ReflectionMethod(DocumentExtractor::class, 'schema'))->invoke($extractor);
+
+        // Anthropic rejected the whole request (400, every document) when an
+        // enum sat next to "type": ["string", "null"]. Nullables are anyOf
+        // only, and the API caps union (anyOf / type-array) parameters at 16
+        // per schema — over it, every request 400s again.
+        $offenders = [];
+        $unions = 0;
+        $visit = function (array $node, string $path) use (&$visit, &$offenders, &$unions) {
+            if (is_array($node['type'] ?? null)) {
+                $offenders[] = "{$path}: type array";
+            }
+            if (in_array(null, $node['enum'] ?? [], true)) {
+                $offenders[] = "{$path}: null inside enum";
+            }
+            if (isset($node['anyOf'])) {
+                $unions++;
+                foreach ($node['anyOf'] as $i => $branch) {
+                    $visit($branch, "{$path}.anyOf[{$i}]");
+                }
+            }
+            // Walk schema positions only, so a property named like a keyword
+            // ("type", "items") is never mistaken for one.
+            foreach ($node['properties'] ?? [] as $name => $child) {
+                $visit($child, "{$path}.{$name}");
+            }
+            if (isset($node['items'])) {
+                $visit($node['items'], "{$path}[]");
+            }
+        };
+        $visit($schema, '$');
+
+        $this->assertSame([], $offenders);
+        $this->assertLessThanOrEqual(16, $unions, 'Anthropic allows at most 16 union parameters per schema');
+
+        $frequency = $schema['properties']['medications']['items']['properties']['frequency'];
+        $this->assertContains(['type' => 'null'], $frequency['anyOf']);
+        $this->assertNotEmpty(array_filter($frequency['anyOf'], fn ($b) => isset($b['enum'])));
+    }
+
     // ── Sanitization (model output is untrusted input) ───────────────────────
 
     public function test_sanitize_enforces_enums_dates_and_lengths(): void
@@ -294,5 +339,22 @@ class ExtractionTest extends TestCase
         $this->assertNull($clean['medications'][0]['frequency']);
         $this->assertNull($clean['weight']);
         $this->assertNull($clean['total_cost']);
+    }
+
+    public function test_sanitize_accepts_enum_values_in_any_capitalisation(): void
+    {
+        $extractor = (new \ReflectionClass(DocumentExtractor::class))->newInstanceWithoutConstructor();
+        $sanitize = new \ReflectionMethod(DocumentExtractor::class, 'sanitize');
+
+        // Structured outputs don't guarantee enum capitalisation.
+        $clean = $sanitize->invoke($extractor, [
+            'document_type' => 'Vaccination',
+            'medications' => [['name' => 'Milbemax', 'frequency' => 'Monthly']],
+            'weight' => ['value' => 28.4, 'unit' => 'KG'],
+        ]);
+
+        $this->assertSame('vaccination', $clean['document_type']);
+        $this->assertSame('monthly', $clean['medications'][0]['frequency']);
+        $this->assertSame('kg', $clean['weight']['unit']);
     }
 }

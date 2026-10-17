@@ -77,6 +77,9 @@ class DocumentExtractor
     private function sanitize(array $raw): array
     {
         $str = fn ($v, int $max) => is_string($v) && trim($v) !== '' ? mb_substr(trim($v), 0, $max) : null;
+        // Structured outputs don't guarantee enum capitalisation ("Daily"),
+        // so compare case-insensitively rather than drop a correct reading.
+        $enum = fn ($v, array $allowed) => is_string($v) && in_array($l = strtolower(trim($v)), $allowed, true) ? $l : null;
         $date = function ($v): ?string {
             if (! is_string($v)) {
                 return null;
@@ -111,7 +114,7 @@ class DocumentExtractor
             ->map(fn ($m) => is_array($m) ? [
                 'name' => $str($m['name'] ?? null, 150),
                 'dosage' => $str($m['dosage'] ?? null, 100),
-                'frequency' => in_array($m['frequency'] ?? null, self::FREQUENCIES, true) ? $m['frequency'] : null,
+                'frequency' => $enum($m['frequency'] ?? null, self::FREQUENCIES),
                 'start_date' => $date($m['start_date'] ?? null),
                 'end_date' => $date($m['end_date'] ?? null),
                 'notes' => $str($m['notes'] ?? null, 500),
@@ -123,7 +126,7 @@ class DocumentExtractor
         if (is_array($raw['weight'] ?? null) && is_numeric($raw['weight']['value'] ?? null) && $raw['weight']['value'] > 0) {
             $weight = [
                 'value' => round((float) $raw['weight']['value'], 2),
-                'unit' => in_array($raw['weight']['unit'] ?? null, ['kg', 'lb'], true) ? $raw['weight']['unit'] : 'kg',
+                'unit' => $enum($raw['weight']['unit'] ?? null, ['kg', 'lb']) ?? 'kg',
                 'date' => $date($raw['weight']['date'] ?? null),
             ];
         }
@@ -133,8 +136,7 @@ class DocumentExtractor
             : null;
 
         return [
-            'document_type' => in_array($raw['document_type'] ?? null, self::CATEGORIES, true)
-                ? $raw['document_type'] : 'other',
+            'document_type' => $enum($raw['document_type'] ?? null, self::CATEGORIES) ?? 'other',
             'matches_pet' => ($raw['matches_pet'] ?? true) !== false,
             'document_date' => $date($raw['document_date'] ?? null),
             'clinic' => $clinic,
@@ -150,8 +152,15 @@ class DocumentExtractor
     /** JSON schema for structured output — mirrors the app's model fields. */
     private function schema(): array
     {
-        $nullableString = ['type' => ['string', 'null']];
-        $nullableDate = ['type' => ['string', 'null'], 'format' => 'date'];
+        // Every nullable field is anyOf [schema, null] — never a type array.
+        // The API rejected a type array next to an enum ("Enum value 'daily'
+        // does not match declared type ['string', 'null']"), failing every
+        // document; one idiom leaves nothing to get wrong per keyword. Each
+        // anyOf counts toward the API's cap of 16 union parameters per
+        // schema (ExtractionTest guards it), so add nullable fields sparingly.
+        $nullable = fn (array $schema) => ['anyOf' => [$schema, ['type' => 'null']]];
+        $nullableString = $nullable(['type' => 'string']);
+        $nullableDate = $nullable(['type' => 'string', 'format' => 'date']);
 
         return [
             'type' => 'object',
@@ -159,8 +168,8 @@ class DocumentExtractor
                 'document_type' => ['type' => 'string', 'enum' => self::CATEGORIES],
                 'matches_pet' => ['type' => 'boolean'],
                 'document_date' => $nullableDate,
-                'clinic' => [
-                    'type' => ['object', 'null'],
+                'clinic' => $nullable([
+                    'type' => 'object',
                     'properties' => [
                         'name' => ['type' => 'string'],
                         'phone' => $nullableString,
@@ -168,7 +177,7 @@ class DocumentExtractor
                     ],
                     'required' => ['name', 'phone', 'address'],
                     'additionalProperties' => false,
-                ],
+                ]),
                 'vaccinations' => [
                     'type' => 'array',
                     'items' => [
@@ -190,7 +199,7 @@ class DocumentExtractor
                         'properties' => [
                             'name' => ['type' => 'string'],
                             'dosage' => $nullableString,
-                            'frequency' => ['type' => ['string', 'null'], 'enum' => [...self::FREQUENCIES, null]],
+                            'frequency' => $nullable(['type' => 'string', 'enum' => self::FREQUENCIES]),
                             'start_date' => $nullableDate,
                             'end_date' => $nullableDate,
                             'notes' => $nullableString,
@@ -199,8 +208,8 @@ class DocumentExtractor
                         'additionalProperties' => false,
                     ],
                 ],
-                'weight' => [
-                    'type' => ['object', 'null'],
+                'weight' => $nullable([
+                    'type' => 'object',
                     'properties' => [
                         'value' => ['type' => 'number'],
                         'unit' => ['type' => 'string', 'enum' => ['kg', 'lb']],
@@ -208,8 +217,8 @@ class DocumentExtractor
                     ],
                     'required' => ['value', 'unit', 'date'],
                     'additionalProperties' => false,
-                ],
-                'total_cost' => ['type' => ['number', 'null']],
+                ]),
+                'total_cost' => $nullable(['type' => 'number']),
                 'suggested_title' => ['type' => 'string'],
                 'notes_for_owner' => $nullableString,
             ],
