@@ -91,8 +91,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
 
   const closeSheet = () => { setModal(false); setForm({ name: '', dueDate: '' }); };
   // A vaccine reminder was just scheduled: the moment to offer notifications
-  // (CHW-230). After the sheet has closed — iOS drops a modal presented while
-  // another is still dismissing (≤300ms).
+  // (CHW-230). maybeAsk waits for the sheet to finish closing.
   const { maybeAsk, prompt: notificationsPrompt } = useNotificationsPrompt();
 
   const handleAdd = () => {
@@ -110,7 +109,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       }
       closeSheet();
       showToast(t('vaccines.toast.scheduled'));
-      setTimeout(maybeAsk, 320);
+      maybeAsk();
     });
   };
 

@@ -23,6 +23,8 @@ import {
 // scheduled (once, by whichever screen saw the change), so nothing waits for
 // the next sign-in.
 const UNKNOWN = { status: 'unknown', canAskAgain: true };
+// Faster than any person can answer the system dialog (see turnOn).
+const INSTANT_REFUSAL_MS = 500;
 let shared = UNKNOWN;
 const listeners = new Set();
 
@@ -74,8 +76,18 @@ export function useNotificationPermission() {
   const turnOn = useCallback(async () => {
     const current = shared;
     if (current.status !== 'granted' && current.canAskAgain) {
+      const started = Date.now();
       const next = await requestNotificationPermission();
       apply(next);
+      // Android only learns notifications are blocked for good by asking:
+      // it reports canAskAgain until then, and the request returns "denied"
+      // at once without showing anything. A refusal that fast came from no
+      // dialog (nobody answers one in <0.5s), so go straight to Settings
+      // rather than leave the tap looking dead. A real "Don't allow" from
+      // the dialog takes longer and is respected.
+      if (next.status === 'denied' && !next.canAskAgain && Date.now() - started < INSTANT_REFUSAL_MS) {
+        Linking.openSettings();
+      }
       return next.status;
     }
     Linking.openSettings();

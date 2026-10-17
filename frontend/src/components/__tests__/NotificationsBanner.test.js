@@ -82,6 +82,31 @@ describe('NotificationsBanner', () => {
     expect(requestNotificationPermission).not.toHaveBeenCalled();
   });
 
+  // Seen on the Android emulator: blocked for good still reports canAskAgain
+  // until asked, and the request is refused at once with no dialog.
+  test('Android blocked-for-good: an instant refusal opens Settings instead of a dead tap', async () => {
+    mockPermission = { status: 'denied', canAskAgain: true };
+    mockAnswer = { status: 'denied', canAskAgain: false };
+    const tree = await render(<NotificationsBanner />);
+
+    await pressButton(tree, 'Turn on');
+    expect(requestNotificationPermission).toHaveBeenCalledTimes(1);
+    expect(Linking.openSettings).toHaveBeenCalledTimes(1);
+    expect(texts(tree)).toContain('Notifications are off');
+  });
+
+  test('a "Don\'t allow" answered in the dialog is respected (no Settings)', async () => {
+    mockPermission = { status: 'denied', canAskAgain: true };
+    mockAnswer = { status: 'denied', canAskAgain: false };
+    const now = jest.spyOn(Date, 'now');
+    now.mockReturnValueOnce(1_000).mockReturnValueOnce(4_000); // 3s in the dialog
+    const tree = await render(<NotificationsBanner />);
+
+    await pressButton(tree, 'Turn on');
+    now.mockRestore();
+    expect(Linking.openSettings).not.toHaveBeenCalled();
+  });
+
   test('turned on in Settings: back in the app it hides and finishes the setup', async () => {
     mockPermission = { status: 'denied', canAskAgain: false };
     const tree = await render(<NotificationsBanner />);
@@ -111,12 +136,16 @@ describe('useNotificationsPrompt (the in-context ask)', () => {
     return api.prompt;
   }
   const dialog = (tree) => tree.root.findByType(ConfirmDialog);
+  // maybeAsk opens the dialog after the save's motion (PROMPT_DELAY_MS).
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 450));
 
   test('asks right after a save while the OS can still prompt', async () => {
     mockPermission = { status: 'undetermined', canAskAgain: true };
     const tree = await render(<Harness />);
 
     await act(async () => { expect(await api.maybeAsk()).toBe(true); });
+    expect(dialog(tree).props.visible).toBe(false); // not mid-animation
+    await act(settle);
     expect(dialog(tree).props.visible).toBe(true);
     expect(dialog(tree).props.title).toBe('Get reminders on this phone?');
   });
@@ -126,10 +155,12 @@ describe('useNotificationsPrompt (the in-context ask)', () => {
     const tree = await render(<Harness />);
 
     await act(async () => { await api.maybeAsk(); });
+    await act(settle);
     await act(async () => dialog(tree).props.onCancel());
     expect(mockPrefs.notificationsAskSnoozedUntil).toBeGreaterThan(Date.now() + 13 * 24 * 3600 * 1000);
 
     await act(async () => { expect(await api.maybeAsk()).toBe(false); });
+    await act(settle);
     expect(dialog(tree).props.visible).toBe(false);
   });
 
