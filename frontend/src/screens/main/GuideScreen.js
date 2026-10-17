@@ -58,9 +58,11 @@ export default function GuideScreen({ navigation, route }) {
 
         <View style={styles.actions}>
           <Button label={text('cta')} onPress={() => guide.cta(navigation)} />
-          {/* navigate, not goBack: returns to the Support form if it's below,
-              and opens it otherwise. */}
-          <Button variant="ghost" label={t('guides.messageUs')} onPress={() => navigation.navigate('Support')} />
+          {/* popTo, not navigate or goBack: goes back to the Support form if
+              it's in the stack, and opens it otherwise. Since React Navigation
+              7, navigate() pushes a second Support instead of going back (seen
+              on the emulator: Back from the form returned to the guide). */}
+          <Button variant="ghost" label={t('guides.messageUs')} onPress={() => navigation.popTo('Support')} />
         </View>
       </ScrollView>
     </SafeAreaView>

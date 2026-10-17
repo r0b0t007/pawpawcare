@@ -14,7 +14,7 @@ import Button from '../../../components/Button';
 import { GUIDES } from '../guides';
 import en from '../../../i18n/en.json';
 
-const navigation = { goBack: jest.fn(), navigate: jest.fn() };
+const navigation = { goBack: jest.fn(), navigate: jest.fn(), popTo: jest.fn() };
 
 async function render(id) {
   let tree;
@@ -83,11 +83,14 @@ test.each([
   expect(navigation.navigate).toHaveBeenCalledWith(...target);
 });
 
-test('"Message us" returns to the help form by name, wherever the guide was opened from', async () => {
+// popTo, because since React Navigation 7 navigate() would push a second
+// Support on top of the one already below the guide.
+test('"Message us" goes back to the help form (popTo), wherever the guide was opened from', async () => {
   const tree = await render('reminders');
 
   await act(async () => button(tree, 'Still need help? Message us').props.onPress());
-  expect(navigation.navigate).toHaveBeenCalledWith('Support');
+  expect(navigation.popTo).toHaveBeenCalledWith('Support');
+  expect(navigation.navigate).not.toHaveBeenCalled();
   expect(navigation.goBack).not.toHaveBeenCalled();
 });
 
