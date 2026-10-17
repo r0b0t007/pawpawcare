@@ -7,23 +7,16 @@ import { post } from '../../services/api';
 import { useTranslation } from '../../i18n';
 import { ui, type } from '../../theme';
 import { Card, ListRow, Button, Chip, showToast, FormScrollView, ScreenHeader } from '../../components';
+import { GUIDES } from './guides';
 
 // Help & feedback (Profile → Help & feedback; other screens can preselect a
 // category with the `category` param). A private message form first, then
-// placeholder guide rows (real guides are a follow-up). Messages are stored
+// the help guides (guides.js, opened in GuideScreen). Messages are stored
 // on the backend and forwarded to the team's inbox, never posted anywhere,
 // and deliberately unrelated to the store rating prompt (services/storeReview).
 // The whole screen sits in a FormScrollView (keyboard-avoiding, taps pass
 // through) so the send button is never trapped behind the keyboard — a top
 // competitor 1★ complaint.
-
-// Placeholders until the real guides exist (CHW-175): shown as "Soon", not
-// tappable, so they don't read as broken links.
-const GUIDES = [
-  { id: 'gettingStarted', icon: 'rocket-launch-outline' },
-  { id: 'reminders', icon: 'bell-outline' },
-  { id: 'sharing', icon: 'account-group-outline' },
-];
 
 // Optional; ids match SupportMessage::CATEGORIES on the backend. Labels and
 // placeholders are `support.category.<id>` / `support.placeholder.<id>`.
@@ -96,7 +89,8 @@ export default function SupportScreen({ navigation, route }) {
             key={guide.id}
             icon={guide.icon}
             title={t(`support.guide.${guide.id}`)}
-            value={t('support.soon')}
+            chevron
+            onPress={() => navigation.navigate('Guide', { id: guide.id })}
             last={i === GUIDES.length - 1}
           />
         ))}

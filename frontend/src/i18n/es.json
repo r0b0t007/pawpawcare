@@ -402,7 +402,6 @@
   "support": {
     "title": "Ayuda y comentarios",
     "guides": "Guías",
-    "soon": "Pronto",
     "guide": {
       "gettingStarted": "Primeros pasos",
       "reminders": "Recordatorios y notificaciones",
@@ -430,6 +429,80 @@
     "sentReply": "Enviado: le responderemos en un plazo de 2 días laborables",
     "sentNote": "Gracias: leemos cada mensaje",
     "sendFailed": "No se ha podido enviar: inténtelo de nuevo"
+  },
+  "guides": {
+    "messageUs": "¿Necesita más ayuda? Escríbanos",
+    "gettingStarted": {
+      "intro": "Cree el perfil de su mascota en un minuto y deje que PawPawCare lleve el control de lo que vence.",
+      "cta": "Añadir una mascota",
+      "addPet": {
+        "title": "Añada su mascota",
+        "body": "Toque «Añada su primera mascota» en Inicio, o «Añadir otra mascota» en la pestaña Mascotas. Solo el nombre es obligatorio.",
+        "step1": "Elija perro, gato, o «Conejo, pájaro u otro».",
+        "step2": "Póngale un nombre. La foto, la raza y el color son opcionales.",
+        "step3": "Añada su cumpleaños, su peso y más, o toque «Omitir por ahora». Puede completarlo más tarde."
+      },
+      "records": {
+        "title": "Añada vacunas y medicamentos",
+        "body": "Abra el perfil de su mascota y vaya a Salud. En «Control de vacunas», toque «Añadir vacuna»: basta con un nombre y una fecha de vencimiento. «Añadir medicamento» pide un nombre, una dosis, la frecuencia y las horas del día."
+      },
+      "home": {
+        "title": "Entienda su pantalla de Inicio",
+        "body": "El titular le indica qué requiere su atención: primero lo atrasado y después las vacunas que vencen en los próximos 30 días. La primera tarjeta muestra la vacuna más urgente, con «Marcar como hecho» y «Reprogramar». «Hoy» muestra los medicamentos del día y «Próximamente», los próximos 7 días. «Todo al día» significa que no hay nada atrasado ni por vencer y que ningún medicamento está pendiente hoy."
+      },
+      "ai": {
+        "title": "Deje que la IA lea un documento veterinario",
+        "body": "En el «Archivo médico», suba una foto de un documento veterinario y toque «Leer con IA». La IA sugiere vacunas, medicamentos, peso, coste y datos de la clínica. No se guarda nada hasta que revise las sugerencias y toque «Aplicar»."
+      }
+    },
+    "reminders": {
+      "intro": "La mayoría de los recordatorios se crean solos. Usted solo añade lo demás.",
+      "cta": "Abrir recordatorios",
+      "automatic": {
+        "title": "Recordatorios que se crean solos",
+        "body": "Cada vacuna que añada tiene un recordatorio 7 días antes de su vencimiento, a las 9:00. Cada medicamento tiene uno en cada hora de toma, que se repite al ritmo del tratamiento; los medicamentos «Según necesidad» no tienen. Todas las personas que comparten la mascota también los reciben, y marcar una vacuna como hecha cancela su recordatorio."
+      },
+      "custom": {
+        "title": "Añada los suyos",
+        "body": "Para todo lo demás, como una visita al veterinario o una reposición, abra «Recordatorios» y añada uno con fecha y hora. En la misma lista puede desactivar o eliminar cualquier recordatorio."
+      },
+      "inbox": {
+        "title": "Su bandeja de notificaciones",
+        "body": "Al tocar una notificación se abre su bandeja (la campana de Inicio), donde puede posponer un recordatorio una hora o descartarlo."
+      },
+      "phone": {
+        "title": "Si no le llegan las notificaciones",
+        "body": "Los recordatorios se programan en su teléfono, así que llegan incluso sin conexión. Si no aparece ninguno, puede que las notificaciones de PawPawCare estén bloqueadas: permítalas en los ajustes de su teléfono. Revise también Perfil → Notificaciones → «Recordatorios de cuidados», que los activa o desactiva solo en este teléfono."
+      },
+      "doses": {
+        "title": "Registre cada toma",
+        "body": "Toque «Registrar» cuando dé un medicamento. La tarjeta «Hoy» de Inicio muestra entonces cuántas tomas del día se han administrado."
+      }
+    },
+    "sharing": {
+      "intro": "Comparta los cuidados con su familia, su veterinario o un cuidador, sin compartir su contraseña.",
+      "cta": "Abrir Compartir mascotas e invitaciones",
+      "invite": {
+        "title": "Invite a un familiar a compartir una mascota",
+        "body": "En el perfil de su mascota, abra «Equipo de cuidados» y envíe una invitación a su correo electrónico. Los copropietarios pueden ver y actualizar los registros; eliminar la mascota o gestionar el equipo de cuidados queda reservado para usted."
+      },
+      "accept": {
+        "title": "Acepte una invitación",
+        "body": "No enviamos las invitaciones por correo, así que avise a la persona de que abra Perfil → «Compartir mascotas e invitaciones». La primera vez, confirma su correo electrónico con un código de 6 dígitos; las invitaciones enviadas a esa dirección aparecerán allí, listas para aceptar."
+      },
+      "vet": {
+        "title": "Comparta con su veterinario",
+        "body": "«Compartir con el veterinario» crea un enlace web de solo lectura con vacunas, medicamentos, peso y documentos recientes. Elija 1 hora, 24 horas o 7 días; su veterinario no necesita aplicación ni cuenta. «Revocar todos los enlaces activos» los desactiva todos a la vez."
+      },
+      "sitter": {
+        "title": "Pase el relevo a un cuidador",
+        "body": "«Traspaso al cuidador» reúne la alimentación, las instrucciones y un contacto de emergencia, además de un enlace que puede enviar a su cuidador, válido de 1 día a 2 semanas. Cualquiera con el enlace puede leerlo, así que no incluya códigos de puerta ni de alarma."
+      },
+      "export": {
+        "title": "Exporte sus registros",
+        "body": "Perfil → «Exportar historiales de salud» crea un PDF o un CSV con vacunas, medicamentos, citas, peso y clínicas de cualquiera de sus mascotas. Es gratis, para siempre."
+      }
+    }
   },
   "errors": {
     "generic": "Algo ha salido mal: inténtelo de nuevo.",
