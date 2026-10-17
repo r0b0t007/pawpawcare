@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { breedLabel, petPhoto } from '../../utils/pets';
+import { breedLabel, petPhoto, isPetOwner } from '../../utils/pets';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
@@ -102,7 +102,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
   const activeReport = (myReports || []).find((r) => r.petId === petId && r.status === 'active');
-  const isOwner = !!pet && pet.ownerId === user?.id;
+  const isOwner = isPetOwner(pet, user);
 
   const [segment, setSegment] = useState('overview');
   const insets = useSafeAreaInsets();
@@ -425,8 +425,16 @@ export default function PetProfileScreen({ navigation, route }) {
     confirmLabel: t('petProfile.confirm.leave'),
     destructive: true,
     // Navigate away first so the pet vanishing from state can't flash a
-    // "Pet not found" frame; the detach then completes in the background.
-    action: () => { setTeamSheet(false); navigation.goBack(); leavePet(petId); },
+    // "Pet not found" frame; the detach then completes in the background,
+    // and a failure says so (the user is already back on the list).
+    action: () => {
+      const name = pet.name;
+      setTeamSheet(false);
+      navigation.goBack();
+      leavePet(petId).then((ok) => {
+        if (!ok) showToast(t('petProfile.toast.leaveFailed', { name }));
+      });
+    },
   });
   const handleLeave = () => setTeamConfirm(leaveConfig());
 

@@ -8,15 +8,23 @@ jest.mock('react-native-safe-area-context', () => {
   return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
 jest.mock('../../../services/imagePicker', () => ({ pickAndUploadImage: jest.fn() }));
+jest.mock('../../../components/Toast', () => ({ showToast: jest.fn(), ToastHost: () => null }));
+// The real dialog mounts a gesture-handler Sheet (native module); a stub keeps its props.
+jest.mock('../../../components/ConfirmDialog', () => function ConfirmDialog() { return null; });
 let mockPets = [];
+let mockUser = { id: 'u1' };
 const mockUpdatePet = jest.fn((id, updates) => Promise.resolve({ id, ...updates }));
+const mockDeletePet = jest.fn(() => Promise.resolve(true));
+const mockLeavePet = jest.fn(() => Promise.resolve(true));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     pets: mockPets,
     updatePet: mockUpdatePet,
-    deletePet: jest.fn(),
+    deletePet: mockDeletePet,
+    leavePet: mockLeavePet,
   }),
 }));
+jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: mockUser }) }));
 
 import React from 'react';
 import { Text, TextInput } from 'react-native';
@@ -28,19 +36,26 @@ import EditPetScreen from '../EditPetScreen';
 const flat = (node) => (node.children || []).map((c) => (typeof c === 'string' ? c : flat(c))).join('');
 const texts = (tree) => tree.root.findAllByType(Text).map(flat);
 
+const mockNavigation = { goBack: jest.fn(), popToTop: jest.fn() };
+
 function render() {
   let tree;
   act(() => {
     tree = TestRenderer.create(
-      <EditPetScreen route={{ params: { petId: 'p1' } }} navigation={{ goBack: jest.fn(), popToTop: jest.fn() }} />,
+      <EditPetScreen route={{ params: { petId: 'p1' } }} navigation={mockNavigation} />,
     );
   });
   return tree;
 }
 
 beforeEach(() => {
-  mockPets = [{ id: 'p1', name: 'Luna', type: 'cat', breed: '', color: '#ffddb8' }];
+  // The signed-in user owns Luna unless a test says otherwise.
+  mockUser = { id: 'u1' };
+  mockPets = [{ id: 'p1', name: 'Luna', type: 'cat', breed: '', color: '#ffddb8', ownerId: 'u1' }];
   mockUpdatePet.mockClear();
+  mockDeletePet.mockClear();
+  mockLeavePet.mockClear();
+  require('../../../components/Toast').showToast.mockClear();
 });
 
 afterEach(async () => {
@@ -83,4 +98,68 @@ test('French: a suggested breed shows in French and is saved back in English', a
   });
   expect(mockUpdatePet).toHaveBeenCalledWith('p1', expect.objectContaining({ breed: 'Mixed' }));
   act(() => tree.unmount());
+});
+
+// CHW-229: only the owner can delete a pet (the API answers co-owners with
+// 403). The owner gets Remove; a co-owner gets Leave (the profile's action)
+// in the same place, so nobody sees a button that can only fail.
+describe('the danger zone', () => {
+  // The danger zone's Pressable (the element that owns onPress), by its label.
+  const dangerButton = (tree, label) => tree.root.findAll((n) => n.props.accessibilityRole === 'button'
+    && typeof n.props.onPress === 'function' && n.findAllByType(Text).some((x) => flat(x) === label))[0];
+  const { showToast } = require('../../../components/Toast');
+  const { ConfirmDialog } = require('../../../components');
+  const dialog = (tree) => tree.root.findByType(ConfirmDialog);
+
+  test('the owner removes the pet, after confirming', async () => {
+    const tree = render();
+
+    expect(dangerButton(tree, 'Leave this pet')).toBeUndefined();
+    act(() => dangerButton(tree, 'Remove Luna').props.onPress());
+    expect(dialog(tree).props.visible).toBe(true);
+    expect(dialog(tree).props.title).toBe('Remove Luna?');
+
+    await act(async () => dialog(tree).props.onConfirm());
+    expect(mockNavigation.popToTop).toHaveBeenCalled();
+    expect(mockDeletePet).toHaveBeenCalledWith('p1');
+    expect(mockLeavePet).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
+
+  test('a co-owner gets Leave instead of Remove, with the leave confirmation', async () => {
+    mockUser = { id: 'u2' };
+    const tree = render();
+
+    expect(dangerButton(tree, 'Remove Luna')).toBeUndefined();
+    expect(texts(tree)).toContain('Only the owner can remove Luna. You can stop being a co-owner instead; you\'ll lose access to their records.');
+    act(() => dangerButton(tree, 'Leave this pet').props.onPress());
+    expect(dialog(tree).props.title).toBe('Leave pet?');
+
+    await act(async () => dialog(tree).props.onConfirm());
+    expect(mockNavigation.popToTop).toHaveBeenCalled();
+    expect(mockLeavePet).toHaveBeenCalledWith('p1');
+    expect(mockDeletePet).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled(); // success is the list without the pet
+    act(() => tree.unmount());
+  });
+
+  test('a failed leave says so (the user is already back on the list)', async () => {
+    mockUser = { id: 'u2' };
+    mockLeavePet.mockResolvedValueOnce(false);
+    const tree = render();
+
+    act(() => dangerButton(tree, 'Leave this pet').props.onPress());
+    await act(async () => dialog(tree).props.onConfirm());
+    expect(showToast).toHaveBeenCalledWith("Couldn't leave Luna. Try again.");
+    act(() => tree.unmount());
+  });
+
+  test('owner ids compare as strings, like petById (API ids can be numbers)', () => {
+    mockUser = { id: 7 };
+    mockPets = [{ ...mockPets[0], ownerId: '7' }];
+    const tree = render();
+
+    expect(dangerButton(tree, 'Remove Luna')).toBeDefined();
+    act(() => tree.unmount());
+  });
 });

@@ -1163,7 +1163,8 @@
       "inviteWithdrawFailed": "Couldn't withdraw the invite. Try again.",
       "shareLinksRevoked": "All share links revoked",
       "careLinksRevoked": "All caretaker links revoked",
-      "notesSaved": "Notes saved"
+      "notesSaved": "Notes saved",
+      "leaveFailed": "Couldn't leave {{name}}. Try again."
     },
     "confirm": {
       "remove": "Remove",
@@ -1505,6 +1506,7 @@
     "saveChanges": "Save changes",
     "dangerZone": "Danger zone",
     "dangerHint": "Removing {{name}} deletes their records for everyone they're shared with.",
+    "coOwnerHint": "Only the owner can remove {{name}}. You can stop being a co-owner instead; you'll lose access to their records.",
     "remove": "Remove {{name}}",
     "confirmTitle": "Remove {{name}}?",
     "confirmMessage": "This deletes all records permanently. This can't be undone.",

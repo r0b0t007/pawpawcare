@@ -6,15 +6,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { resolveAsset } from '../../config';
 import { useTranslation } from '../../i18n';
-import { breedLabel, breedValue } from '../../utils/pets';
+import { breedLabel, breedValue, isPetOwner } from '../../utils/pets';
 import { ui, radii, type, PET_COLOR_PAIRS } from '../../theme';
 import { Button, ConfirmDialog, showToast, ScreenHeader, FormScrollView } from '../../components';
 
 // Edit pet: name, type, breed, identity color and photo. Deleting the pet
 // lives here — behind a danger zone + ConfirmDialog — never on the browse path.
+// Only the owner can delete (the API answers co-owners with 403), so a
+// co-owner gets "Leave this pet" there instead (CHW-229).
 
 // Labels come from i18n (`pets.types.*`); the ids are what gets stored.
 const PET_TYPES = [
@@ -36,8 +39,10 @@ const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
 export default function EditPetScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { petId } = route.params;
-  const { pets, updatePet, deletePet } = useData();
+  const { pets, updatePet, deletePet, leavePet } = useData();
+  const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
+  const isOwner = isPetOwner(pet, user);
 
   const [form, setForm] = useState({
     name: pet?.name || '',
@@ -49,7 +54,7 @@ export default function EditPetScreen({ navigation, route }) {
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [confirmDanger, setConfirmDanger] = useState(false);
   // Local uri of a picked photo whose upload failed — keep showing the chosen
   // image (never saved as avatarUrl) so the user can just tap again to retry.
   const [localPreview, setLocalPreview] = useState(null);
@@ -107,14 +112,44 @@ export default function EditPetScreen({ navigation, route }) {
   // around a marker so each language keeps its own word order.
   const [previewBefore, previewAfter = ''] = t('editPet.preview', { name: NAME_MARK }).split(NAME_MARK);
 
-  const handleRemove = () => {
-    setConfirmRemove(false);
-    // Navigate away first so the pet vanishing from state can't flash a
-    // "Pet not found" frame; the delete then completes in the background.
+  // The owner removes the pet; a co-owner can't (the API answers 403), so
+  // their way out is leaving it, the same action as the profile's ••• menu.
+  // Either way: navigate away first so the pet vanishing from state can't
+  // flash a "Pet not found" frame; the request then completes in the
+  // background, and a failure says so in a toast.
+  const dangerAction = isOwner
+    ? {
+        hint: t('editPet.dangerHint', { name: pet.name }),
+        icon: 'delete-outline',
+        label: t('editPet.remove', { name: pet.name }),
+        title: t('editPet.confirmTitle', { name: pet.name }),
+        message: t('editPet.confirmMessage'),
+        confirmLabel: t('editPet.confirmLabel'),
+        run: () => {
+          const name = pet.name;
+          deletePet(petId).then((ok) =>
+            showToast(ok ? t('editPet.removed', { name }) : t('editPet.removeFailed', { name })));
+        },
+      }
+    : {
+        hint: t('editPet.coOwnerHint', { name: pet.name }),
+        icon: 'exit-to-app',
+        label: t('petProfile.menu.leave'),
+        title: t('petProfile.confirm.leaveTitle'),
+        message: t('petProfile.confirm.leaveMessage', { name: pet.name }),
+        confirmLabel: t('petProfile.confirm.leave'),
+        run: () => {
+          const name = pet.name;
+          leavePet(petId).then((ok) => {
+            if (!ok) showToast(t('petProfile.toast.leaveFailed', { name }));
+          });
+        },
+      };
+
+  const handleDangerConfirm = () => {
+    setConfirmDanger(false);
     navigation.popToTop();
-    const name = pet.name;
-    deletePet(petId).then((ok) =>
-      showToast(ok ? t('editPet.removed', { name }) : t('editPet.removeFailed', { name })));
+    dangerAction.run();
   };
 
   return (
@@ -245,30 +280,28 @@ export default function EditPetScreen({ navigation, route }) {
           disabled={saving || uploading}
         />
 
-        {/* Danger zone */}
+        {/* Danger zone: Remove for the owner, Leave for a co-owner. */}
         <View style={styles.dangerZone}>
           <Text style={styles.dangerLabel}>{t('editPet.dangerZone')}</Text>
-          <Text style={styles.dangerHint}>
-            {t('editPet.dangerHint', { name: pet.name })}
-          </Text>
+          <Text style={styles.dangerHint}>{dangerAction.hint}</Text>
           <Pressable accessibilityRole="button"
             style={({ pressed }) => [styles.removeBtn, pressed && { backgroundColor: ui.dangerPressTint }]}
-            onPress={() => setConfirmRemove(true)}
+            onPress={() => setConfirmDanger(true)}
           >
-            <MaterialCommunityIcons name="delete-outline" size={17} color={ui.danger} />
-            <Text style={styles.removeBtnText}>{t('editPet.remove', { name: pet.name })}</Text>
+            <MaterialCommunityIcons name={dangerAction.icon} size={17} color={ui.danger} />
+            <Text style={styles.removeBtnText}>{dangerAction.label}</Text>
           </Pressable>
         </View>
       </FormScrollView>
 
       <ConfirmDialog
-        visible={confirmRemove}
-        title={t('editPet.confirmTitle', { name: pet.name })}
-        message={t('editPet.confirmMessage')}
-        confirmLabel={t('editPet.confirmLabel')}
+        visible={confirmDanger}
+        title={dangerAction.title}
+        message={dangerAction.message}
+        confirmLabel={dangerAction.confirmLabel}
         destructive
-        onConfirm={handleRemove}
-        onCancel={() => setConfirmRemove(false)}
+        onConfirm={handleDangerConfirm}
+        onCancel={() => setConfirmDanger(false)}
       />
     </SafeAreaView>
   );
