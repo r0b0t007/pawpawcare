@@ -67,23 +67,27 @@ export const deviceTimezone = () => {
  * is false once the system prompt can't be shown any more (iOS after a
  * denial, Android after "Don't ask again"): only the phone's settings help.
  */
+const UNAVAILABLE = { status: 'unavailable', canAskAgain: false };
+const normalize = ({ status, canAskAgain }) => ({
+  status,
+  canAskAgain: status === 'granted' ? true : canAskAgain !== false,
+});
+
 export async function getNotificationPermission() {
-  if (!Notifications) return { status: 'unavailable', canAskAgain: false };
+  if (!Notifications) return UNAVAILABLE;
   try {
-    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
-    return { status, canAskAgain: status === 'granted' ? true : canAskAgain !== false };
+    return normalize(await Notifications.getPermissionsAsync());
   } catch {
-    return { status: 'unavailable', canAskAgain: false };
+    return UNAVAILABLE;
   }
 }
 
 /** Show the system prompt (when it still can) and return the new permission. */
 export async function requestNotificationPermission() {
-  if (!Notifications) return { status: 'unavailable', canAskAgain: false };
+  if (!Notifications) return UNAVAILABLE;
   try {
     await ensureAndroidChannel(); // Android 13+ needs a channel before it prompts
-    const { status, canAskAgain } = await Notifications.requestPermissionsAsync();
-    return { status, canAskAgain: status === 'granted' ? true : canAskAgain !== false };
+    return normalize(await Notifications.requestPermissionsAsync());
   } catch {
     return getNotificationPermission();
   }
@@ -91,23 +95,18 @@ export async function requestNotificationPermission() {
 
 /**
  * Obtain an Expo push token. Returns { token, platform } or null (no
- * permission / simulator / Expo Go). It never shows the permission prompt
- * unless `prompt` is set: the app asks in context (useNotificationPermission,
- * NotificationsBanner), not the moment someone signs in (CHW-230).
+ * permission / simulator / Expo Go). It never shows the permission prompt:
+ * the app asks in context (useNotificationPermission), not the moment someone
+ * signs in (CHW-230).
  */
-export async function registerForPushNotificationsAsync({ prompt = false } = {}) {
+export async function registerForPushNotificationsAsync() {
   if (!Notifications) return null; // Expo Go: no notifications module at all
 
   await ensureAndroidChannel();
 
   if (!Device.isDevice) return null; // push tokens require a physical device
 
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  let status = existing;
-  if (existing !== 'granted' && prompt) {
-    status = (await Notifications.requestPermissionsAsync()).status;
-  }
-  if (status !== 'granted') return null;
+  if ((await getNotificationPermission()).status !== 'granted') return null;
 
   const projectId =
     Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;

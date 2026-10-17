@@ -6,6 +6,7 @@ import { ui, type, radii } from '../theme';
 import { useNotificationPermission } from '../hooks/useNotificationPermission';
 import Card from './Card';
 import Button from './Button';
+import { showToast } from './Toast';
 
 // Says so when this phone can't show PawPawCare's notifications (CHW-230),
 // on the screens about reminders. Two states:
@@ -17,6 +18,16 @@ import Button from './Button';
 export default function NotificationsBanner({ style }) {
   const { t } = useTranslation();
   const { status, canAskAgain, turnOn } = useNotificationPermission();
+
+  // Android only reveals "blocked for good" by being asked: the request then
+  // returns at once with no dialog. Say so, so the tap never looks dead; the
+  // banner switches to "Open settings" at the same time.
+  const onPress = async () => {
+    const result = await turnOn();
+    if (result.prompted && result.status === 'denied' && !result.canAskAgain) {
+      showToast(t('notifications.permission.blockedToast'));
+    }
+  };
 
   if (status !== 'undetermined' && status !== 'denied') return null;
   const blocked = status === 'denied' && !canAskAgain;
@@ -39,7 +50,7 @@ export default function NotificationsBanner({ style }) {
       <Button
         small
         label={blocked ? t('notifications.permission.openSettings') : t('notifications.permission.turnOn')}
-        onPress={turnOn}
+        onPress={onPress}
       />
     </Card>
   );

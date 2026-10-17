@@ -14,6 +14,7 @@ import { petById } from '../../utils/pets';
 import { reminderKind } from '../../utils/reminders';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useNotificationsPrompt } from '../../hooks/useNotificationsPrompt';
 import { useTickAt } from '../../hooks/useTickAt';
 import { ui, type, radii, motion, elevation, photos, vaultColors } from '../../theme';
 import {
@@ -257,6 +258,7 @@ export default function HealthHubScreen({ navigation }) {
       }
       setSheetOpen(false);
       showToast(t('health.toast.saved'));
+      maybeAsk(); // a vaccine reminder was just set up (CHW-230)
     });
   };
 
@@ -271,6 +273,7 @@ export default function HealthHubScreen({ navigation }) {
   };
 
   const { run, isBusy } = useInFlight();
+  const { maybeAsk, prompt: notificationsPrompt } = useNotificationsPrompt();
   const markDone = (v) =>
     run(v.id, async () => {
       const saved = await markVaccinationComplete(v.pet.id, v.id);
@@ -572,6 +575,7 @@ export default function HealthHubScreen({ navigation }) {
           </>
         )}
       </Sheet>
+      {notificationsPrompt}
     </SafeAreaView>
   );
 }

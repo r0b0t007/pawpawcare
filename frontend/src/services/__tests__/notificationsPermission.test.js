@@ -40,11 +40,6 @@ test('with permission already granted, registering returns the push token', asyn
   expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
 });
 
-test('prompt: true still asks (explicit opt-in only)', async () => {
-  expect(await registerForPushNotificationsAsync({ prompt: true })).toEqual(expect.objectContaining({ token: 'ExponentPushToken[x]' }));
-  expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
-});
-
 test('the permission says whether the OS can still prompt', async () => {
   mockPermission = { status: 'denied', canAskAgain: false };
   expect(await getNotificationPermission()).toEqual({ status: 'denied', canAskAgain: false });

@@ -20,6 +20,7 @@ import { initSentry, registerNavigation, wrapRoot } from './src/services/sentry'
 import { AuthProvider } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
 import { ToastHost } from './src/components';
+import { NotificationPermissionWatcher } from './src/hooks/useNotificationPermission';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import { track, trackScreen } from './src/services/analytics';
 import { addNotificationResponseListener } from './src/services/notifications';
@@ -134,6 +135,9 @@ function App() {
               <StatusBar style="dark" backgroundColor="#fffaf6" />
               <AppNavigator />
               <ToastHost />
+              {/* One AppState listener for the notification permission, and the
+                  reaction to a grant wherever it happens (CHW-230). */}
+              <NotificationPermissionWatcher />
             </ObserveNavigationContainer>
           </DataProvider>
         </AuthProvider>

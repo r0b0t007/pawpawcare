@@ -441,7 +441,13 @@ export function AuthProvider({ children }) {
         updateUser,
         refreshUser,
         // Signed-in only: there's no account to attach the phone to otherwise.
-        registerPushDevice: () => (state.user ? registerPushDevice() : Promise.resolve()),
+        // A sign-out still being resent goes first (as in syncDevice), so its
+        // DELETE /devices can't remove the registration made here.
+        registerPushDevice: async () => {
+          if (!state.user) return;
+          await flushPendingLogout();
+          await registerPushDevice();
+        },
         applyPlan,
         deleteAccount,
         sendEmailVerification,

@@ -472,7 +472,7 @@
       },
       "phone": {
         "title": "Si no le llegan las notificaciones",
-        "body": "Los recordatorios se programan en su teléfono, así que llegan incluso sin conexión. Si las notificaciones de PawPawCare están bloqueadas, la pantalla Recordatorios muestra «Notificaciones desactivadas» y su botón abre los ajustes de su teléfono. Revise también Perfil → Notificaciones → «Recordatorios de cuidados», que los activa o desactiva solo en este teléfono."
+        "body": "Los recordatorios se programan en su teléfono, así que llegan incluso sin conexión. Si las notificaciones de PawPawCare no están permitidas, un aviso en la parte superior de la pantalla Recordatorios lo indica, y su botón las activa o abre los ajustes de su teléfono. Revise también Perfil → Notificaciones → «Recordatorios de cuidados», que los activa o desactiva solo en este teléfono."
       },
       "doses": {
         "title": "Registre cada toma",
@@ -845,7 +845,8 @@
       "openSettings": "Abrir ajustes",
       "notNow": "Ahora no",
       "dialogTitle": "¿Recibir recordatorios en este teléfono?",
-      "dialogMessage": "Le avisaremos antes de que venzan las vacunas y las tomas. Puede cambiarlo cuando quiera en los ajustes de su teléfono."
+      "dialogMessage": "Le avisaremos antes de que venzan las vacunas y las tomas. Puede cambiarlo cuando quiera en los ajustes de su teléfono.",
+      "blockedToast": "Las notificaciones de PawPawCare están bloqueadas. Use «Abrir ajustes» para activarlas."
     }
   },
   "records": {

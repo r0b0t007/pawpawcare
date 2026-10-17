@@ -22,6 +22,7 @@ import { useGamificationSummary, milestoneLabel } from '../../hooks/useGamificat
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useNotificationsPrompt } from '../../hooks/useNotificationsPrompt';
 import { formatDecimal, parseDecimal, pluralCount } from '../../utils/numbers';
 import { track } from '../../services/analytics';
 import { ui, type, radii, motion, petPair, scrim } from '../../theme';
@@ -106,6 +107,9 @@ export default function PetProfileScreen({ navigation, route }) {
 
   const [segment, setSegment] = useState('overview');
   const insets = useSafeAreaInsets();
+  // A scheduled medication sets up dose reminders: the moment to offer
+  // notifications (CHW-230).
+  const { maybeAsk, prompt: notificationsPrompt } = useNotificationsPrompt();
 
   // This pet's weekly care streak + earned milestones (nightly-computed).
   const { data: gamification, refetch: refetchGamification, isStale: gamificationStale } = useGamificationSummary();
@@ -271,6 +275,7 @@ export default function PetProfileScreen({ navigation, route }) {
       then: () => {
         setNewMed({ name: '', dosage: '', frequency: 'daily', times: ['08:00'], notes: '' });
         setMedSheet(false);
+        if (!asNeeded) maybeAsk(); // "as needed" has no reminders
       },
     });
   };
@@ -1353,6 +1358,7 @@ export default function PetProfileScreen({ navigation, route }) {
         onCancel={() => setConfirm(null)}
         onConfirm={() => { const a = confirm?.action; setConfirm(null); a?.(); }}
       />
+      {notificationsPrompt}
     </View>
   );
 }

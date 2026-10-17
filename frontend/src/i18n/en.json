@@ -457,7 +457,7 @@
       },
       "phone": {
         "title": "If notifications don't arrive",
-        "body": "Reminders are scheduled on your phone, so they arrive even when you're offline. If notifications are blocked for PawPawCare, the Reminders screen says “Notifications are off”, and its button opens your phone's settings. Also check Profile → Notifications → “Care reminders”, which turns reminders on or off on this phone only."
+        "body": "Reminders are scheduled on your phone, so they arrive even when you're offline. If notifications aren't allowed for PawPawCare, a banner at the top of the Reminders screen says so, and its button turns them on or opens your phone's settings. Also check Profile → Notifications → “Care reminders”, which turns reminders on or off on this phone only."
       },
       "doses": {
         "title": "Log each dose",
@@ -816,7 +816,8 @@
       "openSettings": "Open settings",
       "notNow": "Not now",
       "dialogTitle": "Get reminders on this phone?",
-      "dialogMessage": "We'll notify you before vaccines and doses are due. You can change this anytime in your phone's settings."
+      "dialogMessage": "We'll notify you before vaccines and doses are due. You can change this anytime in your phone's settings.",
+      "blockedToast": "Notifications are blocked for PawPawCare. Use “Open settings” to turn them on."
     }
   },
   "records": {
