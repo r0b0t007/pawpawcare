@@ -60,3 +60,13 @@ google-service-account.json
 # functions build` before every deploy — see docs/deploy-website-cloudflare.md)
 website/_worker.js/
 website/_routes.json
+
+# Local design working files (exports, source photos, fonts, design-tool
+# project): heavy binaries kept on the designer's machine, not in git. The
+# HTML screen designs under design/ stay tracked.
+design/build/
+design/exports/
+design/photos/
+design/Document Fonts/
+design/_mci.json
+design/*.designcraft
