@@ -10,6 +10,7 @@ import { useData } from '../../context/DataContext';
 import { ui, radii, type, motion, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, reminderIcon, Toggle, DeleteButton, NotificationsBanner } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useNotificationsPrompt } from '../../hooks/useNotificationsPrompt';
 import { petById } from '../../utils/pets';
 import { fmtDate } from '../../utils/dates';
 import { recurringSummary } from '../../utils/reminders';
@@ -60,6 +61,8 @@ export default function RemindersScreen({ navigation }) {
   // frame through); the form clears only once it's saved.
   const { run, isBusy } = useInFlight();
   const saving = isBusy('add');
+  // A reminder was just asked for: the moment to offer notifications (CHW-230).
+  const { maybeAsk, prompt: notificationsPrompt } = useNotificationsPrompt();
   const onSave = () => {
     if (!canSave) return undefined;
     return run('add', async () => {
@@ -76,6 +79,7 @@ export default function RemindersScreen({ navigation }) {
       setTitle('');
       setWhen(defaultWhen());
       showToast(t('reminders.toast.added'));
+      maybeAsk();
     });
   };
 
@@ -92,10 +96,6 @@ export default function RemindersScreen({ navigation }) {
       <ScreenHeader title={t('reminders.title')} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {/* CHW-230: the in-context ask on this screen is the banner, not the
-            dialog other screens use: a modal opening while a new row animates
-            in froze the list's layout animation on Android (rows drawn on top
-            of each other until the screen remounted). */}
         <NotificationsBanner style={styles.banner} />
 
         {/* Add custom reminder */}
@@ -221,6 +221,7 @@ export default function RemindersScreen({ navigation }) {
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
       />
+      {notificationsPrompt}
     </SafeAreaView>
   );
 }

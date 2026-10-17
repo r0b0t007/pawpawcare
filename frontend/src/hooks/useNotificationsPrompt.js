@@ -6,14 +6,12 @@ import { useNotificationPermission } from './useNotificationPermission';
 
 const SNOOZE_KEY = 'notificationsAskSnoozedUntil';
 const SNOOZE_MS = 14 * 24 * 60 * 60 * 1000;
-// The dialog opens once the save's own motion is over (a sheet closes in
-// ≤300ms). Don't use it on a screen whose list animates its rows (layout
-// transitions): a modal opening during one froze it on a slow Android device,
-// leaving rows drawn on top of each other — Reminders uses its banner instead.
+// The dialog opens once the save's own motion is over (a sheet closing, a
+// new row animating in: ≤300ms each), so it never lands mid-animation.
 export const PROMPT_DELAY_MS = 400;
 
-// The in-context ask (CHW-230): right after someone schedules something that
-// will remind them (a vaccine), offer to turn notifications on,
+// The in-context ask (CHW-230): right after someone creates something that
+// will remind them (a reminder, a vaccine), offer to turn notifications on,
 // with a sentence saying why, instead of the bare system prompt at sign-in.
 // Only while the OS can still prompt; "Not now" waits 14 days before asking
 // again (the screens' NotificationsBanner stays available meanwhile).
