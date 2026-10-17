@@ -1557,7 +1557,7 @@
     "saveChanges": "Guardar cambios",
     "dangerZone": "Zona de peligro",
     "dangerHint": "Al eliminar a {{name}} se borran sus registros para todas las personas con quienes se comparte.",
-    "coOwnerNote": "Solo el propietario puede eliminar a {{name}}. Para dejar de compartirla, abra el perfil de {{name}} y elija «Dejar esta mascota» en el menú •••.",
+    "coOwnerHint": "Solo el propietario puede eliminar a {{name}}. En su lugar, puede dejar de ser copropietario; perderá el acceso a sus registros.",
     "remove": "Eliminar a {{name}}",
     "confirmTitle": "¿Eliminar a {{name}}?",
     "confirmMessage": "Se eliminarán todos los registros de forma permanente. Esta acción no se puede deshacer.",

@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { breedLabel, petPhoto } from '../../utils/pets';
+import { breedLabel, petPhoto, isPetOwner } from '../../utils/pets';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
 import { convertWeight, weightInsight } from '../../utils/weight';
 import { medicationStreak, medicationStreakLabel, dayKey } from '../../utils/streaks';
@@ -102,7 +102,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
   const activeReport = (myReports || []).find((r) => r.petId === petId && r.status === 'active');
-  const isOwner = !!pet && pet.ownerId === user?.id;
+  const isOwner = isPetOwner(pet, user);
 
   const [segment, setSegment] = useState('overview');
   const insets = useSafeAreaInsets();

@@ -1557,7 +1557,7 @@
     "saveChanges": "Enregistrer les modifications",
     "dangerZone": "Zone de danger",
     "dangerHint": "Supprimer {{name}} efface ses dossiers pour toutes les personnes avec qui il est partagé.",
-    "coOwnerNote": "Seul le propriétaire peut supprimer {{name}}. Pour ne plus co-gérer cet animal, ouvrez le profil de {{name}} et choisissez « Quitter cet animal » dans le menu •••.",
+    "coOwnerHint": "Seul le propriétaire peut supprimer {{name}}. Vous pouvez en revanche cesser d'en être co-propriétaire ; vous perdrez l'accès à ses dossiers.",
     "remove": "Supprimer {{name}}",
     "confirmTitle": "Supprimer {{name}} ?",
     "confirmMessage": "Tous les dossiers seront définitivement supprimés. Cette action est irréversible.",

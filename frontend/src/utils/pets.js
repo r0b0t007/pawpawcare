@@ -12,6 +12,13 @@ export const petPhoto = (pet) => (pet?.avatarUrl ? resolveAsset(pet.avatarUrl) :
 // never shows a lone kitten. Stock is decoration only, never the pet itself.
 export const emptyPhotoFor = (pet, catPhoto) => (pet?.type === 'cat' ? catPhoto : photos.communityPals);
 
+// Whether the signed-in user owns this pet (as opposed to co-owning it). The
+// API reserves deleting the pet and managing its care team to the owner and
+// answers anyone else with 403, so screens offer those actions only when this
+// is true. Ids compare as strings, like petById.
+export const isPetOwner = (pet, user) =>
+  !!pet && pet.ownerId != null && user?.id != null && String(pet.ownerId) === String(user.id);
+
 // The pet with this id, comparing as strings (API ids can arrive as numbers
 // or strings depending on the payload) — undefined when there's none.
 export const petById = (pets, id) =>
