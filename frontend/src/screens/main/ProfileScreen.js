@@ -13,7 +13,7 @@ import { useInFlight } from '../../hooks/useInFlight';
 import { planStatus, planTitle } from '../../utils/subscription';
 import { useTranslation, LANGUAGE_CHOICES, languageChoice, setLanguageChoice } from '../../i18n';
 import { ui, type, motion } from '../../theme';
-import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, PetFaceStack, Toggle, showToast } from '../../components';
+import { Card, ListRow, ConfirmDialog, Sheet, Chip, Button, PetFaceStack, Toggle, showToast, NotificationsBanner } from '../../components';
 
 // The Profile tab ("Lively & Light"): a friendly account card that leads
 // with who you are and who you care for (pet faces — recognition, not
@@ -220,6 +220,7 @@ export default function ProfileScreen({ navigation }) {
         )}
 
         <SectionLabel>{t('profile.sections.notifications')}</SectionLabel>
+        <NotificationsBanner style={styles.sectionCard} />
         <Card style={styles.sectionCard}>
           <ListRow
             icon="bell-outline"

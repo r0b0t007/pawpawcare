@@ -10,6 +10,7 @@ import { ui, type, radii, petPair, photos } from '../../theme';
 import { emptyPhotoFor } from '../../utils/pets';
 import { Card, Button, Sheet, ConfirmDialog, EmptyState, PetFace, StatusPill, showToast, ScreenHeader, DeleteButton, TextField } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useNotificationsPrompt } from '../../hooks/useNotificationsPrompt';
 import { useToday } from '../../hooks/useToday';
 import { fmtFull, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
 import { useLocale, useTranslation } from '../../i18n';
@@ -89,6 +90,10 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
   };
 
   const closeSheet = () => { setModal(false); setForm({ name: '', dueDate: '' }); };
+  // A vaccine reminder was just scheduled: the moment to offer notifications
+  // (CHW-230). After the sheet has closed — iOS drops a modal presented while
+  // another is still dismissing (≤300ms).
+  const { maybeAsk, prompt: notificationsPrompt } = useNotificationsPrompt();
 
   const handleAdd = () => {
     if (!form.name.trim() || !form.dueDate) return undefined;
@@ -105,6 +110,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
       }
       closeSheet();
       showToast(t('vaccines.toast.scheduled'));
+      setTimeout(maybeAsk, 320);
     });
   };
 
@@ -300,6 +306,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
         onCancel={() => setConfirm(null)}
         onConfirm={() => { const a = confirm?.action; setConfirm(null); a?.(); }}
       />
+      {notificationsPrompt}
     </SafeAreaView>
   );
 }

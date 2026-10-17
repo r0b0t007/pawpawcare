@@ -472,7 +472,7 @@
       },
       "phone": {
         "title": "Si les notifications n'arrivent pas",
-        "body": "Les rappels sont programmés sur votre téléphone : ils arrivent même hors connexion. Si aucun ne s'affiche, les notifications sont peut-être bloquées pour PawPawCare : autorisez-les dans les réglages de votre téléphone. Vérifiez aussi Profil → Notifications → « Rappels de soins », qui active ou désactive les rappels sur ce téléphone uniquement."
+        "body": "Les rappels sont programmés sur votre téléphone : ils arrivent même hors connexion. Si les notifications sont bloquées pour PawPawCare, l'écran Rappels affiche « Notifications désactivées » et son bouton ouvre les réglages de votre téléphone. Vérifiez aussi Profil → Notifications → « Rappels de soins », qui active ou désactive les rappels sur ce téléphone uniquement."
       },
       "doses": {
         "title": "Notez chaque prise",
@@ -835,6 +835,17 @@
       "title": "Vous êtes à jour",
       "body": "Les rappels de vaccins, de médicaments et de soins apparaîtront ici.",
       "action": "Ajouter un rappel"
+    },
+    "permission": {
+      "askTitle": "Activez les rappels",
+      "askBody": "Autorisez les notifications et nous vous préviendrons avant l'échéance des vaccins et des prises.",
+      "offTitle": "Notifications désactivées",
+      "offBody": "PawPawCare ne peut pas envoyer de notifications sur ce téléphone : les rappels ne vous parviendront pas. Activez-les dans les réglages de votre téléphone.",
+      "turnOn": "Activer",
+      "openSettings": "Ouvrir les réglages",
+      "notNow": "Plus tard",
+      "dialogTitle": "Recevoir les rappels sur ce téléphone ?",
+      "dialogMessage": "Nous vous préviendrons avant l'échéance des vaccins et des prises. Vous pourrez changer d'avis à tout moment dans les réglages de votre téléphone."
     }
   },
   "records": {

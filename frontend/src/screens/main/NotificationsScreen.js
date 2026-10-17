@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
 import { ui, type, motion, photos } from '../../theme';
-import { Card, EmptyState, PetFace, ScreenHeader, reminderIcon } from '../../components';
+import { Card, EmptyState, PetFace, ScreenHeader, reminderIcon, NotificationsBanner } from '../../components';
 import { useToday } from '../../hooks/useToday';
 import { dayDiff, fmtClock, fmtDayTime, timeAgo } from '../../utils/dates';
 import i18n, { useLocale, useTranslation } from '../../i18n';
@@ -173,6 +173,7 @@ export default function NotificationsScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
+        <NotificationsBanner style={styles.banner} />
         {notifications.length === 0 ? (
           <EmptyState
             photo={photos.emptyBlanket}
@@ -200,6 +201,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: ui.background },
   manageLink: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: ui.accent },
   scroll: { paddingHorizontal: 16, paddingBottom: 32 },
+  banner: { marginBottom: 12 },
   sectionLabel: { marginHorizontal: 8, marginBottom: 10, marginTop: 4, color: ui.subtle },
   sectionCard: { marginBottom: 18 },
   row: {

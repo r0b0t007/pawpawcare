@@ -7,6 +7,7 @@ export { default as SegmentedControl } from './SegmentedControl';
 export { default as Button } from './Button';
 export { default as Sheet } from './Sheet';
 export { default as ConfirmDialog } from './ConfirmDialog';
+export { default as NotificationsBanner } from './NotificationsBanner';
 export { default as UpNextCard } from './UpNextCard';
 export { default as Skeleton } from './Skeleton';
 export { default as CareStreakCard } from './CareStreakCard';

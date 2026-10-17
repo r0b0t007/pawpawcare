@@ -61,10 +61,41 @@ export const deviceTimezone = () => {
 };
 
 /**
- * Request permission and obtain an Expo push token.
- * Returns { token, platform } or null (denied / simulator / Expo Go).
+ * The OS permission to show notifications (CHW-230):
+ * { status: 'granted' | 'denied' | 'undetermined' | 'unavailable', canAskAgain }.
+ * 'unavailable' means there is no notifications module (Expo Go). canAskAgain
+ * is false once the system prompt can't be shown any more (iOS after a
+ * denial, Android after "Don't ask again"): only the phone's settings help.
  */
-export async function registerForPushNotificationsAsync() {
+export async function getNotificationPermission() {
+  if (!Notifications) return { status: 'unavailable', canAskAgain: false };
+  try {
+    const { status, canAskAgain } = await Notifications.getPermissionsAsync();
+    return { status, canAskAgain: status === 'granted' ? true : canAskAgain !== false };
+  } catch {
+    return { status: 'unavailable', canAskAgain: false };
+  }
+}
+
+/** Show the system prompt (when it still can) and return the new permission. */
+export async function requestNotificationPermission() {
+  if (!Notifications) return { status: 'unavailable', canAskAgain: false };
+  try {
+    await ensureAndroidChannel(); // Android 13+ needs a channel before it prompts
+    const { status, canAskAgain } = await Notifications.requestPermissionsAsync();
+    return { status, canAskAgain: status === 'granted' ? true : canAskAgain !== false };
+  } catch {
+    return getNotificationPermission();
+  }
+}
+
+/**
+ * Obtain an Expo push token. Returns { token, platform } or null (no
+ * permission / simulator / Expo Go). It never shows the permission prompt
+ * unless `prompt` is set: the app asks in context (useNotificationPermission,
+ * NotificationsBanner), not the moment someone signs in (CHW-230).
+ */
+export async function registerForPushNotificationsAsync({ prompt = false } = {}) {
   if (!Notifications) return null; // Expo Go: no notifications module at all
 
   await ensureAndroidChannel();
@@ -73,7 +104,7 @@ export async function registerForPushNotificationsAsync() {
 
   const { status: existing } = await Notifications.getPermissionsAsync();
   let status = existing;
-  if (existing !== 'granted') {
+  if (existing !== 'granted' && prompt) {
     status = (await Notifications.requestPermissionsAsync()).status;
   }
   if (status !== 'granted') return null;
