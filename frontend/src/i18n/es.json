@@ -1219,7 +1219,8 @@
       "inviteWithdrawFailed": "No se ha podido retirar la invitación. Inténtelo de nuevo.",
       "shareLinksRevoked": "Se han revocado todos los enlaces compartidos",
       "careLinksRevoked": "Se han revocado todos los enlaces para cuidadores",
-      "notesSaved": "Notas guardadas"
+      "notesSaved": "Notas guardadas",
+      "leaveFailed": "No se ha podido dejar a {{name}}. Inténtelo de nuevo."
     },
     "confirm": {
       "remove": "Eliminar",
@@ -1569,6 +1570,7 @@
     "saveChanges": "Guardar cambios",
     "dangerZone": "Zona de peligro",
     "dangerHint": "Al eliminar a {{name}} se borran sus registros para todas las personas con quienes se comparte.",
+    "coOwnerHint": "Solo el propietario puede eliminar a {{name}}. En su lugar, puede dejar de ser copropietario; perderá el acceso a sus registros.",
     "remove": "Eliminar a {{name}}",
     "confirmTitle": "¿Eliminar a {{name}}?",
     "confirmMessage": "Se eliminarán todos los registros de forma permanente. Esta acción no se puede deshacer.",

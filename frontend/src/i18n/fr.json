@@ -484,7 +484,7 @@
       "cta": "Ouvrir Partage et invitations",
       "invite": {
         "title": "Invitez un proche à co-gérer un animal",
-        "body": "Sur le profil de votre animal, ouvrez « Équipe de soins » et envoyez une invitation à son adresse e-mail. Les co-propriétaires peuvent consulter et mettre à jour les dossiers ; supprimer l'animal ou gérer l'équipe de soins vous est réservé."
+        "body": "Sur le profil de votre animal, ouvrez « Équipe de soins » et envoyez une invitation à son adresse e-mail. Les copropriétaires peuvent consulter et mettre à jour les dossiers ; supprimer l'animal ou gérer l'équipe de soins vous est réservé."
       },
       "accept": {
         "title": "Acceptez une invitation",
@@ -1219,7 +1219,8 @@
       "inviteWithdrawFailed": "Impossible de retirer l'invitation. Veuillez réessayer.",
       "shareLinksRevoked": "Tous les liens de partage ont été révoqués",
       "careLinksRevoked": "Tous les liens de garde ont été révoqués",
-      "notesSaved": "Notes enregistrées"
+      "notesSaved": "Notes enregistrées",
+      "leaveFailed": "Impossible de quitter {{name}}. Veuillez réessayer."
     },
     "confirm": {
       "remove": "Retirer",
@@ -1569,6 +1570,7 @@
     "saveChanges": "Enregistrer les modifications",
     "dangerZone": "Zone de danger",
     "dangerHint": "Supprimer {{name}} efface ses dossiers pour toutes les personnes avec qui il est partagé.",
+    "coOwnerHint": "Seul le propriétaire peut supprimer {{name}}. Vous pouvez en revanche cesser d'en être copropriétaire ; vous perdrez l'accès à ses dossiers.",
     "remove": "Supprimer {{name}}",
     "confirmTitle": "Supprimer {{name}} ?",
     "confirmMessage": "Tous les dossiers seront définitivement supprimés. Cette action est irréversible.",
