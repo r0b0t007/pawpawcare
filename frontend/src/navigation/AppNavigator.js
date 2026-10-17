@@ -104,6 +104,8 @@ function ProfileStack() {
       <Stack.Screen name="AccountDetails" component={AccountDetailsScreen} />
       <Stack.Screen name="Support" component={SupportScreen} />
       <Stack.Screen name="Guide" component={GuideScreen} />
+      {/* Opened from the Reminders guide, so Back returns to the guide. */}
+      <Stack.Screen name="Reminders" component={RemindersScreen} />
       <Stack.Screen name="Moderation" component={ModerationScreen} />
       <Stack.Screen name="Invites" component={InvitesScreen} />
       <Stack.Screen name="Subscription" component={SubscriptionScreen} />

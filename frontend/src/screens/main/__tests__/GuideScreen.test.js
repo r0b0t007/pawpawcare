@@ -71,8 +71,10 @@ test('the guide title and each section title are announced as headers', async ()
 });
 
 test.each([
-  ['gettingStarted', 'Add a pet', ['Pets', { screen: 'AddPet' }]],
-  ['reminders', 'Open reminders', ['Health', { screen: 'Reminders' }]],
+  // On top of PetsList, never alone in a tab that was never visited.
+  ['gettingStarted', 'Add a pet', ['Pets', { screen: 'AddPet', initial: false }]],
+  // In the Profile stack, so Back returns to the guide.
+  ['reminders', 'Open reminders', ['Reminders']],
   ['sharing', 'Open pet sharing & invites', ['Invites']],
 ])('the %s guide opens the screen it is about', async (id, label, target) => {
   const tree = await render(id);
@@ -81,13 +83,28 @@ test.each([
   expect(navigation.navigate).toHaveBeenCalledWith(...target);
 });
 
-test('"Message us" goes back to the help form', async () => {
+test('"Message us" returns to the help form by name, wherever the guide was opened from', async () => {
   const tree = await render('reminders');
 
   await act(async () => button(tree, 'Still need help? Message us').props.onPress());
-  expect(navigation.goBack).toHaveBeenCalled();
+  expect(navigation.navigate).toHaveBeenCalledWith('Support');
+  expect(navigation.goBack).not.toHaveBeenCalled();
 });
 
-test('an unknown guide id falls back to the first guide instead of crashing', async () => {
+test('step numbers are hidden from screen readers (the list order already numbers them)', async () => {
+  const tree = await render('gettingStarted');
+  // Host nodes only: each <View> also appears as its composite wrapper.
+  const badges = tree.root.findAll((n) => typeof n.type === 'string' && n.props.accessibilityElementsHidden
+    && n.props.importantForAccessibility === 'no-hide-descendants'
+    && n.findAllByType(Text).length === 1);
+
+  expect(badges.map((b) => [].concat(b.findByType(Text).props.children).join(''))).toEqual(['1', '2', '3']);
+});
+
+test('an unknown guide id warns in development and falls back to the first guide', async () => {
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
   expect(texts(await render('nope'))).toContain('Getting started');
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('"nope"'));
+  warn.mockRestore();
 });

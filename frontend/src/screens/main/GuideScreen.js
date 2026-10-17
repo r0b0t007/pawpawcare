@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTranslation } from '../../i18n';
-import { ui, type } from '../../theme';
+import { ui, type, radii } from '../../theme';
 import { Card, Button, ScreenHeader } from '../../components';
 import { GUIDES, guideById } from './guides';
 
@@ -14,7 +14,11 @@ import { GUIDES, guideById } from './guides';
 // and in every language without screenshots to keep in sync.
 export default function GuideScreen({ navigation, route }) {
   const { t } = useTranslation();
-  const guide = guideById(route?.params?.id) ?? GUIDES[0];
+  const found = guideById(route?.params?.id);
+  // A wrong id is a bug in the caller: say so in development, but still show
+  // a guide rather than a blank screen.
+  if (!found && __DEV__) console.warn(`GuideScreen: unknown guide id "${route?.params?.id}"`);
+  const guide = found ?? GUIDES[0];
   const text = (...parts) => t(['guides', guide.id, ...parts].join('.'));
 
   return (
@@ -39,8 +43,10 @@ export default function GuideScreen({ navigation, route }) {
               <View style={styles.steps}>
                 {Array.from({ length: section.steps }, (_, i) => (
                   <View key={i} style={styles.step}>
-                    <View style={styles.stepBadge}>
-                      <Text style={styles.stepNumber}>{i + 1}</Text>
+                    {/* The list order already numbers the steps for screen
+                        readers; the badge would only be an extra stop. */}
+                    <View style={styles.stepBadge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                      <Text style={[type.button, styles.stepNumber]}>{i + 1}</Text>
                     </View>
                     <Text style={[type.body, styles.stepText]}>{text(section.id, `step${i + 1}`)}</Text>
                   </View>
@@ -52,7 +58,9 @@ export default function GuideScreen({ navigation, route }) {
 
         <View style={styles.actions}>
           <Button label={text('cta')} onPress={() => guide.cta(navigation)} />
-          <Button variant="ghost" label={t('guides.messageUs')} onPress={() => navigation.goBack()} />
+          {/* navigate, not goBack: returns to the Support form if it's below,
+              and opens it otherwise. */}
+          <Button variant="ghost" label={t('guides.messageUs')} onPress={() => navigation.navigate('Support')} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -68,7 +76,7 @@ const styles = StyleSheet.create({
   iconBadge: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: ui.accentTint,
@@ -82,12 +90,12 @@ const styles = StyleSheet.create({
     minWidth: 24,
     minHeight: 24,
     paddingHorizontal: 6,
-    borderRadius: 12,
+    borderRadius: radii.full,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: ui.accent,
   },
-  stepNumber: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, lineHeight: 16, color: ui.onAccent },
+  stepNumber: { color: ui.onAccent },
   stepText: { flex: 1, color: ui.ink },
   actions: { marginHorizontal: 24, marginTop: 8, gap: 10 },
 });
