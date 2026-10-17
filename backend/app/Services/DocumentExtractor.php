@@ -28,6 +28,9 @@ class DocumentExtractor
 
     private const FREQUENCIES = ['daily', 'weekly', 'monthly', 'as_needed'];
 
+    /** Prompt language per app locale — one entry per User::LOCALES (ExtractionTest guards it). */
+    private const LANGUAGE_NAMES = ['en' => 'English', 'fr' => 'French', 'es' => 'Spanish'];
+
     public function __construct(private ExtractionClient $client) {}
 
     /** Whether the configured provider can read this document at all. */
@@ -51,7 +54,7 @@ class DocumentExtractor
         );
 
         $clean = $this->sanitize($raw);
-        $clean['_meta'] = $this->client->meta();
+        $clean['_meta'] = [...$this->client->meta(), 'locale' => app()->getLocale()];
 
         return $clean;
     }
@@ -60,6 +63,11 @@ class DocumentExtractor
     {
         $age = $pet->age !== null ? "{$pet->age}-year-old " : '';
         $breed = $pet->breed ? "{$pet->breed} " : '';
+        // The requester's language (SetLocale: saved preference, then
+        // Accept-Language), so the title and notes read naturally to them.
+        // The result is cached on the document, so co-owners see the first
+        // requester's language; _meta.locale records which one it was.
+        $language = self::LANGUAGE_NAMES[app()->getLocale()] ?? 'English';
 
         return <<<PROMPT
             You extract structured data from veterinary documents for a pet health app.
@@ -67,6 +75,11 @@ class DocumentExtractor
             Set matches_pet to false if the document clearly refers to a different animal.
             Extract only what is explicitly present in the document — never infer or invent
             values; use null when a field is absent or illegible. Dates must be YYYY-MM-DD.
+            Write suggested_title and notes_for_owner in {$language}. Everything else, including
+            the notes of each vaccination and medication, is copied exactly as it appears in
+            the document (names, products, dosages, instructions, clinic details) — never
+            translated; only a remark you add yourself in those notes is in {$language}.
+            Use plain text, not HTML entities.
             PROMPT;
     }
 
@@ -76,10 +89,23 @@ class DocumentExtractor
      */
     private function sanitize(array $raw): array
     {
-        $str = fn ($v, int $max) => is_string($v) && trim($v) !== '' ? mb_substr(trim($v), 0, $max) : null;
+        // Plain text only: the model sometimes HTML-escapes ("Record &amp;
+        // Invoice"), which the app would show verbatim.
+        $str = function ($v, int $max): ?string {
+            if (! is_string($v)) {
+                return null;
+            }
+            // Scrub invalid UTF-8 first (a /u regex returns null on it, which
+            // would drop the field), then trim whitespace, separators and
+            // invisible format characters: &nbsp; is U+00A0, &#8203; is U+200B.
+            $decoded = html_entity_decode(mb_scrub($v, 'UTF-8'), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $text = preg_replace('/^[\s\p{Z}\p{Cf}]+|[\s\p{Z}\p{Cf}]+$/u', '', $decoded) ?? '';
+
+            return $text !== '' ? mb_substr($text, 0, $max) : null;
+        };
         // Structured outputs don't guarantee enum capitalisation ("Daily"),
         // so compare case-insensitively rather than drop a correct reading.
-        $enum = fn ($v, array $allowed) => is_string($v) && in_array($l = strtolower(trim($v)), $allowed, true) ? $l : null;
+        $enum = fn ($v, array $allowed) => ($t = $str($v, 50)) !== null && in_array($l = mb_strtolower($t), $allowed, true) ? $l : null;
         $date = function ($v): ?string {
             if (! is_string($v)) {
                 return null;
@@ -92,9 +118,10 @@ class DocumentExtractor
         };
 
         $clinic = null;
-        if (is_array($raw['clinic'] ?? null) && $str($raw['clinic']['name'] ?? null, 150)) {
+        $clinicName = is_array($raw['clinic'] ?? null) ? $str($raw['clinic']['name'] ?? null, 150) : null;
+        if ($clinicName !== null) {
             $clinic = [
-                'name' => $str($raw['clinic']['name'], 150),
+                'name' => $clinicName,
                 'phone' => $str($raw['clinic']['phone'] ?? null, 50),
                 'address' => $str($raw['clinic']['address'] ?? null, 255),
             ];
@@ -107,7 +134,7 @@ class DocumentExtractor
                 'due_date' => $date($v['due_date'] ?? null),
                 'notes' => $str($v['notes'] ?? null, 500),
             ] : null)
-            ->filter(fn ($v) => $v && $v['name'])
+            ->filter(fn ($v) => $v && $v['name'] !== null)
             ->values()->all();
 
         $medications = collect(is_array($raw['medications'] ?? null) ? $raw['medications'] : [])
@@ -119,7 +146,7 @@ class DocumentExtractor
                 'end_date' => $date($m['end_date'] ?? null),
                 'notes' => $str($m['notes'] ?? null, 500),
             ] : null)
-            ->filter(fn ($m) => $m && $m['name'])
+            ->filter(fn ($m) => $m && $m['name'] !== null)
             ->values()->all();
 
         $weight = null;
