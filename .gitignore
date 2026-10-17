@@ -70,3 +70,6 @@ design/photos/
 design/Document Fonts/
 design/_mci.json
 design/*.designcraft
+
+# Local state left by the retired Netlify CLI setup (site moved to Cloudflare Pages)
+.netlify/
