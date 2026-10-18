@@ -6,10 +6,13 @@ const fs = require('fs');
 const path = require('path');
 
 const FRONTEND = path.join(__dirname, '..', '..');
-const LOCALES = ['en-US', 'fr-FR', 'es-ES'];
+// App Store locale → Google Play folder. Latin America: the App Store serves it
+// from es-MX, Google Play from es-419.
+const PLAY_DIR = { 'en-US': 'en-US', 'fr-FR': 'fr-FR', 'es-ES': 'es-ES', 'es-MX': 'es-419' };
+const LOCALES = Object.keys(PLAY_DIR);
 const store = JSON.parse(fs.readFileSync(path.join(FRONTEND, 'store.config.json'), 'utf8'));
 const play = (locale, file) =>
-  fs.readFileSync(path.join(FRONTEND, 'fastlane', 'metadata', 'android', locale, file), 'utf8').replace(/\n$/, '');
+  fs.readFileSync(path.join(FRONTEND, 'fastlane', 'metadata', 'android', PLAY_DIR[locale], file), 'utf8').replace(/\n$/, '');
 // Apple counts characters, not bytes ("é" is one).
 const len = (s) => [...s].length;
 const words = (s) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
@@ -58,4 +61,17 @@ describe.each(LOCALES)('%s', (locale) => {
     expect(play(locale, 'title.txt')).toBe(info.title);
     expect(play(locale, 'full_description.txt')).toBe(info.description);
   });
+});
+
+test('every App Store locale has a Play listing and the reverse (no orphan folder)', () => {
+  expect(Object.keys(store.apple.info).sort()).toEqual(LOCALES.slice().sort());
+  const folders = fs.readdirSync(path.join(FRONTEND, 'fastlane', 'metadata', 'android')).sort();
+  expect(folders).toEqual(Object.values(PLAY_DIR).sort());
+});
+
+test('Latin American Spanish is the Spain copy with Spain-only words swapped', () => {
+  const spain = store.apple.info['es-ES'].description;
+  const latam = store.apple.info['es-MX'].description;
+  expect(latam).not.toMatch(/\bcoste\b/);
+  expect(latam).toBe(spain.replace('el coste', 'el costo'));
 });

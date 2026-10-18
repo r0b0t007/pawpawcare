@@ -75,6 +75,27 @@
         "privacyPolicyUrl": "https://pawpawcare.app/privacy/",
         "supportUrl": "https://pawpawcare.app/es/#faq",
         "marketingUrl": "https://pawpawcare.app/es/"
+      },
+      "es-MX": {
+        "title": "PawPawCare: Salud de mascotas",
+        "subtitle": "Cartilla veterinaria y vacunas",
+        "description": "Reúna las vacunas, los medicamentos y el historial veterinario de todas sus mascotas en un solo lugar, sin agobios, y deje que PawPawCare le avise antes de cada vencimiento.\n\nAñada una mascota en un minuto: solo el nombre es obligatorio. PawPawCare se encarga después de lo que viene, para que usted no tenga que recordarlo.\n\nVACUNAS QUE LE AVISAN\n• Registre cada vacuna con su fecha de vencimiento\n• Recibirá un recordatorio 7 días antes, a las 9:00\n• Márquela como hecha con un toque, o reprográmela\n\nMEDICAMENTOS Y TOMAS\n• Pautas diarias, semanales o mensuales, con un recordatorio en cada hora de toma\n• Registre cada toma y vea cuántas lleva hoy\n• También sirve para la desparasitación y los tratamientos contra pulgas y garrapatas\n\nUNA CARTILLA DE SALUD POR MASCOTA\n• Evolución del peso, clínicas veterinarias, citas y gastos\n• Una pantalla de inicio que le dice qué requiere su atención hoy y qué viene esta semana\n\nDEJE QUE LA IA LEA LOS DOCUMENTOS DEL VETERINARIO\n• Añada una foto de un documento veterinario al archivo médico\n• PawPawCare le sugiere las vacunas, los medicamentos, el peso y el costo que encuentra\n• No se guarda nada hasta que lo revise y toque «Aplicar»\n\nCOMPARTA LOS CUIDADOS, NO SU CONTRASEÑA\n• Invite a su familia a compartir una mascota y a mantener su historial al día\n• Envíe a su veterinario un enlace de solo lectura con vacunas, medicamentos, peso y documentos recientes, válido de 1 hora a 7 días, sin aplicación ni cuenta\n• Dé a su cuidador la alimentación, las instrucciones y un contacto de emergencia, con un enlace que caduca\n\nUNA COMUNIDAD QUE CUIDA DE SU MASCOTA\n• Un muro de la comunidad para compartir con otros dueños de mascotas\n• Avise a la comunidad si su mascota se pierde\n\nSUS REGISTROS SON SUYOS\n• Exporte todo en PDF o CSV, gratis para siempre\n• Los recordatorios se programan en su teléfono, así que llegan incluso sin conexión\n• En español, inglés y francés\n\nDescargue PawPawCare y ofrezca a cada una de sus mascotas unos cuidados tranquilos y bien organizados.",
+        "keywords": [
+          "perro",
+          "gato",
+          "desparasitación",
+          "recordatorio",
+          "medicamentos",
+          "peso",
+          "garrapatas",
+          "historial",
+          "cachorro",
+          "pulgas"
+        ],
+        "promoText": "Las vacunas, los medicamentos y el historial veterinario de todas sus mascotas en un solo lugar, con recordatorios que se crean solos.",
+        "privacyPolicyUrl": "https://pawpawcare.app/privacy/",
+        "supportUrl": "https://pawpawcare.app/es/#faq",
+        "marketingUrl": "https://pawpawcare.app/es/"
       }
     }
   }
