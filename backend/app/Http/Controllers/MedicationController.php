@@ -9,6 +9,7 @@ use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class MedicationController extends Controller
 {
@@ -31,7 +32,14 @@ class MedicationController extends Controller
 
         $data = $this->validatePayload($request);
 
-        $med = Medication::create(array_merge($this->normalize($data), ['pet_id' => $petId]));
+        $med = DB::transaction(function () use ($data, $petId) {
+            Pet::lockForRecordWrites($petId);
+            if (($data['active'] ?? true) && Medication::activeLimitReached($petId)) {
+                abort(422, __('This pet already has :max active medications. Stop or delete one to add another.', ['max' => Medication::MAX_ACTIVE_PER_PET]));
+            }
+
+            return Medication::create(array_merge($this->normalize($data), ['pet_id' => $petId]));
+        });
         ReminderScheduler::syncMedicationReminder($med);
 
         return response()->json($med->toApi(), 201);
@@ -43,8 +51,16 @@ class MedicationController extends Controller
         $med = $this->medicationOr404($medicationId, $petId);
 
         $data = $this->validatePayload($request, partial: true);
-        $med->fill($this->normalize($data));
-        $med->save();
+
+        DB::transaction(function () use ($data, $med, $petId) {
+            Pet::lockForRecordWrites($petId);
+            // Switching a stopped medication back on counts towards the limit too.
+            if (! $med->fresh()->active && ($data['active'] ?? false) && Medication::activeLimitReached($petId)) {
+                abort(422, __('This pet already has :max active medications. Stop or delete one to add another.', ['max' => Medication::MAX_ACTIVE_PER_PET]));
+            }
+            $med->fill($this->normalize($data));
+            $med->save();
+        });
 
         ReminderScheduler::syncMedicationReminder($med);
 

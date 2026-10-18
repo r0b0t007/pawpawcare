@@ -10,6 +10,17 @@ class Vaccination extends Model
 {
     use HasUuids;
 
+    /**
+     * Vaccinations per pet (CHW-245): each due one is a reminder for everyone
+     * sharing the pet. Decades of boosters stay far below it.
+     */
+    public const MAX_PER_PET = 200;
+
+    public static function limitReached(string $petId): bool
+    {
+        return static::where('pet_id', $petId)->count() >= self::MAX_PER_PET;
+    }
+
     protected $keyType = 'string';
 
     public $incrementing = false;

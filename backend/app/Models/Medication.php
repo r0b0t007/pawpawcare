@@ -18,6 +18,17 @@ class Medication extends Model
      */
     public const MAX_DOSE_TIMES = 12;
 
+    /**
+     * Active medications per pet (CHW-245): each is up to MAX_DOSE_TIMES
+     * recurring reminders for everyone sharing the pet.
+     */
+    public const MAX_ACTIVE_PER_PET = 30;
+
+    public static function activeLimitReached(string $petId): bool
+    {
+        return static::where('pet_id', $petId)->where('active', true)->count() >= self::MAX_ACTIVE_PER_PET;
+    }
+
     protected $keyType = 'string';
 
     public $incrementing = false;
