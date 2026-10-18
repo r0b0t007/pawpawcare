@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Group;
 use Illuminate\Database\Seeder;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 class GroupSeeder extends Seeder
 {
@@ -51,17 +52,26 @@ class GroupSeeder extends Seeder
         ],
     ];
 
+    /**
+     * Adds whichever default groups are missing, by translation_key, and
+     * never touches an existing row: safe to run on a live server
+     * (docs/deploy-backend.md), every group keeps its id and memberships, and
+     * a group added to DEFAULT_GROUPS later still reaches servers that
+     * already have the others.
+     */
     public function run(): void
     {
-        // Idempotent: only seed when no groups exist yet.
-        if (Group::query()->exists()) {
-            return;
-        }
-
         foreach (self::DEFAULT_GROUPS as $group) {
-            // forceCreate: translation_key is not mass-assignable (no API
-            // writes it; only this seeder and its backfill migration do).
-            Group::forceCreate($group);
+            if (Group::query()->where('translation_key', $group['translation_key'])->exists()) {
+                continue;
+            }
+            try {
+                // forceCreate: translation_key is not mass-assignable (no API
+                // writes it; only this seeder and its backfill migration do).
+                Group::forceCreate($group);
+            } catch (UniqueConstraintViolationException) {
+                // A concurrent run inserted it first (unique translation_key).
+            }
         }
     }
 }
