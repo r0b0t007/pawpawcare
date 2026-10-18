@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ReminderScheduler;
 use App\Support\ReminderText;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -83,6 +84,9 @@ class Reminder extends Model
             'timezone' => $this->timezone,
             'enabled' => (bool) $this->enabled,
             'next_fire_at' => $this->next_fire_at?->toISOString(),
+            // Every occurrence in the next week, for the app's offline local
+            // notifications (ReminderScheduler::upcomingFireTimes).
+            'upcoming_fire_at' => array_map(fn ($t) => $t->toISOString(), ReminderScheduler::upcomingFireTimes($this)),
             'created_at' => $this->created_at?->toISOString(),
         ];
     }

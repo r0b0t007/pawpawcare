@@ -13,6 +13,59 @@ use Illuminate\Support\Collection;
 
 class ReminderScheduler
 {
+    /** How far ahead the app schedules a reminder's local notifications. */
+    public const LOCAL_HORIZON_DAYS = 7;
+
+    /** Most occurrences listed per reminder (a daily one has 7 or 8). */
+    public const LOCAL_MAX_OCCURRENCES = 14;
+
+    /**
+     * The instants (UTC) a reminder fires over the next LOCAL_HORIZON_DAYS,
+     * starting with next_fire_at. The app schedules all of them as local
+     * notifications, so a recurring reminder — a daily dose — keeps arriving
+     * while the phone is offline, not just its next occurrence.
+     *
+     * After next_fire_at (which may be a snooze time, off the usual grid) it
+     * follows the reminder's own time of day in its timezone, as
+     * computeNextFireAt will once each one fires.
+     *
+     * @return list<Carbon>
+     */
+    public static function upcomingFireTimes(Reminder $reminder): array
+    {
+        $next = $reminder->next_fire_at;
+        if (! $reminder->enabled || ! $next) {
+            return [];
+        }
+
+        $times = [$next->copy()->utc()];
+        if ($reminder->schedule_type !== 'recurring') {
+            return $times;
+        }
+
+        [$h, $m] = array_pad(explode(':', $reminder->time_of_day ?: '09:00'), 2, '0');
+        try {
+            $after = $next->copy()->setTimezone($reminder->timezone ?: 'UTC');
+        } catch (\Throwable) {
+            // A zone the API would never store: list only the next one rather
+            // than fail the whole /reminders response.
+            return $times;
+        }
+        $until = Carbon::now()->addDays(self::LOCAL_HORIZON_DAYS);
+
+        $candidate = $after->copy()->setTime((int) $h, (int) $m, 0);
+        $guard = 0;
+        while ($candidate->lessThanOrEqualTo($after) && ++$guard <= 480) {
+            $candidate = self::advance($candidate, $reminder->recurrence);
+        }
+        while (count($times) < self::LOCAL_MAX_OCCURRENCES && $candidate->lessThanOrEqualTo($until)) {
+            $times[] = $candidate->copy()->utc();
+            $candidate = self::advance($candidate, $reminder->recurrence);
+        }
+
+        return $times;
+    }
+
     /**
      * Compute the next absolute (UTC) instant a reminder should fire, or null
      * if it never fires again. Timezone-correct via the reminder's IANA zone.
