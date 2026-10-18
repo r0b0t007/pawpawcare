@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  Extrapolation, FadeIn, FadeOut, LinearTransition, interpolate,
+  Extrapolation, FadeIn, FadeOut, interpolate,
   useAnimatedScrollHandler, useAnimatedStyle, useSharedValue,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,7 +43,10 @@ import {
 // every re-render.
 const SEGMENT_IN = FadeIn.duration(150);
 const ROW_OUT = FadeOut.duration(150);
-const ROW_LAYOUT = LinearTransition.duration(200);
+// No `layout` transition on rows (CHW-236): on Android a row's layout
+// animation could stall mid-way when a row was inserted while its Card grew,
+// leaving two rows drawn on top of each other until the screen remounted.
+// Rows still fade out on delete; the others simply settle into place.
 
 // Every string on this screen comes from i18n (src/i18n/*.json,
 // `petProfile.*`, plus `pets.types` / `pets.genders`); pet names, med names,
@@ -800,7 +803,7 @@ export default function PetProfileScreen({ navigation, route }) {
         {upcoming.map((v) => {
           const p = vaxPill(v);
           return (
-            <Animated.View key={v.id} exiting={ROW_OUT} layout={ROW_LAYOUT}>
+            <Animated.View key={v.id} exiting={ROW_OUT}>
               <ListRow
                 title={v.name}
                 subtitle={t('petProfile.health.dueOn', { date: fullDate(v.dueDate) || '—' })}
@@ -826,7 +829,7 @@ export default function PetProfileScreen({ navigation, route }) {
           <Text style={styles.emptyRowText}>{t('petProfile.health.noMedications')}</Text>
         )}
         {(pet.medications || []).map((med) => (
-          <Animated.View key={med.id} exiting={ROW_OUT} layout={ROW_LAYOUT}>
+          <Animated.View key={med.id} exiting={ROW_OUT}>
             <MedicationRow
               med={med}
               pair={pair}

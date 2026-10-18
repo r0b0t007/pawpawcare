@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, Pressable, StyleSheet, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
@@ -18,7 +18,10 @@ import i18n, { useLocale, useTranslation } from '../../i18n';
 import { EASE_OUT_CSS } from '../../components/motion';
 
 const ROW_OUT = FadeOut.duration(150);
-const ROW_LAYOUT = LinearTransition.duration(200);
+// No `layout` transition on rows (CHW-236): on Android a row's layout
+// animation could stall mid-way when a row was inserted while its Card grew,
+// leaving two rows drawn on top of each other until the screen remounted.
+// Rows still fade out on delete; the others simply settle into place.
 
 function defaultWhen() {
   const d = new Date();
@@ -176,7 +179,6 @@ export default function RemindersScreen({ navigation }) {
               <Animated.View
                 key={r.id}
                 exiting={ROW_OUT}
-                layout={ROW_LAYOUT}
                 style={[styles.reminderRow, i > 0 && styles.rowDivider]}
               >
                 {pet ? (
