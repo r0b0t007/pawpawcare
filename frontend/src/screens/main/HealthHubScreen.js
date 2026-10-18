@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TextInput, Pressable, Platform, StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
@@ -28,7 +28,10 @@ import {
 // read. The one primary action ("Add record") floats in the thumb zone.
 
 const ROW_OUT = FadeOut.duration(150);
-const ROW_LAYOUT = LinearTransition.duration(200);
+// No `layout` transition on rows (CHW-236): on Android a row's layout
+// animation could stall mid-way when a row was inserted while its Card grew,
+// leaving two rows drawn on top of each other until the screen remounted.
+// Rows still fade out on delete; the others simply settle into place.
 
 
 const VAULT = vaultColors;
@@ -285,7 +288,7 @@ export default function HealthHubScreen({ navigation }) {
     const last = i === items.length - 1;
     const v = item.overdueVax;
     return (
-      <Animated.View key={item.key} exiting={ROW_OUT} layout={ROW_LAYOUT}>
+      <Animated.View key={item.key} exiting={ROW_OUT}>
         <Pressable
           onPress={item.onPress}
           accessibilityRole="button"
