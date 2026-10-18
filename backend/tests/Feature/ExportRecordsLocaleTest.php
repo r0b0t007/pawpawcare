@@ -50,7 +50,7 @@ class ExportRecordsLocaleTest extends TestCase
     {
         $pet = Pet::create([
             'owner_id' => $owner->id, 'name' => '¿Toño?', 'type' => 'dog', 'breed' => 'Golden Retriever',
-            'gender' => 'female', 'birthday' => '2020-09-03', 'weight' => 12.5, 'microchipped' => true,
+            'gender' => 'female', 'birthday' => '2020-09-03', 'age' => 1.5, 'weight' => 12.5, 'microchipped' => true,
         ]);
 
         Vaccination::create(['pet_id' => $pet->id, 'name' => 'Rabies', 'due_date' => '2024-03-01', 'status' => 'completed', 'administered_date' => '2024-02-20', 'notes' => 'Bras gauche']);
@@ -117,7 +117,7 @@ class ExportRecordsLocaleTest extends TestCase
         // Display words follow the language...
         $this->assertStringContainsString(';oui', $csv);
         // ...weights use the decimal comma French Excel reads as a number...
-        $this->assertStringContainsString(';"12,5 kg";oui', $csv);
+        $this->assertStringContainsString('2020-09-03;1,5;"12,5 kg";oui', $csv);
         $this->assertStringContainsString("2025-01-15;12,5;kg;\n", $csv);
         // ...stored ids, ISO dates and typed data stay exactly as stored.
         $this->assertStringContainsString('Rabies;completed;2024-03-01;2024-02-20;"Bras gauche"', $csv);
@@ -201,9 +201,9 @@ class ExportRecordsLocaleTest extends TestCase
 
         $this->assertStringStartsNotWith("\u{FEFF}", $csv);
         $this->assertStringContainsString("Name,Type,Breed,Gender,Birthday,Age,Weight,Microchipped\n", $csv);
-        $this->assertStringContainsString('"12.5 kg",yes', $csv);
+        $this->assertStringContainsString('2020-09-03,1.5,"12.5 kg",yes', $csv);
         $this->assertStringContainsString("2025-01-15,12.5,kg,\n", $csv);
-        $this->assertStringNotContainsString(';', $csv);
+        $this->assertStringContainsString("Date,Weight,Unit,Notes\n", $csv);
     }
 
     public function test_the_saved_locale_wins_over_accept_language(): void

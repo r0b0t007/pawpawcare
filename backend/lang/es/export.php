@@ -111,6 +111,8 @@ return [
     ],
 
     'csv' => [
+        // Column separator: what Excel in this language splits a CSV on.
+        'separator' => ';',
         'title' => 'PawPawCare — Exportación del historial de salud',
         'owner' => 'Propietario/a',
         'exported' => 'Exportado el',

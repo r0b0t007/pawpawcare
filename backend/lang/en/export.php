@@ -80,6 +80,8 @@ return [
     // fr/es define it, and anything without an entry prints as stored.
 
     'csv' => [
+        // Column separator: what Excel in this language splits a CSV on.
+        'separator' => ',',
         'title' => 'PawPawCare — Health records export',
         'owner' => 'Owner',
         'exported' => 'Exported',

@@ -94,10 +94,14 @@ class ExportController extends Controller
         $out = fopen('php://temp', 'r+');
         // French and Spanish Excel split a CSV on ";" (their list separator)
         // and read "12,5" as a number; with "," the whole file lands in
-        // column A (CHW-213). English keeps "," and "12.5", byte for byte.
+        // column A (CHW-213). The separator is export.csv.separator and the
+        // decimal mark weight.decimal_point, as in the PDF. English keeps
+        // "," and "12.5", byte for byte. Only the language is known, not the
+        // region: Spain and most of South America split on ";", Mexico and
+        // Central America on ",".
         $english = App::getLocale() === 'en';
-        $separator = $english ? ',' : ';';
-        $num = fn ($value) => $value === null || $english ? $value : str_replace('.', ',', (string) $value);
+        $separator = trans('export.csv.separator');
+        $num = fn ($value) => $value === null || $english ? $value : PublicPageLocale::decimal($value);
 
         $row = function (array $cells) use ($out, $separator) {
             // Neutralize spreadsheet formula injection: a co-owner could plant
@@ -147,7 +151,7 @@ class ExportController extends Controller
                 $pet->breed,
                 $pet->gender,
                 $pet->birthday?->format('Y-m-d'),
-                $pet->age,
+                $num($pet->age),
                 $pet->weight !== null ? $num($pet->weight).' '.$pet->weight_unit : null,
                 $yesNo($pet->microchipped),
             ]);
@@ -208,7 +212,7 @@ class ExportController extends Controller
         // which garbles every accented header ("PropriÃ©taire"). The French
         // and Spanish headers always have some, so those files carry the
         // UTF-8 BOM; English keeps the exact bytes it always had.
-        return App::getLocale() === 'en' ? $csv : "\u{FEFF}".$csv;
+        return $english ? $csv : "\u{FEFF}".$csv;
     }
 
     // ── PDF ────────────────────────────────────────────────────────────────
