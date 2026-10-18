@@ -92,7 +92,18 @@ class ExportController extends Controller
     private function buildCsv(string $ownerName, Collection $bundle): string
     {
         $out = fopen('php://temp', 'r+');
-        $row = function (array $cells) use ($out) {
+        // French and Spanish Excel split a CSV on ";" (their list separator)
+        // and read "12,5" as a number; with "," the whole file lands in
+        // column A (CHW-213). The separator is export.csv.separator and the
+        // decimal mark weight.decimal_point, as in the PDF. English keeps
+        // "," and "12.5", byte for byte. Only the language is known, not the
+        // region: Spain and most of South America split on ";", Mexico and
+        // Central America on ",".
+        $english = App::getLocale() === 'en';
+        $separator = trans('export.csv.separator');
+        $num = fn ($value) => $value === null || $english ? $value : PublicPageLocale::decimal($value);
+
+        $row = function (array $cells) use ($out, $separator) {
             // Neutralize spreadsheet formula injection: a co-owner could plant
             // "=HYPERLINK(...)" in a shared pet's notes and it would execute
             // when this export is opened in Excel/Sheets. A leading apostrophe
@@ -106,7 +117,11 @@ class ExportController extends Controller
                 return $cell;
             }, $cells);
 
-            fputcsv($out, $safe, escape: '\\');
+            // escape: '' is RFC 4180: every '"' inside a cell is doubled. With
+            // PHP's old backslash escape, a typed `x\";=1+1` ended the cell
+            // early in Excel/Sheets (they give "\" no meaning), so the text
+            // after it became its own cell or row, past the check above.
+            fputcsv($out, $safe, $separator, escape: '');
         };
 
         // Headers and section titles follow the locale; dates stay ISO and
@@ -136,8 +151,8 @@ class ExportController extends Controller
                 $pet->breed,
                 $pet->gender,
                 $pet->birthday?->format('Y-m-d'),
-                $pet->age,
-                $pet->weight !== null ? $pet->weight.' '.$pet->weight_unit : null,
+                $num($pet->age),
+                $pet->weight !== null ? $num($pet->weight).' '.$pet->weight_unit : null,
                 $yesNo($pet->microchipped),
             ]);
 
@@ -178,7 +193,7 @@ class ExportController extends Controller
             $row([$t('weights')]);
             $row($col('date', 'weight', 'unit', 'notes'));
             foreach ($entry['weights'] as $w) {
-                $row([$w->logged_at?->format('Y-m-d'), $w->weight, $w->unit, $w->notes]);
+                $row([$w->logged_at?->format('Y-m-d'), $num($w->weight), $w->unit, $w->notes]);
             }
 
             $row([]);
@@ -197,7 +212,7 @@ class ExportController extends Controller
         // which garbles every accented header ("PropriÃ©taire"). The French
         // and Spanish headers always have some, so those files carry the
         // UTF-8 BOM; English keeps the exact bytes it always had.
-        return App::getLocale() === 'en' ? $csv : "\u{FEFF}".$csv;
+        return $english ? $csv : "\u{FEFF}".$csv;
     }
 
     // ── PDF ────────────────────────────────────────────────────────────────
