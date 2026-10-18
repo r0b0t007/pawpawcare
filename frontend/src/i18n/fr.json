@@ -472,7 +472,7 @@
       },
       "phone": {
         "title": "Si les notifications n'arrivent pas",
-        "body": "Les rappels sont programmés sur votre téléphone : ils arrivent même hors connexion. Si les notifications ne sont pas autorisées pour PawPawCare, un bandeau en haut de l'écran Rappels l'indique, et son bouton les active ou ouvre les réglages de votre téléphone. Vérifiez aussi Profil → Notifications → « Rappels de soins », qui active ou désactive les rappels sur ce téléphone uniquement."
+        "body": "La prochaine notification de chaque rappel est programmée sur votre téléphone : elle arrive même hors connexion, et ouvrir l'application programme les suivantes. Si les notifications ne sont pas autorisées pour PawPawCare, un bandeau en haut de l'écran Rappels l'indique, et son bouton les active ou ouvre les réglages de votre téléphone. Vérifiez aussi Profil → Notifications → « Rappels de soins », qui active ou désactive les rappels sur ce téléphone uniquement."
       },
       "doses": {
         "title": "Notez chaque prise",
