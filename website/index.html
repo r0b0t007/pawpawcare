@@ -80,7 +80,7 @@
         "@type": "MobileApplication",
         "@id": "https://pawpawcare.app/#app",
         "name": "PawPawCare",
-        "description": "Pet health management app: vaccination reminders, medication schedules, weight trend insights, a medical records vault with AI document scanning, vet share links, caretaker mode, and a pet-owner community.",
+        "description": "Pet health management app: vaccination reminders, medication schedules, weight trend insights, a medical records vault with AI document reading, vet share links, caretaker mode, and a pet-owner community.",
         "applicationCategory": "HealthApplication",
         "operatingSystem": "iOS, Android",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -90,11 +90,11 @@
           "Vaccination tracking with due-soon reminders",
           "Medication schedules and dose logging",
           "Plain-language weight trend insights",
-          "Medical records vault with AI document scanning",
+          "Medical records vault with AI document reading",
           "Read-only vet share links",
           "Caretaker mode for pet sitters",
           "Family sharing for multi-pet households",
-          "Community feed and lost-pet alerts"
+          "Community feed and lost-pet reports"
         ]
       },
       {
@@ -110,7 +110,7 @@
           {
             "@type": "Question",
             "name": "Is PawPawCare free?",
-            "acceptedAnswer": { "@type": "Answer", "text": "Yes — the early-access preview is completely free, with no card required and no trial clock. Join the waitlist, get your invite, and you have the full app: multi-pet profiles, vaccine and medication tracking, weight trends, the records vault with AI scanning, vet and sitter sharing, and the community feed. When PawPawCare launches publicly, the core tracking you rely on — vaccines, medications, weights, and reminders — stays free. Some power-user features may later become part of an optional paid plan, but we'll always be clear about what's included before anything changes, and preview members will get plenty of notice." }
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes — the early-access preview is completely free, with no card required and no trial clock. Join the waitlist, get your invite, and you have the full app: multi-pet profiles, vaccine and medication tracking, weight trends, the records vault with AI document reading, vet and sitter sharing, and the community feed. When PawPawCare launches publicly, the core tracking you rely on — vaccines, medications, weights, and reminders — stays free. Some power-user features may later become part of an optional paid plan, but we'll always be clear about what's included before anything changes, and preview members will get plenty of notice." }
           },
           {
             "@type": "Question",
@@ -125,12 +125,12 @@
           {
             "@type": "Question",
             "name": "Is my pet's data private?",
-            "acceptedAnswer": { "@type": "Answer", "text": "Yes — your pet's records are yours, and we never sell your data. There are no data brokers and no advertising networks in PawPawCare. Sharing is always something you switch on: vet share links and caretaker pages are read-only, expire on a schedule you choose, and can be revoked at any moment. Documents you scan are processed only to extract the details you review, and are not used to train AI models. Data travels over encrypted HTTPS connections, passwords are stored only as secure hashes, and sessions use short-lived tokens." }
+            "acceptedAnswer": { "@type": "Answer", "text": "Yes — your pet's records are yours, and we never sell your data. There are no data brokers and no advertising networks in PawPawCare. Sharing is always something you switch on: vet share links and caretaker pages are read-only, expire on a schedule you choose, and can be revoked at any moment. Documents you upload are processed only to extract the details you review, and are not used to train AI models. Data travels over encrypted HTTPS connections, passwords are stored only as secure hashes, and sessions use short-lived tokens." }
           },
           {
             "@type": "Question",
             "name": "What's in the free preview?",
-            "acceptedAnswer": { "@type": "Answer", "text": "The full app: multi-pet profiles, vaccination and medication tracking, weight trends, the records vault with AI scanning, vet and sitter sharing, and the community feed." }
+            "acceptedAnswer": { "@type": "Answer", "text": "The full app: multi-pet profiles, vaccination and medication tracking, weight trends, the records vault with AI document reading, vet and sitter sharing, and the community feed." }
           }
         ]
       }
@@ -277,14 +277,14 @@
       <div class="container split">
         <div class="split-copy">
           <p class="tag-chip">Records</p>
-          <h2 id="records-title">Snap a vet record. We file the rest.</h2>
-          <p>Point your camera at a vaccination card, prescription, or invoice. PawPawCare reads it and extracts the vaccines, meds, weights, and costs — then shows you exactly what it found.</p>
+          <h2 id="records-title">Add a photo of a vet record. We file the rest.</h2>
+          <p>Upload a photo of a vaccination card, prescription, or invoice. PawPawCare reads it and extracts the vaccines, meds, weights, and costs — then shows you exactly what it found.</p>
           <p><strong>Nothing is saved until you approve it.</strong> Every extracted item gets a checkbox; you stay the editor-in-chief of your pet's file.</p>
           <p class="disclaimer">PawPawCare helps you organize your pet's health records — it doesn't diagnose, and it isn't a substitute for professional veterinary care. Always confirm AI-extracted details against the original document, and check with your veterinarian before acting on any reminder or trend.</p>
         </div>
         <div class="split-visual reveal" aria-hidden="true">
           <div class="scan-card">
-            <p class="scan-title">Found in your scan</p>
+            <p class="scan-title">Found in your document</p>
             <ul role="list">
               <li><span class="check">✓</span> Rabies booster — due Mar 2027</li>
               <li><span class="check">✓</span> Amoxicillin 50&nbsp;mg · 2× daily</li>
@@ -326,15 +326,15 @@
       <div class="container split split-reverse">
         <div class="split-copy">
           <p class="tag-chip">Community</p>
-          <h2 id="community-title">A neighborhood that has your pet's back.</h2>
+          <h2 id="community-title">A community that has your pet's back.</h2>
           <p>Share the wins, ask the awkward questions, and swap notes with owners who get it.</p>
-          <p>And if a pet ever goes missing, lost-pet alerts reach nearby owners in seconds — because the fastest search party is the one already outside walking.</p>
+          <p>And if a pet ever goes missing, report it to the community right from the app — because the fastest search party is the one already outside walking.</p>
         </div>
         <div class="split-visual reveal">
           <div class="phone phone-sm">
             <div class="phone-frame">
               <span class="phone-island" aria-hidden="true"></span>
-              <img src="/images/community.6bfb4b4b.webp" alt="PawPawCare community feed with posts from local pet owners" width="780" height="1688" loading="lazy" decoding="async">
+              <img src="/images/community.6bfb4b4b.webp" alt="PawPawCare community feed with posts from other pet owners" width="780" height="1688" loading="lazy" decoding="async">
             </div>
           </div>
         </div>
@@ -368,7 +368,7 @@
           <li class="step reveal">
             <span class="step-mark" aria-hidden="true">3</span>
             <h3>Add your pets</h3>
-            <p>Profiles take a minute. Scan your vet records and you're up to date.</p>
+            <p>Profiles take a minute. Add photos of your vet records and you're up to date.</p>
           </li>
         </ol>
       </div>
@@ -397,7 +397,7 @@
         </details>
         <details>
           <summary>Is PawPawCare free?</summary>
-          <p>Yes — the early-access preview is completely free, with no card required and no trial clock. Join the waitlist, get your invite, and you have the full app: multi-pet profiles, vaccine and medication tracking, weight trends, the records vault with AI scanning, vet and sitter sharing, and the community feed. When PawPawCare launches publicly, the core tracking you rely on — vaccines, medications, weights, and reminders — stays free. Some power-user features may later become part of an optional paid plan, but we'll always be clear about what's included before anything changes, and preview members will get plenty of notice. We'd rather earn a subscription with features worth paying for than lock away the basics of keeping your pet healthy.</p>
+          <p>Yes — the early-access preview is completely free, with no card required and no trial clock. Join the waitlist, get your invite, and you have the full app: multi-pet profiles, vaccine and medication tracking, weight trends, the records vault with AI document reading, vet and sitter sharing, and the community feed. When PawPawCare launches publicly, the core tracking you rely on — vaccines, medications, weights, and reminders — stays free. Some power-user features may later become part of an optional paid plan, but we'll always be clear about what's included before anything changes, and preview members will get plenty of notice. We'd rather earn a subscription with features worth paying for than lock away the basics of keeping your pet healthy.</p>
         </details>
         <details>
           <summary>When does it launch?</summary>
@@ -409,11 +409,11 @@
         </details>
         <details>
           <summary>Is my pet's data private?</summary>
-          <p>Yes — your pet's records are yours, and we never sell your data. There are no data brokers and no advertising networks in PawPawCare. Sharing is always something you switch on: vet share links and caretaker pages are read-only, expire on a schedule you choose, and can be revoked at any moment. Documents you scan are processed only to extract the details you review, and are not used to train AI models. Data travels over encrypted HTTPS connections, passwords are stored only as secure hashes, and sessions use short-lived tokens. On this website, analytics load only if you accept the cookie banner — decline and nothing is set. You can read the specifics, and how to delete your account and every record attached to it, in our <a href="/privacy/">Privacy Policy</a>.</p>
+          <p>Yes — your pet's records are yours, and we never sell your data. There are no data brokers and no advertising networks in PawPawCare. Sharing is always something you switch on: vet share links and caretaker pages are read-only, expire on a schedule you choose, and can be revoked at any moment. Documents you upload are processed only to extract the details you review, and are not used to train AI models. Data travels over encrypted HTTPS connections, passwords are stored only as secure hashes, and sessions use short-lived tokens. On this website, analytics load only if you accept the cookie banner — decline and nothing is set. You can read the specifics, and how to delete your account and every record attached to it, in our <a href="/privacy/">Privacy Policy</a>.</p>
         </details>
         <details>
           <summary>What's in the free preview?</summary>
-          <p>The full app: multi-pet profiles, vaccination and medication tracking, weight trends, the records vault with AI scanning, vet and sitter sharing, and the community feed.</p>
+          <p>The full app: multi-pet profiles, vaccination and medication tracking, weight trends, the records vault with AI document reading, vet and sitter sharing, and the community feed.</p>
         </details>
       </div>
     </section>
