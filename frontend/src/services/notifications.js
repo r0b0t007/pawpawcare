@@ -61,8 +61,43 @@ export const deviceTimezone = () => {
 };
 
 /**
- * Request permission and obtain an Expo push token.
- * Returns { token, platform } or null (denied / simulator / Expo Go).
+ * The OS permission to show notifications (CHW-230):
+ * { status: 'granted' | 'denied' | 'undetermined' | 'unavailable', canAskAgain }.
+ * 'unavailable' means there is no notifications module (Expo Go). canAskAgain
+ * is false once the system prompt can't be shown any more (iOS after a
+ * denial, Android after "Don't ask again"): only the phone's settings help.
+ */
+const UNAVAILABLE = { status: 'unavailable', canAskAgain: false };
+const normalize = ({ status, canAskAgain }) => ({
+  status,
+  canAskAgain: status === 'granted' ? true : canAskAgain !== false,
+});
+
+export async function getNotificationPermission() {
+  if (!Notifications) return UNAVAILABLE;
+  try {
+    return normalize(await Notifications.getPermissionsAsync());
+  } catch {
+    return UNAVAILABLE;
+  }
+}
+
+/** Show the system prompt (when it still can) and return the new permission. */
+export async function requestNotificationPermission() {
+  if (!Notifications) return UNAVAILABLE;
+  try {
+    await ensureAndroidChannel(); // Android 13+ needs a channel before it prompts
+    return normalize(await Notifications.requestPermissionsAsync());
+  } catch {
+    return getNotificationPermission();
+  }
+}
+
+/**
+ * Obtain an Expo push token. Returns { token, platform } or null (no
+ * permission / simulator / Expo Go). It never shows the permission prompt:
+ * the app asks in context (useNotificationPermission), not the moment someone
+ * signs in (CHW-230).
  */
 export async function registerForPushNotificationsAsync() {
   if (!Notifications) return null; // Expo Go: no notifications module at all
@@ -71,12 +106,7 @@ export async function registerForPushNotificationsAsync() {
 
   if (!Device.isDevice) return null; // push tokens require a physical device
 
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  let status = existing;
-  if (existing !== 'granted') {
-    status = (await Notifications.requestPermissionsAsync()).status;
-  }
-  if (status !== 'granted') return null;
+  if ((await getNotificationPermission()).status !== 'granted') return null;
 
   const projectId =
     Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;

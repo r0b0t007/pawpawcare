@@ -12,6 +12,9 @@ jest.mock('../../../services/prefs', () => ({
   setPref: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('../../../services/notifications', () => ({
+  // Notifications allowed: the CHW-230 banner stays hidden in these tests.
+  getNotificationPermission: jest.fn(() => Promise.resolve({ status: 'granted', canAskAgain: true })),
+  requestNotificationPermission: jest.fn(),
   scheduleLocalReminders: jest.fn(),
   cancelAllLocalReminders: jest.fn(),
 }));

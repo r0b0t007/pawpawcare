@@ -13,6 +13,13 @@ jest.mock('../../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../../services/imagePicker', () => ({ pickRecordImage: jest.fn() }));
 
 let mockStore = {};
+// The reminder screens show the CHW-230 notifications banner, which reads the
+// signed-in user; allowed here, so it stays hidden.
+jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1' }, registerPushDevice: jest.fn() }) }));
+jest.mock('../../../services/notifications', () => ({
+  ...jest.requireActual('../../../services/notifications'),
+  getNotificationPermission: jest.fn(() => Promise.resolve({ status: 'granted', canAskAgain: true })),
+}));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => mockStore,
 }));

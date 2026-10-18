@@ -174,13 +174,20 @@ export function AuthProvider({ children }) {
         dispatch({ type: 'SET_USER', payload: next });
       })
       .catch(() => {});
+    await registerPushDevice(tz);
+  };
+
+  // Register this phone for server pushes, if notifications are allowed. It
+  // never shows the permission prompt (CHW-230): the app asks in context, and
+  // useNotificationPermission calls this again once permission is granted.
+  const registerPushDevice = async (tz = deviceTimezone()) => {
     try {
       const reg = await registerForPushNotificationsAsync();
       if (reg?.token) {
         await post('/devices', { token: reg.token, platform: reg.platform, timezone: tz }).catch(() => {});
         await AsyncStorage.setItem(PUSH_TOKEN_KEY, reg.token);
-        // A sign-out still waiting to be sent (its resend failed above) must
-        // not unregister the phone this sign-in has just registered.
+        // A sign-out still waiting to be sent (its resend failed in
+        // syncDevice) must not unregister the phone just registered.
         const pending = await getPendingLogout().catch(() => null);
         if (pending?.device_token === reg.token) {
           await storePendingLogout({ ...pending, device_token: null });
@@ -433,6 +440,14 @@ export function AuthProvider({ children }) {
         logout,
         updateUser,
         refreshUser,
+        // Signed-in only: there's no account to attach the phone to otherwise.
+        // A sign-out still being resent goes first (as in syncDevice), so its
+        // DELETE /devices can't remove the registration made here.
+        registerPushDevice: async () => {
+          if (!state.user) return;
+          await flushPendingLogout();
+          await registerPushDevice();
+        },
         applyPlan,
         deleteAccount,
         sendEmailVerification,

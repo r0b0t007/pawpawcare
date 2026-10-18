@@ -11,7 +11,13 @@ jest.mock('../../../services/prefs', () => ({
   getPref: jest.fn((_, fallback) => Promise.resolve(fallback)),
   setPref: jest.fn(() => Promise.resolve()),
 }));
-jest.mock('../../../services/notifications', () => ({ scheduleLocalReminders: jest.fn(), cancelAllLocalReminders: jest.fn() }));
+jest.mock('../../../services/notifications', () => ({
+  scheduleLocalReminders: jest.fn(),
+  cancelAllLocalReminders: jest.fn(),
+  // Notifications allowed: the CHW-230 banner stays hidden in these tests.
+  getNotificationPermission: jest.fn(() => Promise.resolve({ status: 'granted', canAskAgain: true })),
+  requestNotificationPermission: jest.fn(),
+}));
 jest.mock('../../../services/exportRecords', () => ({ exportRecords: jest.fn() }));
 jest.mock('../../../services/sentry', () => ({ captureException: jest.fn(), isSentryEnabled: () => false }));
 jest.mock('../../../services/analytics', () => ({ isAnalyticsEnabled: jest.fn(() => true), setAnalyticsEnabled: jest.fn(), track: jest.fn() }));
