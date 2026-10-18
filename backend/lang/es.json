@@ -80,6 +80,7 @@
     "Validation error": "Error de validación",
     "Weight entry not found": "No se ha encontrado el registro de peso",
     "You already own this pet": "Ya es el propietario de esta mascota",
+    "You can have up to :max reminders. Delete one to add another.": "Puede tener hasta :max recordatorios. Elimine uno para añadir otro.",
     "Your PawPawCare password reset code": "Su código para restablecer la contraseña de PawPawCare",
     "Your PawPawCare verification code": "Su código de verificación de PawPawCare",
     "Your week in care": "Su semana de cuidados",

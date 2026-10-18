@@ -27,6 +27,13 @@ use Symfony\Component\HttpFoundation\Response;
 
 class DocumentController extends Controller
 {
+    /**
+     * Items one apply may add per kind (CHW-243): each vaccination and
+     * medication creates reminders for everyone sharing the pet. One vet
+     * document never lists anywhere near this many.
+     */
+    public const MAX_APPLY_ITEMS = 50;
+
     public function index(Request $request, string $petId): JsonResponse
     {
         $this->petOr404($request, $petId);
@@ -254,12 +261,12 @@ class DocumentController extends Controller
         }
 
         $data = $request->validate([
-            'vaccinations' => 'sometimes|array',
+            'vaccinations' => 'sometimes|array|max:'.self::MAX_APPLY_ITEMS,
             'vaccinations.*.name' => 'required|string|min:1|max:150',
             'vaccinations.*.administered_date' => 'sometimes|nullable|date',
             'vaccinations.*.due_date' => 'sometimes|nullable|date',
             'vaccinations.*.notes' => 'sometimes|nullable|string|max:500',
-            'medications' => 'sometimes|array',
+            'medications' => 'sometimes|array|max:'.self::MAX_APPLY_ITEMS,
             'medications.*.name' => 'required|string|min:1|max:150',
             'medications.*.dosage' => 'sometimes|nullable|string|max:100',
             'medications.*.frequency' => 'sometimes|nullable|in:daily,weekly,monthly,as_needed',
