@@ -130,6 +130,7 @@ Then:
 ```sh
 php artisan key:generate
 php artisan migrate --force
+php artisan db:seed --class=GroupSeeder --force   # the built-in community groups; does nothing once any group exists
 php artisan storage:link          # serves uploaded photos while they're on the local disk (see docs/uploads-r2.md)
 php artisan config:cache && php artisan route:cache
 ```
@@ -199,6 +200,7 @@ setup; the workflow only handles updates.
 cd ~/pawpawcare && git pull
 cd backend && composer install --no-dev --optimize-autoloader
 php artisan migrate --force
+php artisan db:seed --class=GroupSeeder --force   # no-op once any group exists
 php artisan config:cache && php artisan route:cache
 ```
 

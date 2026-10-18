@@ -116,6 +116,19 @@ class GroupLocaleTest extends TestCase
             ->assertJsonPath('is_member', true);
     }
 
+    public function test_the_seeder_is_safe_to_run_again_and_never_adds_to_existing_groups(): void
+    {
+        // The runbook has it run by hand on a live server (CHW-214).
+        $this->seed(GroupSeeder::class);
+        $this->seed(GroupSeeder::class);
+        $this->assertSame(5, DB::table('groups')->count());
+
+        DB::table('groups')->delete();
+        $this->insertRawGroup('Club Teckel Lyon');
+        $this->seed(GroupSeeder::class);
+        $this->assertSame(['Club Teckel Lyon'], DB::table('groups')->pluck('name')->all());
+    }
+
     public function test_a_group_without_a_key_shows_its_stored_text_in_every_language(): void
     {
         $this->insertRawGroup('Club Teckel Lyon', 'Rencontres le samedi.');
