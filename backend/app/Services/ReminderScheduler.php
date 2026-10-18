@@ -215,6 +215,9 @@ class ReminderScheduler
 
         $tz = $user->timezone ?: 'UTC';
         $times = (is_array($med->times) && count($med->times)) ? $med->times : ['09:00'];
+        // Rows saved before the API capped them (CHW-243): one reminder per
+        // distinct time, at most MAX_DOSE_TIMES.
+        $times = array_slice(array_values(array_unique($times)), 0, Medication::MAX_DOSE_TIMES);
         $recurrence = in_array($med->frequency, ['daily', 'weekly', 'monthly'], true) ? $med->frequency : 'daily';
 
         $params = ReminderText::medicationParams($med, $pet);

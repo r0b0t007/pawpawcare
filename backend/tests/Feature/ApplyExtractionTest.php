@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\DocumentController;
 use App\Models\Clinic;
 use App\Models\Document;
 use App\Models\Expense;
@@ -158,6 +159,28 @@ class ApplyExtractionTest extends TestCase
     }
 
     // ── Guards ───────────────────────────────────────────────────────────────
+
+    public function test_one_apply_adds_at_most_fifty_of_each_kind(): void
+    {
+        // CHW-243: each item becomes reminders for everyone sharing the pet.
+        Storage::fake('local');
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+        $doc = $this->extractedDocument($token, $pet);
+        $max = DocumentController::MAX_APPLY_ITEMS;
+        $meds = fn (int $n) => array_map(fn ($i) => ['name' => "Med {$i}", 'frequency' => 'daily'], range(1, $n));
+        $vaxes = fn (int $n) => array_map(fn ($i) => ['name' => "Vax {$i}", 'due_date' => now()->addMonth()->toDateString()], range(1, $n));
+        $apply = fn (array $payload) => $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$doc->id}/apply", $payload);
+
+        $apply(['medications' => $meds($max + 1)])->assertStatus(422);
+        $apply(['vaccinations' => $vaxes($max + 1)])->assertStatus(422);
+        $this->assertSame(0, Medication::where('pet_id', $pet->id)->count());
+        $this->assertSame(0, Vaccination::where('pet_id', $pet->id)->count());
+        $this->assertSame(0, Reminder::where('user_id', $owner->id)->count());
+
+        $apply(['medications' => $meds($max)])->assertOk();
+        $this->assertSame($max, Medication::where('pet_id', $pet->id)->count());
+    }
 
     public function test_apply_requires_a_completed_extraction(): void
     {

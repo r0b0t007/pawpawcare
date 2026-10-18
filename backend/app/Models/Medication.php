@@ -12,6 +12,12 @@ class Medication extends Model
 {
     use HasUuids;
 
+    /**
+     * Dose times per medication (CHW-243). Each is one recurring reminder per
+     * person sharing the pet; the app offers a handful of preset times.
+     */
+    public const MAX_DOSE_TIMES = 12;
+
     protected $keyType = 'string';
 
     public $incrementing = false;

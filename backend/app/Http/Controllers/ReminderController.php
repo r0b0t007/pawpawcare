@@ -12,6 +12,12 @@ use Illuminate\Support\Carbon;
 
 class ReminderController extends Controller
 {
+    /**
+     * Reminders a user can create themselves (CHW-243). Far above real use;
+     * it keeps /reminders, which serializes every row, bounded.
+     */
+    public const MAX_CUSTOM_REMINDERS = 200;
+
     public function index(Request $request): JsonResponse
     {
         $reminders = Reminder::where('user_id', $request->user()->id)
@@ -48,6 +54,10 @@ class ReminderController extends Controller
         if (! empty($data['pet_id'])
             && ! Pet::accessibleBy($user->id)->where('id', $data['pet_id'])->exists()) {
             abort(404, __('Pet not found'));
+        }
+
+        if (Reminder::where('user_id', $user->id)->where('type', 'custom')->count() >= self::MAX_CUSTOM_REMINDERS) {
+            abort(422, __('You can have up to :max reminders. Delete one to add another.', ['max' => self::MAX_CUSTOM_REMINDERS]));
         }
 
         $isOneTime = $data['schedule_type'] === 'one_time';
