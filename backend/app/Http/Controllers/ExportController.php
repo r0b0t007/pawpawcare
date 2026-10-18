@@ -92,7 +92,14 @@ class ExportController extends Controller
     private function buildCsv(string $ownerName, Collection $bundle): string
     {
         $out = fopen('php://temp', 'r+');
-        $row = function (array $cells) use ($out) {
+        // French and Spanish Excel split a CSV on ";" (their list separator)
+        // and read "12,5" as a number; with "," the whole file lands in
+        // column A (CHW-213). English keeps "," and "12.5", byte for byte.
+        $english = App::getLocale() === 'en';
+        $separator = $english ? ',' : ';';
+        $num = fn ($value) => $value === null || $english ? $value : str_replace('.', ',', (string) $value);
+
+        $row = function (array $cells) use ($out, $separator) {
             // Neutralize spreadsheet formula injection: a co-owner could plant
             // "=HYPERLINK(...)" in a shared pet's notes and it would execute
             // when this export is opened in Excel/Sheets. A leading apostrophe
@@ -106,7 +113,11 @@ class ExportController extends Controller
                 return $cell;
             }, $cells);
 
-            fputcsv($out, $safe, escape: '\\');
+            // escape: '' is RFC 4180: every '"' inside a cell is doubled. With
+            // PHP's old backslash escape, a typed `x\";=1+1` ended the cell
+            // early in Excel/Sheets (they give "\" no meaning), so the text
+            // after it became its own cell or row, past the check above.
+            fputcsv($out, $safe, $separator, escape: '');
         };
 
         // Headers and section titles follow the locale; dates stay ISO and
@@ -137,7 +148,7 @@ class ExportController extends Controller
                 $pet->gender,
                 $pet->birthday?->format('Y-m-d'),
                 $pet->age,
-                $pet->weight !== null ? $pet->weight.' '.$pet->weight_unit : null,
+                $pet->weight !== null ? $num($pet->weight).' '.$pet->weight_unit : null,
                 $yesNo($pet->microchipped),
             ]);
 
@@ -178,7 +189,7 @@ class ExportController extends Controller
             $row([$t('weights')]);
             $row($col('date', 'weight', 'unit', 'notes'));
             foreach ($entry['weights'] as $w) {
-                $row([$w->logged_at?->format('Y-m-d'), $w->weight, $w->unit, $w->notes]);
+                $row([$w->logged_at?->format('Y-m-d'), $num($w->weight), $w->unit, $w->notes]);
             }
 
             $row([]);

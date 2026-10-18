@@ -14,6 +14,7 @@ use App\Services\JwtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -105,20 +106,25 @@ class ExportRecordsLocaleTest extends TestCase
         $this->assertStringStartsWith("\u{FEFF}\"PawPawCare — Export des dossiers de santé\"\n", $csv);
         $this->assertSame(1, substr_count($csv, "\u{FEFF}"));
         $this->assertStringContainsString('PawPawCare — Export des dossiers de santé', $csv);
-        $this->assertStringContainsString('Propriétaire,"Zoé Núñez"', $csv);
+        // ";"-separated, as French Excel splits a CSV (CHW-213).
+        $this->assertStringContainsString('Propriétaire;"Zoé Núñez"', $csv);
         $this->assertStringContainsString("=== ANIMAL\u{00A0}: ¿Toño? ===", $csv);
-        $this->assertStringContainsString("Nom,Espèce,Race,Sexe,\"Date de naissance\",Âge,Poids,Pucé\n", $csv);
-        $this->assertStringContainsString("Nom,Statut,Échéance,\"Administré le\",Notes\n", $csv);
+        $this->assertStringContainsString("Nom;Espèce;Race;Sexe;\"Date de naissance\";Âge;Poids;Pucé\n", $csv);
+        $this->assertStringContainsString("Nom;Statut;Échéance;\"Administré le\";Notes\n", $csv);
         $this->assertStringContainsString('MÉDICAMENTS', $csv);
         $this->assertStringContainsString('"HISTORIQUE DU POIDS"', $csv);
-        $this->assertStringContainsString("Intitulé,Catégorie,\"Ajouté le\"\n", $csv);
+        $this->assertStringContainsString("Intitulé;Catégorie;\"Ajouté le\"\n", $csv);
         // Display words follow the language...
-        $this->assertStringContainsString(',oui', $csv);
+        $this->assertStringContainsString(';oui', $csv);
+        // ...weights use the decimal comma French Excel reads as a number...
+        $this->assertStringContainsString(';"12,5 kg";oui', $csv);
+        $this->assertStringContainsString("2025-01-15;12,5;kg;\n", $csv);
         // ...stored ids, ISO dates and typed data stay exactly as stored.
-        $this->assertStringContainsString('Rabies,completed,2024-03-01,2024-02-20,"Bras gauche"', $csv);
-        $this->assertStringContainsString('¿Toño?,dog,"Golden Retriever",female,2020-09-03', $csv);
-        $this->assertStringContainsString('Heartgard,"1 chew",as_needed', $csv);
-        $this->assertStringContainsString('"Lab results",lab,'.now()->format('Y-m-d'), $csv);
+        $this->assertStringContainsString('Rabies;completed;2024-03-01;2024-02-20;"Bras gauche"', $csv);
+        $this->assertStringContainsString('¿Toño?;dog;"Golden Retriever";female;2020-09-03', $csv);
+        $this->assertStringContainsString('Heartgard;"1 chew";as_needed', $csv);
+        $this->assertStringContainsString('"Lab results";lab;'.now()->format('Y-m-d'), $csv);
+        $this->assertStringNotContainsString('Nom,', $csv);
         $this->assertStringNotContainsString('Microchipped', $csv);
         $this->assertStringNotContainsString('PET:', $csv);
     }
@@ -132,11 +138,72 @@ class ExportRecordsLocaleTest extends TestCase
 
         $this->assertStringStartsWith("\u{FEFF}\"PawPawCare — Exportación del historial de salud\"\n", $csv);
         $this->assertStringContainsString('=== MASCOTA: ¿Toño? ===', $csv);
-        $this->assertStringContainsString("Nombre,Especie,Raza,Sexo,\"Fecha de nacimiento\",Edad,Peso,Microchip\n", $csv);
-        $this->assertStringContainsString("Título,Clínica,\"Programada para\",Estado,Notas\n", $csv);
+        $this->assertStringContainsString("Nombre;Especie;Raza;Sexo;\"Fecha de nacimiento\";Edad;Peso;Microchip\n", $csv);
+        $this->assertStringContainsString("Título;Clínica;\"Programada para\";Estado;Notas\n", $csv);
         $this->assertStringContainsString('CLÍNICAS', $csv);
-        $this->assertStringContainsString(',sí,', $csv);
-        $this->assertStringContainsString('Rabies,completed,2024-03-01', $csv);
+        $this->assertStringContainsString(';sí;', $csv);
+        $this->assertStringContainsString('Rabies;completed;2024-03-01', $csv);
+        $this->assertStringContainsString("2025-01-15;12,5;kg;\n", $csv);
+    }
+
+    public function test_a_semicolon_or_comma_typed_by_the_user_stays_inside_its_cell(): void
+    {
+        [$user, $token] = $this->user('fr');
+        $pet = $this->petWithHistory($user);
+        Vaccination::create(['pet_id' => $pet->id, 'name' => 'Lepto; rappel', 'due_date' => '2026-01-01', 'status' => 'pending', 'notes' => 'Bras droit, calme']);
+
+        $csv = $this->withToken($token)->get('/users/me/export?format=csv')->assertOk()->getContent();
+
+        $this->assertStringContainsString('"Lepto; rappel";pending;2026-01-01;;"Bras droit, calme"', $csv);
+    }
+
+    /** Every cell, read the way Excel/Sheets read a CSV (RFC 4180: "\" means nothing). */
+    private function spreadsheetCells(string $csv, string $separator): array
+    {
+        $stream = fopen('php://temp', 'r+');
+        fwrite($stream, preg_replace('/^\x{FEFF}/u', '', $csv));
+        rewind($stream);
+        $cells = [];
+        while (($row = fgetcsv($stream, null, $separator, '"', '')) !== false) {
+            array_push($cells, ...array_filter($row, fn ($c) => $c !== null));
+        }
+
+        return $cells;
+    }
+
+    public static function separators(): array
+    {
+        return ['english' => ['en', ','], 'french' => ['fr', ';']];
+    }
+
+    #[DataProvider('separators')]
+    public function test_a_backslash_before_a_quote_cannot_end_a_cell_early(string $locale, string $separator): void
+    {
+        // A co-owner's note built to close the cell after "x\" and start a
+        // formula cell (and a formula row) of its own.
+        $note = "x\\\"{$separator}=1+1{$separator}\"\ny\\\"\n=2+2";
+        [$user, $token] = $this->user($locale);
+        $pet = $this->petWithHistory($user);
+        Vaccination::create(['pet_id' => $pet->id, 'name' => 'Lepto', 'due_date' => '2026-01-01', 'status' => 'pending', 'notes' => $note]);
+
+        $cells = $this->spreadsheetCells($this->withToken($token)->get('/users/me/export?format=csv')->assertOk()->getContent(), $separator);
+
+        $this->assertContains($note, $cells, 'the note is read back as one cell, unchanged');
+        $this->assertSame([], array_values(array_filter($cells, fn ($c) => str_starts_with($c, '='))));
+    }
+
+    public function test_the_english_csv_keeps_commas_and_decimal_points(): void
+    {
+        [$user, $token] = $this->user('en');
+        $this->petWithHistory($user);
+
+        $csv = $this->withToken($token)->get('/users/me/export?format=csv')->assertOk()->getContent();
+
+        $this->assertStringStartsNotWith("\u{FEFF}", $csv);
+        $this->assertStringContainsString("Name,Type,Breed,Gender,Birthday,Age,Weight,Microchipped\n", $csv);
+        $this->assertStringContainsString('"12.5 kg",yes', $csv);
+        $this->assertStringContainsString("2025-01-15,12.5,kg,\n", $csv);
+        $this->assertStringNotContainsString(';', $csv);
     }
 
     public function test_the_saved_locale_wins_over_accept_language(): void
