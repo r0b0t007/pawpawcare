@@ -123,10 +123,19 @@ export async function registerForPushNotificationsAsync() {
   }
 }
 
+// Pending local notifications kept at once: iOS caps them at ~64.
+const MAX_SCHEDULED = 60;
+
+/** A reminder's fire times: the next week (upcoming_fire_at), else next_fire_at. */
+const fireTimes = (r) =>
+  Array.isArray(r.upcoming_fire_at) && r.upcoming_fire_at.length ? r.upcoming_fire_at : [r.next_fire_at];
+
 /**
  * Reconcile on-device local notifications against the server's reminder list.
- * This is the primary, timezone-correct, offline delivery path. Past-due
- * occurrences are skipped — the server push job handles those as a backstop.
+ * This is the primary, timezone-correct, offline delivery path: every
+ * occurrence in the next week is scheduled, so a daily dose keeps arriving
+ * while the phone is offline. Past-due occurrences are skipped — the server
+ * push job handles those as a backstop.
  */
 export async function scheduleLocalReminders(reminders = []) {
   if (!Notifications) return;
@@ -140,17 +149,17 @@ export async function scheduleLocalReminders(reminders = []) {
     await Notifications.cancelAllScheduledNotificationsAsync();
 
     const now = Date.now();
-    // iOS caps pending local notifications at ~64 — schedule the soonest ones.
+    // Over the cap, the soonest occurrences win.
     const upcoming = reminders
-      .filter((r) => r?.enabled && r?.next_fire_at && new Date(r.next_fire_at).getTime() > now)
-      .sort((a, b) => new Date(a.next_fire_at) - new Date(b.next_fire_at))
-      .slice(0, 60);
+      .filter((r) => r?.enabled)
+      .flatMap((r) => fireTimes(r).filter(Boolean).map((at) => ({ r, at, when: new Date(at).getTime() })))
+      .filter(({ when }) => when > now)
+      .sort((a, b) => a.when - b.when)
+      .slice(0, MAX_SCHEDULED);
 
-    for (const r of upcoming) {
-      const when = new Date(r.next_fire_at).getTime();
-
+    for (const { r, at, when } of upcoming) {
       await Notifications.scheduleNotificationAsync({
-        identifier: `${r.id}:${r.next_fire_at}`,
+        identifier: `${r.id}:${at}`,
         content: {
           title: r.title,
           body: r.body ?? '',
