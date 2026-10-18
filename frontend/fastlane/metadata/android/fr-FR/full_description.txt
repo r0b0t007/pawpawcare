@@ -17,7 +17,7 @@ UN CARNET DE SANTÉ PAR ANIMAL
 • Un écran d'accueil qui vous dit ce qui demande votre attention aujourd'hui et ce qui arrive cette semaine
 
 FAITES LIRE VOS DOCUMENTS VÉTÉRINAIRES PAR L'IA
-• Photographiez un document vétérinaire dans le coffre médical
+• Ajoutez la photo d'un document vétérinaire au coffre médical
 • PawPawCare propose les vaccins, médicaments, poids et coûts qu'il y trouve
 • Rien n'est enregistré avant que vous ayez vérifié et touché « Appliquer »
 
@@ -28,7 +28,7 @@ PARTAGEZ LES SOINS, PAS VOTRE MOT DE PASSE
 
 UNE COMMUNAUTÉ QUI VEILLE SUR VOTRE ANIMAL
 • Un fil communautaire pour échanger avec d'autres propriétaires d'animaux
-• Des alertes pour les animaux perdus
+• Signalez un animal perdu à la communauté
 
 VOS DOSSIERS VOUS APPARTIENNENT
 • Exportez tout en PDF ou CSV, gratuitement et pour toujours

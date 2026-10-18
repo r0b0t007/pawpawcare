@@ -17,7 +17,7 @@ UNA CARTILLA DE SALUD POR MASCOTA
 • Una pantalla de inicio que le dice qué requiere su atención hoy y qué viene esta semana
 
 DEJE QUE LA IA LEA LOS DOCUMENTOS DEL VETERINARIO
-• Haga una foto a un documento veterinario en el archivo médico
+• Añada una foto de un documento veterinario al archivo médico
 • PawPawCare le sugiere las vacunas, los medicamentos, el peso y el coste que encuentra
 • No se guarda nada hasta que lo revise y toque «Aplicar»
 
@@ -28,7 +28,7 @@ COMPARTA LOS CUIDADOS, NO SU CONTRASEÑA
 
 UNA COMUNIDAD QUE CUIDA DE SU MASCOTA
 • Un muro de la comunidad para compartir con otros dueños de mascotas
-• Avisos de mascotas perdidas
+• Avise a la comunidad si su mascota se pierde
 
 SUS REGISTROS SON SUYOS
 • Exporte todo en PDF o CSV, gratis para siempre

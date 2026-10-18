@@ -26,16 +26,20 @@ describe.each(LOCALES)('%s', (locale) => {
     expect(info.title).toMatch(/^PawPawCare\b/);
   });
 
-  test('App Store keywords: one list within 100 characters, commas only, nothing repeated', () => {
-    expect(info.keywords).toHaveLength(1);
-    const [list] = info.keywords;
-    expect(len(list)).toBeLessThanOrEqual(100);
-    expect(list).not.toMatch(/,\s|\s,/);
-    const terms = list.split(',');
+  // EAS Metadata takes keywords as a list (unique items); App Store Connect
+  // joins them with commas into one field of at most 100 characters.
+  test('App Store keywords: a unique list within 100 characters, nothing repeated from the title', () => {
+    const terms = info.keywords;
+    expect(Array.isArray(terms)).toBe(true);
+    expect(len(terms.join(','))).toBeLessThanOrEqual(100);
     expect(new Set(terms).size).toBe(terms.length);
-    // Apple already indexes the title and subtitle: repeating a word wastes space.
-    const taken = new Set([...words(info.title), ...words(info.subtitle)]);
-    expect(terms.filter((term) => words(term).some((w) => taken.has(w)))).toEqual([]);
+    terms.forEach((term) => expect(term).toMatch(/^[^,\s](?:[^,]*[^,\s])?$/));
+    // Apple already indexes the title and subtitle, so repeating one of their
+    // words wastes space — singular/plural and masculine/feminine included
+    // ("veterinario" next to "veterinaria").
+    const stem = (w) => w.replace(/(es|s|a|o|e)$/u, '');
+    const taken = new Set([...words(info.title), ...words(info.subtitle)].map(stem));
+    expect(terms.filter((term) => words(term).some((w) => taken.has(stem(w))))).toEqual([]);
   });
 
   test('App Store links are https on pawpawcare.app', () => {

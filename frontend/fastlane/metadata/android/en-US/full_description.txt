@@ -4,7 +4,7 @@ Add a pet in a minute: only the name is required. PawPawCare then keeps track of
 
 VACCINES THAT REMIND YOU
 • Track every vaccine with its due date
-• A reminder arrives 7 days before it's due, at 9:00
+• A reminder arrives 7 days before it's due, at 9:00 AM
 • Mark it done in one tap, or reschedule
 
 MEDICATIONS AND DOSES
@@ -17,7 +17,7 @@ ONE HEALTH RECORD PER PET
 • A Home screen that tells you what needs you today and what's coming up this week
 
 READ VET DOCUMENTS WITH AI
-• Snap a photo of a vet record in the medical vault
+• Add a photo of a vet record to the medical vault
 • PawPawCare suggests the vaccines, medications, weight and cost it finds
 • Nothing is saved until you check it and tap Apply
 
@@ -28,7 +28,7 @@ SHARE THE CARE, NOT YOUR PASSWORD
 
 A COMMUNITY THAT HAS YOUR PET'S BACK
 • A community feed to share with other pet owners
-• Lost-pet alerts
+• Report a lost pet to the community
 
 YOUR RECORDS ARE YOURS
 • Export everything as PDF or CSV, free forever

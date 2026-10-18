@@ -25,7 +25,16 @@ class Entitlements
      */
     public const NEVER_GATED = ['pets', 'records', 'export', 'basic_sharing', 'account_deletion', 'data_access'];
 
-    /** Features a gate can be switched on for (config entitlements.gates). */
+    /**
+     * Features a gate can be switched on for (config entitlements.gates).
+     *
+     * Both are advertised as plain features in the store listings
+     * (frontend/store.config.json, frontend/fastlane/metadata/android): AI
+     * reading of vet documents and the sitter (caretaker) link. Before
+     * enabling a gate, update every locale there to say it needs a plan —
+     * App Store 2.3.2 and Play's metadata policy require paid features to be
+     * labelled as such.
+     */
     public const GATEABLE = ['ai_extraction', 'care_links'];
 
     /** Gated features with a free monthly allowance → its config key. */
