@@ -457,7 +457,7 @@
       },
       "phone": {
         "title": "If notifications don't arrive",
-        "body": "Reminders are scheduled on your phone, so they arrive even when you're offline. If notifications aren't allowed for PawPawCare, a banner at the top of the Reminders screen says so, and its button turns them on or opens your phone's settings. Also check Profile → Notifications → “Care reminders”, which turns reminders on or off on this phone only."
+        "body": "Each reminder's next notification is set on your phone, so it arrives even when you're offline; opening the app sets up the ones after it. If notifications aren't allowed for PawPawCare, a banner at the top of the Reminders screen says so, and its button turns them on or opens your phone's settings. Also check Profile → Notifications → “Care reminders”, which turns reminders on or off on this phone only."
       },
       "doses": {
         "title": "Log each dose",

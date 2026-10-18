@@ -31,6 +31,13 @@ return [
     'grandfather_before' => env('PAYWALL_GRANDFATHER_BEFORE'),
 
     // Per-feature gates (only effective while paywall_enabled is on).
+    //
+    // BEFORE switching either gate on: the store listings advertise both as
+    // plain features (AI reading of vet documents, the sitter link), in
+    // frontend/store.config.json and frontend/fastlane/metadata/android/*.
+    // Update every locale there to say it needs a plan, and push it to the
+    // stores, first — App Store 2.3.2 and Play's metadata policy require
+    // paid features to be labelled as such.
     'gates' => [
         'ai_extraction' => $flag('GATE_AI_EXTRACTION'),
         'care_links' => $flag('GATE_CARE_LINKS'),

@@ -11,10 +11,14 @@ const FRONTEND = path.join(__dirname, '..', '..');
 const PLAY_DIR = { 'en-US': 'en-US', 'fr-FR': 'fr-FR', 'es-ES': 'es-ES', 'es-MX': 'es-419' };
 const LOCALES = Object.keys(PLAY_DIR);
 const store = JSON.parse(fs.readFileSync(path.join(FRONTEND, 'store.config.json'), 'utf8'));
+// Read as-is: an upload tool may send the file verbatim, trailing newline
+// included, and a 30-character title plus "\n" is over the limit.
 const play = (locale, file) =>
-  fs.readFileSync(path.join(FRONTEND, 'fastlane', 'metadata', 'android', PLAY_DIR[locale], file), 'utf8').replace(/\n$/, '');
-// Apple counts characters, not bytes ("é" is one).
+  fs.readFileSync(path.join(FRONTEND, 'fastlane', 'metadata', 'android', PLAY_DIR[locale], file), 'utf8');
+// Characters ("é" is one). The keyword field is also checked in UTF-8 bytes,
+// the stricter way its 100 limit is sometimes counted.
 const len = (s) => [...s].length;
+const bytes = (s) => Buffer.byteLength(s, 'utf8');
 const words = (s) => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
 describe.each(LOCALES)('%s', (locale) => {
@@ -35,6 +39,7 @@ describe.each(LOCALES)('%s', (locale) => {
     const terms = info.keywords;
     expect(Array.isArray(terms)).toBe(true);
     expect(len(terms.join(','))).toBeLessThanOrEqual(100);
+    expect(bytes(terms.join(','))).toBeLessThanOrEqual(100);
     expect(new Set(terms).size).toBe(terms.length);
     terms.forEach((term) => expect(term).toMatch(/^[^,\s](?:[^,]*[^,\s])?$/));
     // Apple already indexes the title and subtitle, so repeating one of their
@@ -48,6 +53,13 @@ describe.each(LOCALES)('%s', (locale) => {
   test('App Store links are https on pawpawcare.app', () => {
     for (const key of ['privacyPolicyUrl', 'supportUrl', 'marketingUrl']) {
       expect(info[key]).toMatch(/^https:\/\/pawpawcare\.app\//);
+    }
+  });
+
+  test('Google Play files have no leading or trailing whitespace', () => {
+    for (const file of ['title.txt', 'short_description.txt', 'full_description.txt']) {
+      const text = play(locale, file);
+      expect(text).toBe(text.trim());
     }
   });
 
