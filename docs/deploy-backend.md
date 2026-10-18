@@ -130,6 +130,7 @@ Then:
 ```sh
 php artisan key:generate
 php artisan migrate --force
+php artisan db:seed --class=GroupSeeder --force   # the built-in community groups: adds only the missing ones
 php artisan storage:link          # serves uploaded photos while they're on the local disk (see docs/uploads-r2.md)
 php artisan config:cache && php artisan route:cache
 ```
@@ -201,6 +202,12 @@ cd backend && composer install --no-dev --optimize-autoloader
 php artisan migrate --force
 php artisan config:cache && php artisan route:cache
 ```
+
+**Built-in community groups.** Neither the workflow nor this fallback seeds
+them; they are added once at first setup (§5). When a group is added to
+`GroupSeeder::DEFAULT_GROUPS`, run `php artisan db:seed --class=GroupSeeder --force`
+after that deploy. It adds only the missing groups (by `translation_key`, which is
+unique) and never changes an existing one, so ids and memberships are kept.
 
 ## 8. Client configuration that depends on this API
 

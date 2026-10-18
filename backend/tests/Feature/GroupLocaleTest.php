@@ -6,6 +6,7 @@ use App\Models\Group;
 use App\Models\User;
 use App\Services\JwtService;
 use Database\Seeders\GroupSeeder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -114,6 +115,46 @@ class GroupLocaleTest extends TestCase
             ->assertOk()
             ->assertJsonPath('name', 'Amantes de los perros')
             ->assertJsonPath('is_member', true);
+    }
+
+    public function test_rerunning_the_seeder_keeps_existing_groups_and_memberships(): void
+    {
+        // The runbook has it run on a live server (CHW-214): a re-run must not
+        // replace rows, or ids change and memberships cascade away.
+        $this->seed(GroupSeeder::class);
+        $rows = fn () => DB::table('groups')->orderBy('id')->get()->map(fn ($g) => (array) $g)->all();
+        $before = $rows();
+        $dogs = Group::where('translation_key', 'dog_lovers')->value('id');
+        $this->withToken($this->token('en'))->postJson("/community/groups/{$dogs}/join")->assertOk();
+
+        $this->seed(GroupSeeder::class);
+
+        $this->assertSame($before, $rows());
+        $this->assertSame(1, DB::table('group_members')->where('group_id', $dogs)->count());
+    }
+
+    public function test_the_seeder_adds_only_the_missing_default_groups(): void
+    {
+        $custom = $this->insertRawGroup('Club Teckel Lyon');
+        $this->seed(GroupSeeder::class);
+        Group::where('translation_key', 'exotic_pets')->delete();
+        $kept = Group::where('translation_key', 'dog_lovers')->value('id');
+
+        $this->seed(GroupSeeder::class);
+
+        $this->assertSame(count(GroupSeeder::DEFAULT_GROUPS) + 1, DB::table('groups')->count());
+        $this->assertSame(1, DB::table('groups')->where('translation_key', 'exotic_pets')->count());
+        $this->assertSame($kept, Group::where('translation_key', 'dog_lovers')->value('id'));
+        $this->assertSame('Club Teckel Lyon', DB::table('groups')->where('id', $custom)->value('name'));
+    }
+
+    public function test_a_translation_key_belongs_to_one_group_only(): void
+    {
+        $this->seed(GroupSeeder::class);
+        $copy = $this->insertRawGroup('Dog Lovers');
+
+        $this->expectException(UniqueConstraintViolationException::class);
+        DB::table('groups')->where('id', $copy)->update(['translation_key' => 'dog_lovers']);
     }
 
     public function test_a_group_without_a_key_shows_its_stored_text_in_every_language(): void
