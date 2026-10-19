@@ -75,7 +75,6 @@ class Pet extends Model
         return $this->belongsTo(User::class, 'owner_id');
     }
 
-    /** Co-owners granted access in addition to the owner. */
     /**
      * Lock this pet's row until the surrounding transaction ends, so per-pet
      * limit checks (Medication::MAX_ACTIVE_PER_PET, Vaccination::MAX_PER_PET)
@@ -86,6 +85,7 @@ class Pet extends Model
         static::whereKey($petId)->lockForUpdate()->first();
     }
 
+    /** Co-owners granted access in addition to the owner. */
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'pet_members')

@@ -34,8 +34,9 @@ class MedicationController extends Controller
 
         $med = DB::transaction(function () use ($data, $petId) {
             Pet::lockForRecordWrites($petId);
-            if (($data['active'] ?? true) && Medication::activeLimitReached($petId)) {
-                abort(422, __('This pet already has :max active medications. Stop or delete one to add another.', ['max' => Medication::MAX_ACTIVE_PER_PET]));
+            if (Medication::makesReminders($data['active'] ?? true, $data['frequency'] ?? 'daily')
+                && Medication::withRemindersCount($petId) >= Medication::MAX_ACTIVE_PER_PET) {
+                Medication::abortAtLimit();
             }
 
             return Medication::create(array_merge($this->normalize($data), ['pet_id' => $petId]));
@@ -52,14 +53,21 @@ class MedicationController extends Controller
 
         $data = $this->validatePayload($request, partial: true);
 
-        DB::transaction(function () use ($data, $med, $petId) {
+        $med = DB::transaction(function () use ($data, $medicationId, $petId) {
             Pet::lockForRecordWrites($petId);
-            // Switching a stopped medication back on counts towards the limit too.
-            if (! $med->fresh()->active && ($data['active'] ?? false) && Medication::activeLimitReached($petId)) {
-                abort(422, __('This pet already has :max active medications. Stop or delete one to add another.', ['max' => Medication::MAX_ACTIVE_PER_PET]));
+            // Re-read under the lock: it may have changed, or been deleted, meanwhile.
+            $med = $this->medicationOr404($medicationId, $petId);
+            // Switching one back on, or from "as needed" to a schedule, makes
+            // reminders again, so it counts towards the limit.
+            $before = Medication::makesReminders($med->active, $med->frequency);
+            $after = Medication::makesReminders($data['active'] ?? $med->active, $data['frequency'] ?? $med->frequency);
+            if (! $before && $after && Medication::withRemindersCount($petId) >= Medication::MAX_ACTIVE_PER_PET) {
+                Medication::abortAtLimit();
             }
             $med->fill($this->normalize($data));
             $med->save();
+
+            return $med;
         });
 
         ReminderScheduler::syncMedicationReminder($med);

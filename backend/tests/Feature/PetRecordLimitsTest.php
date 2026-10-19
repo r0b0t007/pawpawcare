@@ -56,12 +56,29 @@ class PetRecordLimitsTest extends TestCase
 
         $add()->assertCreated(); // the 30th
         $add()->assertStatus(422)->assertExactJson([
-            'detail' => 'Cet animal a déjà 30 médicaments en cours. Arrêtez-en ou supprimez-en un pour en ajouter un autre.',
+            'detail' => 'Cet animal a déjà 30 médicaments avec rappels. Arrêtez-en ou supprimez-en un pour en ajouter un autre.',
         ]);
-        // A stopped one can still be recorded: it makes no reminders.
+        // Stopped and "as needed" ones can still be recorded: they make no reminders.
         $add(['active' => false])->assertCreated();
+        $add(['frequency' => 'as_needed'])->assertCreated();
 
-        $this->assertSame(Medication::MAX_ACTIVE_PER_PET, Medication::where('pet_id', $pet->id)->where('active', true)->count());
+        $this->assertSame(Medication::MAX_ACTIVE_PER_PET, Medication::withRemindersCount($pet->id));
+    }
+
+    public function test_as_needed_medications_do_not_count_until_they_get_a_schedule(): void
+    {
+        [$user, $token] = $this->actingUser();
+        $pet = $this->pet($user);
+        for ($i = 1; $i <= 5; $i++) {
+            Medication::create(['pet_id' => $pet->id, 'name' => "If needed {$i}", 'frequency' => 'as_needed', 'times' => ['09:00']]);
+        }
+        $this->medications($pet, Medication::MAX_ACTIVE_PER_PET - 1);
+        $asNeeded = Medication::where('pet_id', $pet->id)->where('frequency', 'as_needed')->first();
+
+        $this->withToken($token)->postJson("/pets/{$pet->id}/medications", ['name' => 'Daily', 'frequency' => 'daily'])->assertCreated();
+        // At the limit, giving an "as needed" one a schedule would add reminders.
+        $this->withToken($token)->patchJson("/pets/{$pet->id}/medications/{$asNeeded->id}", ['frequency' => 'daily'])->assertStatus(422);
+        $this->assertSame('as_needed', $asNeeded->fresh()->frequency);
     }
 
     public function test_switching_a_stopped_medication_back_on_counts_towards_the_limit(): void

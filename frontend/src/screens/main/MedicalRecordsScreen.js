@@ -71,6 +71,20 @@ const fmtSize = (bytes) => {
   return i18n.t('records.size.mb', { n: formatDecimal(bytes / 1048576, 1) });
 };
 
+/** The toast after applying a document's extracted items. */
+export function appliedToastText(result, t) {
+  const added =
+    (result.vaccinations?.length || 0) + (result.medications?.length || 0) +
+    (result.weight ? 1 : 0) + (result.expense ? 1 : 0) + (result.clinic ? 1 : 0);
+  const skipped = result.skipped?.length || 0;
+  const addedText = t('records.extract.added', { count: added });
+  // Items over the pet's limit (CHW-245) aren't harmless duplicates: say so.
+  if (result.skipped?.some((s) => s.reason === 'limit reached')) {
+    return t('records.extract.withLimit', { added: addedText });
+  }
+  return skipped ? t('records.extract.withSkipped', { added: addedText, count: skipped }) : addedText;
+}
+
 export default function MedicalRecordsScreen({ navigation, route }) {
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
@@ -194,12 +208,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
 
   const onApplied = (result) => {
     setReviewDoc(null);
-    const added =
-      (result.vaccinations?.length || 0) + (result.medications?.length || 0) +
-      (result.weight ? 1 : 0) + (result.expense ? 1 : 0) + (result.clinic ? 1 : 0);
-    const skipped = result.skipped?.length || 0;
-    const addedText = t('records.extract.added', { count: added });
-    showToast(skipped ? t('records.extract.withSkipped', { added: addedText, count: skipped }) : addedText);
+    showToast(appliedToastText(result, t));
     load();
   };
 

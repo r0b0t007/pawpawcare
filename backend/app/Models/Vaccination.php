@@ -21,6 +21,11 @@ class Vaccination extends Model
         return static::where('pet_id', $petId)->count() >= self::MAX_PER_PET;
     }
 
+    public static function countFor(string $petId): int
+    {
+        return static::where('pet_id', $petId)->count();
+    }
+
     protected $keyType = 'string';
 
     public $incrementing = false;
