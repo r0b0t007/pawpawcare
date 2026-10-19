@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\PetLimitReached;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -41,7 +42,7 @@ class Medication extends Model
     /** The 422 for one more medication with reminders past the limit. */
     public static function abortAtLimit(): never
     {
-        abort(422, __('This pet already has :max medications with reminders. Stop or delete one to add another.', ['max' => self::MAX_ACTIVE_PER_PET]));
+        throw new PetLimitReached(__('This pet already has :max medications with reminders. Stop or delete one to add another.', ['max' => self::MAX_ACTIVE_PER_PET]));
     }
 
     protected $keyType = 'string';

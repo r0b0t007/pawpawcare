@@ -9,7 +9,7 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { pickRecordImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
-import { buildExtractionPayload, extractionCount } from '../../utils/extraction';
+import { appliedToastText, buildExtractionPayload, extractionCount } from '../../utils/extraction';
 import { fmtClock, fmtDay, fmtFull, relativeDay } from '../../utils/dates';
 import i18n, { useLocale, useTranslation } from '../../i18n';
 import { petById, emptyPhotoFor } from '../../utils/pets';
@@ -70,20 +70,6 @@ const fmtSize = (bytes) => {
   if (bytes < 1024 * 1024) return i18n.t('records.size.kb', { n: Math.round(bytes / 1024) });
   return i18n.t('records.size.mb', { n: formatDecimal(bytes / 1048576, 1) });
 };
-
-/** The toast after applying a document's extracted items. */
-export function appliedToastText(result, t) {
-  const added =
-    (result.vaccinations?.length || 0) + (result.medications?.length || 0) +
-    (result.weight ? 1 : 0) + (result.expense ? 1 : 0) + (result.clinic ? 1 : 0);
-  const skipped = result.skipped?.length || 0;
-  const addedText = t('records.extract.added', { count: added });
-  // Items over the pet's limit (CHW-245) aren't harmless duplicates: say so.
-  if (result.skipped?.some((s) => s.reason === 'limit reached')) {
-    return t('records.extract.withLimit', { added: addedText });
-  }
-  return skipped ? t('records.extract.withSkipped', { added: addedText, count: skipped }) : addedText;
-}
 
 export default function MedicalRecordsScreen({ navigation, route }) {
   // Re-render dates and times when the app language changes: this screen

@@ -57,6 +57,7 @@ class PetRecordLimitsTest extends TestCase
         $add()->assertCreated(); // the 30th
         $add()->assertStatus(422)->assertExactJson([
             'detail' => 'Cet animal a déjà 30 médicaments avec rappels. Arrêtez-en ou supprimez-en un pour en ajouter un autre.',
+            'code' => 'pet_limit_reached', // the app shows `detail` instead of its generic toast
         ]);
         // Stopped and "as needed" ones can still be recorded: they make no reminders.
         $add(['active' => false])->assertCreated();
@@ -111,7 +112,7 @@ class PetRecordLimitsTest extends TestCase
         $add = fn () => $this->withToken($token)->postJson("/pets/{$pet->id}/vaccinations", ['name' => 'Rabies', 'due_date' => now()->addMonth()->toDateString()]);
 
         $add()->assertCreated(); // the 200th
-        $add()->assertStatus(422)->assertExactJson(['detail' => 'Esta mascota ya tiene 200 vacunas. Elimine una para añadir otra.']);
+        $add()->assertStatus(422)->assertExactJson(['detail' => 'Esta mascota ya tiene 200 vacunas. Elimine una para añadir otra.', 'code' => 'pet_limit_reached']);
         $this->assertSame(Vaccination::MAX_PER_PET, Vaccination::where('pet_id', $pet->id)->count());
     }
 

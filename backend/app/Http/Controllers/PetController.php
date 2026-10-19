@@ -148,7 +148,7 @@ class PetController extends Controller
         $vax = DB::transaction(function () use ($data, $petId) {
             Pet::lockForRecordWrites($petId);
             if (Vaccination::limitReached($petId)) {
-                abort(422, __('This pet already has :max vaccinations. Delete one to add another.', ['max' => Vaccination::MAX_PER_PET]));
+                Vaccination::abortAtLimit();
             }
 
             return Vaccination::create(array_merge($data, ['pet_id' => $petId]));

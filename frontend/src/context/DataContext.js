@@ -430,6 +430,21 @@ export function DataProvider({ children }) {
     if (err.message === 'SESSION_EXPIRED') logout();
   };
 
+  // Why the last addVaccination / addMedication / updateMedication failed,
+  // when the server said why (a per-pet limit, CHW-245). Those still resolve
+  // false; a screen reads this once, for its failure toast.
+  const failureNote = useRef(null);
+  const noteFailure = (err) => {
+    // 422 {"code": "pet_limit_reached"}: err.message is the server's
+    // explanation, already in the user's language.
+    failureNote.current = err?.status === 422 && err?.code === 'pet_limit_reached' ? err.message : null;
+  };
+  const takeFailureNote = () => {
+    const note = failureNote.current;
+    failureNote.current = null;
+    return note;
+  };
+
   // Every care completion: analytics + a gamification refetch, so streaks and
   // milestones computed by the nightly job surface without a full reload.
   // It's also a good moment for the rating prompt (services/storeReview) —
@@ -756,6 +771,7 @@ export function DataProvider({ children }) {
       return newVax;
     } catch (err) {
       handleApiError(err);
+      noteFailure(err);
       return false;
     }
   };
@@ -948,6 +964,7 @@ export function DataProvider({ children }) {
       return newMed;
     } catch (err) {
       handleApiError(err);
+      noteFailure(err);
       return false;
     }
   };
@@ -962,6 +979,7 @@ export function DataProvider({ children }) {
       return true;
     } catch (err) {
       handleApiError(err);
+      noteFailure(err);
       return false;
     }
   };
@@ -1331,6 +1349,7 @@ export function DataProvider({ children }) {
         updatePet,
         deletePet,
         addVaccination,
+        takeFailureNote,
         markVaccinationComplete,
         deleteVaccination,
         addFavoriteFood,

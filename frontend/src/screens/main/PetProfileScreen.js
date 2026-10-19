@@ -101,7 +101,7 @@ export default function PetProfileScreen({ navigation, route }) {
     addWeight, deleteWeight, addExpense, deleteExpense,
     getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
     createShareLink, revokeShareLinks,
-    getCareProfile, saveCareProfile, createCareLink, revokeCareLinks,
+    getCareProfile, saveCareProfile, createCareLink, revokeCareLinks, takeFailureNote,
   } = useData();
   const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
@@ -221,7 +221,8 @@ export default function PetProfileScreen({ navigation, route }) {
         then?.();
         if (ok) showToast(ok, okOptions);
       } else {
-        showToast(fail);
+        // The server's own reason when it gave one (a per-pet limit).
+        showToast(takeFailureNote() || fail);
       }
     });
 

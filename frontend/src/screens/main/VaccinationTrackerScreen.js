@@ -47,7 +47,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
   useLocale();
   const { t } = useTranslation();
   const { petId } = route.params;
-  const { pets, addVaccination, markVaccinationComplete, deleteVaccination } = useData();
+  const { pets, addVaccination, markVaccinationComplete, deleteVaccination, takeFailureNote } = useData();
   const pet = pets.find((p) => p.id === petId);
 
   const [modal, setModal] = useState(false);
@@ -104,7 +104,7 @@ export default function VaccinationTrackerScreen({ navigation, route }) {
         administeredDate: null,
       });
       if (!saved) {
-        showToast(t('vaccines.toast.scheduleFailed'));
+        showToast(takeFailureNote() || t('vaccines.toast.scheduleFailed'));
         return;
       }
       closeSheet();
