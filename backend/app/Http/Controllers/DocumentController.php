@@ -290,6 +290,11 @@ class DocumentController extends Controller
         ]);
 
         $result = DB::transaction(function () use ($data, $doc, $pet, $petId) {
+            // Parallel applies would each count before the others insert.
+            Pet::lockForRecordWrites($petId);
+            // Counted once under the lock, then kept up to date as items are added.
+            $vaccinations = Vaccination::countFor($petId);
+            $medicationsWithReminders = Medication::withRemindersCount($petId);
             $applied = [
                 'vaccinations' => [], 'medications' => [],
                 'weight' => null, 'expense' => null, 'clinic' => null,
@@ -326,7 +331,13 @@ class DocumentController extends Controller
 
                     continue;
                 }
+                if ($vaccinations >= Vaccination::MAX_PER_PET) {
+                    $applied['skipped'][] = ['type' => 'vaccination', 'name' => $v['name'], 'reason' => 'limit reached'];
 
+                    continue;
+                }
+
+                $vaccinations++;
                 $vax = Vaccination::create([
                     'pet_id' => $petId,
                     'name' => $v['name'],
@@ -350,6 +361,14 @@ class DocumentController extends Controller
 
                     continue;
                 }
+
+                $reminds = Medication::makesReminders(true, $m['frequency'] ?? 'daily');
+                if ($reminds && $medicationsWithReminders >= Medication::MAX_ACTIVE_PER_PET) {
+                    $applied['skipped'][] = ['type' => 'medication', 'name' => $m['name'], 'reason' => 'limit reached'];
+
+                    continue;
+                }
+                $medicationsWithReminders += $reminds ? 1 : 0;
 
                 $med = Medication::create([
                     'pet_id' => $petId,

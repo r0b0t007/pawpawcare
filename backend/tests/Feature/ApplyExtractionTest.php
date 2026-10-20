@@ -178,8 +178,43 @@ class ApplyExtractionTest extends TestCase
         $this->assertSame(0, Vaccination::where('pet_id', $pet->id)->count());
         $this->assertSame(0, Reminder::where('user_id', $owner->id)->count());
 
-        $apply(['medications' => $meds($max)])->assertOk();
-        $this->assertSame($max, Medication::where('pet_id', $pet->id)->count());
+        $apply(['vaccinations' => $vaxes($max)])->assertOk();
+        $this->assertSame($max, Vaccination::where('pet_id', $pet->id)->count());
+
+        // 50 medications pass validation; the pet's limit (CHW-245) keeps 30.
+        $skipped = $apply(['medications' => $meds($max)])->assertOk()->json('skipped');
+        $this->assertSame(Medication::MAX_ACTIVE_PER_PET, Medication::where('pet_id', $pet->id)->count());
+        $this->assertCount($max - Medication::MAX_ACTIVE_PER_PET, $skipped);
+        $this->assertSame(['limit reached'], array_values(array_unique(array_column($skipped, 'reason'))));
+    }
+
+    public function test_items_past_the_pets_limit_are_skipped_not_failed(): void
+    {
+        // CHW-245: the rest of the document still applies.
+        Storage::fake('local');
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+        $doc = $this->extractedDocument($token, $pet);
+        for ($i = 1; $i < Medication::MAX_ACTIVE_PER_PET; $i++) {
+            Medication::create(['pet_id' => $pet->id, 'name' => "Old {$i}", 'times' => ['09:00']]);
+        }
+        for ($i = 1; $i <= Vaccination::MAX_PER_PET; $i++) {
+            Vaccination::create(['pet_id' => $pet->id, 'name' => "Booster {$i}", 'due_date' => '2020-01-01', 'status' => 'completed']);
+        }
+
+        $result = $this->withToken($token)->postJson("/pets/{$pet->id}/documents/{$doc->id}/apply", [
+            'medications' => [['name' => 'Fits'], ['name' => 'One too many']],
+            'vaccinations' => [['name' => 'Rabies', 'due_date' => now()->addYear()->toDateString()]],
+            'weight' => ['value' => 12.5, 'unit' => 'kg'],
+        ])->assertOk()->json();
+
+        $this->assertSame(['Fits'], array_column($result['medications'], 'name'));
+        $this->assertSame([], $result['vaccinations']);
+        $this->assertEqualsCanonicalizing([
+            ['type' => 'medication', 'name' => 'One too many', 'reason' => 'limit reached'],
+            ['type' => 'vaccination', 'name' => 'Rabies', 'reason' => 'limit reached'],
+        ], $result['skipped']);
+        $this->assertSame(1, WeightLog::where('pet_id', $pet->id)->count());
     }
 
     public function test_apply_requires_a_completed_extraction(): void

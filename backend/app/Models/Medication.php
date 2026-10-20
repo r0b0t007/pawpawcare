@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\PetLimitReached;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,32 @@ class Medication extends Model
      * person sharing the pet; the app offers a handful of preset times.
      */
     public const MAX_DOSE_TIMES = 12;
+
+    /**
+     * Medications with reminders per pet (CHW-245): each is up to
+     * MAX_DOSE_TIMES recurring reminders for everyone sharing the pet.
+     * Stopped and "as needed" ones make none (ReminderScheduler) and don't
+     * count; one past its end_date still reminds until stopped, so it does.
+     */
+    public const MAX_ACTIVE_PER_PET = 30;
+
+    /** Whether a medication with these values makes reminders. */
+    public static function makesReminders(bool $active, ?string $frequency): bool
+    {
+        return $active && $frequency !== 'as_needed';
+    }
+
+    /** How many of a pet's medications make reminders. */
+    public static function withRemindersCount(string $petId): int
+    {
+        return static::where('pet_id', $petId)->where('active', true)->where('frequency', '!=', 'as_needed')->count();
+    }
+
+    /** The 422 for one more medication with reminders past the limit. */
+    public static function abortAtLimit(): never
+    {
+        throw new PetLimitReached(__('This pet already has :max medications with reminders. Stop or delete one to add another.', ['max' => self::MAX_ACTIVE_PER_PET]));
+    }
 
     protected $keyType = 'string';
 

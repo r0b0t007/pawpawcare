@@ -9,7 +9,7 @@ import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { pickRecordImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
-import { buildExtractionPayload, extractionCount } from '../../utils/extraction';
+import { appliedToastText, buildExtractionPayload, extractionCount } from '../../utils/extraction';
 import { fmtClock, fmtDay, fmtFull, relativeDay } from '../../utils/dates';
 import i18n, { useLocale, useTranslation } from '../../i18n';
 import { petById, emptyPhotoFor } from '../../utils/pets';
@@ -194,12 +194,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
 
   const onApplied = (result) => {
     setReviewDoc(null);
-    const added =
-      (result.vaccinations?.length || 0) + (result.medications?.length || 0) +
-      (result.weight ? 1 : 0) + (result.expense ? 1 : 0) + (result.clinic ? 1 : 0);
-    const skipped = result.skipped?.length || 0;
-    const addedText = t('records.extract.added', { count: added });
-    showToast(skipped ? t('records.extract.withSkipped', { added: addedText, count: skipped }) : addedText);
+    showToast(appliedToastText(result, t));
     load();
   };
 

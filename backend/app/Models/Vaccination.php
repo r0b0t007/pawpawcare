@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\PetLimitReached;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,28 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Vaccination extends Model
 {
     use HasUuids;
+
+    /**
+     * Vaccinations per pet (CHW-245): each due one is a reminder for everyone
+     * sharing the pet. Decades of boosters stay far below it.
+     */
+    public const MAX_PER_PET = 200;
+
+    public static function countFor(string $petId): int
+    {
+        return static::where('pet_id', $petId)->count();
+    }
+
+    public static function limitReached(string $petId): bool
+    {
+        return self::countFor($petId) >= self::MAX_PER_PET;
+    }
+
+    /** The 422 for one more vaccination past the limit. */
+    public static function abortAtLimit(): never
+    {
+        throw new PetLimitReached(__('This pet already has :max vaccinations. Delete one to add another.', ['max' => self::MAX_PER_PET]));
+    }
 
     protected $keyType = 'string';
 

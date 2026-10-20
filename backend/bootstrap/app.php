@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\PetLimitReached;
 use App\Exceptions\UpgradeRequired;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\JwtAuth;
@@ -62,7 +63,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // distinct status+message per 10 minutes so a misconfiguration hit on
         // every request can't burn the Sentry quota.
         $exceptions->stopIgnoring(HttpException::class);
-        $exceptions->dontReport([UpgradeRequired::class]);
+        $exceptions->dontReport([UpgradeRequired::class, PetLimitReached::class]);
         $exceptions->dontReportWhen(
             fn (Throwable $e) => $e instanceof HttpExceptionInterface && $e->getStatusCode() < 500,
         );
@@ -81,6 +82,9 @@ return Application::configure(basePath: dirname(__DIR__))
                     'code' => 'upgrade_required',
                     'feature' => $e->feature,
                 ], 402);
+            }
+            if ($e instanceof PetLimitReached) {
+                return response()->json(['detail' => $e->getMessage(), 'code' => 'pet_limit_reached'], 422);
             }
             if ($e instanceof ValidationException) {
                 $msg = collect($e->errors())->flatten()->first() ?? __('Validation error');

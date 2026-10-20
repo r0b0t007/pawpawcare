@@ -9,6 +9,7 @@ use App\Services\ReminderScheduler;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class MedicationController extends Controller
 {
@@ -31,8 +32,20 @@ class MedicationController extends Controller
 
         $data = $this->validatePayload($request);
 
-        $med = Medication::create(array_merge($this->normalize($data), ['pet_id' => $petId]));
-        ReminderScheduler::syncMedicationReminder($med);
+        $med = DB::transaction(function () use ($data, $petId) {
+            Pet::lockForRecordWrites($petId);
+            if (Medication::makesReminders($data['active'] ?? true, $data['frequency'] ?? 'daily')
+                && Medication::withRemindersCount($petId) >= Medication::MAX_ACTIVE_PER_PET) {
+                Medication::abortAtLimit();
+            }
+
+            $med = Medication::create(array_merge($this->normalize($data), ['pet_id' => $petId]));
+            // Under the lock, so a concurrent edit can't leave reminders that
+            // match an older state of this medication.
+            ReminderScheduler::syncMedicationReminder($med);
+
+            return $med;
+        });
 
         return response()->json($med->toApi(), 201);
     }
@@ -40,13 +53,25 @@ class MedicationController extends Controller
     public function update(Request $request, string $petId, string $medicationId): JsonResponse
     {
         $this->petOr404($request, $petId);
-        $med = $this->medicationOr404($medicationId, $petId);
-
         $data = $this->validatePayload($request, partial: true);
-        $med->fill($this->normalize($data));
-        $med->save();
 
-        ReminderScheduler::syncMedicationReminder($med);
+        $med = DB::transaction(function () use ($data, $medicationId, $petId) {
+            Pet::lockForRecordWrites($petId);
+            // Read under the lock: a concurrent edit or delete is seen here.
+            $med = $this->medicationOr404($medicationId, $petId);
+            // Switching one back on, or from "as needed" to a schedule, makes
+            // reminders again, so it counts towards the limit.
+            $before = Medication::makesReminders($med->active, $med->frequency);
+            $after = Medication::makesReminders($data['active'] ?? $med->active, $data['frequency'] ?? $med->frequency);
+            if (! $before && $after && Medication::withRemindersCount($petId) >= Medication::MAX_ACTIVE_PER_PET) {
+                Medication::abortAtLimit();
+            }
+            $med->fill($this->normalize($data));
+            $med->save();
+            ReminderScheduler::syncMedicationReminder($med);
+
+            return $med;
+        });
 
         return response()->json($med->fresh()->toApi());
     }

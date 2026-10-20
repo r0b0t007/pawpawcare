@@ -75,6 +75,16 @@ class Pet extends Model
         return $this->belongsTo(User::class, 'owner_id');
     }
 
+    /**
+     * Lock this pet's row until the surrounding transaction ends, so per-pet
+     * limit checks (Medication::MAX_ACTIVE_PER_PET, Vaccination::MAX_PER_PET)
+     * and the insert after them run one request at a time (CHW-245).
+     */
+    public static function lockForRecordWrites(string $petId): void
+    {
+        static::whereKey($petId)->lockForUpdate()->first();
+    }
+
     /** Co-owners granted access in addition to the owner. */
     public function members(): BelongsToMany
     {

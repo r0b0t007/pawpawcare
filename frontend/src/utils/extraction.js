@@ -69,3 +69,19 @@ export const buildExtractionPayload = (sel) => {
 
   return p;
 };
+
+/**
+ * The toast after applying a document's extracted items. Duplicates are a
+ * quiet "N skipped"; items over the pet's limit (CHW-245) are spelled out,
+ * or a medication would silently never get its reminders.
+ */
+export function appliedToastText(result, t) {
+  const added =
+    (result.vaccinations?.length || 0) + (result.medications?.length || 0) +
+    (result.weight ? 1 : 0) + (result.expense ? 1 : 0) + (result.clinic ? 1 : 0);
+  const skipped = result.skipped || [];
+  const addedText = t('records.extract.added', { count: added });
+  const overLimit = skipped.filter((s) => s.reason === 'limit reached').length;
+  if (overLimit) return t('records.extract.withLimit', { added: addedText, count: overLimit });
+  return skipped.length ? t('records.extract.withSkipped', { added: addedText, count: skipped.length }) : addedText;
+}

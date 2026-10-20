@@ -83,7 +83,7 @@ export default function HealthHubScreen({ navigation }) {
   // (and re-run the memos below that build date strings).
   const locale = useLocale();
   const { t } = useTranslation();
-  const { pets, reminders, lastSyncedAt, addVaccination, markVaccinationComplete } = useData();
+  const { pets, reminders, lastSyncedAt, addVaccination, markVaccinationComplete, takeFailureNote } = useData();
 
   const [filter, setFilter] = useState('all');
   // The Health tab stays mounted — "today" must roll over at midnight.
@@ -256,7 +256,7 @@ export default function HealthHubScreen({ navigation }) {
         administeredDate: null,
       });
       if (!saved) {
-        showToast(t('health.toast.saveFailed'));
+        showToast(takeFailureNote() || t('health.toast.saveFailed'));
         return;
       }
       setSheetOpen(false);
