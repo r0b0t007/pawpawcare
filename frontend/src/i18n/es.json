@@ -847,6 +847,11 @@
       "dialogTitle": "¿Recibir recordatorios en este teléfono?",
       "dialogMessage": "Le avisaremos antes de que venzan las vacunas y las tomas. Puede cambiarlo cuando quiera en los ajustes de su teléfono.",
       "blockedToast": "Las notificaciones de PawPawCare están bloqueadas. Use «Abrir ajustes» para activarlas."
+    },
+    "exactAlarms": {
+      "dialogTitle": "¿Recordatorios a su hora?",
+      "dialogMessage": "Android puede entregar los recordatorios de PawPawCare hasta una hora tarde. Permita «Alarmas y recordatorios» para PawPawCare y llegarán al minuto.",
+      "openSettings": "Abrir ajustes"
     }
   },
   "records": {

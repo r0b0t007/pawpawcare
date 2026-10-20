@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!--
+    Lets expo-notifications schedule reminders as exact alarms (CHW-244).
+    Without it Android may deliver a reminder up to an hour late. Android 12-13
+    grant it at install; from Android 14 the user allows it under "Alarms &
+    reminders" (ExactAlarmsModule.openSettings). Not USE_EXACT_ALARM: Google
+    Play reserves that one for alarm-clock, timer and calendar apps.
+  -->
+  <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+</manifest>

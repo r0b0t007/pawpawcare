@@ -7,6 +7,7 @@ import {
   requestNotificationPermission,
   scheduleLocalReminders,
 } from '../services/notifications';
+import { canScheduleExactAlarms } from '../services/exactAlarms';
 
 // The OS notification permission, one value for the whole app (CHW-230), so
 // every banner and prompt sees the same thing the moment it changes.
@@ -93,8 +94,16 @@ export function NotificationPermissionWatcher() {
     };
     onGranted.add(react);
     refreshNotificationPermission();
+    // Android exact alarms (CHW-244): reminders scheduled while they were
+    // blocked stay approximate, so a grant in "Alarms & reminders" means
+    // scheduling them again, now exactly.
+    let exact = canScheduleExactAlarms();
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refreshNotificationPermission();
+      if (state !== 'active') return;
+      refreshNotificationPermission();
+      const now = canScheduleExactAlarms();
+      if (now && !exact) scheduleLocalReminders(remindersRef.current || []);
+      exact = now;
     });
     return () => {
       onGranted.delete(react);

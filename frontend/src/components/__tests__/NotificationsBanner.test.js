@@ -15,6 +15,11 @@ jest.mock('../../services/notifications', () => ({
   requestNotificationPermission: jest.fn(() => Promise.resolve(mockAnswer)),
   scheduleLocalReminders: jest.fn(),
 }));
+let mockExact = true;
+jest.mock('../../services/exactAlarms', () => ({
+  canScheduleExactAlarms: jest.fn(() => mockExact),
+  openExactAlarmSettings: jest.fn(() => true),
+}));
 let mockPrefs = {};
 jest.mock('../../services/prefs', () => ({
   getPref: jest.fn((key, fallback) => Promise.resolve(key in mockPrefs ? mockPrefs[key] : fallback)),
@@ -38,6 +43,7 @@ import {
   requestNotificationPermission,
   scheduleLocalReminders,
 } from '../../services/notifications';
+import { openExactAlarmSettings } from '../../services/exactAlarms';
 
 let foreground;
 const flat = (node) => (node.children || []).map((c) => (typeof c === 'string' ? c : flat(c))).join('');
@@ -63,6 +69,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetNotificationPermissionForTests();
   mockPrefs = {};
+  mockExact = true;
   mockAnswer = { status: 'granted', canAskAgain: true };
   jest.spyOn(AppState, 'addEventListener').mockImplementation((event, handler) => {
     foreground = () => handler('active');
@@ -166,7 +173,8 @@ describe('useNotificationsPrompt (the in-context ask)', () => {
     api = useNotificationsPrompt();
     return api.prompt;
   }
-  const dialog = (tree) => tree.root.findByType(ConfirmDialog);
+  // [0] notifications, [1] on-time reminders (Android exact alarms).
+  const dialog = (tree, which = 0) => tree.root.findAllByType(ConfirmDialog)[which];
 
   test('asks right after a save, once the save\'s motion is over', async () => {
     mockPermission = { status: 'undetermined', canAskAgain: true };
@@ -227,5 +235,68 @@ describe('useNotificationsPrompt (the in-context ask)', () => {
     mockPermission = { status: 'denied', canAskAgain: false };
     await render(withWatcher(<Harness />));
     await act(async () => { expect(await api.maybeAsk()).toBe(false); });
+  });
+
+  // CHW-244: Android 14+ blocks exact alarms until the user allows them, and
+  // reminders can then arrive up to an hour late.
+  test('notifications allowed but exact alarms blocked: offers on-time reminders', async () => {
+    mockPermission = { status: 'granted', canAskAgain: true };
+    mockExact = false;
+    const tree = await render(withWatcher(<Harness />));
+
+    await act(async () => { expect(await api.maybeAsk()).toBe(true); });
+    await settle();
+    expect(dialog(tree, 0).props.visible).toBe(false);
+    expect(dialog(tree, 1).props.visible).toBe(true);
+    expect(dialog(tree, 1).props.title).toBe('Make reminders on time?');
+
+    await act(async () => dialog(tree, 1).props.onConfirm());
+    expect(openExactAlarmSettings).not.toHaveBeenCalled(); // after the dialog has gone
+    await settle(400);
+    expect(openExactAlarmSettings).toHaveBeenCalledTimes(1);
+    expect(requestNotificationPermission).not.toHaveBeenCalled();
+    // Coming back without allowing it doesn't ask again straight away.
+    await act(async () => { expect(await api.maybeAsk()).toBe(false); });
+  });
+
+  test('on-time reminders: "Not now" waits 14 days, on its own clock', async () => {
+    mockPermission = { status: 'granted', canAskAgain: true };
+    mockExact = false;
+    const tree = await render(withWatcher(<Harness />));
+
+    await act(async () => { await api.maybeAsk(); });
+    await settle();
+    await act(async () => dialog(tree, 1).props.onCancel());
+    expect(mockPrefs.exactAlarmsAskSnoozedUntil).toBeGreaterThan(Date.now() + 13 * 24 * 3600 * 1000);
+    expect(mockPrefs.notificationsAskSnoozedUntil).toBeUndefined();
+    await act(async () => { expect(await api.maybeAsk()).toBe(false); });
+  });
+
+  test('notifications come first: no on-time ask while they can still be turned on', async () => {
+    mockPermission = { status: 'undetermined', canAskAgain: true };
+    mockExact = false;
+    const tree = await render(withWatcher(<Harness />));
+
+    await act(async () => { await api.maybeAsk(); });
+    await settle();
+    expect(dialog(tree, 0).props.visible).toBe(true);
+    expect(dialog(tree, 1).props.visible).toBe(false);
+  });
+});
+
+describe('NotificationPermissionWatcher and exact alarms', () => {
+  test('allowing "Alarms & reminders" reschedules the reminders, once', async () => {
+    mockPermission = { status: 'granted', canAskAgain: true };
+    mockExact = false;
+    await render(<NotificationPermissionWatcher />);
+    expect(scheduleLocalReminders).not.toHaveBeenCalled();
+
+    mockExact = true; // allowed in the phone's settings
+    await act(async () => { foreground(); });
+    expect(scheduleLocalReminders).toHaveBeenCalledTimes(1);
+    expect(scheduleLocalReminders).toHaveBeenCalledWith(mockReminders);
+
+    await act(async () => { foreground(); });
+    expect(scheduleLocalReminders).toHaveBeenCalledTimes(1);
   });
 });
