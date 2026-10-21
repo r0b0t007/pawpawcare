@@ -847,6 +847,11 @@
       "dialogTitle": "Recevoir les rappels sur ce téléphone ?",
       "dialogMessage": "Nous vous préviendrons avant l'échéance des vaccins et des prises. Vous pourrez changer d'avis à tout moment dans les réglages de votre téléphone.",
       "blockedToast": "Les notifications sont bloquées pour PawPawCare. Utilisez « Ouvrir les réglages » pour les activer."
+    },
+    "exactAlarms": {
+      "dialogTitle": "Des rappels à l'heure ?",
+      "dialogMessage": "Android peut délivrer les rappels de PawPawCare jusqu'à une heure en retard. Autorisez « Alarmes et rappels » pour PawPawCare et ils arriveront à la minute près.",
+      "openSettings": "Ouvrir les réglages"
     }
   },
   "records": {

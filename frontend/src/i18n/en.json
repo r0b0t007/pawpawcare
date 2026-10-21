@@ -818,6 +818,11 @@
       "dialogTitle": "Get reminders on this phone?",
       "dialogMessage": "We'll notify you before vaccines and doses are due. You can change this anytime in your phone's settings.",
       "blockedToast": "Notifications are blocked for PawPawCare. Use “Open settings” to turn them on."
+    },
+    "exactAlarms": {
+      "dialogTitle": "Make reminders on time?",
+      "dialogMessage": "Android can deliver PawPawCare's reminders up to an hour late. Allow “Alarms & reminders” for PawPawCare and they'll arrive on the minute.",
+      "openSettings": "Open settings"
     }
   },
   "records": {
