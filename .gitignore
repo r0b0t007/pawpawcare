@@ -75,3 +75,6 @@ design/**/*.designcraft
 
 # Local state left by the retired Netlify CLI setup (site moved to Cloudflare Pages)
 .netlify/
+
+# Gradle output of local Expo modules (a local prebuild + build writes it here)
+frontend/modules/*/android/build/
