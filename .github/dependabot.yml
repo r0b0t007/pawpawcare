@@ -53,6 +53,12 @@ updates:
       # jest-expo (versioned with the SDK) pins the jest major.
       - dependency-name: jest
         update-types: [version-update:semver-major]
+      # Babel 8 is ESM-only: the guard tests that parse the source with it
+      # (i18n.guard, unboundIdentifiers) require() it, and Expo's toolchain
+      # (babel-preset-expo) is still on Babel 7. Move with an Expo SDK that
+      # does (CHW-157: #106, #118 failed the Expo bundle job).
+      - dependency-name: "@babel/*"
+        update-types: [version-update:semver-major]
     groups:
       frontend-js:
         update-types: [minor, patch]
