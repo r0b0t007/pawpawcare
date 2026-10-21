@@ -19,6 +19,14 @@ on:
         required: false
         default: "Manual OTA update"
 
+# One publish at a time, in merge order (CHW-254). Two merges seconds apart
+# used to publish in parallel, and the older commit's update could finish last
+# and become the one phones download. GitHub keeps only the newest pending
+# run in a group, so a burst of merges still ends with main's head published.
+concurrency:
+  group: ota-update-production
+  cancel-in-progress: false
+
 jobs:
   update:
     name: Publish OTA update

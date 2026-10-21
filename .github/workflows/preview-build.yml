@@ -37,6 +37,12 @@ on:
         default: false
         type: boolean
 
+# Same reason as ota-update.yml (CHW-254): the preview channel's update must
+# come from the newest push, and two builds for one fingerprint waste quota.
+concurrency:
+  group: preview-build
+  cancel-in-progress: false
+
 jobs:
   # ── 1. Does the native runtime actually differ from the last preview build? ──
   decide:
