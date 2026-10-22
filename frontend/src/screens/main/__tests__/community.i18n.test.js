@@ -32,11 +32,18 @@ jest.mock('../../../services/api', () => ({
 }));
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1', name: 'Sam' } }) }));
 const mockPet = { id: 'p1', name: 'Biscuit', type: 'dog', colorIndex: 0 };
+jest.mock('../../../hooks/useGroups', () => ({
+  useGroupsQuery: () => ({
+    data: [{ id: 'g1', name: 'Dog lovers', members: 1, isJoined: false }],
+    isLoading: false,
+    isStale: false,
+    refetch: jest.fn(),
+  }),
+}));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     pets: [mockPet],
     posts: [],
-    groups: [{ id: 'g1', name: 'Dog lovers', members: 1, isJoined: false }],
     lostPets: [],
     myReports: [],
     refreshLostPets: jest.fn(() => Promise.resolve()),

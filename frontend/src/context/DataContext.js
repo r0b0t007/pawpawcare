@@ -15,7 +15,7 @@ import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
-import { petsKeys, gamificationKeys } from '../hooks/queryKeys';
+import { petsKeys, gamificationKeys, communityKeys } from '../hooks/queryKeys';
 import i18n from '../i18n';
 
 const DataContext = createContext(null);
@@ -144,7 +144,7 @@ const toPost = (p) => ({
   createdAt: p.created_at,
 });
 
-const toGroup = (g) => ({
+export const toGroup = (g) => ({
   id: g.id,
   name: g.name,
   description: g.description,
@@ -240,8 +240,6 @@ function dataReducer(state, action) {
     case 'SET_POSTS':  return { ...state, posts: action.payload };
     case 'ADD_POST':   return { ...state, posts: [action.payload, ...state.posts] };
     case 'UPDATE_POST':return { ...state, posts: state.posts.map((p) => (p.id === action.payload.id ? action.payload : p)) };
-    case 'SET_GROUPS':   return { ...state, groups: action.payload };
-    case 'UPDATE_GROUP': return { ...state, groups: state.groups.map((g) => (g.id === action.payload.id ? action.payload : g)) };
     case 'SET_REMINDERS':     return { ...state, reminders: action.payload };
     case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload.notifications || [], unreadCount: action.payload.unread_count || 0 };
     case 'SET_LOST_PETS':     return { ...state, lostPets: action.payload };
@@ -308,7 +306,7 @@ function dataReducer(state, action) {
 
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
-    pets: [], posts: [], groups: [], reminders: [], notifications: [], unreadCount: 0,
+    pets: [], posts: [], reminders: [], notifications: [], unreadCount: 0,
     lostPets: [], myReports: [], invites: [], dataLoaded: false, lastSyncedAt: null,
     medDoseDays: {}, medDoseCounts: {},
   });
@@ -371,6 +369,7 @@ export function DataProvider({ children }) {
       loadData();
     } else {
       queryClient.removeQueries({ queryKey: petsKeys.all });
+      queryClient.removeQueries({ queryKey: communityKeys.all });
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
       dispatch({ type: 'SET_POSTS', payload: [] });
@@ -388,37 +387,6 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_MED_DOSE_COUNTS', payload: {} });
     }
   }, [user?.id]);
-
-  // The seeded groups' names and descriptions come back in the account's
-  // saved language (the server prefers users.locale over Accept-Language),
-  // so a language switch refetches them — once updateUser has saved the new
-  // locale and handed back the user. Refetching on i18n's languageChanged
-  // instead would race that save and get the old language back.
-  // Newest response wins: the full load's fetch, sent before the sign-in
-  // locale sync landed, must not overwrite the refetch that followed it. It
-  // still applies if it lands first, so a refetch that then fails leaves the
-  // groups in the old language rather than empty.
-  const groupsRequest = useRef(0);
-  const groupsApplied = useRef(0);
-  const refreshGroups = async () => {
-    const request = ++groupsRequest.current;
-    const apiGroups = await get('/community/groups');
-    if (request < groupsApplied.current) return;
-    groupsApplied.current = request;
-    dispatch({ type: 'SET_GROUPS', payload: apiGroups.map(toGroup) });
-  };
-  const groupsLocale = useRef(null);
-  useEffect(() => {
-    const previous = groupsLocale.current;
-    const current = user?.locale ? { userId: user.id, locale: user.locale } : null;
-    groupsLocale.current = current;
-    // First sight of this account's locale: the full load fetches the groups.
-    if (!previous || !current || previous.userId !== current.userId) return;
-    if (previous.locale === current.locale) return;
-    refreshGroups().catch(handleApiError);
-    // refreshGroups/handleApiError are recreated each render; the locale is the trigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.locale]);
 
   // Mutation contract: every add/update/delete/toggle below resolves a truthy
   // value on success (the saved entity, or true) and false on failure. Errors
@@ -522,7 +490,6 @@ export function DataProvider({ children }) {
         if (failures.length) throw new Error(`${failures.length} pet request(s) failed`);
       },
       () => refreshPosts({ rethrow: true }),
-      () => refreshGroups(),
       () => refreshReminders({ rethrow: true }),
       () => refreshNotifications({ rethrow: true }),
       () => refreshInvites({ rethrow: true }),
@@ -1250,7 +1217,12 @@ export function DataProvider({ children }) {
   const toggleGroupMembership = async (groupId) => {
     try {
       const apiGroup = await post(`/community/groups/${groupId}/join`);
-      dispatch({ type: 'UPDATE_GROUP', payload: toGroup(apiGroup) });
+      const updated = toGroup(apiGroup);
+      // The answer is in the saved language, so it replaces the group in that
+      // language's list only; other languages' lists refetch when next shown.
+      queryClient.setQueryData(communityKeys.groups(user?.id, user?.locale), (groups) =>
+        groups?.map((g) => (g.id === updated.id ? updated : g)));
+      queryClient.invalidateQueries({ queryKey: communityKeys.groupsFor(user?.id), refetchType: 'none' });
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1336,7 +1308,6 @@ export function DataProvider({ children }) {
         lastSyncedAt: state.lastSyncedAt,
         pets: state.pets,
         posts: state.posts,
-        groups: state.groups,
         reminders: state.reminders,
         notifications: state.notifications,
         unreadCount: state.unreadCount,

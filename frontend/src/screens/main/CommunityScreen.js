@@ -12,6 +12,8 @@ import { pickAndUploadImage } from '../../services/imagePicker';
 import { uploadImage } from '../../services/api';
 import { track } from '../../services/analytics';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useGroupsQuery } from '../../hooks/useGroups';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { resolveAsset } from '../../config';
 import { ui, type, PET_COLOR_PAIRS, motion, photos, pairFor } from '../../theme';
 import {
@@ -39,10 +41,16 @@ export default function CommunityScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const {
-    posts, groups, togglePaw, addPost, toggleGroupMembership, lostPets,
+    posts, togglePaw, addPost, toggleGroupMembership, lostPets,
     getComments, addComment, deleteComment, refreshLostPets, resolveLostPet,
     reportPost, unreportPost,
   } = useData();
+  // Member counts move with other people's joins; a stale list refetches when
+  // Community is focused again.
+  const {
+    data: groups = [], isLoading: groupsLoading, isStale: groupsStale, refetch: refetchGroups,
+  } = useGroupsQuery();
+  useRefetchOnFocus(refetchGroups, { isStale: groupsStale });
 
   const [section, setSection] = useState('feed');
   const [composerOpen, setComposerOpen] = useState(false);
@@ -330,7 +338,7 @@ export default function CommunityScreen({ navigation }) {
                 </Card>
               );
             })}
-            {groups.length === 0 && (
+            {groups.length === 0 && !groupsLoading && (
               <View style={styles.empty}>
                 <MaterialCommunityIcons name="account-group-outline" size={32} color={ui.faint} />
                 <Text style={styles.emptyTitle}>{t('community.emptyGroupsTitle')}</Text>
