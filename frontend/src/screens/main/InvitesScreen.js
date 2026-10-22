@@ -7,6 +7,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { useInvitesQuery } from '../../hooks/useInvites';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useTranslation } from '../../i18n';
 import { ui, type, radii, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast, FormScrollView, ScreenHeader, EmptyState } from '../../components';
@@ -135,6 +136,8 @@ export default function InvitesScreen({ navigation }) {
   const {
     data: invites = [], isLoading, isError, refetch,
   } = useInvitesQuery();
+  // Back from a pet or the Profile tab: pick up invitations sent meanwhile.
+  useRefetchOnFocus(refetch);
   // Explicit false only: an older API without the flag never hides the list.
   // Social accounts without a provider email (no-reply placeholder) have no
   // inbox to confirm — and no invite can be addressed to them anyway.
@@ -182,10 +185,14 @@ export default function InvitesScreen({ navigation }) {
         {needsVerification ? (
           <VerifyEmailCard email={user.email} onVerified={() => refetch()} />
         ) : invites.length === 0 && isLoading ? null : invites.length === 0 && isError ? (
-          <View style={styles.loadFailed}>
-            <Text style={styles.loadFailedText}>{t('invites.loadFailed')}</Text>
-            <Button variant="ghost" label={t('invites.retry')} onPress={() => refetch()} />
-          </View>
+          <EmptyState
+            compact
+            style={styles.emptyState}
+            title={t('invites.loadFailed')}
+            actionLabel={t('common.retry')}
+            actionIcon="refresh"
+            onAction={() => refetch()}
+          />
         ) : invites.length === 0 ? (
           <EmptyState
             compact
@@ -249,8 +256,6 @@ export default function InvitesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  loadFailed: { alignItems: 'center', gap: 8, paddingVertical: 36, paddingHorizontal: 24 },
-  loadFailedText: { ...type.secondary, color: ui.sub, textAlign: 'center' },
   emptyState: { paddingTop: 40 }, // breathing room under the header
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingHorizontal: 24, paddingBottom: 32, gap: 12 },

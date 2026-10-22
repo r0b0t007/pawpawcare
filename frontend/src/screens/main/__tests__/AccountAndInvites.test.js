@@ -22,6 +22,7 @@ const mockData = {};
 jest.mock('../../../context/DataContext', () => ({ useData: () => mockData }));
 const mockInvitesQuery = {};
 jest.mock('../../../hooks/useInvites', () => ({ useInvitesQuery: () => mockInvitesQuery }));
+jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.fn() }));
 const showInvites = (data, extra = {}) =>
   Object.assign(mockInvitesQuery, { data, isLoading: false, isError: false, refetch: jest.fn(), ...extra });
 
@@ -100,7 +101,7 @@ describe('Invitations', () => {
     const texts = tree.root.findAllByType(require('react-native').Text).map((n) => [].concat(n.props.children).join(''));
     expect(texts).toContain("Couldn't load your invitations.");
     expect(texts).not.toContain('No pending invitations');
-    await act(async () => button(tree, 'Try again').props.onPress());
+    await act(async () => button(tree, 'Retry').props.onPress());
     expect(refetch).toHaveBeenCalled();
   });
 

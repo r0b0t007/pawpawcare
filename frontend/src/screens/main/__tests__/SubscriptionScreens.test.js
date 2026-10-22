@@ -37,6 +37,7 @@ jest.mock('../../../context/AuthContext', () => ({
   useAuth: () => ({ user: mockUser, isAdmin: false, logout: jest.fn(), updateUser: jest.fn(), deleteAccount: jest.fn() }),
 }));
 jest.mock('../../../hooks/useInvites', () => ({ useInvitesQuery: () => ({ data: [] }) }));
+jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.fn() }));
 jest.mock('../../../context/DataContext', () => ({ useData: () => ({ reminders: [], pets: [] }) }));
 
 import React from 'react';

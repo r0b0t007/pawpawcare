@@ -28,6 +28,8 @@ jest.mock('../../context/AuthContext', () => ({
 
 import { DataProvider, useData } from '../../context/DataContext';
 import { useInvitesQuery } from '../useInvites';
+import { useGroupsQuery } from '../useGroups';
+import i18n from '../../i18n';
 import { get, post } from '../../services/api';
 
 const apiInvite = (id, petName = 'Bella') => ({
@@ -130,6 +132,48 @@ describe('reading invitations', () => {
 
     expect(mockLogout).toHaveBeenCalledTimes(1);
   });
+
+  // A refused refresh token fails every active query at once.
+  it('an expired session logs out once, however many queries hit it', async () => {
+    function GroupsProbe() {
+      useGroupsQuery();
+      return null;
+    }
+    get.mockImplementation((path) => (path === '/invites' || path === '/community/groups'
+      ? Promise.reject(new Error('SESSION_EXPIRED'))
+      : otherDomains(path)));
+    await settle(() => {
+      tree = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <DataProvider>
+            <Probe />
+            <GroupsProbe />
+          </DataProvider>
+        </QueryClientProvider>,
+      );
+    });
+
+    expect(get.mock.calls.filter(([path]) => path === '/community/groups')).toHaveLength(1);
+    expect(inviteCalls()).toBe(1);
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+  });
+
+  // toInvite fills in translated fallbacks; they follow the app language
+  // straight away, from the same cached answer.
+  it('fallback names follow a language switch without a refetch', async () => {
+    serverInvites = [{ ...apiInvite('i1'), pet: null, inviter: null }];
+    await mount();
+    const english = [invites.data[0].petName, invites.data[0].inviterName];
+    try {
+      await settle(() => i18n.changeLanguage('fr'));
+      expect([invites.data[0].petName, invites.data[0].inviterName])
+        .toEqual([i18n.t('common.aPetLower'), i18n.t('common.someone')]);
+      expect(invites.data[0].petName).not.toBe(english[0]);
+      expect(inviteCalls()).toBe(1);
+    } finally {
+      await act(async () => { await i18n.changeLanguage('en'); });
+    }
+  });
 });
 
 describe('accounts', () => {
@@ -190,6 +234,25 @@ describe('answering an invitation', () => {
     expect(post).toHaveBeenCalledWith('/invites/i2/decline');
     expect(invites.data.map((i) => i.id)).toEqual(['i1']);
     expect(inviteCalls()).toBe(1);
+  });
+
+  // A refresh was already in flight when the answer landed: its older list
+  // must not put the declined invite back.
+  it('a refresh in flight cannot bring a declined invite back', async () => {
+    await mount();
+    let answerRefresh;
+    get.mockImplementation((path) => (path === '/invites'
+      ? new Promise((resolve) => { answerRefresh = resolve; })
+      : otherDomains(path)));
+    // Start the refresh without waiting for it: its answer is held back.
+    await settle(() => { client.invalidateQueries({ queryKey: ['invites', 'u1'] }); });
+    expect(inviteCalls()).toBe(2);
+    post.mockResolvedValue({});
+
+    await settle(() => data.declineInvite('i1'));
+    await settle(() => answerRefresh([apiInvite('i1'), apiInvite('i2', 'Milo')]));
+
+    expect(invites.data.map((i) => i.id)).toEqual(['i2']);
   });
 
   it('keeps the invitation when the answer fails', async () => {

@@ -363,6 +363,22 @@ export function DataProvider({ children }) {
   // invalidate the matching query so migrated screens refetch (see queryKeys.js).
   const queryClient = useQueryClient();
 
+  // Query hooks' requests end the session the way handleApiError does for
+  // the requests here: one cache subscription rather than a call in every
+  // hook. A refused refresh token fails every active query at once, so this
+  // logs out once per signed-in account, not once per query.
+  const session = useRef({ userId: null, logout });
+  session.current = { userId: user?.id ?? null, logout };
+  const expiredFor = useRef(null);
+  useEffect(() => queryClient.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action?.type !== 'error') return;
+    if (event.action.error?.message !== 'SESSION_EXPIRED') return;
+    const { userId, logout: endSession } = session.current;
+    if (!userId || expiredFor.current === userId) return;
+    expiredFor.current = userId;
+    endSession();
+  }), [queryClient]);
+
   useEffect(() => {
     if (user) {
       loadData();
@@ -370,6 +386,7 @@ export function DataProvider({ children }) {
       queryClient.removeQueries({ queryKey: petsKeys.all });
       queryClient.removeQueries({ queryKey: communityKeys.all });
       queryClient.removeQueries({ queryKey: invitesKeys.all });
+      expiredFor.current = null;
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
       dispatch({ type: 'SET_POSTS', payload: [] });
@@ -1023,8 +1040,13 @@ export function DataProvider({ children }) {
 
   // Invitations addressed to me are read through useInvitesQuery; accepting
   // or declining one drops it from that cache.
-  const dropInvite = (inviteId) =>
-    queryClient.setQueryData(invitesKeys.list(user?.id), (invites) => invites?.filter((i) => i.id !== inviteId));
+  // A list fetch already in flight predates the answer: cancel it first, or
+  // it would land afterwards and put the invite back.
+  const dropInvite = async (inviteId) => {
+    const key = invitesKeys.list(user?.id);
+    await queryClient.cancelQueries({ queryKey: key });
+    queryClient.setQueryData(key, (invites) => invites?.filter((i) => i.id !== inviteId));
+  };
 
   // Owner-side: the roster (owner + members + pending invites) for one pet.
   const getPetShare = async (petId) => {
@@ -1067,11 +1089,11 @@ export function DataProvider({ children }) {
   const acceptInvite = async (inviteId) => {
     try {
       await post(`/invites/${inviteId}/accept`);
-      // Drop the resolved invite, then reload so the shared pet (and its
-      // sub-resources) appear in the list, and re-read the invites too.
-      dropInvite(inviteId);
-      await loadData();
+      // Drop the resolved invite and re-read the list right away, then reload
+      // so the shared pet (and its sub-resources) appear.
+      await dropInvite(inviteId);
       queryClient.invalidateQueries({ queryKey: invitesKeys.list(user?.id) });
+      await loadData();
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1079,7 +1101,7 @@ export function DataProvider({ children }) {
   const declineInvite = async (inviteId) => {
     try {
       await post(`/invites/${inviteId}/decline`);
-      dropInvite(inviteId);
+      await dropInvite(inviteId);
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1221,6 +1243,9 @@ export function DataProvider({ children }) {
       // switched to while the join was in flight, or this one if it had
       // nothing to update yet: the one on screen refetches, the rest go stale.
       const locale = user?.locale ?? null;
+      // A refetch already in flight predates the join: cancel it, or it would
+      // land afterwards and undo the change on screen.
+      await queryClient.cancelQueries({ queryKey: communityKeys.groups(user?.id, locale) });
       let wrote = false;
       queryClient.setQueryData(communityKeys.groups(user?.id, locale), (groups) => {
         if (!groups) return groups;

@@ -3,7 +3,6 @@ import { get } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toGroup } from '../context/DataContext';
 import { communityKeys } from './queryKeys';
-import { useLogoutOnExpiredSession } from './useSessionExpiry';
 
 // Community groups. Joining/leaving stays in DataContext (toggleGroupMembership),
 // which writes the answer into this query's cache.
@@ -45,6 +44,5 @@ export function useGroupsQuery() {
     initialData: () => newestList(queryClient, user?.id),
     initialDataUpdatedAt: 0,
   });
-  useLogoutOnExpiredSession(query.error);
   return query;
 }
