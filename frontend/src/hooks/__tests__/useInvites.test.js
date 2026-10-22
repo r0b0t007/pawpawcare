@@ -220,6 +220,7 @@ describe('answering an invitation', () => {
 
     expect(ok).toBe(true);
     expect(invites.data.map((i) => i.id)).toEqual(['i2']);
+    // One re-read, not one from the drop and another on top.
     expect(inviteCalls()).toBe(2);
   });
 

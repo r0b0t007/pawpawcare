@@ -56,9 +56,12 @@ export default function CommunityScreen({ navigation }) {
   useRefetchOnFocus(refetchGroups, { isStale: groupsStale });
   // New posts from everyone else: a stale feed refetches on focus.
   const {
-    data: posts = [], isLoading: feedLoading, isError: feedFailed, isStale: feedStale,
-    refetch: refetchFeed,
+    data: posts = [], isLoading: feedLoading, isError: feedFailed, isFetching: feedFetching,
+    isStale: feedStale, refetch: refetchFeed,
   } = useFeedQuery();
+  // A retry after a failed load is a fetch with the error still set: show it
+  // as loading, not as the unchanged error card.
+  const feedRetrying = feedFailed && feedFetching;
   useRefetchOnFocus(refetchFeed, { isStale: feedStale });
   const {
     data: lostPets = [], isLoading: lostLoading, isError: lostFailed, isStale: boardStale,
@@ -303,10 +306,10 @@ export default function CommunityScreen({ navigation }) {
                   unreportPost={unreportPost}
                 />
               ))}
-              {posts.length === 0 && feedLoading && (
+              {posts.length === 0 && (feedLoading || feedRetrying) && (
                 <ActivityIndicator color={ui.accent} style={styles.feedLoading} accessibilityLabel={t('common.loading')} />
               )}
-              {posts.length === 0 && feedFailed && (
+              {posts.length === 0 && feedFailed && !feedRetrying && (
                 <EmptyState
                   compact
                   title={t('community.feedLoadFailed')}

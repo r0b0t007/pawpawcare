@@ -280,6 +280,22 @@ describe('reporting and resolving', () => {
     expect(board.data.map((r) => r.id)).toEqual(['r9', 'r1', 'r2']);
   });
 
+  // The feed re-read (the broadcast post) starts, but the confirmation
+  // doesn't wait for it.
+  it('reporting doesn’t wait for the feed', async () => {
+    await mount();
+    const report = apiReport('r9', 'Luna', { reported_by: 'u1' });
+    serverMine = [report];
+    post.mockResolvedValue(report);
+    get.mockImplementation((path) => (path === '/community/posts' ? new Promise(() => {}) : answer(path)));
+
+    let ok;
+    await settle(async () => { ok = await data.reportPetLost('p1', details); });
+
+    expect(ok).toBe(true);
+    expect(calls('/community/posts')).toBe(2);
+  });
+
   it('a failed report resolves false and re-reads nothing', async () => {
     await mount();
     post.mockRejectedValue(new Error('Network error'));

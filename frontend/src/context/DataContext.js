@@ -379,27 +379,34 @@ export function DataProvider({ children }) {
   //   would land afterwards and undo it, and then the query is re-read — the
   //   server already has the change, and what that fetch would have brought
   //   (other people's changes) still arrives;
+  // - the list keeps its age (and an invalidation): the answer updates one
+  //   item, not the rest, so a stale list still refetches when next shown;
   // - with nothing cached there is nothing to update: the query is re-read;
   // - it never throws: the server already saved the change, so a failed
   //   cache write must not make the mutation report a failure (the query is
   //   re-read instead).
+  // `reread: true` re-reads after writing in every case — once.
   // Resolves whether the answer was written.
-  const writeQueryCache = async (queryKey, update) => {
+  const writeQueryCache = async (queryKey, update, { reread = false } = {}) => {
+    let written = false;
+    let needsReread = true;
     try {
-      const wasFetching = queryClient.isFetching({ queryKey, exact: true }) > 0;
+      const before = queryClient.getQueryState(queryKey);
+      const wasFetching = before?.fetchStatus === 'fetching';
       await queryClient.cancelQueries({ queryKey, exact: true });
-      if (queryClient.getQueryData(queryKey) === undefined) {
-        queryClient.invalidateQueries({ queryKey, exact: true });
-        return false;
+      if (queryClient.getQueryData(queryKey) !== undefined) {
+        queryClient.setQueryData(queryKey, update, { updatedAt: before.dataUpdatedAt });
+        written = true;
+        needsReread = reread || wasFetching;
+        if (!needsReread && before.isInvalidated) {
+          queryClient.invalidateQueries({ queryKey, exact: true, refetchType: 'none' });
+        }
       }
-      queryClient.setQueryData(queryKey, update);
-      if (wasFetching) queryClient.invalidateQueries({ queryKey, exact: true });
-      return true;
     } catch (err) {
       console.warn('[data] cache write failed; re-reading', err);
-      queryClient.invalidateQueries({ queryKey, exact: true });
-      return false;
     }
+    if (needsReread) queryClient.invalidateQueries({ queryKey, exact: true });
+    return written;
   };
 
   useEffect(() => {
@@ -1018,8 +1025,12 @@ export function DataProvider({ children }) {
 
   // ── Lost pets ──
 
-  // A lost-pet report is broadcast as a feed post (useFeedQuery): re-read it.
-  const invalidateFeed = () => queryClient.invalidateQueries({ queryKey: communityKeys.feed(user?.id) });
+  // A lost-pet report is broadcast as a feed post (useFeedQuery), and an
+  // admin's removal takes one out: re-read the feed. Not awaited by the
+  // lost-pet mutations — they confirm against the lost-pet lists only.
+  const invalidateFeed = () => {
+    queryClient.invalidateQueries({ queryKey: communityKeys.feed(user?.id) });
+  };
 
   // The board and my reports are read through useLostPets.js. Invalidating
   // cancels a fetch already in flight (it predates the change) and resolves
@@ -1034,7 +1045,8 @@ export function DataProvider({ children }) {
         contact_phone: details.contactPhone || null,
       });
       // Refresh the board/reports and the feed (the broadcast post) — not all pets.
-      await Promise.all([refreshLostPets(), invalidateFeed()]);
+      invalidateFeed();
+      await refreshLostPets();
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1042,7 +1054,8 @@ export function DataProvider({ children }) {
   const resolveLostPet = async (reportId, note) => {
     try {
       await patch(`/lost-pets/${reportId}/resolve`, { resolution_note: note || null });
-      await Promise.all([refreshLostPets(), invalidateFeed()]);
+      invalidateFeed();
+      await refreshLostPets();
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1051,8 +1064,8 @@ export function DataProvider({ children }) {
 
   // Invitations addressed to me are read through useInvitesQuery; accepting
   // or declining one drops it from that cache.
-  const dropInvite = (inviteId) =>
-    writeQueryCache(invitesKeys.list(user?.id), (invites) => invites.filter((i) => i.id !== inviteId));
+  const dropInvite = (inviteId, options) =>
+    writeQueryCache(invitesKeys.list(user?.id), (invites) => invites.filter((i) => i.id !== inviteId), options);
 
   // Owner-side: the roster (owner + members + pending invites) for one pet.
   const getPetShare = async (petId) => {
@@ -1097,8 +1110,7 @@ export function DataProvider({ children }) {
       await post(`/invites/${inviteId}/accept`);
       // Drop the resolved invite and re-read the list right away, then reload
       // so the shared pet (and its sub-resources) appear.
-      await dropInvite(inviteId);
-      queryClient.invalidateQueries({ queryKey: invitesKeys.list(user?.id) });
+      await dropInvite(inviteId, { reread: true });
       await loadData();
       return true;
     } catch (err) { handleApiError(err); return false; }
@@ -1373,6 +1385,7 @@ export function DataProvider({ children }) {
         deleteMedication,
         logMedicationDose,
         reportPetLost,
+        invalidateFeed,
         resolveLostPet,
         getPetShare,
         invitePetMember,

@@ -286,6 +286,35 @@ describe('writing to the feed', () => {
     warn.mockRestore();
   });
 
+  // The answer updates one post, not the rest: a feed due for a refetch must
+  // stay due, or other people's new posts stay hidden for another 5 minutes.
+  it('a paw keeps the feed as old as it was', async () => {
+    await mount();
+    const key = ['community', 'feed', 'u1'];
+    const fetchedAt = client.getQueryState(key).dataUpdatedAt;
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    post.mockResolvedValue(apiPost('b', { paw_count: 1, pawed_by_me: true }));
+
+    await settle(() => data.togglePaw('b'));
+
+    expect(feed.data[1].paws).toBe(1);
+    expect(client.getQueryState(key).dataUpdatedAt).toBe(fetchedAt);
+    expect(feedCalls()).toBe(1);
+  });
+
+  it('a paw on an invalidated feed leaves it invalidated', async () => {
+    await mount();
+    const key = ['community', 'feed', 'u1'];
+    // Marked stale without a refetch, as for a feed nobody is showing.
+    await settle(() => client.invalidateQueries({ queryKey: key, refetchType: 'none' }));
+    expect(client.getQueryState(key).isInvalidated).toBe(true);
+    post.mockResolvedValue(apiPost('b', { paw_count: 1, pawed_by_me: true }));
+
+    await settle(() => data.togglePaw('b'));
+
+    expect(client.getQueryState(key).isInvalidated).toBe(true);
+  });
+
   it('reporting collapses the post, and Undo restores it', async () => {
     await mount();
     post.mockResolvedValue(apiPost('a', { reported_by_me: true }));
