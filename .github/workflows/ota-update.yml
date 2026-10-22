@@ -9,9 +9,10 @@ on:
     branches: [main]
     # Only frontend changes can affect the JS bundle. Without this filter every
     # website-, backend-, or docs-only merge republished an identical update.
+    # Not this workflow file itself: editing it would republish an identical
+    # bundle as a new update. Test a workflow edit with a manual run instead.
     paths:
       - "frontend/**"
-      - ".github/workflows/ota-update.yml"
   workflow_dispatch:
     inputs:
       message:
@@ -19,18 +20,48 @@ on:
         required: false
         default: "Manual OTA update"
 
-# One publish at a time, in merge order (CHW-254). Two merges seconds apart
-# used to publish in parallel, and the older commit's update could finish last
-# and become the one phones download. GitHub keeps only the newest pending
-# run in a group, so a burst of merges still ends with main's head published.
+# One publish at a time (CHW-254). Two merges seconds apart used to publish
+# in parallel, and the older commit's update could finish last and become the
+# one phones download. The queue alone doesn't stop an older commit from
+# publishing (a re-run, or one already queued), so the `guard` job also skips
+# any push run whose commit is no longer main's head.
 concurrency:
   group: ota-update-production
   cancel-in-progress: false
 
 jobs:
+  guard:
+    name: Still main's head?
+    runs-on: ubuntu-latest
+    # Publishing always goes to the production channel: only from main.
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      publish: ${{ steps.head.outputs.publish }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Compare with main
+        id: head
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          git fetch --quiet --depth=1 origin main
+          HEAD_SHA="$(git rev-parse FETCH_HEAD)"
+          if [ "$EVENT" = "push" ] && [ "$HEAD_SHA" != "$GITHUB_SHA" ]; then
+            echo "::notice::$GITHUB_SHA is no longer main's head (${HEAD_SHA:0:8}); the run for the newer commit publishes instead."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
   update:
     name: Publish OTA update
+    needs: guard
+    if: needs.guard.outputs.publish == 'true'
     runs-on: ubuntu-latest
+    # A stuck publish would otherwise hold the queue for GitHub's 6-hour default.
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: ./frontend

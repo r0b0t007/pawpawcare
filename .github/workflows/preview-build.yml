@@ -37,10 +37,12 @@ on:
         default: false
         type: boolean
 
-# Same reason as ota-update.yml (CHW-254): the preview channel's update must
-# come from the newest push, and two builds for one fingerprint waste quota.
+# One run at a time per ref, so the preview channel's update comes from the
+# newest push (CHW-254). It does not stop a second build for the same
+# fingerprint: builds start with --no-wait, so a later run can still see the
+# previous fingerprint as the last *finished* build while the first compiles.
 concurrency:
-  group: preview-build
+  group: preview-build-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
