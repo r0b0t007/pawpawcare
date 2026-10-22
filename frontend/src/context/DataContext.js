@@ -165,6 +165,8 @@ export const toLostPet = (r) => ({
   status: r.status,
   reporterName: r.reporter_name,
   reportedBy: r.reported_by,
+  // On a pet I own or share (whoever filed it), or filed by me (CHW-277).
+  isMine: r.is_mine,
   lastSeenLocation: r.last_seen_location,
   lastSeenAt: r.last_seen_at,
   description: r.description,
@@ -1051,11 +1053,15 @@ export function DataProvider({ children }) {
 
   const reportPetLost = async (petId, details) => {
     try {
-      await post(`/pets/${petId}/lost-report`, {
-        last_seen_location: details.lastSeenLocation || null,
-        description: details.description || null,
-        contact_phone: details.contactPhone || null,
-      });
+      // Blank fields are left out: reporting a pet already on the board
+      // updates its report, and a blank form must not erase its details
+      // (the server clears a field only on an explicit null).
+      const fields = {
+        last_seen_location: details.lastSeenLocation?.trim(),
+        description: details.description?.trim(),
+        contact_phone: details.contactPhone?.trim(),
+      };
+      await post(`/pets/${petId}/lost-report`, Object.fromEntries(Object.entries(fields).filter(([, v]) => v)));
       // Refresh the board/reports and the feed (the broadcast post) — not all pets.
       invalidateFeed();
       await refreshLostPets();
@@ -1104,6 +1110,8 @@ export function DataProvider({ children }) {
   const removePetMember = async (petId, userId) => {
     try {
       await del(`/pets/${petId}/members/${userId}`);
+      // Which lost reports are whose follows who shares the pet.
+      refreshLostPets();
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1113,6 +1121,7 @@ export function DataProvider({ children }) {
     try {
       await post(`/pets/${petId}/leave`);
       dispatch({ type: 'DELETE_PET', payload: petId });
+      refreshLostPets();
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1123,6 +1132,8 @@ export function DataProvider({ children }) {
       // Drop the resolved invite and re-read the list right away, then reload
       // so the shared pet (and its sub-resources) appear.
       await dropInvite(inviteId, { reread: true });
+      // The shared pet may already be on the board: it is mine now too.
+      refreshLostPets();
       await loadData();
       return true;
     } catch (err) { handleApiError(err); return false; }

@@ -15,6 +15,7 @@ import { useInFlight } from '../../hooks/useInFlight';
 import { useGroupsQuery } from '../../hooks/useGroups';
 import { useFeedQuery } from '../../hooks/useFeed';
 import { useLostPetsBoardQuery } from '../../hooks/useLostPets';
+import { isMyReport } from '../../utils/pets';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { resolveAsset } from '../../config';
 import { ui, type, PET_COLOR_PAIRS, motion, photos, pairFor } from '../../theme';
@@ -183,7 +184,7 @@ export default function CommunityScreen({ navigation }) {
 
   const userPair = pairFor(user?.name);
   // Someone else's active report, newest first — the feed's top card.
-  const othersLost = lostPets.filter((r) => r.reportedBy !== user?.id && r.status !== 'resolved');
+  const othersLost = lostPets.filter((r) => !isMyReport(r, user?.id) && r.status !== 'resolved');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -387,7 +388,7 @@ export default function CommunityScreen({ navigation }) {
         {section === 'lost' && (
           <View style={styles.lostList}>
             {lostPets.map((report) => {
-              const mine = report.reportedBy === user?.id;
+              const mine = isMyReport(report, user?.id);
               return (
                 <LostPetCard
                   key={report.id}

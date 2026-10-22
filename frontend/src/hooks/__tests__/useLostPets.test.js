@@ -30,7 +30,7 @@ import { DataProvider, useData } from '../../context/DataContext';
 import { useLostPetsBoardQuery, useMyLostReportsQuery } from '../useLostPets';
 import { useFeedQuery } from '../useFeed';
 import i18n from '../../i18n';
-import { get, post, patch } from '../../services/api';
+import { get, post, patch, del } from '../../services/api';
 
 const apiReport = (id, petName = 'Bella', extra = {}) => ({
   id,
@@ -130,6 +130,14 @@ describe('reading lost-pet reports', () => {
     expect(mine.data.map((r) => [r.id, r.reportedBy, r.status])).toEqual([['r3', 'u1', 'resolved']]);
   });
 
+  // CHW-277: whether a report is mine (my pet, or filed by me) comes from the server.
+  it('carries whether a report is mine', async () => {
+    serverBoard = [apiReport('r1', 'Bella', { is_mine: true }), apiReport('r2', 'Milo', { is_mine: false })];
+    await mount();
+
+    expect(board.data.map((r) => r.isMine)).toEqual([true, false]);
+  });
+
   // My reports used to ride along with /pets in the sign-in load, so a failed
   // /lost-pets/mine discarded every pet with it.
   it('is not part of the full load', async () => {
@@ -181,6 +189,32 @@ describe('reading lost-pet reports', () => {
   });
 });
 
+// CHW-277: which reports are mine follows who shares the pet.
+describe('sharing changes', () => {
+  const reread = () => [calls('/lost-pets'), calls('/lost-pets/mine')];
+
+  it('leaving a pet re-reads both lists', async () => {
+    await mount();
+    post.mockResolvedValue({});
+    await settle(() => data.leavePet('p1'));
+    expect(reread()).toEqual([2, 2]);
+  });
+
+  it('removing a co-owner re-reads both lists', async () => {
+    await mount();
+    del.mockResolvedValue({});
+    await settle(() => data.removePetMember('p1', 'u2'));
+    expect(reread()).toEqual([2, 2]);
+  });
+
+  it('accepting a shared pet re-reads both lists', async () => {
+    await mount();
+    post.mockResolvedValue({});
+    await settle(() => data.acceptInvite('i1'));
+    expect(reread()).toEqual([2, 2]);
+  });
+});
+
 describe('accounts', () => {
   it('never shows the previous account’s reports to the next one', async () => {
     serverMine = [apiReport('r3', 'Luna', { reported_by: 'u1' })];
@@ -228,9 +262,8 @@ describe('reporting and resolving', () => {
     await settle(() => answerBoard());
 
     expect(ok).toBe(true);
-    expect(post).toHaveBeenCalledWith('/pets/p1/lost-report', {
-      last_seen_location: 'Main St', description: null, contact_phone: null,
-    });
+    // Blank fields are left out, so a re-report never erases details.
+    expect(post).toHaveBeenCalledWith('/pets/p1/lost-report', { last_seen_location: 'Main St' });
     expect(client.getQueryData(['lostPets', 'mine', 'u1']).map((r) => r.id)).toEqual(['r9']);
     expect(client.getQueryData(['lostPets', 'board', 'u1']).map((r) => r.id)).toEqual(['r9', 'r1', 'r2']);
     expect(calls('/community/posts')).toBe(2); // the broadcast post, too
@@ -294,6 +327,16 @@ describe('reporting and resolving', () => {
 
     expect(ok).toBe(true);
     expect(calls('/community/posts')).toBe(2);
+  });
+
+  // Spaces are blank too: the server would turn them into a cleared field.
+  it('reporting leaves out fields that are only spaces, and trims the rest', async () => {
+    await mount();
+    post.mockResolvedValue(apiReport('r9', 'Luna', { reported_by: 'u1' }));
+
+    await settle(() => data.reportPetLost('p1', { lastSeenLocation: '  Main St ', description: '   ', contactPhone: '' }));
+
+    expect(post).toHaveBeenCalledWith('/pets/p1/lost-report', { last_seen_location: 'Main St' });
   });
 
   it('a failed report resolves false and re-reads nothing', async () => {

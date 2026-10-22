@@ -27,7 +27,10 @@ jest.mock('../../../hooks/useGamification', () => ({
 }));
 jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.fn() }));
 let mockMyReports = [];
-jest.mock('../../../hooks/useLostPets', () => ({ useMyLostReportsQuery: () => ({ data: mockMyReports }) }));
+const mockRefetchMyReports = jest.fn();
+jest.mock('../../../hooks/useLostPets', () => ({
+  useMyLostReportsQuery: () => ({ data: mockMyReports, refetch: mockRefetchMyReports }),
+}));
 jest.mock('../../../hooks/useToday', () => ({ useToday: () => new Date('2026-10-12T10:00:00') }));
 jest.mock('../../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }));
@@ -157,6 +160,14 @@ describe('the lost-pet menu action', () => {
     return tree;
   };
   afterEach(() => { mockMyReports = []; });
+
+  // A co-owner can report the pet from another phone.
+  it('re-reads my reports when the profile is focused again', () => {
+    const { useRefetchOnFocus } = require('../../../hooks/useRefetchOnFocus');
+    const tree = open();
+    expect(useRefetchOnFocus).toHaveBeenCalledWith(mockRefetchMyReports);
+    act(() => tree.unmount());
+  });
 
   it('is held back until my reports have loaded', () => {
     mockMyReports = undefined;

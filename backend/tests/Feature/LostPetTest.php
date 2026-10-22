@@ -139,6 +139,188 @@ class LostPetTest extends TestCase
         $this->assertStringContainsString('Beta', Post::first()->content);
     }
 
+    /** @return array{0: User, 1: string} a co-owner of $pet */
+    private function coOwnerOf(Pet $pet): array
+    {
+        [$member, $token] = $this->userWithPet();
+        $pet->members()->attach($member->id, ['role' => 'member', 'created_at' => now()]);
+
+        return [$member, $token];
+    }
+
+    // CHW-277: a pet's lost status belongs to the pet, not to whoever filed it.
+    public function test_a_co_owner_sees_the_report_and_can_mark_the_pet_found(): void
+    {
+        [$owner, $ownerToken, $pet] = $this->userWithPet();
+        [, $memberToken] = $this->coOwnerOf($pet);
+        $id = $this->withToken($ownerToken)->postJson("/pets/{$pet->id}/lost-report", [
+            'last_seen_location' => 'Central Park',
+        ])->assertCreated()->json('id');
+
+        $mine = $this->withToken($memberToken)->getJson('/lost-pets/mine')->assertOk()->json();
+        $this->assertCount(1, $mine);
+        $this->assertSame($id, $mine[0]['id']);
+        $this->assertSame($owner->id, $mine[0]['reported_by']);
+        $this->assertTrue($mine[0]['is_mine']);
+
+        $resolved = $this->withToken($memberToken)->patchJson("/lost-pets/{$id}/resolve", [])->assertOk()->json();
+        $this->assertSame('resolved', $resolved['status']);
+        $this->assertSame(0, Post::count());
+    }
+
+    public function test_the_board_says_which_reports_are_on_my_pets(): void
+    {
+        [, $ownerToken, $pet] = $this->userWithPet();
+        [, $memberToken] = $this->coOwnerOf($pet);
+        [, $strangerToken] = $this->userWithPet();
+        $this->withToken($ownerToken)->postJson("/pets/{$pet->id}/lost-report", [])->assertCreated();
+
+        $this->assertTrue($this->withToken($ownerToken)->getJson('/lost-pets')->json('0.is_mine'));
+        $this->assertTrue($this->withToken($memberToken)->getJson('/lost-pets')->json('0.is_mine'));
+        $this->assertFalse($this->withToken($strangerToken)->getJson('/lost-pets')->json('0.is_mine'));
+    }
+
+    // A co-owner's report form starts blank: reporting again must not erase
+    // the last-seen place or the phone, nor take the report over.
+    public function test_reporting_again_keeps_the_details_left_out_and_the_reporter(): void
+    {
+        [$owner, $ownerToken, $pet] = $this->userWithPet();
+        [, $memberToken] = $this->coOwnerOf($pet);
+        $this->withToken($ownerToken)->postJson("/pets/{$pet->id}/lost-report", [
+            'last_seen_location' => 'Central Park',
+            'contact_phone' => '555-1234',
+            'description' => 'Red collar',
+        ])->assertCreated();
+
+        $report = $this->withToken($memberToken)->postJson("/pets/{$pet->id}/lost-report", [
+            'description' => 'Seen near the lake',
+        ])->assertOk()->json();
+
+        $this->assertSame('Central Park', $report['last_seen_location']);
+        $this->assertSame('555-1234', $report['contact_phone']);
+        $this->assertSame('Seen near the lake', $report['description']);
+        $this->assertSame($owner->id, $report['reported_by']);
+        $this->assertSame(1, LostPetReport::where('pet_id', $pet->id)->count());
+        $this->assertStringContainsString('555-1234', Post::first()->content);
+    }
+
+    // A phone shared by mistake must come off the public board without taking
+    // the alert down.
+    public function test_reporting_again_with_a_null_or_empty_detail_clears_it(): void
+    {
+        [, $token, $pet] = $this->userWithPet();
+        $this->withToken($token)->postJson("/pets/{$pet->id}/lost-report", [
+            'last_seen_location' => 'Central Park',
+            'contact_phone' => '555-1234',
+        ])->assertCreated();
+
+        $report = $this->withToken($token)->postJson("/pets/{$pet->id}/lost-report", [
+            'contact_phone' => null,
+            'description' => '',
+        ])->assertOk()->json();
+
+        $this->assertNull($report['contact_phone']);
+        $this->assertNull($report['description']);
+        $this->assertSame('Central Park', $report['last_seen_location']);
+        $this->assertSame('active', $report['status']);
+        $this->assertStringNotContainsString('555-1234', Post::first()->content);
+    }
+
+    // Whoever filed a report can always take it down — even after leaving the
+    // pet, since it may carry their own phone number.
+    public function test_someone_who_filed_the_report_and_left_the_pet_can_still_mark_it_found(): void
+    {
+        [, , $pet] = $this->userWithPet();
+        [$member, $memberToken] = $this->coOwnerOf($pet);
+        $id = $this->withToken($memberToken)->postJson("/pets/{$pet->id}/lost-report", [
+            'contact_phone' => '555-9876',
+        ])->assertCreated()->json('id');
+        $pet->members()->detach($member->id);
+
+        $mine = $this->withToken($memberToken)->getJson('/lost-pets/mine')->json();
+        $this->assertSame([$id], array_column($mine, 'id'));
+        $this->assertTrue($mine[0]['is_mine']);
+        $this->assertTrue($this->withToken($memberToken)->getJson('/lost-pets')->json('0.is_mine'));
+        $this->withToken($memberToken)->patchJson("/lost-pets/{$id}/resolve", [])->assertOk();
+
+        // Once it is down, the pet's history is no longer theirs to see.
+        $this->assertCount(0, $this->withToken($memberToken)->getJson('/lost-pets/mine')->json());
+    }
+
+    // The family takes back a report left with someone who no longer shares
+    // the pet: re-reporting passes it on, and that person's phone goes too.
+    public function test_re_reporting_takes_back_a_report_filed_by_someone_who_left(): void
+    {
+        [$owner, $ownerToken, $pet] = $this->userWithPet();
+        [$member, $memberToken] = $this->coOwnerOf($pet);
+        $id = $this->withToken($memberToken)->postJson("/pets/{$pet->id}/lost-report", [
+            'last_seen_location' => 'Central Park',
+            'contact_phone' => '555-9876',
+        ])->assertCreated()->json('id');
+        $pet->members()->detach($member->id);
+
+        $report = $this->withToken($ownerToken)->postJson("/pets/{$pet->id}/lost-report", [
+            'description' => 'Red collar',
+        ])->assertOk()->json();
+
+        $this->assertSame($id, $report['id']);
+        $this->assertSame($owner->id, $report['reported_by']);
+        $this->assertNull($report['contact_phone']);
+        $this->assertSame('Central Park', $report['last_seen_location']);
+        $this->assertStringNotContainsString('555-9876', Post::first()->content);
+        $this->assertSame($owner->id, Post::first()->author_id);
+        $this->assertFalse($this->withToken($memberToken)->getJson('/lost-pets')->json('0.is_mine'));
+        $this->assertCount(0, $this->withToken($memberToken)->getJson('/lost-pets/mine')->json());
+        $this->withToken($memberToken)->patchJson("/lost-pets/{$id}/resolve", [])->assertNotFound();
+    }
+
+    // is_mine on the board and the mine list are two writings of one rule: for
+    // every viewer, the board's mine-flagged reports are exactly mine's active ones.
+    public function test_the_board_flag_and_the_mine_list_agree_for_every_viewer(): void
+    {
+        [, $ownerToken, $pet] = $this->userWithPet();
+        [, $memberToken] = $this->coOwnerOf($pet);
+        [, $leaverToken] = $this->coOwnerOf($pet);
+        [, $strangerToken, $strangerPet] = $this->userWithPet();
+        $this->withToken($leaverToken)->postJson("/pets/{$pet->id}/lost-report", [])->assertCreated();
+        $this->withToken($strangerToken)->postJson("/pets/{$strangerPet->id}/lost-report", [])->assertCreated();
+        $leaverId = LostPetReport::where('pet_id', $pet->id)->value('reported_by');
+        $pet->members()->detach($leaverId);
+
+        foreach ([$ownerToken, $memberToken, $leaverToken, $strangerToken] as $token) {
+            $flagged = collect($this->withToken($token)->getJson('/lost-pets')->json())
+                ->where('is_mine', true)->pluck('id')->sort()->values()->all();
+            $mine = collect($this->withToken($token)->getJson('/lost-pets/mine')->json())
+                ->where('status', 'active')->pluck('id')->sort()->values()->all();
+            $this->assertSame($mine, $flagged);
+        }
+    }
+
+    // After marking found, the answer says whether it is still mine — as the
+    // lists would.
+    public function test_resolving_answers_with_the_same_is_mine_as_the_lists(): void
+    {
+        [, , $pet] = $this->userWithPet();
+        [$member, $memberToken] = $this->coOwnerOf($pet);
+        $id = $this->withToken($memberToken)->postJson("/pets/{$pet->id}/lost-report", [])->json('id');
+        $pet->members()->detach($member->id);
+
+        $resolved = $this->withToken($memberToken)->patchJson("/lost-pets/{$id}/resolve", [])->assertOk()->json();
+
+        $this->assertFalse($resolved['is_mine']);
+    }
+
+    public function test_someone_who_left_the_pet_can_no_longer_mark_it_found(): void
+    {
+        [, $ownerToken, $pet] = $this->userWithPet();
+        [$member, $memberToken] = $this->coOwnerOf($pet);
+        $id = $this->withToken($ownerToken)->postJson("/pets/{$pet->id}/lost-report", [])->json('id');
+        $pet->members()->detach($member->id);
+
+        $this->assertCount(0, $this->withToken($memberToken)->getJson('/lost-pets/mine')->json());
+        $this->withToken($memberToken)->patchJson("/lost-pets/{$id}/resolve", [])->assertNotFound();
+    }
+
     public function test_resolving_an_already_resolved_report_conflicts(): void
     {
         [, $token, $pet] = $this->userWithPet();

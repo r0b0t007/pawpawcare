@@ -2,7 +2,7 @@ jest.mock('../../config', () => ({ resolveAsset: (p) => `https://cdn.test/${p}` 
 jest.mock('../../theme', () => ({ photos: { communityPals: 'pals.jpg' } }));
 
 import i18n from '../../i18n';
-import { breedLabel, breedValue, emptyPhotoFor, petById, petMeta, petPhoto } from '../pets';
+import { breedLabel, breedValue, emptyPhotoFor, isMyReport, petById, petMeta, petPhoto } from '../pets';
 
 describe('emptyPhotoFor', () => {
   test('cats get the cat photo the screen passes in', () => {
@@ -13,6 +13,22 @@ describe('emptyPhotoFor', () => {
     expect(emptyPhotoFor({ type: 'dog' }, 'kitten.jpg')).toBe('pals.jpg');
     expect(emptyPhotoFor({ type: 'rabbit' }, 'kitten.jpg')).toBe('pals.jpg');
     expect(emptyPhotoFor(undefined, 'kitten.jpg')).toBe('pals.jpg');
+  });
+});
+
+// CHW-277: a report on a shared pet is the co-owner's too, whoever filed it.
+describe('isMyReport', () => {
+  it('follows the server: a co-owner\'s report on my pet is mine', () => {
+    expect(isMyReport({ reportedBy: 'u2', isMine: true }, 'u1')).toBe(true);
+  });
+
+  it('follows the server: someone else\'s report on a pet I left is not', () => {
+    expect(isMyReport({ reportedBy: 'u2', isMine: false }, 'u1')).toBe(false);
+  });
+
+  it('falls back to who filed it when the server does not say', () => {
+    expect(isMyReport({ reportedBy: 'u1' }, 'u1')).toBe(true);
+    expect(isMyReport({ reportedBy: 'u2' }, 'u1')).toBe(false);
   });
 });
 
