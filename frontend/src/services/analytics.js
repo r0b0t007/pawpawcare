@@ -1,9 +1,12 @@
 // PostHog product analytics: the app's own track()/trackScreen() events, plus
 // PostHog's app lifecycle events (Application Installed / Updated / Opened /
-// Backgrounded), which feed its active-user and retention views. Autocapture
+// Became Active / Backgrounded — Became Active on every return to the
+// foreground), which feed its active-user and retention views. Autocapture
 // and session replay are deliberately OFF: this app holds pet medical records,
 // so we never want screen content captured; error autocapture is off too (Sentry
-// handles crashes). All of it stops when the user opts out (Profile → Privacy).
+// handles crashes). Replay also can't be switched on from PostHog's dashboard:
+// recording needs the native posthog-react-native-session-replay plugin, which
+// isn't a dependency (and, being native, can't arrive in an OTA update). All of it stops when the user opts out (Profile → Privacy).
 // The device's choice applies at once; an account's choice is only known after
 // sign-in, so a fresh install sends Installed/Opened before it can apply.
 // All helpers are no-ops when no key is set, and
