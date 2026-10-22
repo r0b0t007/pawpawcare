@@ -47,7 +47,7 @@
     <section class="section" aria-labelledby="privacy-title">
       <div class="container container-narrow legal">
         <h1 id="privacy-title">Privacy Policy</h1>
-        <p class="effective">Effective October 13, 2026 · Applies to the PawPawCare app and this website</p>
+        <p class="effective">Effective October 22, 2026 · Applies to the PawPawCare app and this website</p>
 
         <p>PawPawCare exists to keep your pets' health organized — not to make a business out of your data. This page explains, in plain language, what we collect, why, and what we will never do with it.</p>
 
@@ -62,7 +62,7 @@
           <li><strong>People you invite</strong> — when you invite someone to share a pet, we store the email address you enter so the invitation can find them when they sign in. Please only invite people who'd expect to hear from you.</li>
           <li><strong>Server logs</strong> — like any online service, our server records technical details of each request (such as your IP address, the time, and what was requested) to keep the Service secure, limit abuse, and diagnose problems. Our crash reports and analytics are set not to keep your IP address.</li>
           <li><strong>Device information for reminders</strong> — a push-notification token and your time zone, so reminders reach your phone at the right local time.</li>
-          <li><strong>Usage analytics</strong> — which screens and features are used, collected through PostHog to help us improve the app. Events carry feature names and counts, never your pets' medical details, and they're tied to your account ID, not your name or email. You can turn this off anytime in the app under <strong>Profile → Privacy → Share usage analytics</strong>; your choice is saved on your account and applies on all your devices.</li>
+          <li><strong>Usage analytics</strong> — which screens and features are used, and when the app is installed, updated, opened, or closed, collected through PostHog to help us improve the app. Events carry feature names and counts plus basic device details (phone model, operating system and app version), never your pets' medical details, your name, or your email. Once you sign in, they're tied to your account ID. Before that — for example, right after you install the app on a new phone — they're tied to a random ID created for that installation, which joins your account's analytics when you sign in. You can turn this off anytime in the app under <strong>Profile → Privacy → Share usage analytics</strong>. Your choice is saved on your account and takes effect on each of your devices once you sign in there, so a new installation may already have sent its first install and open events.</li>
           <li><strong>Crash reports</strong> — when the app or our server hits an error, a report (what failed and where in the code) is sent to Sentry so we can fix it. Reports carry your account ID only — no name, email, IP address, screenshots, or pets' records — and are scrubbed of personal details before they leave the device.</li>
           <li><strong>Purchases</strong> — if you subscribe to PawPawCare Plus, Apple or Google handle the payment; we never see your card details. RevenueCat tells us what you bought, its status, and when it renews or ends, linked to your account ID.</li>
           <li><strong>Feedback and support messages</strong> — what you write to us from <strong>Profile → Help &amp; feedback</strong>, the topic you pick, and your app version and phone platform (iOS or Android) so we can reproduce problems. Only our team reads them; they're never posted publicly.</li>
@@ -122,7 +122,7 @@
           <li><strong>Server logs</strong> — 14 days.</li>
           <li><strong>Backups</strong> — encrypted nightly copies of our database and uploads, kept so we can recover from an outage or mistake. Each copy is deleted within 90 days, so anything you delete is gone from backups by then too.</li>
           <li><strong>Crash reports</strong> — deleted automatically by Sentry under its retention period, at most 90 days.</li>
-          <li><strong>Usage analytics</strong> — until your account is deleted, when your analytics profile and its events are deleted too. Turning analytics off stops new events.</li>
+          <li><strong>Usage analytics</strong> — until your account is deleted, when your analytics profile and its events are deleted too, including those your phone sent before you signed in. Events from an installation that never signs in stay under its random ID, which isn't linked to any account. Turning analytics off stops new events.</li>
           <li><strong>Subscription records</strong> — your plan status is deleted with your account; the subscription notices RevenueCat sends us are deleted after 90 days. Apple and Google keep their own purchase records under their policies.</li>
         </ul>
 
