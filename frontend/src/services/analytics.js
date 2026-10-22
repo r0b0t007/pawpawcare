@@ -2,11 +2,25 @@
 // PostHog's app lifecycle events (Application Installed / Updated / Opened /
 // Backgrounded), which feed its active-user and retention views. Autocapture
 // and session replay are deliberately OFF: this app holds pet medical records,
-// so we never want screen content captured. All of it stops when the user opts
-// out (Profile → Privacy). All helpers are no-ops when no key is set, and
+// so we never want screen content captured; error autocapture is off too (Sentry
+// handles crashes). All of it stops when the user opts out (Profile → Privacy).
+// The device's choice applies at once; an account's choice is only known after
+// sign-in, so a fresh install sends Installed/Opened before it can apply.
+// All helpers are no-ops when no key is set, and
 // the native module is required defensively so an OTA update landing on an older
 // build (without the PostHog native deps) degrades to no-op instead of crashing.
 import { POSTHOG_HOST, POSTHOG_KEY } from '../config';
+
+// 'Application Opened' carries the URL that cold-started the app. A link can
+// hold a token, so the URL never leaves the device.
+export const dropLaunchUrl = (event) => {
+  if (event?.event !== 'Application Opened' || !event.properties || !('url' in event.properties)) {
+    return event;
+  }
+  const properties = { ...event.properties };
+  delete properties.url;
+  return { ...event, properties };
+};
 
 let posthog = null;
 // Persisted properties that survive logout's reset() (see resetAnalytics).
@@ -16,22 +30,34 @@ try {
     // eslint-disable-next-line global-require
     const { default: PostHog, PostHogPersistedProperty } = require('posthog-react-native');
     // Spelled out rather than left to PostHog's defaults, which can change
-    // between versions: lifecycle events on, session replay off.
+    // between versions: lifecycle events on, session replay and error
+    // autocapture off.
     posthog = new PostHog(POSTHOG_KEY, {
       host: POSTHOG_HOST,
       captureAppLifecycleEvents: true,
       enableSessionReplay: false,
+      errorTracking: { autocapture: false },
+      before_send: dropLaunchUrl,
     });
-    keepOnReset = [PostHogPersistedProperty.OptedOut];
+    // Passing a list replaces PostHog's own keep-list, so it is repeated here:
+    // without the install markers every relaunch after a logout would count as
+    // a new install, on a new device id.
+    keepOnReset = [
+      PostHogPersistedProperty.OptedOut,
+      PostHogPersistedProperty.InstalledAppBuild,
+      PostHogPersistedProperty.InstalledAppVersion,
+      PostHogPersistedProperty.DeviceId,
+    ];
   }
 } catch (e) {
   // Native module absent (e.g. OTA onto a build without PostHog) — stay silent.
   posthog = null;
 }
 
-// No PostHogProvider is mounted (manual events only); the core client persists
+// No PostHogProvider is mounted: our events go through the helpers below, and
+// the lifecycle events come from the client itself. The core client persists
 // its queue to storage and flushes on its own timer/count, so events survive a
-// backgrounded app. Call the helpers below directly.
+// backgrounded app.
 
 // ── Opt-out ("Share usage analytics" in Profile → Privacy) ────────────────────
 // PostHog persists optIn()/optOut() itself — the single source of truth on the

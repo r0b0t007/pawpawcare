@@ -2,10 +2,12 @@
 // is the single source of truth on the device; logout's reset() must keep it,
 // and the account's server value (analytics_opt_out) wins when a user signs in.
 
-// A stand-in that behaves like posthog-react-native: optIn/optOut persist,
-// reset(keep) clears every persisted property except those listed.
+// A stand-in that behaves like posthog-react-native: optIn/optOut persist, and
+// reset(keep) clears every persisted property except those listed. With no list
+// it keeps the SDK's defaults (install markers and device id); a list replaces them.
+const SDK_DEFAULT_KEEP = ['installed_app_build', 'installed_app_version', 'device_id'];
 function makePosthog() {
-  const persisted = {};
+  const persisted = { installed_app_build: '3', installed_app_version: '1.0.0', device_id: 'dev-1' };
   return {
     persisted,
     get optedOut() {
@@ -20,8 +22,9 @@ function makePosthog() {
     identify: jest.fn(),
     capture: jest.fn(),
     screen: jest.fn(),
-    reset: jest.fn((keep = []) => {
-      for (const key of Object.keys(persisted)) if (!keep.includes(key)) delete persisted[key];
+    reset: jest.fn((keep) => {
+      const kept = keep ?? SDK_DEFAULT_KEEP;
+      for (const key of Object.keys(persisted)) if (!kept.includes(key)) delete persisted[key];
     }),
   };
 }
@@ -34,18 +37,51 @@ function load() {
   jest.doMock('posthog-react-native', () => ({
     __esModule: true,
     default: jest.fn(() => mockPosthog),
-    PostHogPersistedProperty: { OptedOut: 'opted_out' },
+    PostHogPersistedProperty: {
+      OptedOut: 'opted_out',
+      InstalledAppBuild: 'installed_app_build',
+      InstalledAppVersion: 'installed_app_version',
+      DeviceId: 'device_id',
+    },
   }));
   return require('../analytics');
 }
 
-test('the client is created with lifecycle events on and session replay off, explicitly', () => {
+test('the client is created with lifecycle events on, replay and error autocapture off, explicitly', () => {
   load();
   const PostHog = require('posthog-react-native').default;
-  expect(PostHog).toHaveBeenCalledWith('phc_test', {
-    host: 'https://us.i.posthog.com',
-    captureAppLifecycleEvents: true,
-    enableSessionReplay: false,
+  expect(PostHog).toHaveBeenCalledWith(
+    'phc_test',
+    expect.objectContaining({
+      host: 'https://us.i.posthog.com',
+      captureAppLifecycleEvents: true,
+      enableSessionReplay: false,
+      errorTracking: { autocapture: false },
+    }),
+  );
+});
+
+test('the URL that opened the app never leaves the device', () => {
+  const analytics = load();
+  const { before_send: beforeSend } = require('posthog-react-native').default.mock.calls[0][1];
+  expect(beforeSend).toBe(analytics.dropLaunchUrl);
+
+  const opened = { event: 'Application Opened', properties: { url: 'pawpawcare://reset?token=x', $app_build: '3' } };
+  expect(beforeSend(opened)).toEqual({ event: 'Application Opened', properties: { $app_build: '3' } });
+  // Other events, and their own url-like properties, pass through untouched.
+  const other = { event: 'pet_added', properties: { url: 'kept' } };
+  expect(beforeSend(other)).toBe(other);
+});
+
+test('logout keeps the install markers, so a relaunch is not a new install', () => {
+  const analytics = load();
+
+  analytics.resetAnalytics();
+
+  expect(mockPosthog.persisted).toEqual({
+    installed_app_build: '3',
+    installed_app_version: '1.0.0',
+    device_id: 'dev-1',
   });
 });
 
@@ -62,7 +98,7 @@ test('an opt-out survives the reset() at logout', () => {
 
   analytics.resetAnalytics();
 
-  expect(mockPosthog.reset).toHaveBeenCalledWith(['opted_out']);
+  expect(mockPosthog.reset).toHaveBeenCalledWith(expect.arrayContaining(['opted_out']));
   expect(analytics.isAnalyticsEnabled()).toBe(false);
 });
 
