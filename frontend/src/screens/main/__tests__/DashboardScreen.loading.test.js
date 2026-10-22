@@ -29,7 +29,6 @@ jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     pets: [],
     reminders: [],
-    unreadCount: 0,
     medDoseDays: {},
     medDoseCounts: {},
     markVaccinationComplete: jest.fn(),
@@ -40,6 +39,9 @@ jest.mock('../../../context/DataContext', () => ({
 let mockEarlyPets;
 const mockUsePetsQuery = jest.fn(() => ({ data: mockEarlyPets }));
 jest.mock('../../../hooks/usePets', () => ({ usePetsQuery: (opts) => mockUsePetsQuery(opts) }));
+jest.mock('../../../hooks/useNotifications', () => ({
+  useUnreadCount: () => ({ data: 0, isStale: false, refetch: jest.fn() }),
+}));
 let mockPostCount = 0;
 jest.mock('../../../hooks/useFeed', () => ({
   useFeedCount: () => ({ data: mockPostCount, isStale: false, refetch: jest.fn() }),

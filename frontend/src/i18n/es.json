@@ -803,6 +803,7 @@
     }
   },
   "notifications": {
+    "loadFailed": "No se han podido cargar sus notificaciones.",
     "title": "Notificaciones",
     "channelName": "Recordatorios",
     "when": {

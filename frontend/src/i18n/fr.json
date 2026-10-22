@@ -803,6 +803,7 @@
     }
   },
   "notifications": {
+    "loadFailed": "Impossible de charger vos notifications.",
     "title": "Notifications",
     "channelName": "Rappels",
     "when": {
