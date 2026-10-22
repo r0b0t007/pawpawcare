@@ -1623,6 +1623,8 @@
     "leaveHint": "Sale del grupo",
     "emptyGroupsTitle": "Aún no hay grupos",
     "emptyGroupsBody": "Los grupos aparecerán aquí a medida que crezca la comunidad.",
+    "groupsLoadFailed": "No se han podido cargar los grupos.",
+    "groupsRetry": "Reintentar",
     "reportMissing": "Avisar de una mascota desaparecida",
     "card": {
       "hidden": "Publicación oculta: gracias por la denuncia. Nuestro equipo la revisa en un plazo de 24 horas.",

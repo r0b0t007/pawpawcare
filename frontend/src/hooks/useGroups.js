@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -19,22 +20,38 @@ async function fetchGroups() {
   return apiGroups.map(toGroup);
 }
 
+// This account's most recently fetched list, in whichever language.
+function newestList(queryClient, userId) {
+  if (!userId) return undefined;
+  const [newest] = queryClient
+    .getQueryCache()
+    .findAll({ queryKey: communityKeys.groupsFor(userId) })
+    .filter((q) => q.state.data)
+    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt);
+  return newest?.state.data;
+}
+
 export function useGroupsQuery() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: communityKeys.groups(user?.id, user?.locale),
     queryFn: fetchGroups,
     enabled: !!user,
+    // A new language starts from this account's last list, marked stale so it
+    // is fetched at once: the groups stay on screen while the new names load,
+    // and stay if that fetch fails. It is this key's own cache entry, so a
+    // join updates exactly what is shown. Never another account's list.
+    initialData: () => newestList(queryClient, user?.id),
+    initialDataUpdatedAt: 0,
   });
-  if (query.data || !user) return query;
-  // While the new language's groups load, or if that fetch fails, show this
-  // account's newest list in another language rather than none — including
-  // an earlier fetch that only answered after the switch.
-  const [newest] = queryClient
-    .getQueryCache()
-    .findAll({ queryKey: communityKeys.groupsFor(user.id) })
-    .filter((q) => q.state.data)
-    .sort((a, b) => b.state.dataUpdatedAt - a.state.dataUpdatedAt);
-  return { ...query, data: newest?.state.data };
+  // Same as DataContext's handleApiError: a refresh token the server refused
+  // ends the session rather than leaving a signed-in screen that can't load.
+  const expired = query.error?.message === 'SESSION_EXPIRED';
+  useEffect(() => {
+    if (expired) logout();
+    // logout is recreated by AuthContext; the expiry is the trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expired]);
+  return query;
 }

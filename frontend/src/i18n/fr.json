@@ -1623,6 +1623,8 @@
     "leaveHint": "Quitte le groupe",
     "emptyGroupsTitle": "Aucun groupe pour l'instant",
     "emptyGroupsBody": "Les groupes apparaîtront ici à mesure que la communauté grandit.",
+    "groupsLoadFailed": "Impossible de charger les groupes.",
+    "groupsRetry": "Réessayer",
     "reportMissing": "Signaler un animal disparu",
     "card": {
       "hidden": "Publication masquée : merci pour votre signalement. Notre équipe l'examine sous 24 heures.",

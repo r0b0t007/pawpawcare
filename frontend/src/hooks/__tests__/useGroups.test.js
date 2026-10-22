@@ -42,7 +42,10 @@ let data;
 let groups;
 function Probe() {
   data = useData();
-  groups = useGroupsQuery();
+  // React Query re-renders only for the fields read during render, so read
+  // them here the way CommunityScreen destructures them.
+  const { data: list, isError } = useGroupsQuery();
+  groups = { data: list, isError };
   return null;
 }
 
@@ -125,9 +128,11 @@ describe('groups follow the saved language', () => {
     expect(groups.data[0].name).toBe('Amoureux des chiens');
   });
 
-  // Same race, other order: the earlier fetch answers first and the new
-  // language's fetch then fails. The old-language groups stay rather than none.
-  it('keeps the earlier groups when they answer first and the new fetch fails', async () => {
+  // Same race, other order: the earlier fetch only answers after the switch,
+  // and the new language's fetch then fails. While a query has no data React
+  // Query re-reads initialData on each render, so the new language is seeded
+  // with the list that landed meanwhile — old names rather than none.
+  it('keeps the earlier groups when they answer after the switch and the new fetch fails', async () => {
     let answerFirst;
     let failRefetch;
     get.mockImplementation((path) => {
@@ -144,6 +149,8 @@ describe('groups follow the saved language', () => {
 
     expect(groupCalls()).toBe(2);
     expect(groups.data[0].name).toBe('Dog Lovers');
+    // Seeded as stale, so the next focus tries the new language again.
+    expect(client.getQueryState(['community', 'groups', 'u1', 'fr']).dataUpdatedAt).toBe(0);
   });
 
   it('does not refetch on a re-render with the same locale', async () => {
@@ -163,7 +170,33 @@ describe('groups follow the saved language', () => {
 
     expect(groups.isError).toBe(true);
     expect(groups.data[0].name).toBe('Dog Lovers');
+    // It is the new language's own cache entry, so a join can update it.
+    expect(client.getQueryData(['community', 'groups', 'u1', 'es'])[0].name).toBe('Dog Lovers');
     expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it('shows the last list while the new language loads, then the new names', async () => {
+    await mount();
+    let answer;
+    get.mockImplementation((path) =>
+      path === '/community/groups' ? new Promise((resolve) => { answer = resolve; }) : otherDomains(path));
+    mockUser = { ...mockUser, locale: 'fr' };
+    await rerender();
+    expect(groups.data[0].name).toBe('Dog Lovers');
+
+    await settle(() => answer(group('Amoureux des chiens')));
+
+    expect(groups.data[0].name).toBe('Amoureux des chiens');
+  });
+});
+
+describe('session expiry', () => {
+  it('logs out when the groups fetch finds the session expired', async () => {
+    get.mockImplementation((path) =>
+      path === '/community/groups' ? Promise.reject(new Error('SESSION_EXPIRED')) : otherDomains(path));
+    await mount();
+
+    expect(mockLogout).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -206,6 +239,51 @@ describe('joining a group', () => {
     expect(post).toHaveBeenCalledWith('/community/groups/g1/join');
     expect(groups.data[0]).toEqual(expect.objectContaining({ isJoined: true, members: 1 }));
     expect(groupCalls()).toBe(1);
+    // The list it just wrote stays fresh: no extra fetch on the next focus.
+    expect(client.getQueryState(['community', 'groups', 'u1', 'en']).isInvalidated).toBe(false);
+  });
+
+  // The screen shows the last list after the new language failed to load: a
+  // join must change the button the user tapped, not report success silently.
+  it('updates the shown list when the new language failed to load', async () => {
+    await mount();
+    get.mockImplementation((path) =>
+      path === '/community/groups' ? Promise.reject(new Error('Network error')) : otherDomains(path));
+    mockUser = { ...mockUser, locale: 'fr' };
+    await rerender();
+    post.mockResolvedValue(apiGroup('Amoureux des chiens', { member_count: 1, is_member: true }));
+
+    await settle(() => data.toggleGroupMembership('g1'));
+
+    expect(groups.data[0]).toEqual(expect.objectContaining({ isJoined: true, members: 1 }));
+  });
+
+  // The sign-in locale sync lands while the join is in flight: the new
+  // language's list was fetched before the join applied, so it refetches.
+  it('refetches the new language when it changed while the join was in flight', async () => {
+    await mount();
+    let answerJoin;
+    post.mockImplementation(() => new Promise((resolve) => { answerJoin = resolve; }));
+    let joined;
+    await settle(() => { joined = data.toggleGroupMembership('g1'); });
+
+    groupsName = 'Amoureux des chiens';
+    mockUser = { ...mockUser, locale: 'fr' };
+    await rerender();
+    expect(groupCalls()).toBe(2);
+    expect(groups.data[0].isJoined).toBe(false);
+
+    get.mockImplementation((path) =>
+      path === '/community/groups'
+        ? Promise.resolve([apiGroup('Amoureux des chiens', { member_count: 1, is_member: true })])
+        : otherDomains(path));
+    await settle(async () => {
+      answerJoin(apiGroup('Dog Lovers', { member_count: 1, is_member: true }));
+      await joined;
+    });
+
+    expect(groupCalls()).toBe(3);
+    expect(groups.data[0]).toEqual(expect.objectContaining({ name: 'Amoureux des chiens', isJoined: true }));
   });
 
   it('resolves false and leaves the list alone when the join fails', async () => {

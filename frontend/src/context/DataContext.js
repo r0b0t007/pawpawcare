@@ -1218,11 +1218,22 @@ export function DataProvider({ children }) {
     try {
       const apiGroup = await post(`/community/groups/${groupId}/join`);
       const updated = toGroup(apiGroup);
-      // The answer is in the saved language, so it replaces the group in that
-      // language's list only; other languages' lists refetch when next shown.
-      queryClient.setQueryData(communityKeys.groups(user?.id, user?.locale), (groups) =>
-        groups?.map((g) => (g.id === updated.id ? updated : g)));
-      queryClient.invalidateQueries({ queryKey: communityKeys.groupsFor(user?.id), refetchType: 'none' });
+      // The answer is in the language that was saved when the join went out,
+      // so it replaces the group in that language's list. Every other list of
+      // this account predates the change — another language, including one
+      // switched to while the join was in flight, or this one if it had
+      // nothing to update yet: the one on screen refetches, the rest go stale.
+      const locale = user?.locale ?? null;
+      let wrote = false;
+      queryClient.setQueryData(communityKeys.groups(user?.id, locale), (groups) => {
+        if (!groups) return groups;
+        wrote = true;
+        return groups.map((g) => (g.id === updated.id ? updated : g));
+      });
+      queryClient.invalidateQueries({
+        queryKey: communityKeys.groupsFor(user?.id),
+        predicate: (q) => !wrote || q.queryKey[3] !== locale,
+      });
       return true;
     } catch (err) {
       handleApiError(err);

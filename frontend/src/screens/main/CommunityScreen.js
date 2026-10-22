@@ -48,7 +48,8 @@ export default function CommunityScreen({ navigation }) {
   // Member counts move with other people's joins; a stale list refetches when
   // Community is focused again.
   const {
-    data: groups = [], isLoading: groupsLoading, isStale: groupsStale, refetch: refetchGroups,
+    data: groups = [], isLoading: groupsLoading, isError: groupsFailed, isStale: groupsStale,
+    refetch: refetchGroups,
   } = useGroupsQuery();
   useRefetchOnFocus(refetchGroups, { isStale: groupsStale });
 
@@ -338,7 +339,14 @@ export default function CommunityScreen({ navigation }) {
                 </Card>
               );
             })}
-            {groups.length === 0 && !groupsLoading && (
+            {groups.length === 0 && groupsFailed && (
+              <View style={styles.empty}>
+                <MaterialCommunityIcons name="cloud-off-outline" size={32} color={ui.faint} />
+                <Text style={styles.emptyText}>{t('community.groupsLoadFailed')}</Text>
+                <Button variant="ghost" label={t('community.groupsRetry')} onPress={() => refetchGroups()} />
+              </View>
+            )}
+            {groups.length === 0 && !groupsLoading && !groupsFailed && (
               <View style={styles.empty}>
                 <MaterialCommunityIcons name="account-group-outline" size={32} color={ui.faint} />
                 <Text style={styles.emptyTitle}>{t('community.emptyGroupsTitle')}</Text>
