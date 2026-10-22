@@ -23,6 +23,7 @@ import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
 import { useInFlight } from '../../hooks/useInFlight';
 import { useNotificationsPrompt } from '../../hooks/useNotificationsPrompt';
+import { useMyLostReportsQuery } from '../../hooks/useLostPets';
 import { formatDecimal, parseDecimal, pluralCount } from '../../utils/numbers';
 import { track } from '../../services/analytics';
 import { ui, type, radii, motion, petPair, scrim } from '../../theme';
@@ -96,7 +97,7 @@ export default function PetProfileScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { petId } = route.params;
   const {
-    pets, myReports, medDoseDays, medDoseCounts, addFavoriteFood, removeFavoriteFood, addActivity,
+    pets, medDoseDays, medDoseCounts, addFavoriteFood, removeFavoriteFood, addActivity,
     addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
     addWeight, deleteWeight, addExpense, deleteExpense,
     getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
@@ -105,7 +106,10 @@ export default function PetProfileScreen({ navigation, route }) {
   } = useData();
   const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
-  const activeReport = (myReports || []).find((r) => r.petId === petId && r.status === 'active');
+  // Until my reports load, whether the pet is lost is unknown: the menu
+  // offers neither "report lost" nor "mark found" rather than the wrong one.
+  const { data: myReports } = useMyLostReportsQuery();
+  const activeReport = myReports?.find((r) => r.petId === petId && r.status === 'active');
   const isOwner = isPetOwner(pet, user);
 
   const [segment, setSegment] = useState('overview');
@@ -922,9 +926,9 @@ export default function PetProfileScreen({ navigation, route }) {
     { icon: 'pencil-outline', title: t('petProfile.menu.editDetails'), onPress: () => { setMenuSheet(false); navigation.navigate('EditPet', { petId }); } },
     { icon: 'share-variant-outline', title: t('petProfile.menu.shareWithVet'), onPress: () => fromMenu(() => setVetSheet(true)) },
     { icon: 'account-group-outline', title: t('petProfile.menu.careTeam'), onPress: () => fromMenu(() => { setInviteError(null); setTeamSheet(true); }) },
-    activeReport
+    myReports && (activeReport
       ? { icon: 'home-heart', title: t('petProfile.menu.markFound', { name: pet.name }), onPress: () => fromMenu(handleMarkFound) }
-      : { icon: 'map-marker-alert-outline', title: t('petProfile.menu.reportLost', { name: pet.name }), danger: true, onPress: () => fromMenu(() => setLostSheet(true)) },
+      : { icon: 'map-marker-alert-outline', title: t('petProfile.menu.reportLost', { name: pet.name }), danger: true, onPress: () => fromMenu(() => setLostSheet(true)) }),
     !isOwner && { icon: 'exit-to-app', title: t('petProfile.menu.leave'), danger: true, onPress: () => fromMenu(() => askConfirm(leaveConfig())) },
   ].filter(Boolean);
 

@@ -24,6 +24,14 @@ export const invitesKeys = {
   list: (userId) => ['invites', userId ?? null],
 };
 
+// Lost-pet reports: the community board and the signed-in account's own
+// reports (see useLostPets.js).
+export const lostPetsKeys = {
+  all: ['lostPets'],
+  board: (userId) => ['lostPets', 'board', userId ?? null],
+  mine: (userId) => ['lostPets', 'mine', userId ?? null],
+};
+
 export const gamificationKeys = {
   summary: ['gamification', 'summary'],
   recap: ['gamification', 'recap'],

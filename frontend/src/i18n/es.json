@@ -1683,6 +1683,7 @@
     "nearby": "Avisos cercanos",
     "emptyTitle": "No hay mascotas desaparecidas",
     "emptyBody": "Buenas noticias: todas las mascotas de la comunidad están a salvo en casa.",
+    "loadFailed": "No se han podido cargar los avisos de mascotas desaparecidas.",
     "contactOwner": "Contactar con el propietario",
     "markFound": {
       "title": "¿Marcar como encontrada?",

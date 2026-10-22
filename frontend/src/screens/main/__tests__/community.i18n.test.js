@@ -41,13 +41,15 @@ beforeEach(() => mockGroupsQuery.mockReturnValue({
   isStale: false,
   refetch: jest.fn(),
 }));
+const mockBoard = { data: [], isLoading: false, isError: false, isStale: false, refetch: jest.fn() };
+jest.mock('../../../hooks/useLostPets', () => ({
+  useLostPetsBoardQuery: () => mockBoard,
+  useMyLostReportsQuery: () => ({ data: [], refetch: jest.fn() }),
+}));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     pets: [mockPet],
     posts: [],
-    lostPets: [],
-    myReports: [],
-    refreshLostPets: jest.fn(() => Promise.resolve()),
   }),
 }));
 

@@ -1683,6 +1683,7 @@
     "nearby": "Signalés à proximité",
     "emptyTitle": "Aucun animal signalé perdu",
     "emptyBody": "Bonne nouvelle : tous les animaux de la communauté sont en sécurité chez eux.",
+    "loadFailed": "Impossible de charger les signalements d'animaux perdus.",
     "contactOwner": "Contacter le propriétaire",
     "markFound": {
       "title": "Marquer comme retrouvé ?",

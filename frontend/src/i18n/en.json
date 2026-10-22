@@ -1626,6 +1626,7 @@
     "nearby": "Reported nearby",
     "emptyTitle": "No pets reported lost",
     "emptyBody": "Good news — every pet in the community is home safe.",
+    "loadFailed": "Couldn't load the lost-pet board.",
     "contactOwner": "Contact owner",
     "markFound": {
       "title": "Mark as found?",

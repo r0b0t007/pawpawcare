@@ -15,7 +15,7 @@ import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
-import { petsKeys, gamificationKeys, communityKeys, invitesKeys } from '../hooks/queryKeys';
+import { petsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys } from '../hooks/queryKeys';
 import i18n from '../i18n';
 
 const DataContext = createContext(null);
@@ -154,7 +154,7 @@ export const toGroup = (g) => ({
   isJoined: g.is_member,
 });
 
-const toLostPet = (r) => ({
+export const toLostPet = (r) => ({
   id: r.id,
   petId: r.pet_id,
   petName: r.pet_name || i18n.t('common.aPet'),
@@ -242,8 +242,6 @@ function dataReducer(state, action) {
     case 'UPDATE_POST':return { ...state, posts: state.posts.map((p) => (p.id === action.payload.id ? action.payload : p)) };
     case 'SET_REMINDERS':     return { ...state, reminders: action.payload };
     case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload.notifications || [], unreadCount: action.payload.unread_count || 0 };
-    case 'SET_LOST_PETS':     return { ...state, lostPets: action.payload };
-    case 'SET_MY_REPORTS':    return { ...state, myReports: action.payload };
     // Trust: when the store last successfully synced with the server (ms
     // epoch, or null before the first sync / after logout).
     case 'SET_LAST_SYNCED':   return { ...state, lastSyncedAt: action.payload };
@@ -306,7 +304,7 @@ function dataReducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], reminders: [], notifications: [], unreadCount: 0,
-    lostPets: [], myReports: [], dataLoaded: false, lastSyncedAt: null,
+    dataLoaded: false, lastSyncedAt: null,
     medDoseDays: {}, medDoseCounts: {},
   });
   const { user, logout } = useAuth();
@@ -386,14 +384,13 @@ export function DataProvider({ children }) {
       queryClient.removeQueries({ queryKey: petsKeys.all });
       queryClient.removeQueries({ queryKey: communityKeys.all });
       queryClient.removeQueries({ queryKey: invitesKeys.all });
+      queryClient.removeQueries({ queryKey: lostPetsKeys.all });
       expiredFor.current = null;
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
       dispatch({ type: 'SET_POSTS', payload: [] });
       dispatch({ type: 'SET_REMINDERS', payload: [] });
       dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: [], unread_count: 0 } });
-      dispatch({ type: 'SET_LOST_PETS', payload: [] });
-      dispatch({ type: 'SET_MY_REPORTS', payload: [] });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
       // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
       // cleared from memory so a different account never renders it — and the
@@ -446,10 +443,9 @@ export function DataProvider({ children }) {
   const loadData = async () => {
     const loaders = [
       async () => {
-        // Pets and my lost-pet reports land together: PetProfile derives its
-        // report-lost / mark-found actions from BOTH, and a half-loaded pair
-        // renders the wrong action (e.g. "report as lost" for a lost pet).
-        const [apiPets, apiMyReports] = await Promise.all([get('/pets'), get('/lost-pets/mine')]);
+        // My lost-pet reports are read through useMyLostReportsQuery;
+        // PetProfile offers neither report-lost nor mark-found until they load.
+        const apiPets = await get('/pets');
 
         // Each pet has six sub-resources, so a load is 1 + 6N requests. One
         // failure among them used to reject the whole domain: no pets for the
@@ -497,7 +493,6 @@ export function DataProvider({ children }) {
           buildPet(apiPet, i, Object.fromEntries(RESOURCES.map((r, j) => [r, listsByPet[i][j]])))
         );
         dispatch({ type: 'SET_PETS', payload: petsWithData });
-        dispatch({ type: 'SET_MY_REPORTS', payload: apiMyReports.map(toLostPet) });
         // Hydrating prunes the stored dose history of every med it isn't
         // given, so a pet whose medications never loaded would lose its
         // history for good. Skip it; the next full load hydrates.
@@ -1007,13 +1002,10 @@ export function DataProvider({ children }) {
     } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
-  const refreshLostPets = async () => {
-    try {
-      const [board, mine] = await Promise.all([get('/lost-pets'), get('/lost-pets/mine')]);
-      dispatch({ type: 'SET_LOST_PETS', payload: board.map(toLostPet) });
-      dispatch({ type: 'SET_MY_REPORTS', payload: mine.map(toLostPet) });
-    } catch (err) { handleApiError(err); }
-  };
+  // The board and my reports are read through useLostPets.js. Invalidating
+  // cancels a fetch already in flight (it predates the change) and resolves
+  // once the lists on screen are re-read, so a screen confirms against them.
+  const refreshLostPets = () => queryClient.invalidateQueries({ queryKey: lostPetsKeys.all });
 
   const reportPetLost = async (petId, details) => {
     try {
@@ -1344,8 +1336,6 @@ export function DataProvider({ children }) {
         reminders: state.reminders,
         notifications: state.notifications,
         unreadCount: state.unreadCount,
-        lostPets: state.lostPets,
-        myReports: state.myReports,
         medDoseDays: state.medDoseDays,
         medDoseCounts: state.medDoseCounts,
         addPet,
@@ -1366,7 +1356,6 @@ export function DataProvider({ children }) {
         updateMedication,
         deleteMedication,
         logMedicationDose,
-        refreshLostPets,
         reportPetLost,
         resolveLostPet,
         getPetShare,
