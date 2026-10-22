@@ -23,6 +23,10 @@ const toRecords = (data) => ({
   documents: data.documents.map(toDocument),
 });
 
+// The screen re-reads whenever it opens — a co-owner's phone may have changed
+// the vault since — and a read that fails says so at once: the screen offers
+// its own "Try again" and pull to refresh, so no automatic retries keep the
+// user waiting (an expired session still ends at the first failure).
 export function useVaultQuery(petId) {
   const { user } = useAuth();
   return useQuery({
@@ -30,5 +34,7 @@ export function useVaultQuery(petId) {
     queryFn: () => fetchVault(petId),
     enabled: !!user && !!petId,
     select: toRecords,
+    refetchOnMount: 'always',
+    retry: false,
   });
 }

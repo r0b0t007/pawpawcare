@@ -88,10 +88,12 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const name = pet?.name || petName;
 
   const {
-    data: records, isError, isFetching, refetch,
+    data: records, isError, isFetching, isStale, refetch,
   } = useVaultQuery(petId);
-  // Records can change from another phone sharing the pet: re-read on focus.
-  useRefetchOnFocus(refetch);
+  // Records can change from another phone sharing the pet: the vault re-reads
+  // whenever the screen opens, and on focus once it is stale (the screen can
+  // stay mounted under a tab).
+  useRefetchOnFocus(refetch, { isStale });
   // A failed first load says so and offers a retry instead of leaving the
   // loading placeholders up forever; while that retry runs, the placeholders
   // come back so the tap visibly does something. Only read without records:

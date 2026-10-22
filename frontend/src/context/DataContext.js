@@ -1152,42 +1152,63 @@ export function DataProvider({ children }) {
   // ── Medical records vault ──
 
   // The vault is read through useVaultQuery (useVault.js), which holds the
-  // server's lists as they came. Adds and edits re-read it — the server
-  // orders each list (clinics by name, visits and documents newest first) —
-  // without holding up the sheet that saved. Deletes take just that row out.
+  // server's lists as they came. A saved row goes straight into its list, in
+  // the server's order — clinics by name, visits and documents newest first —
+  // so the list (and the clinic chips of the next sheet) shows it as the
+  // sheet closes, with no re-read. Deletes take just that row out.
   const vaultKey = (petId) => vaultKeys.pet(user?.id, petId);
   const invalidateVault = (petId) => {
     queryClient.invalidateQueries({ queryKey: vaultKey(petId) });
   };
+  const VAULT_ORDER = {
+    clinics: (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }),
+    appointments: (a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at),
+    documents: (a, b) => new Date(b.created_at) - new Date(a.created_at),
+  };
+  const saveToVault = (petId, list, row) =>
+    writeQueryCache(vaultKey(petId), (vault) => ({
+      ...vault,
+      [list]: [...vault[list].filter((x) => x.id !== row.id), row].sort(VAULT_ORDER[list]),
+    }));
   const dropFromVault = (petId, list, id) =>
     writeQueryCache(vaultKey(petId), (vault) => ({ ...vault, [list]: vault[list].filter((x) => x.id !== id) }));
 
   const addClinic = async (petId, data) => {
     const c = await post(`/pets/${petId}/clinics`, data);
-    invalidateVault(petId);
+    await saveToVault(petId, 'clinics', c);
     return toClinic(c);
   };
   const updateClinic = async (petId, id, data) => {
     const c = await patch(`/pets/${petId}/clinics/${id}`, data);
-    invalidateVault(petId);
+    // Visits show the clinic's name: re-read so they follow a rename.
+    await writeQueryCache(vaultKey(petId), (vault) => ({
+      ...vault,
+      clinics: vault.clinics.map((x) => (x.id === c.id ? c : x)).sort(VAULT_ORDER.clinics),
+    }), { reread: true });
     return toClinic(c);
   };
+  // The server unlinks the clinic's visits and documents (clinic_id is set
+  // null on delete): so does the cache, or visits would keep its name.
   const deleteClinic = async (petId, id) => {
     try {
       await del(`/pets/${petId}/clinics/${id}`);
-      await dropFromVault(petId, 'clinics', id);
+      await writeQueryCache(vaultKey(petId), (vault) => ({
+        clinics: vault.clinics.filter((x) => x.id !== id),
+        appointments: vault.appointments.map((a) => (a.clinic_id === id ? { ...a, clinic_id: null, clinic_name: null } : a)),
+        documents: vault.documents.map((d) => (d.clinic_id === id ? { ...d, clinic_id: null } : d)),
+      }));
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
 
   const addAppointment = async (petId, data) => {
     const a = await post(`/pets/${petId}/appointments`, data);
-    invalidateVault(petId);
+    await saveToVault(petId, 'appointments', a);
     return toAppointment(a);
   };
   const updateAppointment = async (petId, id, data) => {
     const a = await patch(`/pets/${petId}/appointments/${id}`, data);
-    invalidateVault(petId);
+    await saveToVault(petId, 'appointments', a);
     return toAppointment(a);
   };
   const deleteAppointment = async (petId, id) => {
@@ -1202,7 +1223,7 @@ export function DataProvider({ children }) {
   const addDocument = async (petId, file, fields) => {
     const d = await uploadDocument(petId, file, fields);
     trackCareAction('document_uploaded');
-    invalidateVault(petId);
+    await saveToVault(petId, 'documents', d);
     return toDocument(d);
   };
   const deleteDocument = async (petId, id) => {
@@ -1245,7 +1266,9 @@ export function DataProvider({ children }) {
       expense: !!result.expense,
     });
     noteGoodMoment('extraction_applied');
-    // The document is marked applied; the new records live in pet state.
+    // Applying can create a clinic and link the document to it, besides
+    // marking the document applied: re-read the vault. The new records live
+    // in pet state.
     invalidateVault(petId);
     loadData();
     return result;

@@ -230,6 +230,16 @@ test('Medical records show loading, a retry, then the records', async () => {
   expect(texts(tree)).not.toContain("We couldn't open the vault");
 });
 
+// The screen can stay mounted under a tab: a focus re-read only once stale.
+test('Medical records re-read on focus only once the vault is stale', async () => {
+  const { useRefetchOnFocus } = require('../../../hooks/useRefetchOnFocus');
+  const refetch = jest.fn();
+  mockVaultQuery.mockReturnValue({ data: EMPTY_VAULT, isError: false, isFetching: false, isStale: false, refetch });
+  await render(<MedicalRecordsScreen navigation={navigation} route={{ params: { petId: 'p1', petName: 'Biscuit' } }} />);
+
+  expect(useRefetchOnFocus).toHaveBeenCalledWith(refetch, { isStale: false });
+});
+
 // DataContext takes the row out of the vault; the screen only confirms.
 test('Medical records delete through DataContext and say so', async () => {
   const deleteDocument = jest.fn(() => Promise.resolve(true));

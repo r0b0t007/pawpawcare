@@ -30,7 +30,7 @@ jest.mock('../../context/AuthContext', () => ({
 
 import { DataProvider, useData } from '../../context/DataContext';
 import { useVaultQuery } from '../useVault';
-import { get, post, del, uploadDocument } from '../../services/api';
+import { get, post, patch, del, uploadDocument } from '../../services/api';
 
 const clinic = (id, name) => ({ id, pet_id: 'p1', name });
 const visit = (id, title) => ({ id, pet_id: 'p1', title, scheduled_at: '2026-11-01T09:00:00Z', status: 'scheduled' });
@@ -139,6 +139,29 @@ describe('reading the vault', () => {
   });
 });
 
+describe('re-reading', () => {
+  // As load() did: a co-owner's phone may have changed the vault since.
+  it('re-reads every time the screen opens, even when the cache is fresh', async () => {
+    client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 5 * 60 * 1000 } } });
+    await mount();
+    await rerender(<DataOnly />);
+    await rerender();
+
+    expect(reads()).toEqual([2, 2, 2]);
+  });
+
+  // The screen offers its own "Try again": no automatic retries keep the
+  // user waiting.
+  it('a failed read fails at once, without automatic retries', async () => {
+    client = new QueryClient({ defaultOptions: { queries: { retry: 2, retryDelay: 0, gcTime: Infinity } } });
+    get.mockImplementation((path) => (path === '/pets/p1/documents' ? Promise.reject(new Error('Network error')) : answer(path)));
+    await mount();
+
+    expect(vault.isError).toBe(true);
+    expect(calls('/pets/p1/documents')).toBe(1);
+  });
+});
+
 describe('accounts', () => {
   it('drops the cached vaults at logout', async () => {
     await mount();
@@ -153,29 +176,59 @@ describe('accounts', () => {
 });
 
 describe('changing the vault', () => {
-  // The server orders each list, so an add re-reads — without holding up the
-  // sheet that saved it.
-  it('adding a clinic resolves with it and re-reads the vault', async () => {
+  // The saved row goes straight into its list, in the server's order, so the
+  // list (and the next sheet's clinic chips) has it as the sheet closes.
+  it('an added clinic is listed at once, by name, without a re-read', async () => {
     await mount();
-    post.mockResolvedValue(clinic('c2', 'Ark Vets'));
-    get.mockImplementation((path) => (VAULT.includes(path) ? new Promise(() => {}) : answer(path)));
+    post.mockResolvedValue(clinic('c2', 'ark Vets'));
 
     let added;
-    await settle(async () => { added = await data.addClinic('p1', { name: 'Ark Vets' }); });
+    await settle(async () => { added = await data.addClinic('p1', { name: 'ark Vets' }); });
 
-    expect(added).toEqual(expect.objectContaining({ id: 'c2', name: 'Ark Vets' }));
+    expect(added).toEqual(expect.objectContaining({ id: 'c2', name: 'ark Vets' }));
+    expect(ids('clinics')).toEqual(['c2', 'c1']);
+    expect(reads()).toEqual([1, 1, 1]);
+  });
+
+  it('an added visit or upload is listed at once, newest first', async () => {
+    await mount();
+    post.mockResolvedValue({ ...visit('a2', 'Vaccines'), scheduled_at: '2026-12-01T09:00:00Z' });
+    await settle(() => data.addAppointment('p1', { title: 'Vaccines' }));
+    expect(ids('appointments')).toEqual(['a2', 'a1']);
+
+    uploadDocument.mockResolvedValue(doc('d3', 'Invoice', { created_at: '2026-10-22T10:00:00Z' }));
+    await settle(() => data.addDocument('p1', { uri: 'file://x.jpg', name: 'x.jpg' }, { title: 'Invoice' }));
+    expect(ids('documents')).toEqual(['d3', 'd1', 'd2']);
+    expect(reads()).toEqual([1, 1, 1]);
+  });
+
+  // Visits show the clinic's name, so a rename re-reads them too.
+  it('renaming a clinic shows it and re-reads the visits', async () => {
+    await mount();
+    patch.mockImplementation(() => {
+      server.p1.clinics = [clinic('c1', 'Riverside Animal Hospital')];
+      return Promise.resolve(server.p1.clinics[0]);
+    });
+
+    await settle(() => data.updateClinic('p1', 'c1', { name: 'Riverside Animal Hospital' }));
+
+    expect(vault.data.clinics[0].name).toBe('Riverside Animal Hospital');
     expect(reads()).toEqual([2, 2, 2]);
   });
 
-  it('a visit or an upload re-reads it too', async () => {
+  // The server unlinks the clinic's visits and documents on delete.
+  it('deleting a clinic unlinks its visits and documents too', async () => {
+    server.p1.appointments = [{ ...visit('a1', 'Check-up'), clinic_id: 'c1', clinic_name: 'Riverside Vets' }];
+    server.p1.documents = [doc('d1', 'Bloodwork', { clinic_id: 'c1' }), doc('d2', 'X-ray')];
     await mount();
-    post.mockResolvedValue(visit('a2', 'Vaccines'));
-    await settle(() => data.addAppointment('p1', { title: 'Vaccines' }));
-    expect(reads()).toEqual([2, 2, 2]);
+    del.mockResolvedValue(null);
 
-    uploadDocument.mockResolvedValue(doc('d3', 'Invoice'));
-    await settle(() => data.addDocument('p1', { uri: 'file://x.jpg', name: 'x.jpg' }, { title: 'Invoice' }));
-    expect(reads()).toEqual([3, 3, 3]);
+    await settle(() => data.deleteClinic('p1', 'c1'));
+
+    expect(ids('clinics')).toEqual([]);
+    expect(vault.data.appointments[0]).toEqual(expect.objectContaining({ clinicId: null, clinicName: null }));
+    expect(vault.data.documents[0].clinicId).toBeNull();
+    expect(reads()).toEqual([1, 1, 1]);
   });
 
   // Only the row the server confirmed leaves; nothing is re-read.
