@@ -20,6 +20,10 @@ const mockAuth = {};
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => mockAuth }));
 const mockData = {};
 jest.mock('../../../context/DataContext', () => ({ useData: () => mockData }));
+const mockInvitesQuery = {};
+jest.mock('../../../hooks/useInvites', () => ({ useInvitesQuery: () => mockInvitesQuery }));
+const showInvites = (data, extra = {}) =>
+  Object.assign(mockInvitesQuery, { data, isLoading: false, isError: false, refetch: jest.fn(), ...extra });
 
 import React from 'react';
 import { TextInput } from 'react-native';
@@ -65,7 +69,8 @@ describe('Invitations', () => {
 
   async function renderWith(data) {
     Object.assign(mockAuth, { user: { email: 'me@example.test', email_verified: true } });
-    Object.assign(mockData, { invites: [INVITE], refreshInvites: jest.fn(), ...data });
+    showInvites([INVITE]);
+    Object.assign(mockData, data);
     await act(async () => {
       tree = TestRenderer.create(<InvitesScreen navigation={navigation} />);
     });
@@ -82,6 +87,30 @@ describe('Invitations', () => {
     await act(async () => button(tree, 'Accept').props.onPress());
     expect(showToast).toHaveBeenCalledWith("Couldn't accept the invite for Bella. Try again.");
     expect(showToast).not.toHaveBeenCalledWith("You're now caring for Bella");
+  });
+
+  // A failed load must not read as "no invitations".
+  it('says the invitations failed to load, with a retry', async () => {
+    Object.assign(mockAuth, { user: { email: 'me@example.test', email_verified: true } });
+    const refetch = jest.fn();
+    showInvites(undefined, { isError: true, refetch });
+    await act(async () => {
+      tree = TestRenderer.create(<InvitesScreen navigation={navigation} />);
+    });
+    const texts = tree.root.findAllByType(require('react-native').Text).map((n) => [].concat(n.props.children).join(''));
+    expect(texts).toContain("Couldn't load your invitations.");
+    expect(texts).not.toContain('No pending invitations');
+    await act(async () => button(tree, 'Try again').props.onPress());
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('shows nothing, not the empty state, while the first load runs', async () => {
+    Object.assign(mockAuth, { user: { email: 'me@example.test', email_verified: true } });
+    showInvites(undefined, { isLoading: true });
+    await act(async () => {
+      tree = TestRenderer.create(<InvitesScreen navigation={navigation} />);
+    });
+    expect(tree.root.findAll((n) => n.props.title === 'No pending invitations')).toHaveLength(0);
   });
 
   it('says declining failed instead of confirming it', async () => {
@@ -115,11 +144,8 @@ describe('in French', () => {
 
   it('an invitation reads in French, with the names as written', async () => {
     Object.assign(mockAuth, { user: { email: 'me@example.test', email_verified: true } });
-    Object.assign(mockData, {
-      invites: [{ id: 'i1', petName: 'Bella <3', inviterName: 'Sam', role: 'family' }],
-      refreshInvites: jest.fn(),
-      acceptInvite: jest.fn(() => Promise.resolve(true)),
-    });
+    showInvites([{ id: 'i1', petName: 'Bella <3', inviterName: 'Sam', role: 'family' }]);
+    Object.assign(mockData, { acceptInvite: jest.fn(() => Promise.resolve(true)) });
     await act(async () => {
       tree = TestRenderer.create(<InvitesScreen navigation={navigation} />);
     });
@@ -133,7 +159,7 @@ describe('in French', () => {
 test('an invitation reads exactly as before i18n, names in bold', async () => {
   const { Text } = require('react-native');
   Object.assign(mockAuth, { user: { email: 'me@example.test', email_verified: true } });
-  Object.assign(mockData, { invites: [{ id: 'i1', petName: 'Bella', inviterName: 'Sam' }], refreshInvites: jest.fn() });
+  showInvites([{ id: 'i1', petName: 'Bella', inviterName: 'Sam' }]);
   await act(async () => {
     tree = TestRenderer.create(<InvitesScreen navigation={navigation} />);
   });

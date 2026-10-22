@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toGroup } from '../context/DataContext';
 import { communityKeys } from './queryKeys';
+import { useLogoutOnExpiredSession } from './useSessionExpiry';
 
 // Community groups. Joining/leaving stays in DataContext (toggleGroupMembership),
 // which writes the answer into this query's cache.
@@ -32,7 +32,7 @@ function newestList(queryClient, userId) {
 }
 
 export function useGroupsQuery() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: communityKeys.groups(user?.id, user?.locale),
@@ -45,13 +45,6 @@ export function useGroupsQuery() {
     initialData: () => newestList(queryClient, user?.id),
     initialDataUpdatedAt: 0,
   });
-  // Same as DataContext's handleApiError: a refresh token the server refused
-  // ends the session rather than leaving a signed-in screen that can't load.
-  const expired = query.error?.message === 'SESSION_EXPIRED';
-  useEffect(() => {
-    if (expired) logout();
-    // logout is recreated by AuthContext; the expiry is the trigger.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expired]);
+  useLogoutOnExpiredSession(query.error);
   return query;
 }

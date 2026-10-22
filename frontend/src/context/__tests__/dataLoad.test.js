@@ -121,7 +121,7 @@ describe('DataContext initial load', () => {
     expect(data.pets[0].medications).toHaveLength(1);
     // Still reported as a partial load (the pets domain counts as failed).
     expect(data.dataLoaded).toBe(true);
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('1/5 domains failed'));
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('1/4 domains failed'));
   });
 
   it('keeps the pet when its vaccinations fail', async () => {
@@ -131,7 +131,7 @@ describe('DataContext initial load', () => {
     expect(data.pets).toHaveLength(1);
     // Listed as missing, so screens don't call the pet "all good".
     expect(data.pets[0].missing).toEqual(['vaccinations']);
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('1/5 domains failed'));
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('1/4 domains failed'));
   });
 
   // Pruning the stored dose history against a pet whose medications never

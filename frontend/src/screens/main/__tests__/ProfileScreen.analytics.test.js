@@ -35,8 +35,9 @@ jest.mock('../../../context/AuthContext', () => ({
     updateUser: mockUpdateUser,
   }),
 }));
+jest.mock('../../../hooks/useInvites', () => ({ useInvitesQuery: () => ({ data: [] }) }));
 jest.mock('../../../context/DataContext', () => ({
-  useData: () => ({ invites: [], reminders: [], pets: [] }),
+  useData: () => ({ reminders: [], pets: [] }),
 }));
 
 import React from 'react';

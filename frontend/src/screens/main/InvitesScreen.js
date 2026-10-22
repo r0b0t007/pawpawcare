@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { useInvitesQuery } from '../../hooks/useInvites';
 import { useTranslation } from '../../i18n';
 import { ui, type, radii, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast, FormScrollView, ScreenHeader, EmptyState } from '../../components';
@@ -130,7 +131,10 @@ const TYPE_ICON = {
 export default function InvitesScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { invites, refreshInvites, acceptInvite, declineInvite } = useData();
+  const { acceptInvite, declineInvite } = useData();
+  const {
+    data: invites = [], isLoading, isError, refetch,
+  } = useInvitesQuery();
   // Explicit false only: an older API without the flag never hides the list.
   // Social accounts without a provider email (no-reply placeholder) have no
   // inbox to confirm — and no invite can be addressed to them anyway.
@@ -142,9 +146,9 @@ export default function InvitesScreen({ navigation }) {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshInvites();
+    await refetch();
     setRefreshing(false);
-  }, [refreshInvites]);
+  }, [refetch]);
 
   // Resolves true when the server took it (acceptInvite/declineInvite never throw).
   const respond = async (id, action) => {
@@ -176,7 +180,12 @@ export default function InvitesScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {needsVerification ? (
-          <VerifyEmailCard email={user.email} onVerified={() => refreshInvites()} />
+          <VerifyEmailCard email={user.email} onVerified={() => refetch()} />
+        ) : invites.length === 0 && isLoading ? null : invites.length === 0 && isError ? (
+          <View style={styles.loadFailed}>
+            <Text style={styles.loadFailedText}>{t('invites.loadFailed')}</Text>
+            <Button variant="ghost" label={t('invites.retry')} onPress={() => refetch()} />
+          </View>
         ) : invites.length === 0 ? (
           <EmptyState
             compact
@@ -240,6 +249,8 @@ export default function InvitesScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
+  loadFailed: { alignItems: 'center', gap: 8, paddingVertical: 36, paddingHorizontal: 24 },
+  loadFailedText: { ...type.secondary, color: ui.sub, textAlign: 'center' },
   emptyState: { paddingTop: 40 }, // breathing room under the header
   safe: { flex: 1, backgroundColor: ui.background },
   scroll: { paddingHorizontal: 24, paddingBottom: 32, gap: 12 },

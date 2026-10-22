@@ -36,7 +36,8 @@ let mockUser;
 jest.mock('../../../context/AuthContext', () => ({
   useAuth: () => ({ user: mockUser, isAdmin: false, logout: jest.fn(), updateUser: jest.fn(), deleteAccount: jest.fn() }),
 }));
-jest.mock('../../../context/DataContext', () => ({ useData: () => ({ invites: [], reminders: [], pets: [] }) }));
+jest.mock('../../../hooks/useInvites', () => ({ useInvitesQuery: () => ({ data: [] }) }));
+jest.mock('../../../context/DataContext', () => ({ useData: () => ({ reminders: [], pets: [] }) }));
 
 import React from 'react';
 import { Linking, Text } from 'react-native';
