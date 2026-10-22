@@ -1,6 +1,6 @@
 # Store privacy disclosures
 
-What to enter in **App Store Connect → App Privacy** and **Play Console → App content → Data safety** for PawPawCare, based on what the app and server actually collect (October 2026: Sentry, server-side PostHog with an in-app opt-out, RevenueCat subscriptions, Google/Apple sign-in). Keep this in sync with `website/privacy/index.html`; both stores reject listings whose answers contradict the privacy policy.
+What to enter in **App Store Connect → App Privacy** and **Play Console → App content → Data safety** for PawPawCare, based on what the app and server actually collect (October 2026: Sentry, PostHog from the app and the server with an in-app opt-out, RevenueCat subscriptions, Google/Apple sign-in). Keep this in sync with `website/privacy/index.html`; both stores reject listings whose answers contradict the privacy policy.
 
 Update this file whenever a new SDK or data flow ships, then update both store forms.
 
@@ -17,7 +17,7 @@ Update this file whenever a new SDK or data flow ships, then update both store f
 
 ## Apple — App Privacy ("nutrition label")
 
-For every type below: **Linked to the user = Yes** (all keyed by account ID), **Used for tracking = No**.
+For every type below: **Linked to the user = Yes** (keyed by account ID; PostHog's pre-sign-in installation ID joins the account's profile at sign-in), **Used for tracking = No**.
 
 | Apple data type | What it is in PawPawCare | Purposes to tick |
 |---|---|---|
@@ -27,14 +27,17 @@ For every type below: **Linked to the user = Yes** (all keyed by account ID), **
 | User Content → Customer Support | Help & feedback messages | App Functionality |
 | User Content → Other User Content | pet records (vaccines, meds, weights, notes, documents), community posts, lost-pet reports | App Functionality |
 | Identifiers → User ID | our account UUID (PostHog, Sentry, RevenueCat) | App Functionality, Analytics |
+| Identifiers → Device ID | PostHog's random installation ID: lifecycle events (installed, updated, opened, backgrounded) go out under it before sign-in | Analytics |
 | Purchases → Purchase History | Plus subscription status/history via RevenueCat | App Functionality |
 | Usage Data → Product Interaction | PostHog feature events (opt-out available) | Analytics |
 | Diagnostics → Crash Data | Sentry crash reports (account ID only, scrubbed) | App Functionality |
 | Diagnostics → Performance Data | Sentry performance traces (10% sample) and Expo Observe launch metrics | App Functionality |
 
+Device ID is the cautious reading: Apple's definition is "the device's advertising identifier, or other device-level ID". There are still no advertising identifiers, and the push token on its own wouldn't need this row; PostHog's installation ID is what puts it there.
+
 IP addresses appear only in server logs (14 days) and rate limiting, for security; they are never used to derive location, so neither form gets a location row for them. Re-check this if anything starts geolocating requests.
 
-Do **not** tick: Health & Fitness (pet records aren't the user's health data), Location (lost-pet reports are typed text, no GPS), Financial Info (Apple/Google take payment; we never see cards), Device ID (no advertising identifiers; the push token isn't an Apple "Device ID"), Browsing/Search History, Contacts, Sensitive Info.
+Do **not** tick: Health & Fitness (pet records aren't the user's health data), Location (lost-pet reports are typed text, no GPS), Financial Info (Apple/Google take payment; we never see cards), Browsing/Search History, Contacts, Sensitive Info.
 
 ## Google Play — Data safety
 
@@ -51,10 +54,13 @@ Do **not** tick: Health & Fitness (pet records aren't the user's health data), L
 | Photos and videos → Photos | Optional | App functionality |
 | Files and docs → Files and docs | Optional (vet documents) | App functionality |
 | Messages → Other in-app messages | Optional (support messages, community posts/comments) | App functionality |
+| Device or other IDs → Device or other IDs | Optional (Profile → Privacy toggle) | Analytics |
 | App activity → App interactions | Optional (Profile → Privacy toggle) | Analytics |
 | App activity → Other user-generated content | Required (pet records) | App functionality |
 | App info and performance → Crash logs | Required | App functionality (diagnostics) |
 | App info and performance → Diagnostics | Required | App functionality (diagnostics) |
+
+Device or other IDs covers PostHog's random installation ID, which pre-sign-in analytics events are sent under. Google's examples for this type include a Firebase installation ID, the closest equivalent.
 
 Security practices: **encrypted in transit = Yes**; **users can request deletion = Yes** (URL above).
 
