@@ -39,6 +39,16 @@ function load() {
   return require('../analytics');
 }
 
+test('the client is created with lifecycle events on and session replay off, explicitly', () => {
+  load();
+  const PostHog = require('posthog-react-native').default;
+  expect(PostHog).toHaveBeenCalledWith('phc_test', {
+    host: 'https://us.i.posthog.com',
+    captureAppLifecycleEvents: true,
+    enableSessionReplay: false,
+  });
+});
+
 test('the switch state is PostHog’s persisted state', () => {
   const analytics = load();
   expect(analytics.isAnalyticsEnabled()).toBe(true);

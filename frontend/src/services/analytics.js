@@ -1,6 +1,9 @@
-// PostHog product analytics — manual events only (autocapture and session
-// replay are deliberately OFF: this app holds pet medical records, so we never
-// want screen content captured). All helpers are no-ops when no key is set, and
+// PostHog product analytics: the app's own track()/trackScreen() events, plus
+// PostHog's app lifecycle events (Application Installed / Updated / Opened /
+// Backgrounded), which feed its active-user and retention views. Autocapture
+// and session replay are deliberately OFF: this app holds pet medical records,
+// so we never want screen content captured. All of it stops when the user opts
+// out (Profile → Privacy). All helpers are no-ops when no key is set, and
 // the native module is required defensively so an OTA update landing on an older
 // build (without the PostHog native deps) degrades to no-op instead of crashing.
 import { POSTHOG_HOST, POSTHOG_KEY } from '../config';
@@ -12,7 +15,13 @@ try {
   if (POSTHOG_KEY) {
     // eslint-disable-next-line global-require
     const { default: PostHog, PostHogPersistedProperty } = require('posthog-react-native');
-    posthog = new PostHog(POSTHOG_KEY, { host: POSTHOG_HOST });
+    // Spelled out rather than left to PostHog's defaults, which can change
+    // between versions: lifecycle events on, session replay off.
+    posthog = new PostHog(POSTHOG_KEY, {
+      host: POSTHOG_HOST,
+      captureAppLifecycleEvents: true,
+      enableSessionReplay: false,
+    });
     keepOnReset = [PostHogPersistedProperty.OptedOut];
   }
 } catch (e) {
