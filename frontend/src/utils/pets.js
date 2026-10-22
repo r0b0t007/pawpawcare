@@ -74,3 +74,8 @@ export const petMeta = (pet) =>
   ]
     .filter(Boolean)
     .join(' · ');
+
+// A lost-pet report I may treat as mine and mark found: on a pet I own or
+// share (whoever in the family filed it), or filed by me. The server says so
+// (`is_mine`); before it did, only the reporter could.
+export const isMyReport = (report, userId) => report.isMine ?? report.reportedBy === userId;

@@ -6,6 +6,7 @@ use App\Models\LostPetReport;
 use App\Models\Pet;
 use App\Models\Post;
 use App\Support\Uploads;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -25,18 +26,23 @@ class LostPetController extends Controller
             ->take($limit)
             ->get();
 
-        return response()->json($reports->map->toApi());
+        return response()->json($this->withIsMine($request, $reports));
     }
 
-    /** The current user's own reports (active + resolved). */
+    /**
+     * My reports (active + resolved): those on the pets I own or share, whoever
+     * in the family filed them, so every co-owner sees that a pet is lost and
+     * can mark it found — and those I filed, so someone who left a shared pet
+     * can still take down an alert carrying their phone number.
+     */
     public function mine(Request $request): JsonResponse
     {
-        $reports = LostPetReport::with(['pet', 'reporter'])
-            ->where('reported_by', $request->user()->id)
+        $reports = $this->mineQuery($request)
+            ->with(['pet', 'reporter'])
             ->orderByDesc('created_at')
             ->get();
 
-        return response()->json($reports->map->toApi());
+        return response()->json($this->withIsMine($request, $reports));
     }
 
     /** Report a pet lost (owner only) — upserts the active report and broadcasts to the feed. */
@@ -59,9 +65,15 @@ class LostPetController extends Controller
 
         Uploads::assertUsableUrl($data['photo_url'] ?? null, $pet->participantIds(), $report?->photo_url, 'photo_url');
 
+        // Reporting a pet that is already on the board updates its report. Only
+        // the fields sent change: one left out keeps what is there (the app
+        // leaves blank fields out, so a co-owner's blank form never erases the
+        // last-seen place or the contact phone), and an explicit null or empty
+        // value (Laravel turns '' into null) clears it, so a phone shared by
+        // mistake comes off the board without taking the alert down. The
+        // report stays with whoever filed it.
         $report ??= new LostPetReport(['pet_id' => $pet->id, 'reported_by' => $request->user()->id, 'status' => 'active']);
         $report->fill($data);
-        $report->reported_by = $request->user()->id;
         $report->status = 'active';
         $report->save();
 
@@ -81,19 +93,17 @@ class LostPetController extends Controller
 
         $report->load(['pet', 'reporter']);
 
-        return response()->json($report->toApi(), $isNew ? 201 : 200);
+        return response()->json($report->toApi() + ['is_mine' => true], $isNew ? 201 : 200);
     }
 
-    /** Mark a report resolved (owner only) and remove its feed post. */
+    /** Mark a report resolved (an owner or co-owner of the pet, or whoever filed it) and remove its feed post. */
     public function resolve(Request $request, string $reportId): JsonResponse
     {
         $data = $request->validate([
             'resolution_note' => 'sometimes|nullable|string|max:200',
         ]);
 
-        $report = LostPetReport::where('id', $reportId)
-            ->where('reported_by', $request->user()->id)
-            ->first();
+        $report = $this->mineQuery($request)->where('id', $reportId)->first();
 
         if (! $report) {
             abort(404, __('Report not found'));
@@ -115,7 +125,43 @@ class LostPetController extends Controller
 
         $report->load(['pet', 'reporter']);
 
-        return response()->json($report->toApi());
+        return response()->json($report->toApi() + ['is_mine' => true]);
+    }
+
+    /**
+     * Reports on a pet I own or share, or active ones I filed: the ones I may
+     * see as mine and mark found. A filer who left the pet keeps only that —
+     * taking down an alert that may carry their phone — not the pet's history.
+     */
+    private function mineQuery(Request $request): Builder
+    {
+        $userId = $request->user()->id;
+
+        return LostPetReport::where(function (Builder $q) use ($userId) {
+            $q->whereIn('pet_id', Pet::accessibleBy($userId)->select('id'))
+                ->orWhere(fn (Builder $own) => $own->where('reported_by', $userId)->where('status', 'active'));
+        });
+    }
+
+    /**
+     * Serialize reports with `is_mine`: whether the viewer may treat the report
+     * as theirs and mark the pet found (see mineQuery) — not only who filed it.
+     *
+     * @param  iterable<LostPetReport>  $reports
+     * @return list<array<string, mixed>>
+     */
+    private function withIsMine(Request $request, iterable $reports): array
+    {
+        $userId = $request->user()->id;
+        $myPets = Pet::accessibleBy($userId)->pluck('id')->flip();
+
+        return collect($reports)
+            ->map(fn (LostPetReport $report) => $report->toApi() + [
+                'is_mine' => $myPets->has($report->pet_id)
+                    || ($report->reported_by === $userId && $report->status === 'active'),
+            ])
+            ->values()
+            ->all();
     }
 
     private function broadcastContent(Pet $pet, LostPetReport $report): string

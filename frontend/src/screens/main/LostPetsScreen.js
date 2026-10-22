@@ -8,6 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ui, type, photos } from '../../theme';
 import { Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, FormScrollView } from '../../components';
 import LostPetCard from './LostPetCard';
+import { isMyReport } from '../../utils/pets';
 import { useInFlight } from '../../hooks/useInFlight';
 import { useLostPetsBoardQuery, useMyLostReportsQuery } from '../../hooks/useLostPets';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
@@ -47,7 +48,7 @@ export default function LostPetsScreen({ navigation }) {
 
   const activeReports = myReports.filter((r) => r.status !== 'resolved');
   const reportedPetIds = new Set(activeReports.map((r) => r.petId));
-  const otherReports = lostPets.filter((r) => r.reportedBy !== user?.id);
+  const otherReports = lostPets.filter((r) => !isMyReport(r, user?.id));
 
   const selectPet = (pet) => {
     if (reportedPetIds.has(pet.id)) {

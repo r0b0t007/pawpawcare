@@ -142,6 +142,27 @@ test('a feed that failed to load says so in French, with a retry — not "no pos
   expect(refetch).toHaveBeenCalled();
 });
 
+// CHW-277: a co-owner's report on my pet is mine — Mark found, and not the
+// feed's "have you seen" card — even though someone else filed it.
+test('a report on a pet I share is mine, whoever filed it', async () => {
+  const LostPetCard = require('../LostPetCard').default;
+  mockBoard.data = [
+    { id: 'r1', petId: 'p1', petName: 'Biscuit', status: 'active', reportedBy: 'u2', isMine: true, createdAt: '2026-10-20T10:00:00Z' },
+    { id: 'r2', petId: 'p9', petName: 'Rex', status: 'active', reportedBy: 'u3', isMine: false, createdAt: '2026-10-20T10:00:00Z' },
+  ];
+  try {
+    await render(<CommunityScreen navigation={nav} />);
+    // The feed leads with someone else's lost pet, never with one of mine.
+    expect(tree.root.findAllByType(LostPetCard).map((c) => c.props.report.id)).toEqual(['r2']);
+
+    await act(async () => tree.root.findByType(SegmentedControl).props.onChange('lost'));
+    const cards = tree.root.findAllByType(LostPetCard);
+    expect(cards.map((c) => [c.props.report.id, c.props.mine])).toEqual([['r1', true], ['r2', false]]);
+  } finally {
+    mockBoard.data = [];
+  }
+});
+
 test('the lost-pet report screen speaks French', async () => {
   await render(<LostPetsScreen navigation={nav} />);
   expect(texts()).toEqual(expect.arrayContaining(['Quel animal ?', 'Biscuit']));

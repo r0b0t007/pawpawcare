@@ -130,6 +130,14 @@ describe('reading lost-pet reports', () => {
     expect(mine.data.map((r) => [r.id, r.reportedBy, r.status])).toEqual([['r3', 'u1', 'resolved']]);
   });
 
+  // CHW-277: whether a report is mine (my pet, or filed by me) comes from the server.
+  it('carries whether a report is mine', async () => {
+    serverBoard = [apiReport('r1', 'Bella', { is_mine: true }), apiReport('r2', 'Milo', { is_mine: false })];
+    await mount();
+
+    expect(board.data.map((r) => r.isMine)).toEqual([true, false]);
+  });
+
   // My reports used to ride along with /pets in the sign-in load, so a failed
   // /lost-pets/mine discarded every pet with it.
   it('is not part of the full load', async () => {
@@ -228,9 +236,8 @@ describe('reporting and resolving', () => {
     await settle(() => answerBoard());
 
     expect(ok).toBe(true);
-    expect(post).toHaveBeenCalledWith('/pets/p1/lost-report', {
-      last_seen_location: 'Main St', description: null, contact_phone: null,
-    });
+    // Blank fields are left out, so a re-report never erases details.
+    expect(post).toHaveBeenCalledWith('/pets/p1/lost-report', { last_seen_location: 'Main St' });
     expect(client.getQueryData(['lostPets', 'mine', 'u1']).map((r) => r.id)).toEqual(['r9']);
     expect(client.getQueryData(['lostPets', 'board', 'u1']).map((r) => r.id)).toEqual(['r9', 'r1', 'r2']);
     expect(calls('/community/posts')).toBe(2); // the broadcast post, too
