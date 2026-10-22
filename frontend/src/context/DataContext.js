@@ -755,6 +755,8 @@ export function DataProvider({ children }) {
       await del(`/pets/${petId}`);
       dispatch({ type: 'DELETE_PET', payload: petId });
       queryClient.invalidateQueries({ queryKey: petsKeys.all });
+      // Its medical records must not outlive it in memory.
+      queryClient.removeQueries({ queryKey: vaultKeys.pet(user?.id, petId) });
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1123,6 +1125,8 @@ export function DataProvider({ children }) {
     try {
       await post(`/pets/${petId}/leave`);
       dispatch({ type: 'DELETE_PET', payload: petId });
+      // Its medical records are no longer mine to hold.
+      queryClient.removeQueries({ queryKey: vaultKeys.pet(user?.id, petId) });
       refreshLostPets();
       return true;
     } catch (err) { handleApiError(err); return false; }
@@ -1178,21 +1182,13 @@ export function DataProvider({ children }) {
     await saveToVault(petId, 'clinics', c);
     return toClinic(c);
   };
-  const updateClinic = async (petId, id, data) => {
-    const c = await patch(`/pets/${petId}/clinics/${id}`, data);
-    // Visits show the clinic's name: re-read so they follow a rename.
-    await writeQueryCache(vaultKey(petId), (vault) => ({
-      ...vault,
-      clinics: vault.clinics.map((x) => (x.id === c.id ? c : x)).sort(VAULT_ORDER.clinics),
-    }), { reread: true });
-    return toClinic(c);
-  };
   // The server unlinks the clinic's visits and documents (clinic_id is set
   // null on delete): so does the cache, or visits would keep its name.
   const deleteClinic = async (petId, id) => {
     try {
       await del(`/pets/${petId}/clinics/${id}`);
       await writeQueryCache(vaultKey(petId), (vault) => ({
+        ...vault,
         clinics: vault.clinics.filter((x) => x.id !== id),
         appointments: vault.appointments.map((a) => (a.clinic_id === id ? { ...a, clinic_id: null, clinic_name: null } : a)),
         documents: vault.documents.map((d) => (d.clinic_id === id ? { ...d, clinic_id: null } : d)),
@@ -1206,15 +1202,15 @@ export function DataProvider({ children }) {
     await saveToVault(petId, 'appointments', a);
     return toAppointment(a);
   };
-  const updateAppointment = async (petId, id, data) => {
-    const a = await patch(`/pets/${petId}/appointments/${id}`, data);
-    await saveToVault(petId, 'appointments', a);
-    return toAppointment(a);
-  };
   const deleteAppointment = async (petId, id) => {
     try {
       await del(`/pets/${petId}/appointments/${id}`);
-      await dropFromVault(petId, 'appointments', id);
+      // The server unlinks the visit's documents (appointment_id set null).
+      await writeQueryCache(vaultKey(petId), (vault) => ({
+        ...vault,
+        appointments: vault.appointments.filter((x) => x.id !== id),
+        documents: vault.documents.map((d) => (d.appointment_id === id ? { ...d, appointment_id: null } : d)),
+      }));
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1456,10 +1452,8 @@ export function DataProvider({ children }) {
         acceptInvite,
         declineInvite,
         addClinic,
-        updateClinic,
         deleteClinic,
         addAppointment,
-        updateAppointment,
         deleteAppointment,
         addDocument,
         deleteDocument,

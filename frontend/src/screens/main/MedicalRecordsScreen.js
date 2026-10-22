@@ -88,7 +88,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const name = pet?.name || petName;
 
   const {
-    data: records, isError, isFetching, isStale, refetch,
+    data: records, isError, isFetching, isStale, errorUpdatedAt, refetch,
   } = useVaultQuery(petId);
   // Records can change from another phone sharing the pet: the vault re-reads
   // whenever the screen opens, and on focus once it is stale (the screen can
@@ -109,18 +109,25 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   // AI reads are paid: one at a time, and a double tap never starts two.
   const { run: runExtract, isBusy: isExtractBusy } = useInFlight();
 
-  // One refresh at a time (pull or "Try again"). A failed refresh over
-  // records already shown keeps them and says so instead of failing silently.
+  // Any failed re-read over records already shown — on opening, on focus or
+  // a pull — keeps them and says so, instead of passing old (or no longer
+  // shared) records off as current.
+  const shownRef = useRef(records);
+  shownRef.current = records;
+  useEffect(() => {
+    if (errorUpdatedAt && shownRef.current) showToast(i18n.t('records.toast.refreshFailed'));
+  }, [errorUpdatedAt]);
+
+  // One refresh at a time (pull or "Try again").
   const refreshBusy = useRef(false);
   const onRefresh = useCallback(async () => {
     if (refreshBusy.current) return;
     refreshBusy.current = true;
     setRefreshing(true);
-    const result = await refetch();
-    if (result.isError && records) showToast(t('records.toast.refreshFailed'));
+    await refetch();
     refreshBusy.current = false;
     setRefreshing(false);
-  }, [refetch, records, t]);
+  }, [refetch]);
 
   const clinics = records?.clinics || [];
   const appointments = records?.appointments || [];

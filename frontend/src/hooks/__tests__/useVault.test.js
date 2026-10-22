@@ -30,7 +30,7 @@ jest.mock('../../context/AuthContext', () => ({
 
 import { DataProvider, useData } from '../../context/DataContext';
 import { useVaultQuery } from '../useVault';
-import { get, post, patch, del, uploadDocument } from '../../services/api';
+import { get, post, del, uploadDocument } from '../../services/api';
 
 const clinic = (id, name) => ({ id, pet_id: 'p1', name });
 const visit = (id, title) => ({ id, pet_id: 'p1', title, scheduled_at: '2026-11-01T09:00:00Z', status: 'scheduled' });
@@ -162,6 +162,34 @@ describe('re-reading', () => {
   });
 });
 
+describe('pets that go', () => {
+  const cached = () => client.getQueryCache().findAll({ queryKey: ['vault', 'u1', 'p1'] }).length;
+
+  // A pet's medical records must not outlive it (or my access) in memory.
+  // The records screen is closed by then: the vault is only cached.
+  it('deleting a pet drops its vault', async () => {
+    await mount();
+    await rerender(<DataOnly />);
+    expect(cached()).toBe(1);
+    del.mockResolvedValue(null);
+
+    await settle(() => data.deletePet('p1'));
+
+    expect(cached()).toBe(0);
+  });
+
+  it('leaving a shared pet drops its vault', async () => {
+    await mount();
+    await rerender(<DataOnly />);
+    expect(cached()).toBe(1);
+    post.mockResolvedValue({});
+
+    await settle(() => data.leavePet('p1'));
+
+    expect(cached()).toBe(0);
+  });
+});
+
 describe('accounts', () => {
   it('drops the cached vaults at logout', async () => {
     await mount();
@@ -202,18 +230,17 @@ describe('changing the vault', () => {
     expect(reads()).toEqual([1, 1, 1]);
   });
 
-  // Visits show the clinic's name, so a rename re-reads them too.
-  it('renaming a clinic shows it and re-reads the visits', async () => {
+  // The server unlinks the visit's documents on delete.
+  it('deleting a visit unlinks its documents too', async () => {
+    server.p1.documents = [doc('d1', 'Bloodwork', { appointment_id: 'a1' }), doc('d2', 'X-ray')];
     await mount();
-    patch.mockImplementation(() => {
-      server.p1.clinics = [clinic('c1', 'Riverside Animal Hospital')];
-      return Promise.resolve(server.p1.clinics[0]);
-    });
+    del.mockResolvedValue(null);
 
-    await settle(() => data.updateClinic('p1', 'c1', { name: 'Riverside Animal Hospital' }));
+    await settle(() => data.deleteAppointment('p1', 'a1'));
 
-    expect(vault.data.clinics[0].name).toBe('Riverside Animal Hospital');
-    expect(reads()).toEqual([2, 2, 2]);
+    expect(ids('appointments')).toEqual([]);
+    expect(vault.data.documents.map((d) => d.appointmentId)).toEqual([null, null]);
+    expect(ids('clinics')).toEqual(['c1']);
   });
 
   // The server unlinks the clinic's visits and documents on delete.
@@ -226,6 +253,7 @@ describe('changing the vault', () => {
     await settle(() => data.deleteClinic('p1', 'c1'));
 
     expect(ids('clinics')).toEqual([]);
+    expect(ids('documents')).toEqual(['d1', 'd2']);
     expect(vault.data.appointments[0]).toEqual(expect.objectContaining({ clinicId: null, clinicName: null }));
     expect(vault.data.documents[0].clinicId).toBeNull();
     expect(reads()).toEqual([1, 1, 1]);

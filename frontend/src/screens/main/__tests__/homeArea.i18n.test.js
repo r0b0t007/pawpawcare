@@ -52,6 +52,7 @@ jest.mock('../../../hooks/useNotifications', () => ({
   useNotificationsQuery: () => mockNotificationsQuery(),
   useUnreadCount: () => ({ data: 0, isStale: false, refetch: jest.fn() }),
 }));
+jest.mock('../../../components/Toast', () => ({ showToast: jest.fn(), ToastHost: () => null }));
 const mockVaultQuery = jest.fn();
 jest.mock('../../../hooks/useVault', () => ({ useVaultQuery: () => mockVaultQuery() }));
 const EMPTY_VAULT = { clinics: [], appointments: [], documents: [] };
@@ -228,6 +229,23 @@ test('Medical records show loading, a retry, then the records', async () => {
   await act(async () => tree.update(records()));
   expect(texts(tree)).toContain('Bloodwork');
   expect(texts(tree)).not.toContain("We couldn't open the vault");
+});
+
+// Opening re-reads the vault: if that fails over records from the cache, the
+// screen says so rather than passing them off as current.
+test('Medical records say when a re-read fails over cached records', async () => {
+  const { showToast } = require('../../../components/Toast');
+  showToast.mockClear();
+  const shown = { ...EMPTY_VAULT, documents: [{ id: 'd1', petId: 'p1', title: 'Bloodwork', category: 'lab', extractionStatus: 'none' }] };
+  const records = () => <MedicalRecordsScreen navigation={navigation} route={{ params: { petId: 'p1', petName: 'Biscuit' } }} />;
+  mockVaultQuery.mockReturnValue({ data: shown, isError: false, isFetching: true, errorUpdatedAt: 0, refetch: jest.fn() });
+  await render(records());
+  expect(showToast).not.toHaveBeenCalled();
+
+  mockVaultQuery.mockReturnValue({ data: shown, isError: true, isFetching: false, errorUpdatedAt: 1000, refetch: jest.fn() });
+  await act(async () => tree.update(records()));
+  expect(showToast).toHaveBeenCalledWith("Couldn't refresh the vault. Showing what was already here.");
+  expect(texts(tree)).toContain('Bloodwork');
 });
 
 // The screen can stay mounted under a tab: a focus re-read only once stale.
