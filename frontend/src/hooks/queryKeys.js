@@ -34,6 +34,12 @@ export const lostPetsKeys = {
   mine: (userId) => ['lostPets', 'mine', userId ?? null],
 };
 
+// The in-app notification list and its unread count (see useNotifications.js).
+export const notificationsKeys = {
+  all: ['notifications'],
+  list: (userId) => ['notifications', userId ?? null],
+};
+
 export const gamificationKeys = {
   summary: ['gamification', 'summary'],
   recap: ['gamification', 'recap'],

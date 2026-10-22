@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, ScrollView, Pressable, StyleSheet, RefreshControl,
+  View, Text, ScrollView, Pressable, StyleSheet, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,9 +8,14 @@ import { useData } from '../../context/DataContext';
 import { ui, type, motion, photos } from '../../theme';
 import { Card, EmptyState, PetFace, ScreenHeader, reminderIcon, NotificationsBanner } from '../../components';
 import { useToday } from '../../hooks/useToday';
+import { useNotificationsQuery } from '../../hooks/useNotifications';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { dayDiff, fmtClock, fmtDayTime, timeAgo } from '../../utils/dates';
 import i18n, { useLocale, useTranslation } from '../../i18n';
 import { petById } from '../../utils/pets';
+
+// Stable while the list hasn't loaded, so the sections memo doesn't rerun.
+const NONE = [];
 
 // "Lively & Light" notifications: a calm list grouped by when (Today /
 // Upcoming / Earlier). Each row leads with the pet's face (or the reminder
@@ -45,17 +50,27 @@ export default function NotificationsScreen({ navigation }) {
   useLocale();
   const { t } = useTranslation();
   const {
-    pets, notifications, unreadCount, refreshNotifications,
-    markNotificationRead, snoozeNotification, dismissNotification,
+    pets, markNotificationRead, snoozeNotification, dismissNotification,
   } = useData();
+  const {
+    data, isLoading, isError, isFetching, refetch,
+  } = useNotificationsQuery();
+  // Reminders fire and pushes arrive while the app is elsewhere: re-read
+  // whenever the list is shown again.
+  useRefetchOnFocus(refetch);
+  const notifications = data?.notifications ?? NONE;
+  const unreadCount = data?.unreadCount ?? 0;
+  // A retry after a failed load is a fetch with the error still set: show it
+  // as loading, not as the unchanged error.
+  const retrying = isError && isFetching;
   const [refreshing, setRefreshing] = useState(false);
   const today = useToday();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshNotifications();
+    await refetch();
     setRefreshing(false);
-  }, [refreshNotifications]);
+  }, [refetch]);
 
   // Today / Upcoming / Earlier by calendar day. The server sends newest
   // first, which suits Today and Earlier; Upcoming reads soonest first.
@@ -174,7 +189,20 @@ export default function NotificationsScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         <NotificationsBanner style={styles.banner} />
-        {notifications.length === 0 ? (
+        {notifications.length === 0 && (isLoading || retrying) && (
+          <ActivityIndicator color={ui.accent} style={styles.loading} accessibilityLabel={t('common.loading')} />
+        )}
+        {notifications.length === 0 && isError && !retrying && (
+          <EmptyState
+            compact
+            title={t('notifications.loadFailed')}
+            actionLabel={t('common.retry')}
+            actionIcon="refresh"
+            onAction={() => refetch()}
+            style={styles.empty}
+          />
+        )}
+        {notifications.length === 0 && !isLoading && !isError && (
           <EmptyState
             photo={photos.emptyBlanket}
             title={t('notifications.empty.title')}
@@ -184,7 +212,8 @@ export default function NotificationsScreen({ navigation }) {
             onAction={() => navigation.navigate('Reminders')}
             style={styles.empty}
           />
-        ) : (
+        )}
+        {notifications.length > 0 && (
           sections.map((section) => (
             <View key={section.id}>
               <Text style={[type.sectionLabel, styles.sectionLabel]}>{section.label}</Text>
@@ -202,6 +231,7 @@ const styles = StyleSheet.create({
   manageLink: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: ui.accent },
   scroll: { paddingHorizontal: 16, paddingBottom: 32 },
   banner: { marginBottom: 12 },
+  loading: { paddingVertical: 36 },
   sectionLabel: { marginHorizontal: 8, marginBottom: 10, marginTop: 4, color: ui.subtle },
   sectionCard: { marginBottom: 18 },
   row: {

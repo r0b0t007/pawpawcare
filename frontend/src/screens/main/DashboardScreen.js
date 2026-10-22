@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { usePetsQuery } from '../../hooks/usePets';
 import { useFeedCount } from '../../hooks/useFeed';
+import { useUnreadCount } from '../../hooks/useNotifications';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
@@ -75,13 +76,17 @@ export default function DashboardScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const {
-    dataLoaded, pets, reminders, unreadCount, medDoseDays, medDoseCounts,
+    dataLoaded, pets, reminders, medDoseDays, medDoseCounts,
     markVaccinationComplete, logMedicationDose,
   } = useData();
   // The community teaser counts the feed's posts. Home stays mounted under
   // the tab bar: a stale (or failed) feed refetches when it is shown again.
   const { data: postCount, isStale: feedStale, refetch: refetchFeed } = useFeedCount();
   useRefetchOnFocus(refetchFeed, { isStale: feedStale });
+  // The bell's dot. Pushes arrive while Home is under another tab: a stale
+  // count refetches when Home is shown again.
+  const { data: unreadCount = 0, isStale: unreadStale, refetch: refetchUnread } = useUnreadCount();
+  useRefetchOnFocus(refetchUnread, { isStale: unreadStale });
 
   // TTI: the dashboard is the main entry screen — interactive once the initial
   // data fan-out has rendered. Safe to call repeatedly; first call wins.

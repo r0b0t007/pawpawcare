@@ -15,7 +15,9 @@ import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
-import { petsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys } from '../hooks/queryKeys';
+import {
+  petsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys,
+} from '../hooks/queryKeys';
 import i18n from '../i18n';
 
 const DataContext = createContext(null);
@@ -238,7 +240,6 @@ function dataReducer(state, action) {
     case 'UPDATE_PET': return { ...state, pets: state.pets.map((p) => (p.id === action.payload.id ? action.payload : p)) };
     case 'DELETE_PET': return { ...state, pets: state.pets.filter((p) => p.id !== action.payload) };
     case 'SET_REMINDERS':     return { ...state, reminders: action.payload };
-    case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload.notifications || [], unreadCount: action.payload.unread_count || 0 };
     // Trust: when the store last successfully synced with the server (ms
     // epoch, or null before the first sync / after logout).
     case 'SET_LAST_SYNCED':   return { ...state, lastSyncedAt: action.payload };
@@ -300,7 +301,7 @@ function dataReducer(state, action) {
 
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
-    pets: [], reminders: [], notifications: [], unreadCount: 0,
+    pets: [], reminders: [],
     dataLoaded: false, lastSyncedAt: null,
     medDoseDays: {}, medDoseCounts: {},
   });
@@ -417,11 +418,11 @@ export function DataProvider({ children }) {
       queryClient.removeQueries({ queryKey: communityKeys.all });
       queryClient.removeQueries({ queryKey: invitesKeys.all });
       queryClient.removeQueries({ queryKey: lostPetsKeys.all });
+      queryClient.removeQueries({ queryKey: notificationsKeys.all });
       expiredFor.current = null;
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
       dispatch({ type: 'SET_REMINDERS', payload: [] });
-      dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: [], unread_count: 0 } });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
       // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
       // cleared from memory so a different account never renders it — and the
@@ -532,7 +533,6 @@ export function DataProvider({ children }) {
         if (failures.length) throw new Error(`${failures.length} pet request(s) failed`);
       },
       () => refreshReminders({ rethrow: true }),
-      () => refreshNotifications({ rethrow: true }),
     ];
 
     const results = await Promise.allSettled(loaders.map((load) => load()));
@@ -600,12 +600,10 @@ export function DataProvider({ children }) {
     } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
-  const refreshNotifications = async ({ rethrow = false } = {}) => {
-    try {
-      const data = await get('/notifications');
-      dispatch({ type: 'SET_NOTIFICATIONS', payload: data });
-    } catch (err) { if (rethrow) throw err; handleApiError(err); }
-  };
+  // The notification list is read through useNotifications.js. Invalidating
+  // cancels a fetch already in flight (it predates the change) and resolves
+  // once the list on screen is re-read, so a screen confirms against it.
+  const refreshNotifications = () => queryClient.invalidateQueries({ queryKey: notificationsKeys.list(user?.id) });
 
   const addReminder = async (payload) => {
     try {
@@ -1362,8 +1360,6 @@ export function DataProvider({ children }) {
         lastSyncedAt: state.lastSyncedAt,
         pets: state.pets,
         reminders: state.reminders,
-        notifications: state.notifications,
-        unreadCount: state.unreadCount,
         medDoseDays: state.medDoseDays,
         medDoseCounts: state.medDoseCounts,
         addPet,
@@ -1421,7 +1417,6 @@ export function DataProvider({ children }) {
         deleteComment,
         toggleGroupMembership,
         refreshReminders,
-        refreshNotifications,
         addReminder,
         updateReminder,
         deleteReminder,

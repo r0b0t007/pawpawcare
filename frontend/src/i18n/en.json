@@ -775,6 +775,7 @@
     }
   },
   "notifications": {
+    "loadFailed": "Couldn't load your notifications.",
     "title": "Notifications",
     "channelName": "Reminders",
     "when": {

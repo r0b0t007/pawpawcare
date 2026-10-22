@@ -25,7 +25,7 @@ jest.mock('../../../context/DataContext', () => ({
 }));
 
 import React from 'react';
-import { Text } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import i18n from '../../../i18n';
 import HealthHubScreen from '../HealthHubScreen';
@@ -37,6 +37,12 @@ import { milestoneLabel } from '../../../hooks/useGamification';
 import { petHealthStatus } from '../../../components/petStatus';
 import { medicationStreakLabel } from '../../../utils/streaks';
 
+jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.fn() }));
+const mockNotificationsQuery = jest.fn();
+jest.mock('../../../hooks/useNotifications', () => ({
+  useNotificationsQuery: () => mockNotificationsQuery(),
+  useUnreadCount: () => ({ data: 0, isStale: false, refetch: jest.fn() }),
+}));
 const noop = () => Promise.resolve(true);
 const BISCUIT = {
   id: 'p1', name: 'Biscuit', type: 'dog', colorIndex: 0,
@@ -68,11 +74,12 @@ async function inFrench(fn) {
 }
 
 beforeEach(() => {
+  mockNotificationsQuery.mockReturnValue({
+    data: { notifications: [], unreadCount: 0 }, isLoading: false, isError: false, isFetching: false, refetch: jest.fn(),
+  });
   mockStore = {
     pets: [BISCUIT],
     reminders: [],
-    notifications: [],
-    unreadCount: 0,
     lastSyncedAt: null,
     addVaccination: noop,
     markVaccinationComplete: noop,
@@ -80,7 +87,6 @@ beforeEach(() => {
     addReminder: noop,
     updateReminder: noop,
     deleteReminder: noop,
-    refreshNotifications: noop,
     markNotificationRead: noop,
     snoozeNotification: noop,
     dismissNotification: noop,
@@ -132,6 +138,31 @@ test('Notifications', async () => {
   await inFrench(async () => {
     expect(texts(tree)).toContain('Vous êtes à jour');
   });
+});
+
+// The list loads on its own now: never "all caught up" before it has.
+test('Notifications show they are loading, then a retry if the load failed', async () => {
+  mockNotificationsQuery.mockReturnValue({ data: undefined, isLoading: true, isError: false, isFetching: true, refetch: jest.fn() });
+  let shown = await render(<NotificationsScreen navigation={navigation} />);
+  const spinner = () => tree.root.findAllByType(ActivityIndicator).some((n) => n.props.accessibilityLabel === 'Loading…');
+  expect(spinner()).toBe(true);
+  expect(shown).not.toContain("You're all caught up");
+
+  const refetch = jest.fn();
+  mockNotificationsQuery.mockReturnValue({ data: undefined, isLoading: false, isError: true, isFetching: false, refetch });
+  await act(async () => tree.update(<NotificationsScreen navigation={navigation} />));
+  shown = texts(tree);
+  expect(shown).toContain("Couldn't load your notifications.");
+  expect(shown).not.toContain("You're all caught up");
+  const retry = tree.root.findAll((n) => n.props.label === 'Retry' && typeof n.props.onPress === 'function')[0];
+  await act(async () => retry.props.onPress());
+  expect(refetch).toHaveBeenCalled();
+
+  // Retrying: loading again, not the same error.
+  mockNotificationsQuery.mockReturnValue({ data: undefined, isLoading: false, isError: true, isFetching: true, refetch });
+  await act(async () => tree.update(<NotificationsScreen navigation={navigation} />));
+  expect(spinner()).toBe(true);
+  expect(texts(tree)).not.toContain("Couldn't load your notifications.");
 });
 
 test('Medical records', async () => {
