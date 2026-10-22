@@ -40,6 +40,13 @@ export const notificationsKeys = {
   list: (userId) => ['notifications', userId ?? null],
 };
 
+// A pet's medical records vault: clinics, visits and documents together
+// (see useVault.js).
+export const vaultKeys = {
+  all: ['vault'],
+  pet: (userId, petId) => ['vault', userId ?? null, petId],
+};
+
 export const gamificationKeys = {
   summary: ['gamification', 'summary'],
   recap: ['gamification', 'recap'],

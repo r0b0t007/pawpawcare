@@ -16,7 +16,7 @@ import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
 import {
-  petsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys,
+  petsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys, vaultKeys,
 } from '../hooks/queryKeys';
 import i18n from '../i18n';
 
@@ -188,8 +188,9 @@ export const toInvite = (i) => ({
   createdAt: i.created_at,
 });
 
-// Medical records vault — lazy-loaded per pet, not kept in global pet state.
-const toClinic = (c) => ({
+// Medical records vault — read per pet through useVault.js, not kept in
+// global pet state.
+export const toClinic = (c) => ({
   id: c.id,
   petId: c.pet_id,
   name: c.name,
@@ -200,7 +201,7 @@ const toClinic = (c) => ({
   notes: c.notes || null,
 });
 
-const toAppointment = (a) => ({
+export const toAppointment = (a) => ({
   id: a.id,
   petId: a.pet_id,
   clinicId: a.clinic_id || null,
@@ -211,7 +212,7 @@ const toAppointment = (a) => ({
   notes: a.notes || null,
 });
 
-const toDocument = (d) => ({
+export const toDocument = (d) => ({
   id: d.id,
   petId: d.pet_id,
   appointmentId: d.appointment_id || null,
@@ -422,6 +423,7 @@ export function DataProvider({ children }) {
       queryClient.removeQueries({ queryKey: invitesKeys.all });
       queryClient.removeQueries({ queryKey: lostPetsKeys.all });
       queryClient.removeQueries({ queryKey: notificationsKeys.all });
+      queryClient.removeQueries({ queryKey: vaultKeys.all });
       expiredFor.current = null;
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
@@ -753,6 +755,8 @@ export function DataProvider({ children }) {
       await del(`/pets/${petId}`);
       dispatch({ type: 'DELETE_PET', payload: petId });
       queryClient.invalidateQueries({ queryKey: petsKeys.all });
+      // Its medical records must not outlive it in memory.
+      queryClient.removeQueries({ queryKey: vaultKeys.pet(user?.id, petId) });
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1121,6 +1125,8 @@ export function DataProvider({ children }) {
     try {
       await post(`/pets/${petId}/leave`);
       dispatch({ type: 'DELETE_PET', payload: petId });
+      // Its medical records are no longer mine to hold.
+      queryClient.removeQueries({ queryKey: vaultKeys.pet(user?.id, petId) });
       refreshLostPets();
       return true;
     } catch (err) { handleApiError(err); return false; }
@@ -1149,58 +1155,79 @@ export function DataProvider({ children }) {
 
   // ── Medical records vault ──
 
-  // Lazy-load a pet's clinics, appointments, and documents together. Returns
-  // mapped lists (or null on error) for the records screen to hold locally.
-  const getPetRecords = async (petId) => {
-    try {
-      const [clinics, appointments, documents] = await Promise.all([
-        get(`/pets/${petId}/clinics`),
-        get(`/pets/${petId}/appointments`),
-        get(`/pets/${petId}/documents`),
-      ]);
-      return {
-        clinics: clinics.map(toClinic),
-        appointments: appointments.map(toAppointment),
-        documents: documents.map(toDocument),
-      };
-    } catch (err) {
-      handleApiError(err);
-      return null;
-    }
+  // The vault is read through useVaultQuery (useVault.js), which holds the
+  // server's lists as they came. A saved row goes straight into its list, in
+  // the server's order — clinics by name, visits and documents newest first —
+  // so the list (and the clinic chips of the next sheet) shows it as the
+  // sheet closes, with no re-read. Deletes take just that row out.
+  const vaultKey = (petId) => vaultKeys.pet(user?.id, petId);
+  const invalidateVault = (petId) => {
+    queryClient.invalidateQueries({ queryKey: vaultKey(petId) });
   };
+  const VAULT_ORDER = {
+    clinics: (a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }),
+    appointments: (a, b) => new Date(b.scheduled_at) - new Date(a.scheduled_at),
+    documents: (a, b) => new Date(b.created_at) - new Date(a.created_at),
+  };
+  const saveToVault = (petId, list, row) =>
+    writeQueryCache(vaultKey(petId), (vault) => ({
+      ...vault,
+      [list]: [...vault[list].filter((x) => x.id !== row.id), row].sort(VAULT_ORDER[list]),
+    }));
+  const dropFromVault = (petId, list, id) =>
+    writeQueryCache(vaultKey(petId), (vault) => ({ ...vault, [list]: vault[list].filter((x) => x.id !== id) }));
 
   const addClinic = async (petId, data) => {
     const c = await post(`/pets/${petId}/clinics`, data);
+    await saveToVault(petId, 'clinics', c);
     return toClinic(c);
   };
-  const updateClinic = async (petId, id, data) => {
-    const c = await patch(`/pets/${petId}/clinics/${id}`, data);
-    return toClinic(c);
-  };
+  // The server unlinks the clinic's visits and documents (clinic_id is set
+  // null on delete): so does the cache, or visits would keep its name.
   const deleteClinic = async (petId, id) => {
-    try { await del(`/pets/${petId}/clinics/${id}`); return true; } catch (err) { handleApiError(err); return false; }
+    try {
+      await del(`/pets/${petId}/clinics/${id}`);
+      await writeQueryCache(vaultKey(petId), (vault) => ({
+        ...vault,
+        clinics: vault.clinics.filter((x) => x.id !== id),
+        appointments: vault.appointments.map((a) => (a.clinic_id === id ? { ...a, clinic_id: null, clinic_name: null } : a)),
+        documents: vault.documents.map((d) => (d.clinic_id === id ? { ...d, clinic_id: null } : d)),
+      }));
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const addAppointment = async (petId, data) => {
     const a = await post(`/pets/${petId}/appointments`, data);
-    return toAppointment(a);
-  };
-  const updateAppointment = async (petId, id, data) => {
-    const a = await patch(`/pets/${petId}/appointments/${id}`, data);
+    await saveToVault(petId, 'appointments', a);
     return toAppointment(a);
   };
   const deleteAppointment = async (petId, id) => {
-    try { await del(`/pets/${petId}/appointments/${id}`); return true; } catch (err) { handleApiError(err); return false; }
+    try {
+      await del(`/pets/${petId}/appointments/${id}`);
+      // The server unlinks the visit's documents (appointment_id set null).
+      await writeQueryCache(vaultKey(petId), (vault) => ({
+        ...vault,
+        appointments: vault.appointments.filter((x) => x.id !== id),
+        documents: vault.documents.map((d) => (d.appointment_id === id ? { ...d, appointment_id: null } : d)),
+      }));
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // file = { uri, name }; fields = { title, category, appointment_id?, clinic_id? }
   const addDocument = async (petId, file, fields) => {
     const d = await uploadDocument(petId, file, fields);
     trackCareAction('document_uploaded');
+    await saveToVault(petId, 'documents', d);
     return toDocument(d);
   };
   const deleteDocument = async (petId, id) => {
-    try { await del(`/pets/${petId}/documents/${id}`); return true; } catch (err) { handleApiError(err); return false; }
+    try {
+      await del(`/pets/${petId}/documents/${id}`);
+      await dropFromVault(petId, 'documents', id);
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
   // Mint a short-lived signed URL to view a document (files aren't public).
   const getDocumentUrl = async (petId, id) => {
@@ -1216,6 +1243,11 @@ export function DataProvider({ children }) {
   const extractDocument = async (petId, id) => {
     const d = await post(`/pets/${petId}/documents/${id}/extract`);
     track('document_extracted', { category: d.category });
+    // The reading may also have changed the document's title or category.
+    await writeQueryCache(vaultKey(petId), (vault) => ({
+      ...vault,
+      documents: vault.documents.map((x) => (x.id === d.id ? d : x)),
+    }));
     return toDocument(d);
   };
   // Apply the user's reviewed subset. The created records live in global pet
@@ -1230,6 +1262,10 @@ export function DataProvider({ children }) {
       expense: !!result.expense,
     });
     noteGoodMoment('extraction_applied');
+    // Applying can create a clinic and link the document to it, besides
+    // marking the document applied: re-read the vault. The new records live
+    // in pet state.
+    invalidateVault(petId);
     loadData();
     return result;
   };
@@ -1415,12 +1451,9 @@ export function DataProvider({ children }) {
         leavePet,
         acceptInvite,
         declineInvite,
-        getPetRecords,
         addClinic,
-        updateClinic,
         deleteClinic,
         addAppointment,
-        updateAppointment,
         deleteAppointment,
         addDocument,
         deleteDocument,
