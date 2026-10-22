@@ -9,6 +9,7 @@ import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { usePetsQuery } from '../../hooks/usePets';
+import { useFeedCount } from '../../hooks/useFeed';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
@@ -74,9 +75,13 @@ export default function DashboardScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const {
-    dataLoaded, pets, posts, reminders, unreadCount, medDoseDays, medDoseCounts,
+    dataLoaded, pets, reminders, unreadCount, medDoseDays, medDoseCounts,
     markVaccinationComplete, logMedicationDose,
   } = useData();
+  // The community teaser counts the feed's posts. Home stays mounted under
+  // the tab bar: a stale (or failed) feed refetches when it is shown again.
+  const { data: postCount, isStale: feedStale, refetch: refetchFeed } = useFeedCount();
+  useRefetchOnFocus(refetchFeed, { isStale: feedStale });
 
   // TTI: the dashboard is the main entry screen — interactive once the initial
   // data fan-out has rendered. Safe to call repeatedly; first call wins.
@@ -691,15 +696,17 @@ export default function DashboardScreen({ navigation }) {
                   <MaterialCommunityIcons name="forum-outline" size={18} color={TEASER_PAIR.fg} />
                 </View>
                 <Text style={styles.teaserText}>
-                  {posts.length > 0 ? (
+                  {postCount > 0 ? (
                     <>
                       <Text style={styles.teaserBold}>
-                        {t('home.community.recentPosts', { count: posts.length })}
+                        {t('home.community.recentPosts', { count: postCount })}
                       </Text>
                       {t('home.community.inCommunity')}
                     </>
                   ) : (
-                    t('home.community.sayHi')
+                    // Until the feed loads, the count is unknown: not "say hi"
+                    // to a community that may be busy.
+                    t(postCount === 0 ? 'home.community.sayHi' : 'home.community.visit')
                   )}
                 </Text>
                 <MaterialCommunityIcons name="chevron-right" size={18} color={ui.faint} />

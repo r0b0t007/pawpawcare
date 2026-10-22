@@ -8,6 +8,7 @@ import { resolveAsset } from '../../config';
 import { ui, type, radii, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast, ScreenHeader, EmptyState } from '../../components';
 import i18n, { useTranslation } from '../../i18n';
+import { useData } from '../../context/DataContext';
 
 // Admin-only review queue (Profile → Moderation). Lists every community post
 // with open reports — including ones auto-hidden from the feed at 3+ reports —
@@ -31,6 +32,8 @@ export default function ModerationScreen({ navigation }) {
   const [hasMore, setHasMore] = useState(false);
   const [busyId, setBusyId] = useState(null); // post id with an in-flight action
   const [confirmRemove, setConfirmRemove] = useState(null); // post id pending confirm
+  // The feed is cached (useFeedQuery): a removed post must leave it too.
+  const { invalidateFeed } = useData();
   const nextPageRef = useRef(2); // the next page loadMore should request
 
   // Fetch page 1 and replace the list (initial load + pull-to-refresh).
@@ -98,6 +101,7 @@ export default function ModerationScreen({ navigation }) {
     try {
       await del(`/admin/posts/${postId}`);
       removeFromList(postId);
+      invalidateFeed();
       showToast(t('moderation.removed'));
     } catch (e) {
       showToast(e?.message || t('moderation.removeFailed'));

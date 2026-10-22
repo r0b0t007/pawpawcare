@@ -11,9 +11,11 @@ export const subscriptionKeys = {
 };
 
 // Seeded group names come back in the account's saved language, so the locale
-// is part of the key (see useGroups.js); membership is per account.
+// is part of the key (see useGroups.js); membership is per account. The feed
+// (useFeed.js) carries per-account flags (pawed / reported by me).
 export const communityKeys = {
   all: ['community'],
+  feed: (userId) => ['community', 'feed', userId ?? null],
   groupsFor: (userId) => ['community', 'groups', userId ?? null],
   groups: (userId, locale) => ['community', 'groups', userId ?? null, locale ?? null],
 };

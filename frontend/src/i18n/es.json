@@ -628,6 +628,7 @@
       "recentPosts_many": "{{count}} publicaciones recientes",
       "recentPosts_other": "{{count}} publicaciones recientes",
       "inCommunity": " en la comunidad",
+      "visit": "Descubra lo que comparte la comunidad",
       "sayHi": "Salude a la comunidad"
     }
   },
@@ -1613,6 +1614,7 @@
     "post": "Publicar",
     "emptyFeedTitle": "Aún no hay publicaciones",
     "emptyFeedBody": "¡Sea el primero en compartir un momento con su mascota!",
+    "feedLoadFailed": "No se han podido cargar las publicaciones.",
     "members_one": "{{count}} miembro",
     "members_many": "{{count}} miembros",
     "members_other": "{{count}} miembros",

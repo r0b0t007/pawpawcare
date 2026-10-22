@@ -28,6 +28,7 @@ jest.mock('../../context/AuthContext', () => ({
 
 import { DataProvider, useData } from '../../context/DataContext';
 import { useLostPetsBoardQuery, useMyLostReportsQuery } from '../useLostPets';
+import { useFeedQuery } from '../useFeed';
 import i18n from '../../i18n';
 import { get, post, patch } from '../../services/api';
 
@@ -55,6 +56,7 @@ function Probe() {
   // them here the way the screens destructure them.
   const { data: boardList, isError: boardFailed } = useLostPetsBoardQuery();
   const { data: mineList, isError: mineFailed } = useMyLostReportsQuery();
+  useFeedQuery();
   board = { data: boardList, isError: boardFailed };
   mine = { data: mineList, isError: mineFailed };
   return null;
@@ -276,6 +278,22 @@ describe('reporting and resolving', () => {
     await settle(() => answerOld());
 
     expect(board.data.map((r) => r.id)).toEqual(['r9', 'r1', 'r2']);
+  });
+
+  // The feed re-read (the broadcast post) starts, but the confirmation
+  // doesn't wait for it.
+  it('reporting doesn’t wait for the feed', async () => {
+    await mount();
+    const report = apiReport('r9', 'Luna', { reported_by: 'u1' });
+    serverMine = [report];
+    post.mockResolvedValue(report);
+    get.mockImplementation((path) => (path === '/community/posts' ? new Promise(() => {}) : answer(path)));
+
+    let ok;
+    await settle(async () => { ok = await data.reportPetLost('p1', details); });
+
+    expect(ok).toBe(true);
+    expect(calls('/community/posts')).toBe(2);
   });
 
   it('a failed report resolves false and re-reads nothing', async () => {

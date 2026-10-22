@@ -602,6 +602,7 @@
       "recentPosts_one": "{{count}} recent post",
       "recentPosts_other": "{{count}} recent posts",
       "inCommunity": " in the community",
+      "visit": "See what the community is sharing",
       "sayHi": "Say hi to the community"
     }
   },
@@ -1559,6 +1560,7 @@
     "post": "Post",
     "emptyFeedTitle": "No posts yet",
     "emptyFeedBody": "Be the first to share a moment with your pet!",
+    "feedLoadFailed": "Couldn't load the posts.",
     "members_one": "{{count}} member",
     "members_other": "{{count}} members",
     "join": "Join",

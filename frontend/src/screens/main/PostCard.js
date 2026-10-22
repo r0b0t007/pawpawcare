@@ -14,7 +14,7 @@ import { useTranslation } from '../../i18n';
 export default function PostCard({ post, userId, onPaw, getComments, addComment, deleteComment, reportPost, unreportPost }) {
   const { t } = useTranslation();
   const hasPawed = !!post.pawedByMe;
-  const paws = post.paws ?? 0; // partial payloads (UPDATE_POST, optimistic adds) may lack it
+  const paws = post.paws ?? 0;
   const pair = pairFor(post.authorName);
   const isOwn = post.authorId === userId;
 

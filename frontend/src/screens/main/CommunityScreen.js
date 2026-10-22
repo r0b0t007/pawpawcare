@@ -13,6 +13,7 @@ import { uploadImage } from '../../services/api';
 import { track } from '../../services/analytics';
 import { useInFlight } from '../../hooks/useInFlight';
 import { useGroupsQuery } from '../../hooks/useGroups';
+import { useFeedQuery } from '../../hooks/useFeed';
 import { useLostPetsBoardQuery } from '../../hooks/useLostPets';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { resolveAsset } from '../../config';
@@ -42,7 +43,7 @@ export default function CommunityScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const {
-    posts, togglePaw, addPost, toggleGroupMembership,
+    togglePaw, addPost, toggleGroupMembership,
     getComments, addComment, deleteComment, resolveLostPet,
     reportPost, unreportPost,
   } = useData();
@@ -53,6 +54,15 @@ export default function CommunityScreen({ navigation }) {
     refetch: refetchGroups,
   } = useGroupsQuery();
   useRefetchOnFocus(refetchGroups, { isStale: groupsStale });
+  // New posts from everyone else: a stale feed refetches on focus.
+  const {
+    data: posts = [], isLoading: feedLoading, isError: feedFailed, isFetching: feedFetching,
+    isStale: feedStale, refetch: refetchFeed,
+  } = useFeedQuery();
+  // A retry after a failed load is a fetch with the error still set: show it
+  // as loading, not as the unchanged error card.
+  const feedRetrying = feedFailed && feedFetching;
+  useRefetchOnFocus(refetchFeed, { isStale: feedStale });
   const {
     data: lostPets = [], isLoading: lostLoading, isError: lostFailed, isStale: boardStale,
     refetch: refetchBoard,
@@ -296,7 +306,20 @@ export default function CommunityScreen({ navigation }) {
                   unreportPost={unreportPost}
                 />
               ))}
-              {posts.length === 0 && (
+              {posts.length === 0 && (feedLoading || feedRetrying) && (
+                <ActivityIndicator color={ui.accent} style={styles.feedLoading} accessibilityLabel={t('common.loading')} />
+              )}
+              {posts.length === 0 && feedFailed && !feedRetrying && (
+                <EmptyState
+                  compact
+                  title={t('community.feedLoadFailed')}
+                  actionLabel={t('common.retry')}
+                  actionIcon="refresh"
+                  onAction={() => refetchFeed()}
+                  style={styles.emptyState}
+                />
+              )}
+              {posts.length === 0 && !feedLoading && !feedFailed && (
                 <EmptyState
                   photo={photos.communityPals}
                   title={t('community.emptyFeedTitle')}
@@ -440,6 +463,7 @@ const styles = StyleSheet.create({
   },
   moreLostText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: ui.accent },
   emptyState: { paddingVertical: 20 },
+  feedLoading: { paddingVertical: 36 },
 
   // Composer
   composerCollapsed: {

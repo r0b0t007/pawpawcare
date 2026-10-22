@@ -28,7 +28,6 @@ let mockStore = {};
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     pets: [],
-    posts: [],
     reminders: [],
     unreadCount: 0,
     medDoseDays: {},
@@ -41,6 +40,10 @@ jest.mock('../../../context/DataContext', () => ({
 let mockEarlyPets;
 const mockUsePetsQuery = jest.fn(() => ({ data: mockEarlyPets }));
 jest.mock('../../../hooks/usePets', () => ({ usePetsQuery: (opts) => mockUsePetsQuery(opts) }));
+let mockPostCount = 0;
+jest.mock('../../../hooks/useFeed', () => ({
+  useFeedCount: () => ({ data: mockPostCount, isStale: false, refetch: jest.fn() }),
+}));
 
 import React from 'react';
 import { Text } from 'react-native';
@@ -92,6 +95,7 @@ const REAL_TIMERS = [
 beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers({ now: NOW, doNotFake: REAL_TIMERS });
+  mockPostCount = 0;
 });
 afterEach(() => {
   act(() => tree?.unmount());
@@ -156,4 +160,28 @@ test('switching the language re-renders Coming up dates and times at once', asyn
     });
   }
   expect(texts(tree)).toContain('Biscuit · Oct 17, 9:00 AM');
+});
+
+// The feed loads on its own, after Home: until its count is known (or if it
+// failed) the teaser doesn't invite a "hi" to a community that may be busy.
+describe('the community teaser', () => {
+  const store = { dataLoaded: true, pets: [BISCUIT] };
+
+  it('stays neutral until the feed has loaded', async () => {
+    mockPostCount = undefined;
+    const shown = await render({ store, early: [BISCUIT] });
+    expect(shown).toContain('See what the community is sharing');
+    expect(shown).not.toContain('Say hi to the community');
+  });
+
+  it('says hi to an empty community', async () => {
+    const shown = await render({ store, early: [BISCUIT] });
+    expect(shown).toContain('Say hi to the community');
+  });
+
+  it('counts the recent posts', async () => {
+    mockPostCount = 3;
+    const shown = await render({ store, early: [BISCUIT] });
+    expect(shown).toContain('3 recent posts');
+  });
 });
