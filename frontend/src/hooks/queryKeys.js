@@ -4,6 +4,14 @@ export const petsKeys = {
   all: ['pets'],
 };
 
+// Every pet with all six sub-resources, as DataContext's sign-in load builds
+// it. Kept under its own root so the light pets list's invalidations (petsKeys)
+// never re-run the 1 + 6N load.
+export const petRecordsKeys = {
+  all: ['petRecords'],
+  list: (userId) => ['petRecords', userId ?? null],
+};
+
 export const subscriptionKeys = {
   all: ['subscription'],
   // Per account: RevenueCat can target different offerings per customer.
