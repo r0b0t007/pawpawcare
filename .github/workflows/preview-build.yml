@@ -37,6 +37,14 @@ on:
         default: false
         type: boolean
 
+# One run at a time per ref, so the preview channel's update comes from the
+# newest push (CHW-254). It does not stop a second build for the same
+# fingerprint: builds start with --no-wait, so a later run can still see the
+# previous fingerprint as the last *finished* build while the first compiles.
+concurrency:
+  group: preview-build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # ── 1. Does the native runtime actually differ from the last preview build? ──
   decide:
