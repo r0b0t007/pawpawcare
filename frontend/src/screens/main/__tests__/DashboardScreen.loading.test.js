@@ -40,9 +40,6 @@ let mockEarlyPets;
 const mockUsePetsQuery = jest.fn(() => ({ data: mockEarlyPets }));
 jest.mock('../../../hooks/usePets', () => ({ usePetsQuery: (opts) => mockUsePetsQuery(opts) }));
 jest.mock('../../../hooks/useNotifications', () => ({
-  useNotificationsQuery: () => ({
-    data: { notifications: [], unreadCount: 0 }, isLoading: false, isError: false, isFetching: false, refetch: jest.fn(),
-  }),
   useUnreadCount: () => ({ data: 0, isStale: false, refetch: jest.fn() }),
 }));
 let mockPostCount = 0;

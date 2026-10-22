@@ -22,6 +22,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { DataProvider } from './src/context/DataContext';
 import { ToastHost } from './src/components';
 import { NotificationPermissionWatcher } from './src/hooks/useNotificationPermission';
+import { NotificationsRefresher } from './src/hooks/useNotifications';
 import AppErrorBoundary from './src/components/AppErrorBoundary';
 import { track, trackScreen } from './src/services/analytics';
 import { addNotificationResponseListener } from './src/services/notifications';
@@ -139,6 +140,7 @@ function App() {
               {/* One AppState listener for the notification permission, and the
                   reaction to a grant wherever it happens (CHW-230). */}
               <NotificationPermissionWatcher />
+              <NotificationsRefresher />
             </ObserveNavigationContainer>
           </DataProvider>
         </AuthProvider>

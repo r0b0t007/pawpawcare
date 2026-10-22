@@ -342,7 +342,8 @@ export function DataProvider({ children }) {
   );
   const reminderTick = useTickAt(reminderTimes, REMINDER_REFETCH_DELAY);
   useEffect(() => {
-    if (reminderTick > 0 && user) refreshReminders();
+    // The fire also created a delivery: the inbox and the bell re-read too.
+    if (reminderTick > 0 && user) { refreshReminders(); invalidateNotifications(); }
     // refreshReminders is recreated each render; the tick is the trigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reminderTick]);
@@ -473,6 +474,9 @@ export function DataProvider({ children }) {
   // only loses that domain — a transient blip on any single endpoint used to
   // discard the entire store (dashboard showed 0 pets until a full reload).
   const loadData = async () => {
+    // Notifications are read through useNotifications.js, but a full reload
+    // (sign-in, accepting a shared pet) still re-reads them.
+    invalidateNotifications();
     const loaders = [
       async () => {
         // My lost-pet reports are read through useMyLostReportsQuery;
@@ -600,10 +604,20 @@ export function DataProvider({ children }) {
     } catch (err) { if (rethrow) throw err; handleApiError(err); }
   };
 
-  // The notification list is read through useNotifications.js. Invalidating
-  // cancels a fetch already in flight (it predates the change) and resolves
-  // once the list on screen is re-read, so a screen confirms against it.
-  const refreshNotifications = () => queryClient.invalidateQueries({ queryKey: notificationsKeys.list(user?.id) });
+  // The notification list is read through useNotifications.js.
+  const invalidateNotifications = () => {
+    queryClient.invalidateQueries({ queryKey: notificationsKeys.all });
+  };
+  // Actions write the server's answer into it straight away, rather than
+  // waiting for a re-read (and its retries on a flaky link). The unread count
+  // is the server's own rule: undismissed deliveries in the list, unread.
+  const updateNotifications = (update) =>
+    writeQueryCache(notificationsKeys.list(user?.id), (data) => {
+      const notifications = update(data.notifications || []);
+      return { ...data, notifications, unread_count: notifications.filter((n) => !n.read_at).length };
+    });
+  const replaceNotification = (delivery) =>
+    updateNotifications((list) => list.map((n) => (n.id === delivery.id ? delivery : n)));
 
   const addReminder = async (payload) => {
     try {
@@ -631,16 +645,16 @@ export function DataProvider({ children }) {
 
   const markNotificationRead = async (id) => {
     try {
-      await post(`/notifications/${id}/read`);
-      await refreshNotifications();
+      const delivery = await post(`/notifications/${id}/read`);
+      await replaceNotification(delivery);
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
 
   const snoozeNotification = async (id, minutes = 60) => {
     try {
-      await post(`/notifications/${id}/snooze`, { minutes });
-      await Promise.all([refreshNotifications(), refreshReminders()]);
+      const delivery = await post(`/notifications/${id}/snooze`, { minutes });
+      await Promise.all([replaceNotification(delivery), refreshReminders()]);
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -648,7 +662,7 @@ export function DataProvider({ children }) {
   const dismissNotification = async (id) => {
     try {
       await post(`/notifications/${id}/dismiss`);
-      await refreshNotifications();
+      await updateNotifications((list) => list.filter((n) => n.id !== id));
       return true;
     } catch (err) { handleApiError(err); return false; }
   };

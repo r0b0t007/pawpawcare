@@ -190,3 +190,10 @@ export function addNotificationResponseListener(handler) {
   if (!Notifications) return { remove: () => {} };
   return Notifications.addNotificationResponseReceivedListener(handler);
 }
+
+// A notification shown while the app is in the foreground (a server push or a
+// local reminder firing).
+export function addNotificationReceivedListener(handler) {
+  if (!Notifications) return { remove: () => {} };
+  return Notifications.addNotificationReceivedListener(handler);
+}

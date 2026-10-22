@@ -165,6 +165,16 @@ test('Notifications show they are loading, then a retry if the load failed', asy
   expect(texts(tree)).not.toContain("Couldn't load your notifications.");
 });
 
+// A background re-read that fails keeps the list it has, even an empty one.
+test('Notifications keep a loaded empty list when a re-read fails', async () => {
+  mockNotificationsQuery.mockReturnValue({
+    data: { notifications: [], unreadCount: 0 }, isLoading: false, isError: true, isFetching: false, refetch: jest.fn(),
+  });
+  const shown = await render(<NotificationsScreen navigation={navigation} />);
+  expect(shown).toContain("You're all caught up");
+  expect(shown).not.toContain("Couldn't load your notifications.");
+});
+
 test('Medical records', async () => {
   const shown = await render(
     <MedicalRecordsScreen navigation={navigation} route={{ params: { petId: 'p1', petName: 'Biscuit' } }} />,

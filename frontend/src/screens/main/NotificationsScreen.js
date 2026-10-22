@@ -60,9 +60,11 @@ export default function NotificationsScreen({ navigation }) {
   useRefetchOnFocus(refetch);
   const notifications = data?.notifications ?? NONE;
   const unreadCount = data?.unreadCount ?? 0;
-  // A retry after a failed load is a fetch with the error still set: show it
-  // as loading, not as the unchanged error.
-  const retrying = isError && isFetching;
+  // Failed only with nothing to show: a background re-read that fails keeps
+  // the cached list (even an empty one). A retry after a failed load is a
+  // fetch with the error still set: show it as loading, not the same error.
+  const failed = isError && data === undefined;
+  const retrying = failed && isFetching;
   const [refreshing, setRefreshing] = useState(false);
   const today = useToday();
 
@@ -192,7 +194,7 @@ export default function NotificationsScreen({ navigation }) {
         {notifications.length === 0 && (isLoading || retrying) && (
           <ActivityIndicator color={ui.accent} style={styles.loading} accessibilityLabel={t('common.loading')} />
         )}
-        {notifications.length === 0 && isError && !retrying && (
+        {failed && !retrying && (
           <EmptyState
             compact
             title={t('notifications.loadFailed')}
@@ -202,7 +204,7 @@ export default function NotificationsScreen({ navigation }) {
             style={styles.empty}
           />
         )}
-        {notifications.length === 0 && !isLoading && !isError && (
+        {notifications.length === 0 && !isLoading && !failed && (
           <EmptyState
             photo={photos.emptyBlanket}
             title={t('notifications.empty.title')}
