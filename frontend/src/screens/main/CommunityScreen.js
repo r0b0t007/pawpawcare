@@ -13,6 +13,7 @@ import { uploadImage } from '../../services/api';
 import { track } from '../../services/analytics';
 import { useInFlight } from '../../hooks/useInFlight';
 import { useGroupsQuery } from '../../hooks/useGroups';
+import { useLostPetsBoardQuery } from '../../hooks/useLostPets';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { resolveAsset } from '../../config';
 import { ui, type, PET_COLOR_PAIRS, motion, photos, pairFor } from '../../theme';
@@ -41,8 +42,8 @@ export default function CommunityScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const {
-    posts, togglePaw, addPost, toggleGroupMembership, lostPets,
-    getComments, addComment, deleteComment, refreshLostPets, resolveLostPet,
+    posts, togglePaw, addPost, toggleGroupMembership,
+    getComments, addComment, deleteComment, resolveLostPet,
     reportPost, unreportPost,
   } = useData();
   // Member counts move with other people's joins; a stale list refetches when
@@ -52,6 +53,10 @@ export default function CommunityScreen({ navigation }) {
     refetch: refetchGroups,
   } = useGroupsQuery();
   useRefetchOnFocus(refetchGroups, { isStale: groupsStale });
+  const {
+    data: lostPets = [], isLoading: lostLoading, isError: lostFailed, isStale: boardStale,
+    refetch: refetchBoard,
+  } = useLostPetsBoardQuery();
 
   const [section, setSection] = useState('feed');
   const [composerOpen, setComposerOpen] = useState(false);
@@ -65,19 +70,18 @@ export default function CommunityScreen({ navigation }) {
 
   // The feed leads with a lost pet, so it needs a fresh board too. This tab
   // stays mounted: refresh whenever Community is focused or the section
-  // changes — always for Lost pets, and for the feed unless the board was
-  // fetched in the last minute (no extra GET on every Feed tap).
-  const boardFetchedAt = useRef(0);
+  // changes — always for Lost pets, and for the feed once the board is stale
+  // (BOARD_STALE_MS, so no extra GET on every Feed tap). The query fetches
+  // on mount by itself.
+  const boardStaleRef = useRef(boardStale);
+  boardStaleRef.current = boardStale;
+  const boardMounted = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      const stale = Date.now() - boardFetchedAt.current > 60000;
-      if (section === 'lost' || (section === 'feed' && stale)) {
-        boardFetchedAt.current = Date.now();
-        refreshLostPets();
-      }
-      // refreshLostPets is recreated each render; section is the trigger.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [section]),
+      const mounting = !boardMounted.current;
+      boardMounted.current = true;
+      if (section === 'lost' || (section === 'feed' && !mounting && boardStaleRef.current)) refetchBoard();
+    }, [section, refetchBoard]),
   );
 
   const attachImage = async () => {
@@ -371,7 +375,17 @@ export default function CommunityScreen({ navigation }) {
                 />
               );
             })}
-            {lostPets.length === 0 && (
+            {lostPets.length === 0 && lostFailed && (
+              <EmptyState
+                compact
+                title={t('lostPets.loadFailed')}
+                actionLabel={t('common.retry')}
+                actionIcon="refresh"
+                onAction={() => refetchBoard()}
+                style={styles.emptyState}
+              />
+            )}
+            {lostPets.length === 0 && !lostLoading && !lostFailed && (
               <EmptyState
                 compact
                 photo={photos.communityPals}

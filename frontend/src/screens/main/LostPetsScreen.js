@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, RefreshControl, Linking, Pressable, TextInput, Keyboard,
 } from 'react-native';
@@ -9,6 +9,8 @@ import { ui, type, photos } from '../../theme';
 import { Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, FormScrollView } from '../../components';
 import LostPetCard from './LostPetCard';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useLostPetsBoardQuery, useMyLostReportsQuery } from '../../hooks/useLostPets';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useLocale, useTranslation } from '../../i18n';
 
 // Redesign: this pushed screen is now the report/manage surface — the board
@@ -20,9 +22,15 @@ export default function LostPetsScreen({ navigation }) {
   // can stay mounted under another tab while the language is switched.
   useLocale();
   const { t } = useTranslation();
+  const { pets, reportPetLost, resolveLostPet } = useData();
   const {
-    pets, lostPets, myReports, refreshLostPets, reportPetLost, resolveLostPet,
-  } = useData();
+    data: lostPets = [], isLoading: boardLoading, isError: boardFailed, isStale: boardStale,
+    refetch: refetchBoard,
+  } = useLostPetsBoardQuery();
+  const { data: myReports = [], refetch: refetchMine } = useMyLostReportsQuery();
+  // Back from a pet's profile: pick up reports changed meanwhile.
+  useRefetchOnFocus(refetchBoard, { isStale: boardStale });
+  useRefetchOnFocus(refetchMine);
   const { user } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPetId, setSelectedPetId] = useState(null);
@@ -31,13 +39,11 @@ export default function LostPetsScreen({ navigation }) {
   const [phone, setPhone] = useState('');
   const [confirm, setConfirm] = useState(null); // { title, message, confirmLabel, action }
 
-  useEffect(() => { refreshLostPets(); }, []);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshLostPets();
+    await Promise.all([refetchBoard(), refetchMine()]);
     setRefreshing(false);
-  }, [refreshLostPets]);
+  }, [refetchBoard, refetchMine]);
 
   const activeReports = myReports.filter((r) => r.status !== 'resolved');
   const reportedPetIds = new Set(activeReports.map((r) => r.petId));
@@ -188,7 +194,17 @@ export default function LostPetsScreen({ navigation }) {
         {/* Other reports */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>{t('lostPets.nearby')}</Text>
-          {otherReports.length === 0 ? (
+          {otherReports.length === 0 && boardFailed && (
+            <EmptyState
+              compact
+              title={t('lostPets.loadFailed')}
+              actionLabel={t('common.retry')}
+              actionIcon="refresh"
+              onAction={() => refetchBoard()}
+              style={{ paddingVertical: 12 }}
+            />
+          )}
+          {otherReports.length === 0 && !boardLoading && !boardFailed && (
             <EmptyState
               compact
               photo={photos.communityPals}
@@ -196,7 +212,8 @@ export default function LostPetsScreen({ navigation }) {
               body={t('lostPets.emptyBody')}
               style={{ paddingVertical: 12 }}
             />
-          ) : (
+          )}
+          {otherReports.length > 0 && (
             otherReports.map((r) => (
               <LostPetCard
                 key={r.id}

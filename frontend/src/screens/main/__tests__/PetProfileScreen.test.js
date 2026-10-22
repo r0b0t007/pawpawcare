@@ -11,11 +11,23 @@ jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
   return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
 });
+// The menu opens in a Sheet, which needs a gesture root.
+jest.mock('react-native-gesture-handler', () => {
+  const chain = new Proxy({}, { get: () => () => chain });
+  return {
+    Gesture: { Pan: () => chain },
+    GestureDetector: ({ children }) => children,
+    GestureHandlerRootView: ({ children }) => children,
+  };
+});
+jest.mock('expo-haptics', () => ({ impactAsync: jest.fn(), ImpactFeedbackStyle: { Medium: 'medium' } }));
 jest.mock('../../../hooks/useGamification', () => ({
   useGamificationSummary: () => ({ data: undefined, refetch: jest.fn(), isStale: false }),
   milestoneLabel: () => null,
 }));
 jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.fn() }));
+let mockMyReports = [];
+jest.mock('../../../hooks/useLostPets', () => ({ useMyLostReportsQuery: () => ({ data: mockMyReports }) }));
 jest.mock('../../../hooks/useToday', () => ({ useToday: () => new Date('2026-10-12T10:00:00') }));
 jest.mock('../../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }));
@@ -26,7 +38,6 @@ jest.mock('../../../context/DataContext', () => {
   return {
     useData: () => ({
       pets: mockPets,
-      myReports: [],
       medDoseDays: {},
       ...Object.fromEntries(
         [
@@ -128,4 +139,48 @@ test('renders its chrome in the app language, never translating the pet name', a
     });
     act(() => tree.unmount());
   }
+});
+
+// My lost-pet reports load on their own (useMyLostReportsQuery). Until they
+// have, the menu offers neither action: "report lost" for a pet already on
+// the board would overwrite its report with an empty form.
+describe('the lost-pet menu action', () => {
+  const menuTitles = (tree) => {
+    const more = tree.root.findAll((n) => n.props.accessibilityLabel === 'More actions for Luna' && n.props.onPress);
+    act(() => more[0].props.onPress());
+    return tree.root.findAll((n) => n.props.chevron && typeof n.props.title === 'string').map((n) => n.props.title);
+  };
+  const open = () => {
+    let tree;
+    mockPets = [LUNA];
+    act(() => { tree = TestRenderer.create(<PetProfileScreen {...props} />); });
+    return tree;
+  };
+  afterEach(() => { mockMyReports = []; });
+
+  it('is held back until my reports have loaded', () => {
+    mockMyReports = undefined;
+    const tree = open();
+    const titles = menuTitles(tree);
+    expect(titles).toContain('Edit details');
+    expect(titles).not.toContain('Report Luna as lost');
+    expect(titles).not.toContain('Mark Luna as found');
+    act(() => tree.unmount());
+  });
+
+  it('offers to report a pet that is not on the board', () => {
+    const tree = open();
+    expect(menuTitles(tree)).toContain('Report Luna as lost');
+    act(() => tree.unmount());
+  });
+
+  it('offers to mark a lost pet found, under the lost banner', () => {
+    mockMyReports = [{ id: 'r1', petId: 'p1', status: 'active' }];
+    const tree = open();
+    expect(texts(tree)).toContain('Luna is reported lost');
+    const titles = menuTitles(tree);
+    expect(titles).toContain('Mark Luna as found');
+    expect(titles).not.toContain('Report Luna as lost');
+    act(() => tree.unmount());
+  });
 });
