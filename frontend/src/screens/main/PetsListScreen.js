@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, Pressable, FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { usePetsQuery } from '../../hooks/usePets';
+import { usePetRecordsQuery } from '../../hooks/usePetRecords';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { petMeta, petPhoto } from '../../utils/pets';
 import { useTranslation } from '../../i18n';
@@ -17,11 +17,14 @@ import { Button, EmptyState, PetCard, Skeleton, petHealthStatus } from '../../co
 const SEVERITY = { overdue: 0, due: 1, ok: 2 };
 
 export default function PetsListScreen({ navigation }) {
-  // Reads come from React Query; writes still go through DataContext, which
-  // invalidates the pets query (see queryKeys.js) so this list refetches.
+  // The full pet records, as every pet screen sees them: DataContext's writes
+  // land in the same cache, and a stale list re-reads on focus (edits made on
+  // another phone sharing a pet).
   const { t } = useTranslation();
-  const { data: pets = [], isLoading, isError, refetch } = usePetsQuery();
-  useRefetchOnFocus(refetch);
+  const {
+    data: pets = [], isLoading, isError, isStale, refetch,
+  } = usePetRecordsQuery();
+  useRefetchOnFocus(refetch, { isStale });
 
   const sorted = useMemo(
     () =>

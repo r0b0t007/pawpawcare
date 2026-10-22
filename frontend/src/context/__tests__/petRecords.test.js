@@ -23,11 +23,14 @@ jest.mock('../../services/prefs', () => ({
   setPref: jest.fn(() => Promise.resolve()),
 }));
 let mockUser = { id: 'u1' };
+const mockLogout = jest.fn();
 jest.mock('../AuthContext', () => ({
-  useAuth: () => ({ user: mockUser, logout: jest.fn() }),
+  useAuth: () => ({ user: mockUser, logout: mockLogout }),
 }));
 
 import { DataProvider, useData } from '../DataContext';
+import { usePetRecordsQuery } from '../../hooks/usePetRecords';
+import { usePetsQuery } from '../../hooks/usePets';
 import { get, post, patch, del } from '../../services/api';
 
 const PET = { id: 'p1', owner_id: 'u1', name: 'Rex', type: 'dog' };
@@ -82,13 +85,13 @@ describe('pet records in the cache', () => {
     expect(client.getQueryData(['petRecords', 'u1'])).toBe(data.pets);
   });
 
-  // They are filled by the sign-in load, not fetched by a query of their own:
-  // nothing may garbage-collect them while no hook observes them.
-  it('are never garbage-collected or stale', async () => {
+  // useData().pets reads them without a query observer: nothing may
+  // garbage-collect them. A failed load says so at once, without retries.
+  it('are never garbage-collected, and not retried', async () => {
     await mount();
 
     expect(client.getQueryCache().find({ queryKey: ['petRecords', 'u1'] }).options)
-      .toEqual(expect.objectContaining({ gcTime: Infinity, staleTime: Infinity }));
+      .toEqual(expect.objectContaining({ gcTime: Infinity, retry: false }));
   });
 
   // Two pets added at once both land: each write applies to the current
@@ -132,6 +135,73 @@ describe('pet records in the cache', () => {
 
     expect(data.pets).toEqual([]);
     expect(client.getQueryCache().findAll({ queryKey: ['petRecords'] })).toHaveLength(0);
+  });
+});
+
+// The records are a query: the sign-in load and a screen's hook share it.
+describe('the records query', () => {
+  const calls = (path) => get.mock.calls.filter(([p]) => p === path).length;
+  function PetsTab() {
+    usePetRecordsQuery();
+    return null;
+  }
+
+  // The Pets tab mounts with Home at sign-in: one 1 + 6N load between them,
+  // and the light list (Home's early names) adds only /pets.
+  it('runs one load at sign-in, whoever asks first', async () => {
+    function Home() {
+      usePetsQuery();
+      return null;
+    }
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <DataProvider>
+            <PetsTab />
+            <Home />
+            <Probe />
+          </DataProvider>
+        </QueryClientProvider>,
+      );
+    });
+
+    expect(calls('/pets/p1/vaccinations')).toBe(1);
+    expect(calls('/pets/p1/medications')).toBe(1);
+    expect(calls('/pets')).toBe(2); // the records load, and the light list
+    expect(data.pets.map((p) => p.id)).toEqual(['p1']);
+  });
+
+  // Accepting a shared pet reloads everything, even records loaded moments ago.
+  it('a full reload re-reads records that are still fresh', async () => {
+    client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 5 * 60 * 1000 } } });
+    await mount();
+    expect(calls('/pets/p1/medications')).toBe(1);
+    post.mockResolvedValue({});
+
+    await act(async () => { await data.acceptInvite('i1'); });
+
+    expect(calls('/pets/p1/medications')).toBe(2);
+  });
+
+  // The records query and the sign-in load both meet the expired session.
+  it('an expired session signs out once', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    get.mockImplementation((path) => (path === '/pets'
+      ? Promise.reject(new Error('SESSION_EXPIRED'))
+      : Promise.resolve([])));
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <DataProvider>
+            <PetsTab />
+            <Probe />
+          </DataProvider>
+        </QueryClientProvider>,
+      );
+    });
+
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+    console.warn.mockRestore();
   });
 });
 
@@ -219,6 +289,8 @@ describe('after logout', () => {
       return Promise.resolve([]);
     });
     await mount();
+    // Watching from before the logout: removing the query cancels the load.
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockUser = null;
     await act(async () => { tree.update(element()); });
 
@@ -226,6 +298,9 @@ describe('after logout', () => {
 
     expect(records()).toHaveLength(0);
     expect(data.pets).toEqual([]);
+    // Nothing to report: the load was for an account no longer signed in.
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('a mutation that answers late writes nothing', async () => {

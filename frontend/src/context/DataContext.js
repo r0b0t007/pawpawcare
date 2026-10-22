@@ -2,7 +2,7 @@ import React, {
   createContext, useCallback, useContext, useReducer, useEffect, useMemo, useRef, useSyncExternalStore,
 } from 'react';
 import { AppState } from 'react-native';
-import { hashKey, useQueryClient } from '@tanstack/react-query';
+import { hashKey, isCancelledError, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { PET_COLOR_PAIRS } from '../theme';
 
@@ -279,6 +279,73 @@ function dataReducer(state, action) {
 // Stable while no pet records are cached, so readers' memos don't rerun.
 const NO_PETS = [];
 
+// ── Pet records query ──
+
+// API resource → field on the mapped pet (toPet's option names match the
+// resources except foods → favoriteFoods).
+const PET_FIELDS = {
+  vaccinations: 'vaccinations', activities: 'activities', foods: 'favoriteFoods',
+  medications: 'medications', weights: 'weights', expenses: 'expenses',
+};
+const PET_RESOURCES = Object.keys(PET_FIELDS);
+
+// Requests that failed in the last load, per records query (by key hash): a
+// partial load still returns its pets, so the count travels beside them.
+const petLoadFailures = new Map();
+
+// Every pet with its six sub-resources: 1 + 6N requests. One failure among
+// them used to reject the whole load: no pets for the rest of the session
+// (Home said "Welcome to PawPawCare", every profile said "Pet not found").
+// Now a failed request keeps that pet's last good copy of the field; with
+// none, the field is listed in pet.missing so screens don't read the empty
+// list as "nothing on record". The failures are counted in petLoadFailures.
+export async function fetchPetRecords(queryClient, queryKey) {
+  const apiPets = await get('/pets');
+  const previous = new Map((queryClient.getQueryData(queryKey) ?? NO_PETS).map((p) => [p.id, p]));
+  const failures = [];
+  const fetchList = (petId, resource) =>
+    get(`/pets/${petId}/${resource}`).catch((err) => {
+      // An expired session ends the load (and signs out) at once, instead of
+      // after every other request has failed the same way.
+      if (err?.message === 'SESSION_EXPIRED') throw err;
+      failures.push(err);
+      return null;
+    });
+  const buildPet = (apiPet, i, lists) => {
+    const loaded = Object.fromEntries(Object.entries(lists).filter(([, list]) => list));
+    const pet = toPet(apiPet, { ...loaded, index: i });
+    const old = previous.get(apiPet.id);
+    const missing = [];
+    for (const [resource, field] of Object.entries(PET_FIELDS)) {
+      if (loaded[resource]) continue;
+      if (old) pet[field] = old[field];
+      if (!old || old.missing?.includes(field)) missing.push(field);
+    }
+    if (missing.length) pet.missing = missing;
+    return pet;
+  };
+
+  const listsByPet = await Promise.all(
+    apiPets.map((p) => Promise.all(PET_RESOURCES.map((r) => fetchList(p.id, r))))
+  );
+  petLoadFailures.set(hashKey(queryKey), failures.length);
+  return apiPets.map((apiPet, i) =>
+    buildPet(apiPet, i, Object.fromEntries(PET_RESOURCES.map((r, j) => [r, listsByPet[i][j]])))
+  );
+}
+
+// Never garbage-collected (DataContext's useData().pets reads them without a
+// query observer), and not retried: a failed load says so at once, as it did
+// before it was a query. Stale after the app-wide five minutes.
+const PET_RECORDS_DEFAULTS = { gcTime: Infinity, retry: false };
+
+// The records query, for the sign-in load and usePetRecordsQuery alike.
+export const petRecordsQuery = (queryClient, queryKey) => ({
+  queryKey,
+  queryFn: () => fetchPetRecords(queryClient, queryKey),
+  ...PET_RECORDS_DEFAULTS,
+});
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function DataProvider({ children }) {
@@ -295,13 +362,14 @@ export function DataProvider({ children }) {
 
   // ── Pet records ──
   // Every pet with its six sub-resources lives in the React Query cache
-  // (petRecordsKeys), filled by the sign-in load below and changed by the
-  // mutations — not fetched by a query of its own yet, so it never goes stale
-  // or is garbage-collected. A store subscription (not a query observer)
-  // re-renders with each write as it happens, as the reducer did.
+  // (petRecordsKeys): fetched by its query (fetchPetRecords — the sign-in
+  // load runs it, and usePetRecordsQuery screens re-read it), changed by the
+  // mutations. It is never garbage-collected. A store subscription (not a
+  // query observer) re-renders with each write as it happens, as the reducer
+  // did.
   const petRecordsKey = petRecordsKeys.list(user?.id);
   useEffect(() => {
-    queryClient.setQueryDefaults(petRecordsKeys.all, { gcTime: Infinity, staleTime: Infinity });
+    queryClient.setQueryDefaults(petRecordsKeys.all, PET_RECORDS_DEFAULTS);
   }, [queryClient]);
   const petRecordsHash = hashKey(petRecordsKey);
   const subscribePets = useCallback((onChange) => queryClient.getQueryCache().subscribe((event) => {
@@ -398,13 +466,18 @@ export function DataProvider({ children }) {
   const session = useRef({ userId: null, logout });
   session.current = { userId: user?.id ?? null, logout };
   const expiredFor = useRef(null);
-  useEffect(() => queryClient.getQueryCache().subscribe((event) => {
-    if (event.type !== 'updated' || event.action?.type !== 'error') return;
-    if (event.action.error?.message !== 'SESSION_EXPIRED') return;
+  // The sign-in load and the query cache can both meet the same expired
+  // session (the pet records are a query): one guarded sign-out for both.
+  const endExpiredSession = () => {
     const { userId, logout: endSession } = session.current;
     if (!userId || expiredFor.current === userId) return;
     expiredFor.current = userId;
     endSession();
+  };
+  useEffect(() => queryClient.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action?.type !== 'error') return;
+    if (event.action.error?.message !== 'SESSION_EXPIRED') return;
+    endExpiredSession();
   }), [queryClient]);
 
   // Writes a mutation's answer into a query's cache, for every domain:
@@ -511,65 +584,28 @@ export function DataProvider({ children }) {
     invalidateNotifications();
     const loaders = [
       async () => {
-        // My lost-pet reports are read through useMyLostReportsQuery;
-        // PetProfile offers neither report-lost nor mark-found until they load.
-        const apiPets = await get('/pets');
-
-        // Each pet has six sub-resources, so a load is 1 + 6N requests. One
-        // failure among them used to reject the whole domain: no pets for the
-        // rest of the session (Home said "Welcome to PawPawCare", every
-        // profile said "Pet not found") while the Pets tab, on React Query,
-        // still listed them. Now a failed request keeps that pet's last good
-        // copy of the field; with none, the field is listed in pet.missing so
-        // screens don't read the empty list as "nothing on record". The domain
-        // still counts as failed below (logged as a partial load).
+        // The records query's own fetch (fetchPetRecords). If a screen's hook
+        // already started it, this joins that fetch rather than running a
+        // second 1 + 6N load; otherwise it runs it, fresh or not.
         const loadingFor = petRecordsKey;
-        const previous = new Map((queryClient.getQueryData(loadingFor) ?? NO_PETS).map((p) => [p.id, p]));
-        const failures = [];
-        const fetchList = (petId, resource) =>
-          get(`/pets/${petId}/${resource}`).catch((err) => {
-            // An expired session ends the load (and signs out below) at once,
-            // instead of after every other request has failed the same way.
-            if (err?.message === 'SESSION_EXPIRED') throw err;
-            failures.push(err);
-            return null;
-          });
-        // API resource → field on the mapped pet (toPet's option names
-        // match the resources except foods → favoriteFoods).
-        const FIELDS = {
-          vaccinations: 'vaccinations', activities: 'activities', foods: 'favoriteFoods',
-          medications: 'medications', weights: 'weights', expenses: 'expenses',
-        };
-        const RESOURCES = Object.keys(FIELDS);
-        const buildPet = (apiPet, i, lists) => {
-          const loaded = Object.fromEntries(Object.entries(lists).filter(([, list]) => list));
-          const pet = toPet(apiPet, { ...loaded, index: i });
-          const old = previous.get(apiPet.id);
-          const missing = [];
-          for (const [resource, field] of Object.entries(FIELDS)) {
-            if (loaded[resource]) continue;
-            if (old) pet[field] = old[field];
-            if (!old || old.missing?.includes(field)) missing.push(field);
-          }
-          if (missing.length) pet.missing = missing;
-          return pet;
-        };
-
-        const listsByPet = await Promise.all(
-          apiPets.map((p) => Promise.all(RESOURCES.map((r) => fetchList(p.id, r))))
-        );
-        const petsWithData = apiPets.map((apiPet, i) =>
-          buildPet(apiPet, i, Object.fromEntries(RESOURCES.map((r, j) => [r, listsByPet[i][j]])))
-        );
-        // Signed out (or switched account) while loading: drop the answer.
+        let petsWithData;
+        try {
+          petsWithData = await queryClient.fetchQuery({ ...petRecordsQuery(queryClient, loadingFor), staleTime: 0 });
+        } catch (err) {
+          // Logout removed the query mid-load: nothing to report.
+          if (isCancelledError(err)) return;
+          throw err;
+        }
+        // Signed out (or switched account) while loading: nothing to hydrate.
         if (hashKey(loadingFor) !== hashKey(petRecordsKeys.list(session.current.userId))) return;
-        queryClient.setQueryData(loadingFor, petsWithData);
         // Hydrating prunes the stored dose history of every med it isn't
         // given, so a pet whose medications never loaded would lose its
         // history for good. Skip it; the next full load hydrates.
         if (!petsWithData.some((p) => p.missing?.includes('medications'))) hydrateDoseDays(petsWithData);
 
-        if (failures.length) throw new Error(`${failures.length} pet request(s) failed`);
+        // A partial load still counts as failed (logged below).
+        const failures = petLoadFailures.get(hashKey(loadingFor)) ?? 0;
+        if (failures) throw new Error(`${failures} pet request(s) failed`);
       },
       () => refreshReminders({ rethrow: true }),
     ];
@@ -579,7 +615,7 @@ export function DataProvider({ children }) {
     // Log out once, however many loaders hit the expired session — logout()
     // has no in-flight guard, so a per-failure handleApiError would fire it
     // up to once per domain.
-    if (failed.some((r) => r.reason?.message === 'SESSION_EXPIRED')) logout();
+    if (failed.some((r) => r.reason?.message === 'SESSION_EXPIRED')) endExpiredSession();
     if (failed.length) {
       console.warn(`[data] ${failed.length}/${loaders.length} domains failed to load; kept previous state for those`);
     }
