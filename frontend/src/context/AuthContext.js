@@ -159,7 +159,7 @@ export function AuthProvider({ children }) {
     // when push is unavailable (reminder times, server-sent pushes and email).
     // The saved locale goes back on the user: content the server translates
     // (the seeded community groups) may have been fetched in the old language
-    // meanwhile, and DataContext refetches it when user.locale changes. Only
+    // meanwhile, and useGroupsQuery keys them on user.locale. Only
     // the locale is taken, so a plan applied meanwhile is never undone; and
     // only while the app still shows it, so a language picked in Profile
     // since this PATCH went out wins. Not via applyUser: this is no account

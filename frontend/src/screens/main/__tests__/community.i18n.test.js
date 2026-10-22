@@ -32,11 +32,19 @@ jest.mock('../../../services/api', () => ({
 }));
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1', name: 'Sam' } }) }));
 const mockPet = { id: 'p1', name: 'Biscuit', type: 'dog', colorIndex: 0 };
+const mockGroupsQuery = jest.fn();
+jest.mock('../../../hooks/useGroups', () => ({ useGroupsQuery: () => mockGroupsQuery() }));
+beforeEach(() => mockGroupsQuery.mockReturnValue({
+  data: [{ id: 'g1', name: 'Dog lovers', members: 1, isJoined: false }],
+  isLoading: false,
+  isError: false,
+  isStale: false,
+  refetch: jest.fn(),
+}));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     pets: [mockPet],
     posts: [],
-    groups: [{ id: 'g1', name: 'Dog lovers', members: 1, isJoined: false }],
     lostPets: [],
     myReports: [],
     refreshLostPets: jest.fn(() => Promise.resolve()),
@@ -82,6 +90,19 @@ test('English: a one-member group reads "1 member" (was "1 members" before CHW-1
   await render(<CommunityScreen navigation={nav} />);
   await act(async () => tree.root.findByType(SegmentedControl).props.onChange('groups'));
   expect(texts()).toContain('1 member');
+});
+
+test('groups that failed to load say so in French, with a retry — not "no groups yet"', async () => {
+  const refetch = jest.fn();
+  mockGroupsQuery.mockReturnValue({ data: undefined, isLoading: false, isError: true, isStale: true, refetch });
+  await render(<CommunityScreen navigation={nav} />);
+  await act(async () => tree.root.findByType(SegmentedControl).props.onChange('groups'));
+
+  expect(texts()).toEqual(expect.arrayContaining(['Impossible de charger les groupes.', 'Réessayer']));
+  expect(texts()).not.toContain('Aucun groupe pour l\'instant');
+  const retry = tree.root.findAll((n) => n.props.label === 'Réessayer' && typeof n.props.onPress === 'function')[0];
+  await act(async () => retry.props.onPress());
+  expect(refetch).toHaveBeenCalled();
 });
 
 test('the lost-pet report screen speaks French', async () => {

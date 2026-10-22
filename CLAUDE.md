@@ -47,7 +47,7 @@ Data fetching is migrating from `DataContext` to `@tanstack/react-query`, one do
 1. Query keys live in `frontend/src/hooks/queryKeys.js`; domain hooks in `frontend/src/hooks/` (see `usePets.js`) reuse the `services/api.js` client and the mappers exported from `DataContext.js`.
 2. **Reads** migrate to `useQuery`; **writes stay in `DataContext`** until every reader of that domain has migrated — DataContext mutations invalidate the matching query key to keep both stores in sync.
 3. Screens refetch on focus via `useRefetchOnFocus` to pick up edits from unmigrated screens.
-4. Consult `expo:expo-data-fetching` before extending. Migrated so far: pets (pilot), gamification (`useGamification.js` — reads-only domain). Remaining: dashboard, reminders, notifications, community, lost pets, invites, medical vault.
+4. Consult `expo:expo-data-fetching` before extending. Migrated so far: pets (pilot), gamification (`useGamification.js` — reads-only domain), community groups (`useGroups.js` — the saved locale is part of the key, so a language switch is a new query; `toggleGroupMembership` writes the server's answer into the cache). Remaining: dashboard, notifications, community feed, lost pets, invites, medical vault, and reminders **last** — DataContext's reminders list is also this device's notification schedule (`scheduleLocalReminders`, newest-request-wins, the post-fire refetch tick), so migrating its reads must keep one source for scheduling.
 
 ## Backend changes
 

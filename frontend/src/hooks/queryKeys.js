@@ -10,6 +10,14 @@ export const subscriptionKeys = {
   offerings: (userId) => ['subscription', 'offerings', userId ?? null],
 };
 
+// Seeded group names come back in the account's saved language, so the locale
+// is part of the key (see useGroups.js); membership is per account.
+export const communityKeys = {
+  all: ['community'],
+  groupsFor: (userId) => ['community', 'groups', userId ?? null],
+  groups: (userId, locale) => ['community', 'groups', userId ?? null, locale ?? null],
+};
+
 export const gamificationKeys = {
   summary: ['gamification', 'summary'],
   recap: ['gamification', 'recap'],

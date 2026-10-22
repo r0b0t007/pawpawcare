@@ -1568,6 +1568,8 @@
     "leaveHint": "Leaves the group",
     "emptyGroupsTitle": "No groups yet",
     "emptyGroupsBody": "Groups will appear here as the community grows.",
+    "groupsLoadFailed": "Couldn't load the groups.",
+    "groupsRetry": "Try again",
     "reportMissing": "Report a missing pet",
     "card": {
       "hidden": "Post hidden — thanks for the report. Our team reviews within 24 hours.",
