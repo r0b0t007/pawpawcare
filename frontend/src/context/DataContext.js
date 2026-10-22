@@ -16,7 +16,7 @@ import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
 import {
-  petsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys,
+  petsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys, vaultKeys,
 } from '../hooks/queryKeys';
 import i18n from '../i18n';
 
@@ -188,8 +188,9 @@ export const toInvite = (i) => ({
   createdAt: i.created_at,
 });
 
-// Medical records vault — lazy-loaded per pet, not kept in global pet state.
-const toClinic = (c) => ({
+// Medical records vault — read per pet through useVault.js, not kept in
+// global pet state.
+export const toClinic = (c) => ({
   id: c.id,
   petId: c.pet_id,
   name: c.name,
@@ -200,7 +201,7 @@ const toClinic = (c) => ({
   notes: c.notes || null,
 });
 
-const toAppointment = (a) => ({
+export const toAppointment = (a) => ({
   id: a.id,
   petId: a.pet_id,
   clinicId: a.clinic_id || null,
@@ -211,7 +212,7 @@ const toAppointment = (a) => ({
   notes: a.notes || null,
 });
 
-const toDocument = (d) => ({
+export const toDocument = (d) => ({
   id: d.id,
   petId: d.pet_id,
   appointmentId: d.appointment_id || null,
@@ -422,6 +423,7 @@ export function DataProvider({ children }) {
       queryClient.removeQueries({ queryKey: invitesKeys.all });
       queryClient.removeQueries({ queryKey: lostPetsKeys.all });
       queryClient.removeQueries({ queryKey: notificationsKeys.all });
+      queryClient.removeQueries({ queryKey: vaultKeys.all });
       expiredFor.current = null;
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
@@ -1149,58 +1151,66 @@ export function DataProvider({ children }) {
 
   // ── Medical records vault ──
 
-  // Lazy-load a pet's clinics, appointments, and documents together. Returns
-  // mapped lists (or null on error) for the records screen to hold locally.
-  const getPetRecords = async (petId) => {
-    try {
-      const [clinics, appointments, documents] = await Promise.all([
-        get(`/pets/${petId}/clinics`),
-        get(`/pets/${petId}/appointments`),
-        get(`/pets/${petId}/documents`),
-      ]);
-      return {
-        clinics: clinics.map(toClinic),
-        appointments: appointments.map(toAppointment),
-        documents: documents.map(toDocument),
-      };
-    } catch (err) {
-      handleApiError(err);
-      return null;
-    }
+  // The vault is read through useVaultQuery (useVault.js), which holds the
+  // server's lists as they came. Adds and edits re-read it — the server
+  // orders each list (clinics by name, visits and documents newest first) —
+  // without holding up the sheet that saved. Deletes take just that row out.
+  const vaultKey = (petId) => vaultKeys.pet(user?.id, petId);
+  const invalidateVault = (petId) => {
+    queryClient.invalidateQueries({ queryKey: vaultKey(petId) });
   };
+  const dropFromVault = (petId, list, id) =>
+    writeQueryCache(vaultKey(petId), (vault) => ({ ...vault, [list]: vault[list].filter((x) => x.id !== id) }));
 
   const addClinic = async (petId, data) => {
     const c = await post(`/pets/${petId}/clinics`, data);
+    invalidateVault(petId);
     return toClinic(c);
   };
   const updateClinic = async (petId, id, data) => {
     const c = await patch(`/pets/${petId}/clinics/${id}`, data);
+    invalidateVault(petId);
     return toClinic(c);
   };
   const deleteClinic = async (petId, id) => {
-    try { await del(`/pets/${petId}/clinics/${id}`); return true; } catch (err) { handleApiError(err); return false; }
+    try {
+      await del(`/pets/${petId}/clinics/${id}`);
+      await dropFromVault(petId, 'clinics', id);
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   const addAppointment = async (petId, data) => {
     const a = await post(`/pets/${petId}/appointments`, data);
+    invalidateVault(petId);
     return toAppointment(a);
   };
   const updateAppointment = async (petId, id, data) => {
     const a = await patch(`/pets/${petId}/appointments/${id}`, data);
+    invalidateVault(petId);
     return toAppointment(a);
   };
   const deleteAppointment = async (petId, id) => {
-    try { await del(`/pets/${petId}/appointments/${id}`); return true; } catch (err) { handleApiError(err); return false; }
+    try {
+      await del(`/pets/${petId}/appointments/${id}`);
+      await dropFromVault(petId, 'appointments', id);
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
 
   // file = { uri, name }; fields = { title, category, appointment_id?, clinic_id? }
   const addDocument = async (petId, file, fields) => {
     const d = await uploadDocument(petId, file, fields);
     trackCareAction('document_uploaded');
+    invalidateVault(petId);
     return toDocument(d);
   };
   const deleteDocument = async (petId, id) => {
-    try { await del(`/pets/${petId}/documents/${id}`); return true; } catch (err) { handleApiError(err); return false; }
+    try {
+      await del(`/pets/${petId}/documents/${id}`);
+      await dropFromVault(petId, 'documents', id);
+      return true;
+    } catch (err) { handleApiError(err); return false; }
   };
   // Mint a short-lived signed URL to view a document (files aren't public).
   const getDocumentUrl = async (petId, id) => {
@@ -1216,6 +1226,11 @@ export function DataProvider({ children }) {
   const extractDocument = async (petId, id) => {
     const d = await post(`/pets/${petId}/documents/${id}/extract`);
     track('document_extracted', { category: d.category });
+    // The reading may also have changed the document's title or category.
+    await writeQueryCache(vaultKey(petId), (vault) => ({
+      ...vault,
+      documents: vault.documents.map((x) => (x.id === d.id ? d : x)),
+    }));
     return toDocument(d);
   };
   // Apply the user's reviewed subset. The created records live in global pet
@@ -1230,6 +1245,8 @@ export function DataProvider({ children }) {
       expense: !!result.expense,
     });
     noteGoodMoment('extraction_applied');
+    // The document is marked applied; the new records live in pet state.
+    invalidateVault(petId);
     loadData();
     return result;
   };
@@ -1415,7 +1432,6 @@ export function DataProvider({ children }) {
         leavePet,
         acceptInvite,
         declineInvite,
-        getPetRecords,
         addClinic,
         updateClinic,
         deleteClinic,

@@ -38,11 +38,23 @@ import { petHealthStatus } from '../../../components/petStatus';
 import { medicationStreakLabel } from '../../../utils/streaks';
 
 jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.fn() }));
+// The delete confirmation opens a dialog, which needs a gesture root.
+jest.mock('react-native-gesture-handler', () => {
+  const chain = new Proxy({}, { get: () => () => chain });
+  return {
+    Gesture: { Pan: () => chain },
+    GestureDetector: ({ children }) => children,
+    GestureHandlerRootView: ({ children }) => children,
+  };
+});
 const mockNotificationsQuery = jest.fn();
 jest.mock('../../../hooks/useNotifications', () => ({
   useNotificationsQuery: () => mockNotificationsQuery(),
   useUnreadCount: () => ({ data: 0, isStale: false, refetch: jest.fn() }),
 }));
+const mockVaultQuery = jest.fn();
+jest.mock('../../../hooks/useVault', () => ({ useVaultQuery: () => mockVaultQuery() }));
+const EMPTY_VAULT = { clinics: [], appointments: [], documents: [] };
 const noop = () => Promise.resolve(true);
 const BISCUIT = {
   id: 'p1', name: 'Biscuit', type: 'dog', colorIndex: 0,
@@ -74,6 +86,7 @@ async function inFrench(fn) {
 }
 
 beforeEach(() => {
+  mockVaultQuery.mockReturnValue({ data: EMPTY_VAULT, isError: false, isFetching: false, refetch: jest.fn() });
   mockNotificationsQuery.mockReturnValue({
     data: { notifications: [], unreadCount: 0 }, isLoading: false, isError: false, isFetching: false, refetch: jest.fn(),
   });
@@ -90,7 +103,6 @@ beforeEach(() => {
     markNotificationRead: noop,
     snoozeNotification: noop,
     dismissNotification: noop,
-    getPetRecords: () => Promise.resolve({ clinics: [], appointments: [], documents: [] }),
     addClinic: noop, deleteClinic: noop, addAppointment: noop, deleteAppointment: noop,
     addDocument: noop, deleteDocument: noop, getDocumentUrl: noop, extractDocument: noop, applyExtraction: noop,
   };
@@ -183,6 +195,57 @@ test('Medical records', async () => {
   await inFrench(async () => {
     expect(texts(tree)).toContain('Créez le coffre de Biscuit');
   });
+});
+
+// The vault loads when the screen opens: placeholders first, a retry if the
+// first load failed (placeholders again while it runs), and a failed re-read
+// keeps what is shown.
+test('Medical records show loading, a retry, then the records', async () => {
+  const records = () => <MedicalRecordsScreen navigation={navigation} route={{ params: { petId: 'p1', petName: 'Biscuit' } }} />;
+  const placeholders = () => tree.root.findAll((n) => n.props.accessibilityLabel === 'Loading records' && n.props.children).length > 0;
+
+  mockVaultQuery.mockReturnValue({ data: undefined, isError: false, isFetching: true, refetch: jest.fn() });
+  await render(records());
+  expect(placeholders()).toBe(true);
+
+  const refetch = jest.fn(() => Promise.resolve({ isError: false }));
+  mockVaultQuery.mockReturnValue({ data: undefined, isError: true, isFetching: false, refetch });
+  await act(async () => tree.update(records()));
+  expect(texts(tree)).toContain("We couldn't open the vault");
+  const retry = tree.root.findAll((n) => n.props.label === 'Try again' && typeof n.props.onPress === 'function')[0];
+  await act(async () => retry.props.onPress());
+  expect(refetch).toHaveBeenCalled();
+
+  mockVaultQuery.mockReturnValue({ data: undefined, isError: true, isFetching: true, refetch });
+  await act(async () => tree.update(records()));
+  expect(placeholders()).toBe(true);
+  expect(texts(tree)).not.toContain("We couldn't open the vault");
+
+  mockVaultQuery.mockReturnValue({
+    data: { ...EMPTY_VAULT, documents: [{ id: 'd1', petId: 'p1', title: 'Bloodwork', category: 'lab', extractionStatus: 'none' }] },
+    isError: true, isFetching: false, refetch,
+  });
+  await act(async () => tree.update(records()));
+  expect(texts(tree)).toContain('Bloodwork');
+  expect(texts(tree)).not.toContain("We couldn't open the vault");
+});
+
+// DataContext takes the row out of the vault; the screen only confirms.
+test('Medical records delete through DataContext and say so', async () => {
+  const deleteDocument = jest.fn(() => Promise.resolve(true));
+  mockStore.deleteDocument = deleteDocument;
+  mockVaultQuery.mockReturnValue({
+    data: { ...EMPTY_VAULT, documents: [{ id: 'd1', petId: 'p1', title: 'Bloodwork', category: 'lab', extractionStatus: 'none' }] },
+    isError: false, isFetching: false, refetch: jest.fn(),
+  });
+  await render(<MedicalRecordsScreen navigation={navigation} route={{ params: { petId: 'p1', petName: 'Biscuit' } }} />);
+
+  const remove = tree.root.findAll((n) => n.props.accessibilityLabel === 'Delete Bloodwork' && typeof n.props.onPress === 'function')[0];
+  await act(async () => remove.props.onPress());
+  const dialog = tree.root.findAll((n) => typeof n.props.onConfirm === 'function' && n.props.visible)[0];
+  await act(async () => dialog.props.onConfirm());
+
+  expect(deleteDocument).toHaveBeenCalledWith('p1', 'd1');
 });
 
 test('shared labels: status, milestones, streaks', async () => {

@@ -15,6 +15,8 @@ import i18n, { useLocale, useTranslation } from '../../i18n';
 import { petById, emptyPhotoFor } from '../../utils/pets';
 import { formatDecimal } from '../../utils/numbers';
 import { useInFlight } from '../../hooks/useInFlight';
+import { useVaultQuery } from '../../hooks/useVault';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { ui, type, radii, motion, photos, vaultColors } from '../../theme';
 import {
   Card, Chip, Button, Sheet, ConfirmDialog, DeleteButton, EmptyState, PetFace, Skeleton, showToast, ScreenHeader, TextField,
@@ -78,17 +80,23 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { petId, petName } = route.params;
   const {
-    pets, getPetRecords, addClinic, deleteClinic,
+    pets, addClinic, deleteClinic,
     addAppointment, deleteAppointment, addDocument, deleteDocument, getDocumentUrl,
     extractDocument, applyExtraction,
   } = useData();
   const pet = petById(pets, petId);
   const name = pet?.name || petName;
 
-  const [records, setRecords] = useState(null);
-  // getPetRecords resolves null on failure: say so and offer a retry instead
-  // of leaving the loading placeholders up forever.
-  const [loadFailed, setLoadFailed] = useState(false);
+  const {
+    data: records, isError, isFetching, refetch,
+  } = useVaultQuery(petId);
+  // Records can change from another phone sharing the pet: re-read on focus.
+  useRefetchOnFocus(refetch);
+  // A failed first load says so and offers a retry instead of leaving the
+  // loading placeholders up forever; while that retry runs, the placeholders
+  // come back so the tap visibly does something. Only read without records:
+  // a failed re-read over records already shown keeps them.
+  const loadFailed = isError && !isFetching;
   const [refreshing, setRefreshing] = useState(false);
   const [clinicModal, setClinicModal] = useState(false);
   const [apptModal, setApptModal] = useState(false);
@@ -99,30 +107,18 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   // AI reads are paid: one at a time, and a double tap never starts two.
   const { run: runExtract, isBusy: isExtractBusy } = useInFlight();
 
-  const load = useCallback(async () => {
-    const data = await getPetRecords(petId);
-    if (data) setRecords(data);
-    setLoadFailed(!data);
-    return !!data;
-  }, [getPetRecords, petId]);
-
-  useEffect(() => { load(); }, [load]);
-
-  // One refresh at a time (pull or "Try again"). A retry from the failure
-  // view drops back to the loading placeholders so the tap visibly does
-  // something; a failed refresh over records already shown keeps them and
-  // says so instead of failing silently.
+  // One refresh at a time (pull or "Try again"). A failed refresh over
+  // records already shown keeps them and says so instead of failing silently.
   const refreshBusy = useRef(false);
   const onRefresh = useCallback(async () => {
     if (refreshBusy.current) return;
     refreshBusy.current = true;
     setRefreshing(true);
-    setLoadFailed(false);
-    const ok = await load();
-    if (!ok && records) showToast(t('records.toast.refreshFailed'));
+    const result = await refetch();
+    if (result.isError && records) showToast(t('records.toast.refreshFailed'));
     refreshBusy.current = false;
     setRefreshing(false);
-  }, [load, records, t]);
+  }, [refetch, records, t]);
 
   const clinics = records?.clinics || [];
   const appointments = records?.appointments || [];
@@ -151,10 +147,10 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   };
 
   // Deletes resolve true/false (DataContext contract): only a removal the
-  // server confirmed says so, and only that row leaves the list (no refetch
-  // of the whole vault); a failure keeps the row and offers a retry.
+  // server confirmed says so, and DataContext takes only that row out of the
+  // vault (no refetch of the whole vault); a failure keeps the row.
   // `kind` is 'document' | 'appointment' | 'clinic' (records.delete.<kind>).
-  const confirmDelete = (kind, remove, key, id) =>
+  const confirmDelete = (kind, remove) =>
     setConfirm({
       title: t(`records.delete.${kind}.title`),
       message: t(`records.delete.${kind}.message`, { name: name || t('records.thisPet') }),
@@ -163,7 +159,6 @@ export default function MedicalRecordsScreen({ navigation, route }) {
       action: async () => {
         if (await remove()) {
           showToast(t(`records.delete.${kind}.removed`));
-          setRecords((r) => (r ? { ...r, [key]: (r[key] || []).filter((x) => x.id !== id) } : r));
         } else {
           showToast(t(`records.delete.${kind}.failed`));
         }
@@ -183,7 +178,6 @@ export default function MedicalRecordsScreen({ navigation, route }) {
       try {
         const updated = await extractDocument(petId, doc.id);
         setReviewDoc(updated);
-        load();
       } catch (e) {
         showToast(e.message || t('records.toast.readFailed'));
       } finally {
@@ -195,7 +189,6 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const onApplied = (result) => {
     setReviewDoc(null);
     showToast(appliedToastText(result, t));
-    load();
   };
 
   const renderDocument = (d, last) => {
@@ -219,7 +212,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         onAccessibilityAction={({ nativeEvent }) => {
           if (nativeEvent.actionName === 'activate') openDocument(d);
           else if (nativeEvent.actionName === 'read') startExtraction(d);
-          else if (nativeEvent.actionName === 'delete') confirmDelete('document', () => deleteDocument(petId, d.id), 'documents', d.id);
+          else if (nativeEvent.actionName === 'delete') confirmDelete('document', () => deleteDocument(petId, d.id));
         }}
       >
         <View style={styles.rowIcon}>
@@ -255,7 +248,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
             <Text style={styles.readPillText}>{t('records.doc.read')}</Text>
           </Pressable>
         )}
-        <DeleteButton label={t('records.deleteA11y', { name: d.title })} onPress={() => confirmDelete('document', () => deleteDocument(petId, d.id), 'documents', d.id)} />
+        <DeleteButton label={t('records.deleteA11y', { name: d.title })} onPress={() => confirmDelete('document', () => deleteDocument(petId, d.id))} />
       </Pressable>
     );
   };
@@ -277,7 +270,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
           <MaterialCommunityIcons name={s.icon} size={12} color={s.fg} />
           <Text style={[styles.statusText, { color: s.fg }]}>{apptStatusLabel(a.status)}</Text>
         </View>
-        <DeleteButton label={t('records.deleteA11y', { name: a.title })} onPress={() => confirmDelete('appointment', () => deleteAppointment(petId, a.id), 'appointments', a.id)} />
+        <DeleteButton label={t('records.deleteA11y', { name: a.title })} onPress={() => confirmDelete('appointment', () => deleteAppointment(petId, a.id))} />
       </View>
     );
   };
@@ -304,7 +297,7 @@ export default function MedicalRecordsScreen({ navigation, route }) {
           <MaterialCommunityIcons name="phone" size={17} color={ui.accent} />
         </Pressable>
       )}
-      <DeleteButton label={t('records.deleteA11y', { name: c.name })} onPress={() => confirmDelete('clinic', () => deleteClinic(petId, c.id), 'clinics', c.id)} />
+      <DeleteButton label={t('records.deleteA11y', { name: c.name })} onPress={() => confirmDelete('clinic', () => deleteClinic(petId, c.id))} />
     </View>
   );
 
@@ -414,20 +407,17 @@ export default function MedicalRecordsScreen({ navigation, route }) {
         visible={clinicModal}
         onClose={() => setClinicModal(false)}
         onSave={(data) => addClinic(petId, data)}
-        onDone={load}
       />
       <AppointmentModal
         visible={apptModal}
         clinics={clinics}
         onClose={() => setApptModal(false)}
         onSave={(data) => addAppointment(petId, data)}
-        onDone={load}
       />
       <DocumentModal
         visible={docModal}
         onClose={() => setDocModal(false)}
         onSave={(file, fields) => addDocument(petId, file, fields)}
-        onDone={load}
       />
       <ExtractionSheet
         visible={!!reviewDoc}
@@ -536,7 +526,7 @@ function FormSheet({ visible, title, onClose, onSave, busy, saveLabel, busyLabel
 // The vault's add/update calls THROW by design (the forms show the API's
 // validation message). Each save runs through useInFlight so a double tap
 // never creates the record twice.
-function ClinicModal({ visible, onClose, onSave, onDone }) {
+function ClinicModal({ visible, onClose, onSave }) {
   const { t } = useTranslation();
   const [form, setForm] = useState({ name: '', vet_name: '', phone: '', email: '', address: '', notes: '' });
   const [error, setError] = useState(null);
@@ -559,7 +549,7 @@ function ClinicModal({ visible, onClose, onSave, onDone }) {
           address: form.address.trim() || null,
           notes: form.notes.trim() || null,
         });
-        reset(); onClose(); await onDone();
+        reset(); onClose();
         showToast(t('records.clinic.added'));
       } catch (e) { setError(e.message || t('records.clinic.saveFailed')); }
     });
@@ -592,7 +582,7 @@ function ClinicModal({ visible, onClose, onSave, onDone }) {
   );
 }
 
-function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
+function AppointmentModal({ visible, clinics, onClose, onSave }) {
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [when, setWhen] = useState(new Date());
@@ -620,7 +610,7 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
           status,
           notes: notes.trim() || null,
         });
-        reset(); onClose(); await onDone();
+        reset(); onClose();
         showToast(t('records.visit.logged'), { celebrate: true, actionType: 'appointment_logged' });
       } catch (e) { setError(e.message || t('records.visit.saveFailed')); }
     });
@@ -698,7 +688,7 @@ function AppointmentModal({ visible, clinics, onClose, onSave, onDone }) {
   );
 }
 
-function DocumentModal({ visible, onClose, onSave, onDone }) {
+function DocumentModal({ visible, onClose, onSave }) {
   const { t } = useTranslation();
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState('');
@@ -731,7 +721,7 @@ function DocumentModal({ visible, onClose, onSave, onDone }) {
       setError(null);
       try {
         await onSave(file, { title: title.trim(), category });
-        reset(); onClose(); await onDone();
+        reset(); onClose();
         showToast(t('records.doc.uploaded'));
       } catch (e) {
         // Keep the ENTIRE form + picked file; the banner + retry button take
