@@ -30,7 +30,7 @@ import { DataProvider, useData } from '../../context/DataContext';
 import { useLostPetsBoardQuery, useMyLostReportsQuery } from '../useLostPets';
 import { useFeedQuery } from '../useFeed';
 import i18n from '../../i18n';
-import { get, post, patch } from '../../services/api';
+import { get, post, patch, del } from '../../services/api';
 
 const apiReport = (id, petName = 'Bella', extra = {}) => ({
   id,
@@ -189,6 +189,32 @@ describe('reading lost-pet reports', () => {
   });
 });
 
+// CHW-277: which reports are mine follows who shares the pet.
+describe('sharing changes', () => {
+  const reread = () => [calls('/lost-pets'), calls('/lost-pets/mine')];
+
+  it('leaving a pet re-reads both lists', async () => {
+    await mount();
+    post.mockResolvedValue({});
+    await settle(() => data.leavePet('p1'));
+    expect(reread()).toEqual([2, 2]);
+  });
+
+  it('removing a co-owner re-reads both lists', async () => {
+    await mount();
+    del.mockResolvedValue({});
+    await settle(() => data.removePetMember('p1', 'u2'));
+    expect(reread()).toEqual([2, 2]);
+  });
+
+  it('accepting a shared pet re-reads both lists', async () => {
+    await mount();
+    post.mockResolvedValue({});
+    await settle(() => data.acceptInvite('i1'));
+    expect(reread()).toEqual([2, 2]);
+  });
+});
+
 describe('accounts', () => {
   it('never shows the previous account’s reports to the next one', async () => {
     serverMine = [apiReport('r3', 'Luna', { reported_by: 'u1' })];
@@ -301,6 +327,16 @@ describe('reporting and resolving', () => {
 
     expect(ok).toBe(true);
     expect(calls('/community/posts')).toBe(2);
+  });
+
+  // Spaces are blank too: the server would turn them into a cleared field.
+  it('reporting leaves out fields that are only spaces, and trims the rest', async () => {
+    await mount();
+    post.mockResolvedValue(apiReport('r9', 'Luna', { reported_by: 'u1' }));
+
+    await settle(() => data.reportPetLost('p1', { lastSeenLocation: '  Main St ', description: '   ', contactPhone: '' }));
+
+    expect(post).toHaveBeenCalledWith('/pets/p1/lost-report', { last_seen_location: 'Main St' });
   });
 
   it('a failed report resolves false and re-reads nothing', async () => {

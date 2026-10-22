@@ -29,7 +29,9 @@ export function useLostPetsBoardQuery() {
   });
 }
 
-// My own reports, active and resolved. Until they load, data stays undefined
+// My reports, active and resolved: those on pets I own or share, whoever in
+// the family filed them, and active ones I filed (CHW-277) — each `isMine`.
+// Never filter them by reportedBy. Until they load, data stays undefined
 // (never a stand-in []), so a screen can tell "not lost" from "not known yet".
 export function useMyLostReportsQuery() {
   const { user } = useAuth();

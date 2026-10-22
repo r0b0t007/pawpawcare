@@ -108,7 +108,9 @@ export default function PetProfileScreen({ navigation, route }) {
   const pet = pets.find((p) => p.id === petId);
   // Until my reports load, whether the pet is lost is unknown: the menu
   // offers neither "report lost" nor "mark found" rather than the wrong one.
-  const { data: myReports } = useMyLostReportsQuery();
+  // A co-owner's report changes it from another phone: re-read on focus.
+  const { data: myReports, refetch: refetchMyReports } = useMyLostReportsQuery();
+  useRefetchOnFocus(refetchMyReports);
   const activeReport = myReports?.find((r) => r.petId === petId && r.status === 'active');
   const isOwner = isPetOwner(pet, user);
 
