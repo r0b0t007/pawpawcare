@@ -28,7 +28,6 @@ let mockStore = {};
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     pets: [],
-    posts: [],
     reminders: [],
     unreadCount: 0,
     medDoseDays: {},
@@ -41,6 +40,9 @@ jest.mock('../../../context/DataContext', () => ({
 let mockEarlyPets;
 const mockUsePetsQuery = jest.fn(() => ({ data: mockEarlyPets }));
 jest.mock('../../../hooks/usePets', () => ({ usePetsQuery: (opts) => mockUsePetsQuery(opts) }));
+jest.mock('../../../hooks/useFeed', () => ({
+  useFeedQuery: () => ({ data: [], isLoading: false, isError: false, isStale: false, refetch: jest.fn() }),
+}));
 
 import React from 'react';
 import { Text } from 'react-native';

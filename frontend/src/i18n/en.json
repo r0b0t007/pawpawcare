@@ -1559,6 +1559,7 @@
     "post": "Post",
     "emptyFeedTitle": "No posts yet",
     "emptyFeedBody": "Be the first to share a moment with your pet!",
+    "feedLoadFailed": "Couldn't load the posts.",
     "members_one": "{{count}} member",
     "members_other": "{{count}} members",
     "join": "Join",

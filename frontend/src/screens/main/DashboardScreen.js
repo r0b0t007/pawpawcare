@@ -9,6 +9,7 @@ import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { usePetsQuery } from '../../hooks/usePets';
+import { useFeedQuery } from '../../hooks/useFeed';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useToday } from '../../hooks/useToday';
@@ -74,9 +75,11 @@ export default function DashboardScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const {
-    dataLoaded, pets, posts, reminders, unreadCount, medDoseDays, medDoseCounts,
+    dataLoaded, pets, reminders, unreadCount, medDoseDays, medDoseCounts,
     markVaccinationComplete, logMedicationDose,
   } = useData();
+  // The community teaser counts the feed's posts.
+  const { data: posts = [] } = useFeedQuery();
 
   // TTI: the dashboard is the main entry screen — interactive once the initial
   // data fan-out has rendered. Safe to call repeatedly; first call wins.

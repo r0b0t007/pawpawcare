@@ -28,6 +28,7 @@ jest.mock('../../context/AuthContext', () => ({
 
 import { DataProvider, useData } from '../../context/DataContext';
 import { useLostPetsBoardQuery, useMyLostReportsQuery } from '../useLostPets';
+import { useFeedQuery } from '../useFeed';
 import i18n from '../../i18n';
 import { get, post, patch } from '../../services/api';
 
@@ -55,6 +56,7 @@ function Probe() {
   // them here the way the screens destructure them.
   const { data: boardList, isError: boardFailed } = useLostPetsBoardQuery();
   const { data: mineList, isError: mineFailed } = useMyLostReportsQuery();
+  useFeedQuery();
   board = { data: boardList, isError: boardFailed };
   mine = { data: mineList, isError: mineFailed };
   return null;

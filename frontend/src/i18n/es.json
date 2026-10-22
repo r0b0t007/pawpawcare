@@ -1613,6 +1613,7 @@
     "post": "Publicar",
     "emptyFeedTitle": "Aún no hay publicaciones",
     "emptyFeedBody": "¡Sea el primero en compartir un momento con su mascota!",
+    "feedLoadFailed": "No se han podido cargar las publicaciones.",
     "members_one": "{{count}} miembro",
     "members_many": "{{count}} miembros",
     "members_other": "{{count}} miembros",

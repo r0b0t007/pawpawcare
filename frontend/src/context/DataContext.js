@@ -129,7 +129,7 @@ export const toPet = (apiPet, opts = {}) => {
   };
 };
 
-const toPost = (p) => ({
+export const toPost = (p) => ({
   id: p.id,
   authorId: p.author_id,
   authorName: p.author_name || i18n.t('common.unknown'),
@@ -237,9 +237,6 @@ function dataReducer(state, action) {
     case 'ADD_PET':    return { ...state, pets: [...state.pets, action.payload] };
     case 'UPDATE_PET': return { ...state, pets: state.pets.map((p) => (p.id === action.payload.id ? action.payload : p)) };
     case 'DELETE_PET': return { ...state, pets: state.pets.filter((p) => p.id !== action.payload) };
-    case 'SET_POSTS':  return { ...state, posts: action.payload };
-    case 'ADD_POST':   return { ...state, posts: [action.payload, ...state.posts] };
-    case 'UPDATE_POST':return { ...state, posts: state.posts.map((p) => (p.id === action.payload.id ? action.payload : p)) };
     case 'SET_REMINDERS':     return { ...state, reminders: action.payload };
     case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload.notifications || [], unreadCount: action.payload.unread_count || 0 };
     // Trust: when the store last successfully synced with the server (ms
@@ -303,7 +300,7 @@ function dataReducer(state, action) {
 
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
-    pets: [], posts: [], reminders: [], notifications: [], unreadCount: 0,
+    pets: [], reminders: [], notifications: [], unreadCount: 0,
     dataLoaded: false, lastSyncedAt: null,
     medDoseDays: {}, medDoseCounts: {},
   });
@@ -388,7 +385,6 @@ export function DataProvider({ children }) {
       expiredFor.current = null;
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
-      dispatch({ type: 'SET_POSTS', payload: [] });
       dispatch({ type: 'SET_REMINDERS', payload: [] });
       dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: [], unread_count: 0 } });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
@@ -500,7 +496,6 @@ export function DataProvider({ children }) {
 
         if (failures.length) throw new Error(`${failures.length} pet request(s) failed`);
       },
-      () => refreshPosts({ rethrow: true }),
       () => refreshReminders({ rethrow: true }),
       () => refreshNotifications({ rethrow: true }),
     ];
@@ -995,12 +990,9 @@ export function DataProvider({ children }) {
 
   // ── Lost pets ──
 
-  const refreshPosts = async ({ rethrow = false } = {}) => {
-    try {
-      const apiPosts = await get('/community/posts');
-      dispatch({ type: 'SET_POSTS', payload: apiPosts.map(toPost) });
-    } catch (err) { if (rethrow) throw err; handleApiError(err); }
-  };
+  // The feed is read through useFeedQuery: re-read it (a lost-pet report is
+  // broadcast as a post).
+  const refreshPosts = () => queryClient.invalidateQueries({ queryKey: communityKeys.feed(user?.id) });
 
   // The board and my reports are read through useLostPets.js. Invalidating
   // cancels a fetch already in flight (it predates the change) and resolves
@@ -1214,10 +1206,31 @@ export function DataProvider({ children }) {
 
   // ── Community ──
 
+  // Post answers are written into the feed cache (useFeedQuery), which holds
+  // the server's posts as they came. A feed fetch already in flight predates
+  // the change: cancel it first, or it would land afterwards and undo it.
+  // With no feed cached yet there is nothing to update; it is re-read.
+  const updateFeed = async (update) => {
+    const key = communityKeys.feed(user?.id);
+    await queryClient.cancelQueries({ queryKey: key });
+    if (queryClient.getQueryData(key) === undefined) {
+      queryClient.invalidateQueries({ queryKey: key });
+      return;
+    }
+    queryClient.setQueryData(key, update);
+  };
+  const replacePost = (apiPost) =>
+    updateFeed((posts) => posts.map((p) => (p.id === apiPost.id ? apiPost : p)));
+  const countComment = (postId, delta) =>
+    updateFeed((posts) => posts.map((p) => (p.id === postId
+      ? { ...p, comment_count: Math.max(0, (p.comment_count ?? 0) + delta) }
+      : p)));
+
   const addPost = async (content, imageUrl) => {
     try {
       const apiPost = await post('/community/posts', { content, image_url: imageUrl || null });
-      dispatch({ type: 'ADD_POST', payload: toPost(apiPost) });
+      // A re-read that landed meanwhile may already list it.
+      await updateFeed((posts) => [apiPost, ...posts.filter((p) => p.id !== apiPost.id)]);
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1258,7 +1271,7 @@ export function DataProvider({ children }) {
   const togglePaw = async (postId) => {
     try {
       const apiPost = await post(`/community/posts/${postId}/paw`);
-      dispatch({ type: 'UPDATE_POST', payload: toPost(apiPost) });
+      await replacePost(apiPost);
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1267,12 +1280,12 @@ export function DataProvider({ children }) {
   };
 
   // Flag a post for moderation (idempotent server-side). The API returns the
-  // post with `reported_by_me` set, which keeps the store's collapsed state in
+  // post with `reported_by_me` set, which keeps the feed's collapsed state in
   // sync; a feed refresh persists it via the same flag.
   const reportPost = async (postId) => {
     try {
       const apiPost = await post(`/community/posts/${postId}/report`);
-      dispatch({ type: 'UPDATE_POST', payload: toPost(apiPost) });
+      await replacePost(apiPost);
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1284,7 +1297,7 @@ export function DataProvider({ children }) {
   const unreportPost = async (postId) => {
     try {
       const apiPost = await del(`/community/posts/${postId}/report`);
-      dispatch({ type: 'UPDATE_POST', payload: toPost(apiPost) });
+      await replacePost(apiPost);
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1305,8 +1318,7 @@ export function DataProvider({ children }) {
   const addComment = async (postId, content) => {
     try {
       const apiComment = await post(`/community/posts/${postId}/comments`, { content });
-      const p = state.posts.find((x) => x.id === postId);
-      if (p) dispatch({ type: 'UPDATE_POST', payload: { ...p, comments: (p.comments || 0) + 1 } });
+      await countComment(postId, 1);
       return apiComment;
     } catch (err) {
       handleApiError(err);
@@ -1317,8 +1329,7 @@ export function DataProvider({ children }) {
   const deleteComment = async (postId, commentId) => {
     try {
       await del(`/community/posts/${postId}/comments/${commentId}`);
-      const p = state.posts.find((x) => x.id === postId);
-      if (p) dispatch({ type: 'UPDATE_POST', payload: { ...p, comments: Math.max(0, (p.comments || 0) - 1) } });
+      await countComment(postId, -1);
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1332,7 +1343,6 @@ export function DataProvider({ children }) {
         dataLoaded: state.dataLoaded,
         lastSyncedAt: state.lastSyncedAt,
         pets: state.pets,
-        posts: state.posts,
         reminders: state.reminders,
         notifications: state.notifications,
         unreadCount: state.unreadCount,

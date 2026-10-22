@@ -34,6 +34,9 @@ jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id:
 const mockPet = { id: 'p1', name: 'Biscuit', type: 'dog', colorIndex: 0 };
 const mockGroupsQuery = jest.fn();
 jest.mock('../../../hooks/useGroups', () => ({ useGroupsQuery: () => mockGroupsQuery() }));
+jest.mock('../../../hooks/useFeed', () => ({
+  useFeedQuery: () => ({ data: [], isLoading: false, isError: false, isStale: false, refetch: jest.fn() }),
+}));
 beforeEach(() => mockGroupsQuery.mockReturnValue({
   data: [{ id: 'g1', name: 'Dog lovers', members: 1, isJoined: false }],
   isLoading: false,
@@ -49,7 +52,6 @@ jest.mock('../../../hooks/useLostPets', () => ({
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     pets: [mockPet],
-    posts: [],
   }),
 }));
 
