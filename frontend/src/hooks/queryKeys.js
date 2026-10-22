@@ -18,6 +18,12 @@ export const communityKeys = {
   groups: (userId, locale) => ['community', 'groups', userId ?? null, locale ?? null],
 };
 
+// Invitations addressed to the signed-in account (see useInvites.js).
+export const invitesKeys = {
+  all: ['invites'],
+  list: (userId) => ['invites', userId ?? null],
+};
+
 export const gamificationKeys = {
   summary: ['gamification', 'summary'],
   recap: ['gamification', 'recap'],

@@ -389,6 +389,7 @@
     },
     "emptyTitle": "Aucune invitation en attente",
     "emptyBody": "Lorsque quelqu'un partagera un animal avec vous, l'invitation apparaîtra ici.",
+    "loadFailed": "Impossible de charger vos invitations.",
     "invitedYou": "{{inviter}} vous invite à devenir copropriétaire de {{pet}}",
     "accept": "Accepter",
     "decline": "Refuser",

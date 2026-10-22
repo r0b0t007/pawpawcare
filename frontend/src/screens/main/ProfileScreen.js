@@ -3,6 +3,8 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { useInvitesQuery } from '../../hooks/useInvites';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { getPref, setPref } from '../../services/prefs';
 import { scheduleLocalReminders, cancelAllLocalReminders } from '../../services/notifications';
 import { exportRecords } from '../../services/exportRecords';
@@ -32,7 +34,10 @@ function SectionLabel({ children }) {
 export default function ProfileScreen({ navigation }) {
   const { t } = useTranslation();
   const { user, isAdmin, logout, updateUser } = useAuth();
-  const { invites, reminders, pets } = useData();
+  const { reminders, pets } = useData();
+  // The tab stays mounted: refresh the pending badge whenever it's shown.
+  const { data: invites = [], refetch: refetchInvites } = useInvitesQuery();
+  useRefetchOnFocus(refetchInvites);
   // Subscription row: only once the server shows subscriptions to this
   // account (or it already has a plan) — invisible while the feature is dark.
   const { plan, included, visible: subscriptionsVisible } = usePlan();

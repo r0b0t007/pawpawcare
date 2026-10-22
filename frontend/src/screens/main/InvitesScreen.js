@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { useInvitesQuery } from '../../hooks/useInvites';
+import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { useTranslation } from '../../i18n';
 import { ui, type, radii, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, showToast, FormScrollView, ScreenHeader, EmptyState } from '../../components';
@@ -130,7 +132,12 @@ const TYPE_ICON = {
 export default function InvitesScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { invites, refreshInvites, acceptInvite, declineInvite } = useData();
+  const { acceptInvite, declineInvite } = useData();
+  const {
+    data: invites = [], isLoading, isError, refetch,
+  } = useInvitesQuery();
+  // Back from a pet or the Profile tab: pick up invitations sent meanwhile.
+  useRefetchOnFocus(refetch);
   // Explicit false only: an older API without the flag never hides the list.
   // Social accounts without a provider email (no-reply placeholder) have no
   // inbox to confirm — and no invite can be addressed to them anyway.
@@ -142,9 +149,9 @@ export default function InvitesScreen({ navigation }) {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refreshInvites();
+    await refetch();
     setRefreshing(false);
-  }, [refreshInvites]);
+  }, [refetch]);
 
   // Resolves true when the server took it (acceptInvite/declineInvite never throw).
   const respond = async (id, action) => {
@@ -176,7 +183,16 @@ export default function InvitesScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {needsVerification ? (
-          <VerifyEmailCard email={user.email} onVerified={() => refreshInvites()} />
+          <VerifyEmailCard email={user.email} onVerified={() => refetch()} />
+        ) : invites.length === 0 && isLoading ? null : invites.length === 0 && isError ? (
+          <EmptyState
+            compact
+            style={styles.emptyState}
+            title={t('invites.loadFailed')}
+            actionLabel={t('common.retry')}
+            actionIcon="refresh"
+            onAction={() => refetch()}
+          />
         ) : invites.length === 0 ? (
           <EmptyState
             compact

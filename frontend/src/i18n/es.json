@@ -389,6 +389,7 @@
     },
     "emptyTitle": "No hay invitaciones pendientes",
     "emptyBody": "Cuando alguien comparta una mascota con usted, la invitación aparecerá aquí.",
+    "loadFailed": "No se han podido cargar sus invitaciones.",
     "invitedYou": "{{inviter}} le ha invitado a ser copropietario de {{pet}}",
     "accept": "Aceptar",
     "decline": "Rechazar",

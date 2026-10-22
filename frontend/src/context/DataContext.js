@@ -15,7 +15,7 @@ import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
-import { petsKeys, gamificationKeys, communityKeys } from '../hooks/queryKeys';
+import { petsKeys, gamificationKeys, communityKeys, invitesKeys } from '../hooks/queryKeys';
 import i18n from '../i18n';
 
 const DataContext = createContext(null);
@@ -172,7 +172,7 @@ const toLostPet = (r) => ({
 });
 
 // An invitation addressed to me (someone shared their pet with my email).
-const toInvite = (i) => ({
+export const toInvite = (i) => ({
   id: i.id,
   petId: i.pet_id,
   petName: i.pet?.name || i18n.t('common.aPetLower'),
@@ -244,7 +244,6 @@ function dataReducer(state, action) {
     case 'SET_NOTIFICATIONS': return { ...state, notifications: action.payload.notifications || [], unreadCount: action.payload.unread_count || 0 };
     case 'SET_LOST_PETS':     return { ...state, lostPets: action.payload };
     case 'SET_MY_REPORTS':    return { ...state, myReports: action.payload };
-    case 'SET_INVITES':       return { ...state, invites: action.payload };
     // Trust: when the store last successfully synced with the server (ms
     // epoch, or null before the first sync / after logout).
     case 'SET_LAST_SYNCED':   return { ...state, lastSyncedAt: action.payload };
@@ -307,7 +306,7 @@ function dataReducer(state, action) {
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
     pets: [], posts: [], reminders: [], notifications: [], unreadCount: 0,
-    lostPets: [], myReports: [], invites: [], dataLoaded: false, lastSyncedAt: null,
+    lostPets: [], myReports: [], dataLoaded: false, lastSyncedAt: null,
     medDoseDays: {}, medDoseCounts: {},
   });
   const { user, logout } = useAuth();
@@ -364,12 +363,30 @@ export function DataProvider({ children }) {
   // invalidate the matching query so migrated screens refetch (see queryKeys.js).
   const queryClient = useQueryClient();
 
+  // Query hooks' requests end the session the way handleApiError does for
+  // the requests here: one cache subscription rather than a call in every
+  // hook. A refused refresh token fails every active query at once, so this
+  // logs out once per signed-in account, not once per query.
+  const session = useRef({ userId: null, logout });
+  session.current = { userId: user?.id ?? null, logout };
+  const expiredFor = useRef(null);
+  useEffect(() => queryClient.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action?.type !== 'error') return;
+    if (event.action.error?.message !== 'SESSION_EXPIRED') return;
+    const { userId, logout: endSession } = session.current;
+    if (!userId || expiredFor.current === userId) return;
+    expiredFor.current = userId;
+    endSession();
+  }), [queryClient]);
+
   useEffect(() => {
     if (user) {
       loadData();
     } else {
       queryClient.removeQueries({ queryKey: petsKeys.all });
       queryClient.removeQueries({ queryKey: communityKeys.all });
+      queryClient.removeQueries({ queryKey: invitesKeys.all });
+      expiredFor.current = null;
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       dispatch({ type: 'SET_PETS', payload: [] });
       dispatch({ type: 'SET_POSTS', payload: [] });
@@ -377,7 +394,6 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_NOTIFICATIONS', payload: { notifications: [], unread_count: 0 } });
       dispatch({ type: 'SET_LOST_PETS', payload: [] });
       dispatch({ type: 'SET_MY_REPORTS', payload: [] });
-      dispatch({ type: 'SET_INVITES', payload: [] });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
       // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
       // cleared from memory so a different account never renders it — and the
@@ -492,7 +508,6 @@ export function DataProvider({ children }) {
       () => refreshPosts({ rethrow: true }),
       () => refreshReminders({ rethrow: true }),
       () => refreshNotifications({ rethrow: true }),
-      () => refreshInvites({ rethrow: true }),
     ];
 
     const results = await Promise.allSettled(loaders.map((load) => load()));
@@ -1023,11 +1038,14 @@ export function DataProvider({ children }) {
 
   // ── Sharing (co-owners) ──
 
-  const refreshInvites = async ({ rethrow = false } = {}) => {
-    try {
-      const apiInvites = await get('/invites');
-      dispatch({ type: 'SET_INVITES', payload: apiInvites.map(toInvite) });
-    } catch (err) { if (rethrow) throw err; handleApiError(err); }
+  // Invitations addressed to me are read through useInvitesQuery; accepting
+  // or declining one drops it from that cache.
+  // A list fetch already in flight predates the answer: cancel it first, or
+  // it would land afterwards and put the invite back.
+  const dropInvite = async (inviteId) => {
+    const key = invitesKeys.list(user?.id);
+    await queryClient.cancelQueries({ queryKey: key });
+    queryClient.setQueryData(key, (invites) => invites?.filter((i) => i.id !== inviteId));
   };
 
   // Owner-side: the roster (owner + members + pending invites) for one pet.
@@ -1071,9 +1089,10 @@ export function DataProvider({ children }) {
   const acceptInvite = async (inviteId) => {
     try {
       await post(`/invites/${inviteId}/accept`);
-      // Drop the resolved invite, then reload so the shared pet (and its
-      // sub-resources) appear in the list.
-      dispatch({ type: 'SET_INVITES', payload: state.invites.filter((i) => i.id !== inviteId) });
+      // Drop the resolved invite and re-read the list right away, then reload
+      // so the shared pet (and its sub-resources) appear.
+      await dropInvite(inviteId);
+      queryClient.invalidateQueries({ queryKey: invitesKeys.list(user?.id) });
       await loadData();
       return true;
     } catch (err) { handleApiError(err); return false; }
@@ -1082,7 +1101,7 @@ export function DataProvider({ children }) {
   const declineInvite = async (inviteId) => {
     try {
       await post(`/invites/${inviteId}/decline`);
-      dispatch({ type: 'SET_INVITES', payload: state.invites.filter((i) => i.id !== inviteId) });
+      await dropInvite(inviteId);
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1224,6 +1243,9 @@ export function DataProvider({ children }) {
       // switched to while the join was in flight, or this one if it had
       // nothing to update yet: the one on screen refetches, the rest go stale.
       const locale = user?.locale ?? null;
+      // A refetch already in flight predates the join: cancel it, or it would
+      // land afterwards and undo the change on screen.
+      await queryClient.cancelQueries({ queryKey: communityKeys.groups(user?.id, locale) });
       let wrote = false;
       queryClient.setQueryData(communityKeys.groups(user?.id, locale), (groups) => {
         if (!groups) return groups;
@@ -1324,7 +1346,6 @@ export function DataProvider({ children }) {
         unreadCount: state.unreadCount,
         lostPets: state.lostPets,
         myReports: state.myReports,
-        invites: state.invites,
         medDoseDays: state.medDoseDays,
         medDoseCounts: state.medDoseCounts,
         addPet,
@@ -1348,7 +1369,6 @@ export function DataProvider({ children }) {
         refreshLostPets,
         reportPetLost,
         resolveLostPet,
-        refreshInvites,
         getPetShare,
         invitePetMember,
         cancelPetInvite,

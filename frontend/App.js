@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/plus-jakarta-sans';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { retryQuery } from './src/services/queryRetry';
 import { ObserveRoot, ObserveNavigationContainer, configureObserve } from './src/services/observe';
 import { initSentry, registerNavigation, wrapRoot } from './src/services/sentry';
 
@@ -59,7 +60,7 @@ if (GOOGLE_WEB_CLIENT_ID) {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 1000 * 60 * 5, retry: 2 },
+    queries: { staleTime: 1000 * 60 * 5, retry: retryQuery },
   },
 });
 

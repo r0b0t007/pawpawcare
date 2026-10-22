@@ -374,6 +374,7 @@
     },
     "emptyTitle": "No pending invitations",
     "emptyBody": "When someone shares a pet with you, the invite will appear here.",
+    "loadFailed": "Couldn't load your invitations.",
     "invitedYou": "{{inviter}} invited you to co-own {{pet}}",
     "accept": "Accept",
     "decline": "Decline",
