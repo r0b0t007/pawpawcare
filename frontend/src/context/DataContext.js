@@ -1,5 +1,5 @@
 import React, {
-  createContext, useCallback, useContext, useReducer, useEffect, useMemo, useRef, useState, useSyncExternalStore,
+  createContext, useCallback, useContext, useReducer, useEffect, useMemo, useRef, useSyncExternalStore,
 } from 'react';
 import { AppState } from 'react-native';
 import { hashKey, useQueryClient } from '@tanstack/react-query';
@@ -288,6 +288,9 @@ export function DataProvider({ children }) {
     medDoseDays: {}, medDoseCounts: {},
   });
   const { user, logout } = useAuth();
+  // Bridge to React Query while domains migrate off this store: mutations here
+  // write or invalidate the matching query so migrated screens follow (see
+  // queryKeys.js).
   const queryClient = useQueryClient();
 
   // ── Pet records ──
@@ -297,29 +300,34 @@ export function DataProvider({ children }) {
   // or is garbage-collected. A store subscription (not a query observer)
   // re-renders with each write as it happens, as the reducer did.
   const petRecordsKey = petRecordsKeys.list(user?.id);
-  useState(() => queryClient.setQueryDefaults(petRecordsKeys.all, { gcTime: Infinity, staleTime: Infinity }));
+  useEffect(() => {
+    queryClient.setQueryDefaults(petRecordsKeys.all, { gcTime: Infinity, staleTime: Infinity });
+  }, [queryClient]);
   const petRecordsHash = hashKey(petRecordsKey);
   const subscribePets = useCallback((onChange) => queryClient.getQueryCache().subscribe((event) => {
     if (event.query.queryHash === petRecordsHash) onChange();
   }), [queryClient, petRecordsHash]);
   const pets = useSyncExternalStore(subscribePets, () => queryClient.getQueryData(petRecordsKey) ?? NO_PETS);
   // Every write applies to the cache's current list, as the reducer applied
-  // its actions to the current state.
+  // its actions to the current state — only while the account it was made
+  // for is still signed in: a late answer after logout must not bring that
+  // account's records back (they would never be collected).
   const writePets = (update) => {
+    if ((user?.id ?? null) !== session.current.userId) return;
     queryClient.setQueryData(petRecordsKey, (current) => update(current ?? NO_PETS));
   };
-  const replacePet = (pet) => writePets((list) => list.map((p) => (p.id === pet.id ? pet : p)));
+  // One pet's change, applied to that pet as it is in the cache now — not as
+  // the screen last rendered it — so changes to one pet at once all land. A
+  // pet no longer listed is skipped: the server has already saved the change.
+  const updatePetRecord = (petId, update) =>
+    writePets((list) => list.map((p) => (p.id === petId ? update(p) : p)));
   const dropPet = (petId) => writePets((list) => list.filter((p) => p.id !== petId));
-  // The pets loader reads the current list to keep a pet's last good data
-  // when one of its requests fails (see loadData).
-  const petsRef = useRef(pets);
-  petsRef.current = pets;
 
   // The day rolled over while the app stayed open: re-derive every open
   // vaccination's status for the new day, so "due soon" yesterday reads
   // "overdue" today on every screen without a reload.
   const rollVaxStatus = (today) => {
-    queryClient.setQueryData(petRecordsKeys.list(userRef.current?.id), (current) => {
+    queryClient.setQueryData(petRecordsKeys.list(session.current.userId), (current) => {
       if (!current) return undefined;
       let changed = false;
       const next = current.map((p) => {
@@ -337,8 +345,6 @@ export function DataProvider({ children }) {
       return changed ? next : undefined;
     });
   };
-  const userRef = useRef(user);
-  userRef.current = user;
 
   // Midnight rollover: statuses were derived for the day the data loaded.
   // Re-derive them when the local day changes — on a timer while the app is
@@ -385,8 +391,6 @@ export function DataProvider({ children }) {
     setPref('medDoseDays', state.medDoseDays);
     setPref('medDoseCounts', state.medDoseCounts);
   }, [state.medDoseDays, state.medDoseCounts]);
-  // Bridge to React Query while domains migrate off this store: mutations here
-  // invalidate the matching query so migrated screens refetch (see queryKeys.js).
   // Query hooks' requests end the session the way handleApiError does for
   // the requests here: one cache subscription rather than a call in every
   // hook. A refused refresh token fails every active query at once, so this
@@ -519,7 +523,8 @@ export function DataProvider({ children }) {
         // copy of the field; with none, the field is listed in pet.missing so
         // screens don't read the empty list as "nothing on record". The domain
         // still counts as failed below (logged as a partial load).
-        const previous = new Map(petsRef.current.map((p) => [p.id, p]));
+        const loadingFor = petRecordsKey;
+        const previous = new Map((queryClient.getQueryData(loadingFor) ?? NO_PETS).map((p) => [p.id, p]));
         const failures = [];
         const fetchList = (petId, resource) =>
           get(`/pets/${petId}/${resource}`).catch((err) => {
@@ -556,7 +561,9 @@ export function DataProvider({ children }) {
         const petsWithData = apiPets.map((apiPet, i) =>
           buildPet(apiPet, i, Object.fromEntries(RESOURCES.map((r, j) => [r, listsByPet[i][j]])))
         );
-        queryClient.setQueryData(petRecordsKey, petsWithData);
+        // Signed out (or switched account) while loading: drop the answer.
+        if (hashKey(loadingFor) !== hashKey(petRecordsKeys.list(session.current.userId))) return;
+        queryClient.setQueryData(loadingFor, petsWithData);
         // Hydrating prunes the stored dose history of every med it isn't
         // given, so a pet whose medications never loaded would lose its
         // history for good. Skip it; the next full load hydrates.
@@ -744,25 +751,26 @@ export function DataProvider({ children }) {
 
       if (Object.keys(apiUpdate).length > 0) {
         const updated = await patch(`/pets/${petId}`, apiUpdate);
-        const existing = pets.find((p) => p.id === petId);
-        const merged = {
-          ...existing,
-          ...toPet(updated, {
-            // Map the frontend shape back to the API keys toVax reads — both
-            // dates, or the round-trip silently drops administered_date.
-            vaccinations: existing.vaccinations.map((v) => ({
-              ...v,
-              due_date: v.dueDate,
-              administered_date: v.administeredDate,
-            })),
-            activities: existing.activities,
-            foods: existing.favoriteFoods,
-          }),
-        };
-        // Preserve sub-resources that toPet would otherwise re-map from frontend shape.
-        merged.medications = existing.medications || [];
-        merged.weights = existing.weights || [];
-        replacePet(merged);
+        updatePetRecord(petId, (existing) => {
+          const merged = {
+            ...existing,
+            ...toPet(updated, {
+              // Map the frontend shape back to the API keys toVax reads — both
+              // dates, or the round-trip silently drops administered_date.
+              vaccinations: existing.vaccinations.map((v) => ({
+                ...v,
+                due_date: v.dueDate,
+                administered_date: v.administeredDate,
+              })),
+              activities: existing.activities,
+              foods: existing.favoriteFoods,
+            }),
+          };
+          // Preserve sub-resources that toPet would otherwise re-map from frontend shape.
+          merged.medications = existing.medications || [];
+          merged.weights = existing.weights || [];
+          return merged;
+        });
         queryClient.invalidateQueries({ queryKey: petsKeys.all });
         // A weight edit creates a server-side log; refetch so the tracker stays in sync.
         if (updates.weight !== undefined) refreshPetWeights(petId);
@@ -791,16 +799,11 @@ export function DataProvider({ children }) {
   // ── Vaccination ──
 
   // Shared tail of every vaccination mutation: apply the change to the pet's
-  // local list, then mark the pets query stale so migrated screens refetch.
-  // Guard: if the pet isn't in the store (mid-reload), skip the local update
-  // rather than throwing AFTER the server write — a swallowed TypeError here
-  // would hide the change until the next full load; the invalidated query is
-  // the recovery path either way.
+  // local list (skipped if the pet isn't listed, e.g. mid-reload — the
+  // invalidated query is the recovery path), then mark the pets query stale
+  // so migrated screens refetch.
   const applyVaxChange = (petId, mutate) => {
-    const pet = pets.find((p) => p.id === petId);
-    if (pet) {
-      replacePet({ ...pet, vaccinations: mutate(pet.vaccinations || []) });
-    }
+    updatePetRecord(petId, (pet) => ({ ...pet, vaccinations: mutate(pet.vaccinations || []) }));
     queryClient.invalidateQueries({ queryKey: petsKeys.all });
     // The server creates/removes the vaccination's due-date reminder: refetch
     // so Health and Reminders match and this device's local notifications are
@@ -856,8 +859,7 @@ export function DataProvider({ children }) {
     try {
       const apiFood = await post(`/pets/${petId}/foods`, { name: foodName });
       const newFood = toFood(apiFood);
-      const pet = pets.find((p) => p.id === petId);
-      replacePet({ ...pet, favoriteFoods: [...pet.favoriteFoods, newFood] });
+      updatePetRecord(petId, (pet) => ({ ...pet, favoriteFoods: [...pet.favoriteFoods, newFood] }));
       return true;
     } catch (err) {
       handleApiError(err);
@@ -868,8 +870,7 @@ export function DataProvider({ children }) {
   const removeFavoriteFood = async (petId, foodId) => {
     try {
       await del(`/pets/${petId}/foods/${foodId}`);
-      const pet = pets.find((p) => p.id === petId);
-      replacePet({ ...pet, favoriteFoods: pet.favoriteFoods.filter((f) => f.id !== foodId) });
+      updatePetRecord(petId, (pet) => ({ ...pet, favoriteFoods: pet.favoriteFoods.filter((f) => f.id !== foodId) }));
       return true;
     } catch (err) {
       handleApiError(err);
@@ -888,8 +889,7 @@ export function DataProvider({ children }) {
         icon: activity.icon,
       });
       const newAct = toAct(apiAct);
-      const pet = pets.find((p) => p.id === petId);
-      replacePet({ ...pet, activities: [...pet.activities, newAct] });
+      updatePetRecord(petId, (pet) => ({ ...pet, activities: [...pet.activities, newAct] }));
       trackCareAction('activity_added');
       return true;
     } catch (err) {
@@ -905,14 +905,11 @@ export function DataProvider({ children }) {
       const apiWeights = await get(`/pets/${petId}/weights`);
       const weights = apiWeights.map(toWeight);
       const latest = weights.length ? weights[weights.length - 1] : null;
-      const pet = pets.find((p) => p.id === petId);
-      if (pet) {
-        replacePet({
-          ...pet,
-          weights,
-          ...(latest ? { weight: String(latest.weight), weightUnit: latest.unit } : {}),
-        });
-      }
+      updatePetRecord(petId, (pet) => ({
+        ...pet,
+        weights,
+        ...(latest ? { weight: String(latest.weight), weightUnit: latest.unit } : {}),
+      }));
     } catch (err) {
       handleApiError(err);
     }
@@ -925,10 +922,11 @@ export function DataProvider({ children }) {
         logged_at: entry.loggedAt || undefined,
       });
       const newW = toWeight(apiW);
-      const pet = pets.find((p) => p.id === petId);
-      const weights = [...(pet.weights || []), newW].sort((a, b) => (a.loggedAt || '').localeCompare(b.loggedAt || ''));
-      const latest = weights[weights.length - 1];
-      replacePet({ ...pet, weights, weight: String(latest.weight), weightUnit: latest.unit });
+      updatePetRecord(petId, (pet) => {
+        const weights = [...(pet.weights || []), newW].sort((a, b) => (a.loggedAt || '').localeCompare(b.loggedAt || ''));
+        const latest = weights[weights.length - 1];
+        return { ...pet, weights, weight: String(latest.weight), weightUnit: latest.unit };
+      });
       trackCareAction('weight_logged');
       return newW;
     } catch (err) {
@@ -940,14 +938,15 @@ export function DataProvider({ children }) {
   const deleteWeight = async (petId, weightId) => {
     try {
       await del(`/pets/${petId}/weights/${weightId}`);
-      const pet = pets.find((p) => p.id === petId);
-      const weights = (pet.weights || []).filter((w) => w.id !== weightId);
-      const latest = weights.length ? weights[weights.length - 1] : null;
-      replacePet({
-        ...pet,
-        weights,
-        weight: latest ? String(latest.weight) : pet.weight,
-        weightUnit: latest ? latest.unit : pet.weightUnit,
+      updatePetRecord(petId, (pet) => {
+        const weights = (pet.weights || []).filter((w) => w.id !== weightId);
+        const latest = weights.length ? weights[weights.length - 1] : null;
+        return {
+          ...pet,
+          weights,
+          weight: latest ? String(latest.weight) : pet.weight,
+          weightUnit: latest ? latest.unit : pet.weightUnit,
+        };
       });
       return true;
     } catch (err) {
@@ -967,8 +966,7 @@ export function DataProvider({ children }) {
         notes: entry.notes || undefined,
       });
       const newE = toExpense(apiE);
-      const pet = pets.find((p) => p.id === petId);
-      replacePet({ ...pet, expenses: [newE, ...(pet.expenses || [])] });
+      updatePetRecord(petId, (pet) => ({ ...pet, expenses: [newE, ...(pet.expenses || [])] }));
       trackCareAction('expense_added');
       return newE;
     } catch (err) {
@@ -980,8 +978,7 @@ export function DataProvider({ children }) {
   const deleteExpense = async (petId, expenseId) => {
     try {
       await del(`/pets/${petId}/expenses/${expenseId}`);
-      const pet = pets.find((p) => p.id === petId);
-      replacePet({ ...pet, expenses: (pet.expenses || []).filter((e) => e.id !== expenseId) });
+      updatePetRecord(petId, (pet) => ({ ...pet, expenses: (pet.expenses || []).filter((e) => e.id !== expenseId) }));
       return true;
     } catch (err) {
       handleApiError(err);
@@ -1001,8 +998,7 @@ export function DataProvider({ children }) {
         notes: med.notes || null,
       });
       const newMed = toMed(apiMed);
-      const pet = pets.find((p) => p.id === petId);
-      replacePet({ ...pet, medications: [...(pet.medications || []), newMed] });
+      updatePetRecord(petId, (pet) => ({ ...pet, medications: [...(pet.medications || []), newMed] }));
       refreshReminders(); // a medication schedules dose reminders
       return newMed;
     } catch (err) {
@@ -1016,8 +1012,7 @@ export function DataProvider({ children }) {
     try {
       const apiMed = await patch(`/pets/${petId}/medications/${medId}`, updates);
       const updated = toMed(apiMed);
-      const pet = pets.find((p) => p.id === petId);
-      replacePet({ ...pet, medications: (pet.medications || []).map((m) => (m.id === medId ? updated : m)) });
+      updatePetRecord(petId, (pet) => ({ ...pet, medications: (pet.medications || []).map((m) => (m.id === medId ? updated : m)) }));
       refreshReminders();
       return true;
     } catch (err) {
@@ -1030,8 +1025,7 @@ export function DataProvider({ children }) {
   const deleteMedication = async (petId, medId) => {
     try {
       await del(`/pets/${petId}/medications/${medId}`);
-      const pet = pets.find((p) => p.id === petId);
-      replacePet({ ...pet, medications: (pet.medications || []).filter((m) => m.id !== medId) });
+      updatePetRecord(petId, (pet) => ({ ...pet, medications: (pet.medications || []).filter((m) => m.id !== medId) }));
       refreshReminders();
       return true;
     } catch (err) {
