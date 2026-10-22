@@ -374,6 +374,34 @@ export function DataProvider({ children }) {
     endSession();
   }), [queryClient]);
 
+  // Writes a mutation's answer into a query's cache, for every domain:
+  // - a fetch already in flight predates the change: it is cancelled, or it
+  //   would land afterwards and undo it, and then the query is re-read — the
+  //   server already has the change, and what that fetch would have brought
+  //   (other people's changes) still arrives;
+  // - with nothing cached there is nothing to update: the query is re-read;
+  // - it never throws: the server already saved the change, so a failed
+  //   cache write must not make the mutation report a failure (the query is
+  //   re-read instead).
+  // Resolves whether the answer was written.
+  const writeQueryCache = async (queryKey, update) => {
+    try {
+      const wasFetching = queryClient.isFetching({ queryKey, exact: true }) > 0;
+      await queryClient.cancelQueries({ queryKey, exact: true });
+      if (queryClient.getQueryData(queryKey) === undefined) {
+        queryClient.invalidateQueries({ queryKey, exact: true });
+        return false;
+      }
+      queryClient.setQueryData(queryKey, update);
+      if (wasFetching) queryClient.invalidateQueries({ queryKey, exact: true });
+      return true;
+    } catch (err) {
+      console.warn('[data] cache write failed; re-reading', err);
+      queryClient.invalidateQueries({ queryKey, exact: true });
+      return false;
+    }
+  };
+
   useEffect(() => {
     if (user) {
       loadData();
@@ -990,9 +1018,8 @@ export function DataProvider({ children }) {
 
   // ── Lost pets ──
 
-  // The feed is read through useFeedQuery: re-read it (a lost-pet report is
-  // broadcast as a post).
-  const refreshPosts = () => queryClient.invalidateQueries({ queryKey: communityKeys.feed(user?.id) });
+  // A lost-pet report is broadcast as a feed post (useFeedQuery): re-read it.
+  const invalidateFeed = () => queryClient.invalidateQueries({ queryKey: communityKeys.feed(user?.id) });
 
   // The board and my reports are read through useLostPets.js. Invalidating
   // cancels a fetch already in flight (it predates the change) and resolves
@@ -1007,7 +1034,7 @@ export function DataProvider({ children }) {
         contact_phone: details.contactPhone || null,
       });
       // Refresh the board/reports and the feed (the broadcast post) — not all pets.
-      await Promise.all([refreshLostPets(), refreshPosts()]);
+      await Promise.all([refreshLostPets(), invalidateFeed()]);
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1015,7 +1042,7 @@ export function DataProvider({ children }) {
   const resolveLostPet = async (reportId, note) => {
     try {
       await patch(`/lost-pets/${reportId}/resolve`, { resolution_note: note || null });
-      await Promise.all([refreshLostPets(), refreshPosts()]);
+      await Promise.all([refreshLostPets(), invalidateFeed()]);
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1024,13 +1051,8 @@ export function DataProvider({ children }) {
 
   // Invitations addressed to me are read through useInvitesQuery; accepting
   // or declining one drops it from that cache.
-  // A list fetch already in flight predates the answer: cancel it first, or
-  // it would land afterwards and put the invite back.
-  const dropInvite = async (inviteId) => {
-    const key = invitesKeys.list(user?.id);
-    await queryClient.cancelQueries({ queryKey: key });
-    queryClient.setQueryData(key, (invites) => invites?.filter((i) => i.id !== inviteId));
-  };
+  const dropInvite = (inviteId) =>
+    writeQueryCache(invitesKeys.list(user?.id), (invites) => invites.filter((i) => i.id !== inviteId));
 
   // Owner-side: the roster (owner + members + pending invites) for one pet.
   const getPetShare = async (petId) => {
@@ -1207,18 +1229,8 @@ export function DataProvider({ children }) {
   // ── Community ──
 
   // Post answers are written into the feed cache (useFeedQuery), which holds
-  // the server's posts as they came. A feed fetch already in flight predates
-  // the change: cancel it first, or it would land afterwards and undo it.
-  // With no feed cached yet there is nothing to update; it is re-read.
-  const updateFeed = async (update) => {
-    const key = communityKeys.feed(user?.id);
-    await queryClient.cancelQueries({ queryKey: key });
-    if (queryClient.getQueryData(key) === undefined) {
-      queryClient.invalidateQueries({ queryKey: key });
-      return;
-    }
-    queryClient.setQueryData(key, update);
-  };
+  // the server's posts as they came.
+  const updateFeed = (update) => writeQueryCache(communityKeys.feed(user?.id), update);
   const replacePost = (apiPost) =>
     updateFeed((posts) => posts.map((p) => (p.id === apiPost.id ? apiPost : p)));
   const countComment = (postId, delta) =>
@@ -1243,23 +1255,17 @@ export function DataProvider({ children }) {
       const apiGroup = await post(`/community/groups/${groupId}/join`);
       const updated = toGroup(apiGroup);
       // The answer is in the language that was saved when the join went out,
-      // so it replaces the group in that language's list. Every other list of
-      // this account predates the change — another language, including one
-      // switched to while the join was in flight, or this one if it had
-      // nothing to update yet: the one on screen refetches, the rest go stale.
+      // so it replaces the group in that language's list (re-read instead if
+      // it had nothing to update yet). Every other list of this account
+      // predates the change — another language, including one switched to
+      // while the join was in flight: the one on screen refetches, the rest
+      // go stale.
       const locale = user?.locale ?? null;
-      // A refetch already in flight predates the join: cancel it, or it would
-      // land afterwards and undo the change on screen.
-      await queryClient.cancelQueries({ queryKey: communityKeys.groups(user?.id, locale) });
-      let wrote = false;
-      queryClient.setQueryData(communityKeys.groups(user?.id, locale), (groups) => {
-        if (!groups) return groups;
-        wrote = true;
-        return groups.map((g) => (g.id === updated.id ? updated : g));
-      });
+      await writeQueryCache(communityKeys.groups(user?.id, locale),
+        (groups) => groups.map((g) => (g.id === updated.id ? updated : g)));
       queryClient.invalidateQueries({
         queryKey: communityKeys.groupsFor(user?.id),
-        predicate: (q) => !wrote || q.queryKey[3] !== locale,
+        predicate: (q) => q.queryKey[3] !== locale,
       });
       return true;
     } catch (err) {

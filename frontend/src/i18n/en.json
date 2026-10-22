@@ -602,6 +602,7 @@
       "recentPosts_one": "{{count}} recent post",
       "recentPosts_other": "{{count}} recent posts",
       "inCommunity": " in the community",
+      "visit": "See what the community is sharing",
       "sayHi": "Say hi to the community"
     }
   },

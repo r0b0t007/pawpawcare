@@ -28,7 +28,7 @@ jest.mock('../../context/AuthContext', () => ({
 }));
 
 import { DataProvider, useData } from '../../context/DataContext';
-import { useFeedQuery } from '../useFeed';
+import { useFeedQuery, useFeedCount } from '../useFeed';
 import i18n from '../../i18n';
 import { get, post, del } from '../../services/api';
 
@@ -153,6 +153,32 @@ describe('reading the feed', () => {
   });
 });
 
+describe('the post count for Home', () => {
+  let count;
+  function CountProbe() {
+    data = useData();
+    ({ data: count } = useFeedCount());
+    return null;
+  }
+
+  it('is how many posts the feed has, from the same cached answer', async () => {
+    await mount(CountProbe);
+    expect(count).toBe(2);
+    expect(feedCalls()).toBe(1);
+
+    post.mockResolvedValue(apiPost('n'));
+    await settle(() => data.addPost('Hello'));
+    expect(count).toBe(3);
+  });
+
+  // Not 0: Home shows a neutral line rather than "say hi" to an empty feed.
+  it('is unknown until the feed loads', async () => {
+    get.mockImplementation((path) => (path === '/community/posts' ? new Promise(() => {}) : answer(path)));
+    await mount(CountProbe);
+    expect(count).toBeUndefined();
+  });
+});
+
 describe('accounts', () => {
   // Pawed / reported by me are per account.
   it('never shows the previous account’s feed to the next one', async () => {
@@ -216,22 +242,48 @@ describe('writing to the feed', () => {
   });
 
   // A focus refetch was already in flight when the paw landed: its older
-  // list must not undo the change on screen.
-  it('a fetch in flight cannot undo a paw', async () => {
+  // list must not undo the change on screen. It is cancelled, then re-read —
+  // so what it would have brought (someone else's new post) still arrives,
+  // and the feed isn't left looking fresh without it.
+  it('a fetch in flight cannot undo a paw, and what it would have brought still arrives', async () => {
     await mount();
     let answerOld;
     const old = serverPosts;
-    get.mockImplementation((path) => (path === '/community/posts'
-      ? new Promise((resolve) => { answerOld = () => resolve(old); })
-      : otherDomains(path)));
+    get.mockImplementation((path) => {
+      if (path !== '/community/posts') return otherDomains(path);
+      if (answerOld) return Promise.resolve(serverPosts);
+      return new Promise((resolve) => { answerOld = () => resolve(old); });
+    });
     await settle(() => { client.invalidateQueries({ queryKey: ['community', 'feed', 'u1'] }); });
     expect(feedCalls()).toBe(2);
-    post.mockResolvedValue(apiPost('b', { paw_count: 1, pawed_by_me: true }));
+    const pawed = apiPost('b', { paw_count: 1, pawed_by_me: true });
+    post.mockResolvedValue(pawed);
+    serverPosts = [apiPost('z', { author_name: 'Kim' }), old[0], pawed];
 
     await settle(() => data.togglePaw('b'));
     await settle(() => answerOld());
 
-    expect(feed.data[1]).toEqual(expect.objectContaining({ id: 'b', paws: 1, pawedByMe: true }));
+    expect(feedCalls()).toBe(3);
+    expect(ids()).toEqual(['z', 'a', 'b']);
+    expect(feed.data[2]).toEqual(expect.objectContaining({ id: 'b', paws: 1, pawedByMe: true }));
+  });
+
+  // The server saved the comment: a cache that can't take the write must not
+  // turn that into a failure (PostCard would restore the text, and a resend
+  // would post it twice). The feed is re-read instead.
+  it('a cache write that fails still reports the saved comment', async () => {
+    await mount();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    client.setQueryData(['community', 'feed', 'u1'], { unexpected: 'shape' });
+    post.mockResolvedValue({ id: 'c1', content: 'Nice' });
+
+    let saved;
+    await settle(async () => { saved = await data.addComment('b', 'Nice'); });
+
+    expect(saved).toEqual({ id: 'c1', content: 'Nice' });
+    expect(feedCalls()).toBe(2);
+    expect(feed.data.map((p) => p.id)).toEqual(['a', 'b']);
+    warn.mockRestore();
   });
 
   it('reporting collapses the post, and Undo restores it', async () => {

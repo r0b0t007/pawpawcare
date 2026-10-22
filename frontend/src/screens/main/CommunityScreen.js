@@ -303,6 +303,9 @@ export default function CommunityScreen({ navigation }) {
                   unreportPost={unreportPost}
                 />
               ))}
+              {posts.length === 0 && feedLoading && (
+                <ActivityIndicator color={ui.accent} style={styles.feedLoading} accessibilityLabel={t('common.loading')} />
+              )}
               {posts.length === 0 && feedFailed && (
                 <EmptyState
                   compact
@@ -457,6 +460,7 @@ const styles = StyleSheet.create({
   },
   moreLostText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13.5, color: ui.accent },
   emptyState: { paddingVertical: 20 },
+  feedLoading: { paddingVertical: 36 },
 
   // Composer
   composerCollapsed: {

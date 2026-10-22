@@ -628,6 +628,7 @@
       "recentPosts_many": "{{count}} publications récentes",
       "recentPosts_other": "{{count}} publications récentes",
       "inCommunity": " dans la communauté",
+      "visit": "Découvrez ce que partage la communauté",
       "sayHi": "Dites bonjour à la communauté"
     }
   },

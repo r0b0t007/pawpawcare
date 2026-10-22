@@ -288,20 +288,28 @@ describe('joining a group', () => {
 
   // A focus refetch was already in flight when the join landed: its older
   // list must not undo the change on screen.
+  // It is cancelled, then re-read: the re-read follows the join, and still
+  // brings someone else's join made meanwhile.
   it('a refetch in flight cannot undo a join', async () => {
     await mount();
-    let answerRefetch;
-    get.mockImplementation((path) => (path === '/community/groups'
-      ? new Promise((resolve) => { answerRefetch = resolve; })
-      : otherDomains(path)));
+    let answerOld;
+    let current = group('Dog Lovers');
+    get.mockImplementation((path) => {
+      if (path !== '/community/groups') return otherDomains(path);
+      if (answerOld) return Promise.resolve(current);
+      return new Promise((resolve) => { answerOld = () => resolve(group('Dog Lovers')); });
+    });
     // Start the refetch without waiting for it: its answer is held back.
     await settle(() => { client.invalidateQueries({ queryKey: ['community', 'groups', 'u1', 'en'] }); });
+    expect(groupCalls()).toBe(2);
     post.mockResolvedValue(apiGroup('Dog Lovers', { member_count: 1, is_member: true }));
+    current = [apiGroup('Dog Lovers', { member_count: 2, is_member: true })];
 
     await settle(() => data.toggleGroupMembership('g1'));
-    await settle(() => answerRefetch(group('Dog Lovers')));
+    await settle(() => answerOld());
 
-    expect(groups.data[0]).toEqual(expect.objectContaining({ isJoined: true, members: 1 }));
+    expect(groupCalls()).toBe(3);
+    expect(groups.data[0]).toEqual(expect.objectContaining({ isJoined: true, members: 2 }));
   });
 
   it('resolves false and leaves the list alone when the join fails', async () => {

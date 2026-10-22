@@ -1,9 +1,8 @@
-import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { get } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toInvite } from '../context/DataContext';
-import { useLocale } from '../i18n';
+import { useLocaleSelect } from './useLocaleSelect';
 import { invitesKeys } from './queryKeys';
 
 // Pet-sharing invitations addressed to me. Accepting and declining stay in
@@ -16,9 +15,7 @@ import { invitesKeys } from './queryKeys';
 // "Someone") that must follow a language switch without a refetch.
 export function useInvitesQuery() {
   const { user } = useAuth();
-  const locale = useLocale();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const select = useCallback((invites) => invites.map(toInvite), [locale]);
+  const select = useLocaleSelect(toInvite);
   return useQuery({
     queryKey: invitesKeys.list(user?.id),
     queryFn: () => get('/invites'),

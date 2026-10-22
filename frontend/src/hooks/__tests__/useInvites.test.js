@@ -238,21 +238,27 @@ describe('answering an invitation', () => {
 
   // A refresh was already in flight when the answer landed: its older list
   // must not put the declined invite back.
+  // It is cancelled, then re-read: the re-read follows the decline, and
+  // still brings an invitation sent meanwhile.
   it('a refresh in flight cannot bring a declined invite back', async () => {
     await mount();
-    let answerRefresh;
-    get.mockImplementation((path) => (path === '/invites'
-      ? new Promise((resolve) => { answerRefresh = resolve; })
-      : otherDomains(path)));
+    let answerOld;
+    get.mockImplementation((path) => {
+      if (path !== '/invites') return otherDomains(path);
+      if (answerOld) return Promise.resolve(serverInvites);
+      return new Promise((resolve) => { answerOld = () => resolve([apiInvite('i1'), apiInvite('i2', 'Milo')]); });
+    });
     // Start the refresh without waiting for it: its answer is held back.
     await settle(() => { client.invalidateQueries({ queryKey: ['invites', 'u1'] }); });
     expect(inviteCalls()).toBe(2);
     post.mockResolvedValue({});
+    serverInvites = [apiInvite('i2', 'Milo'), apiInvite('i3', 'Coco')];
 
     await settle(() => data.declineInvite('i1'));
-    await settle(() => answerRefresh([apiInvite('i1'), apiInvite('i2', 'Milo')]));
+    await settle(() => answerOld());
 
-    expect(invites.data.map((i) => i.id)).toEqual(['i2']);
+    expect(inviteCalls()).toBe(3);
+    expect(invites.data.map((i) => i.id)).toEqual(['i2', 'i3']);
   });
 
   it('keeps the invitation when the answer fails', async () => {
