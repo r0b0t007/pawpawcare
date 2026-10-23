@@ -20,8 +20,10 @@ jest.mock('../../../services/notifications', () => ({
   ...jest.requireActual('../../../services/notifications'),
   getNotificationPermission: jest.fn(() => Promise.resolve({ status: 'granted', canAskAgain: true })),
 }));
+const mockWithoutPets = ({ pets, ...rest }) => rest;
+jest.mock('../../../hooks/usePetRecords', () => ({ usePetRecords: () => mockStore.pets }));
 jest.mock('../../../context/DataContext', () => ({
-  useData: () => mockStore,
+  useData: () => mockWithoutPets(mockStore),
 }));
 
 import React from 'react';

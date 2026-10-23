@@ -52,10 +52,10 @@ jest.mock('../../../hooks/useLostPets', () => ({
   useMyLostReportsQuery: () => ({ data: [], refetch: jest.fn() }),
 }));
 const mockInvalidateFeed = jest.fn();
+jest.mock('../../../hooks/usePetRecords', () => ({ usePetRecords: () => [mockPet] }));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
     invalidateFeed: mockInvalidateFeed,
-    pets: [mockPet],
   }),
 }));
 

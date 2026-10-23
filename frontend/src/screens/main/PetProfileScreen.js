@@ -11,6 +11,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { usePetRecords } from '../../hooks/usePetRecords';
 import { useAuth } from '../../context/AuthContext';
 import { breedLabel, petPhoto, isPetOwner } from '../../utils/pets';
 import { dosesPerDay, dosesTakenOn } from '../../utils/doses';
@@ -97,13 +98,14 @@ export default function PetProfileScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { petId } = route.params;
   const {
-    pets, medDoseDays, medDoseCounts, addFavoriteFood, removeFavoriteFood, addActivity,
+    medDoseDays, medDoseCounts, addFavoriteFood, removeFavoriteFood, addActivity,
     addMedication, deleteMedication, logMedicationDose, reportPetLost, resolveLostPet,
     addWeight, deleteWeight, addExpense, deleteExpense,
     getPetShare, invitePetMember, cancelPetInvite, removePetMember, leavePet,
     createShareLink, revokeShareLinks,
     getCareProfile, saveCareProfile, createCareLink, revokeCareLinks, takeFailureNote,
   } = useData();
+  const pets = usePetRecords();
   const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
   // Until my reports load, whether the pet is lost is unknown: the menu

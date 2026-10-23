@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { usePetRecords } from '../../hooks/usePetRecords';
 import { useAuth } from '../../context/AuthContext';
 import { pickAndUploadImage } from '../../services/imagePicker';
 import { resolveAsset } from '../../config';
@@ -39,7 +40,8 @@ const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
 export default function EditPetScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { petId } = route.params;
-  const { pets, updatePet, deletePet, leavePet } = useData();
+  const { updatePet, deletePet, leavePet } = useData();
+  const pets = usePetRecords();
   const { user } = useAuth();
   const pet = pets.find((p) => p.id === petId);
   const isOwner = isPetOwner(pet, user);

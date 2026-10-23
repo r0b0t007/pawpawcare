@@ -16,9 +16,9 @@ let mockUser = { id: 'u1' };
 const mockUpdatePet = jest.fn((id, updates) => Promise.resolve({ id, ...updates }));
 const mockDeletePet = jest.fn(() => Promise.resolve(true));
 const mockLeavePet = jest.fn(() => Promise.resolve(true));
+jest.mock('../../../hooks/usePetRecords', () => ({ usePetRecords: () => mockPets }));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
-    pets: mockPets,
     updatePet: mockUpdatePet,
     deletePet: mockDeletePet,
     leavePet: mockLeavePet,

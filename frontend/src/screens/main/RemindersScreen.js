@@ -7,6 +7,7 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
+import { usePetRecords } from '../../hooks/usePetRecords';
 import { ui, radii, type, motion, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, reminderIcon, Toggle, DeleteButton, NotificationsBanner } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';
@@ -48,7 +49,8 @@ export default function RemindersScreen({ navigation }) {
   // can stay mounted under another tab while the language is switched.
   useLocale();
   const { t } = useTranslation();
-  const { reminders, pets, addReminder, updateReminder, deleteReminder } = useData();
+  const { reminders, addReminder, updateReminder, deleteReminder } = useData();
+  const pets = usePetRecords();
   // A reminder tied to a pet shows that pet's face — recognised before read.
   const petOf = (r) => petById(pets, r.pet_id) || null;
 

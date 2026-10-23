@@ -25,20 +25,23 @@ jest.mock('../../../services/storeReview', () => ({ noteGoodMoment: jest.fn() })
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1', name: 'Sam' } }) }));
 
 let mockStore = {};
+const mockWithoutPets = ({ pets, ...rest }) => rest;
+jest.mock('../../../hooks/usePetRecords', () => ({ usePetRecords: () => mockStore.pets ?? [] }));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
-    pets: [],
     reminders: [],
     medDoseDays: {},
     medDoseCounts: {},
     markVaccinationComplete: jest.fn(),
     logMedicationDose: jest.fn(),
-    ...mockStore,
+    ...mockWithoutPets(mockStore),
   }),
 }));
 let mockEarlyPets;
 const mockUsePetsQuery = jest.fn(() => ({ data: mockEarlyPets }));
-jest.mock('../../../hooks/usePets', () => ({ usePetsQuery: (opts) => mockUsePetsQuery(opts) }));
+jest.mock('../../../hooks/usePets', () => ({
+  usePetsQuery: (opts) => mockUsePetsQuery(opts),
+}));
 jest.mock('../../../hooks/useNotifications', () => ({
   useUnreadCount: () => ({ data: 0, isStale: false, refetch: jest.fn() }),
 }));
