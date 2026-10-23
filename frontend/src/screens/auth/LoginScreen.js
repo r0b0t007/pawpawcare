@@ -28,6 +28,8 @@ export default function LoginScreen({ navigation }) {
   // An i18n key, so the message follows a language change while shown.
   const [localError, setLocalError] = useState(null);
   const passwordRef = useRef(null);
+  // Kept above the keyboard by FormScrollView (CHW-154).
+  const submitRef = useRef(null);
   // One request per tap: a double tap (or Return + tap) never logs in twice.
   const { run, isBusy } = useInFlight();
 
@@ -60,7 +62,7 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <FormScrollView contentContainerStyle={styles.scroll}>
+      <FormScrollView contentContainerStyle={styles.scroll} keepVisible={submitRef}>
         <ScreenHeader onBack={() => navigation.goBack()} flush />
 
         <PhotoBand source={photos.welcomeHero} height={120} />
@@ -116,12 +118,14 @@ export default function LoginScreen({ navigation }) {
 
         <FormError message={displayError} style={styles.formError} />
 
-        <Button
-          label={submitting ? t('auth.login.submitting') : t('auth.login.submit')}
-          onPress={handleLogin}
-          disabled={busy}
-          style={styles.submitBtn}
-        />
+        <View ref={submitRef} collapsable={false}>
+          <Button
+            label={submitting ? t('auth.login.submitting') : t('auth.login.submit')}
+            onPress={handleLogin}
+            disabled={busy}
+            style={styles.submitBtn}
+          />
+        </View>
 
         <SocialAuthButtons />
 

@@ -51,6 +51,8 @@ export default function SignupScreen({ navigation }) {
   const emailRef = useRef(null);
   const passwordRef = useRef(null);
   const confirmRef = useRef(null);
+  // Kept above the keyboard by FormScrollView (CHW-154).
+  const submitRef = useRef(null);
   // One request per tap: a double tap (or Return + tap) never signs up twice.
   const { run, isBusy } = useInFlight();
 
@@ -92,7 +94,7 @@ export default function SignupScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <FormScrollView contentContainerStyle={styles.scroll}>
+      <FormScrollView contentContainerStyle={styles.scroll} keepVisible={submitRef}>
         <ScreenHeader onBack={() => navigation.goBack()} flush />
 
         <PhotoBand source={photos.communityPals} height={104} />
@@ -171,12 +173,14 @@ export default function SignupScreen({ navigation }) {
 
         <FormError message={displayError} style={styles.formError} />
 
-        <Button
-          label={submitting ? t('auth.signup.submitting') : t('auth.signup.submit')}
-          onPress={handleSignup}
-          disabled={busy}
-          style={styles.submitBtn}
-        />
+        <View ref={submitRef} collapsable={false}>
+          <Button
+            label={submitting ? t('auth.signup.submitting') : t('auth.signup.submit')}
+            onPress={handleSignup}
+            disabled={busy}
+            style={styles.submitBtn}
+          />
+        </View>
 
         <SocialAuthButtons />
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import { Button, showToast, FormScrollView, ScreenHeader, PhotoBand } from '../.
 export default function ForgotPasswordScreen({ navigation }) {
   const { t } = useTranslation();
   const [step, setStep] = useState('email'); // 'email' | 'code'
+  // The step's main button, kept above the keyboard by FormScrollView (CHW-154).
+  const submitRef = useRef(null);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -112,7 +114,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <FormScrollView contentContainerStyle={styles.scroll}>
+      <FormScrollView contentContainerStyle={styles.scroll} keepVisible={submitRef}>
         <ScreenHeader onBack={handleBack} flush />
 
         <PhotoBand source={photos.emptyBlanket} height={120} />
@@ -146,12 +148,14 @@ export default function ForgotPasswordScreen({ navigation }) {
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <Button
-              label={sending ? t('auth.forgot.sending') : t('auth.forgot.send')}
-              onPress={() => sendCode()}
-              disabled={sending}
-              style={styles.submitBtn}
-            />
+            <View ref={submitRef} collapsable={false}>
+              <Button
+                label={sending ? t('auth.forgot.sending') : t('auth.forgot.send')}
+                onPress={() => sendCode()}
+                disabled={sending}
+                style={styles.submitBtn}
+              />
+            </View>
           </>
         ) : (
           <>
@@ -236,12 +240,14 @@ export default function ForgotPasswordScreen({ navigation }) {
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-            <Button
-              label={resetting ? t('auth.forgot.submitting') : t('auth.forgot.submit')}
-              onPress={handleReset}
-              disabled={resetting}
-              style={styles.submitBtn}
-            />
+            <View ref={submitRef} collapsable={false}>
+              <Button
+                label={resetting ? t('auth.forgot.submitting') : t('auth.forgot.submit')}
+                onPress={handleReset}
+                disabled={resetting}
+                style={styles.submitBtn}
+              />
+            </View>
 
             <Pressable accessibilityRole="button"
               style={({ pressed }) => [styles.resendLink, pressed && { opacity: motion.pressOpacity }]}
