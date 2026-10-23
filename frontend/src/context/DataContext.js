@@ -17,8 +17,10 @@ import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
+import { useQueryCacheData } from '../hooks/useQueryCacheData';
 import {
-  petsKeys, petRecordsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys, vaultKeys,
+  petsKeys, petRecordsKeys, remindersKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys,
+  vaultKeys,
 } from '../hooks/queryKeys';
 import i18n from '../i18n';
 
@@ -240,7 +242,6 @@ const REMINDER_REFETCH_DELAY = 90000;
 function dataReducer(state, action) {
   switch (action.type) {
     case 'SET_DATA_LOADED': return { ...state, dataLoaded: action.payload };
-    case 'SET_REMINDERS':     return { ...state, reminders: action.payload };
     // Trust: when the store last successfully synced with the server (ms
     // epoch, or null before the first sync / after logout).
     case 'SET_LAST_SYNCED':   return { ...state, lastSyncedAt: action.payload };
@@ -354,6 +355,17 @@ export async function fetchPetRecords(queryClient, queryKey) {
 // Stale after the app-wide five minutes.
 const PET_RECORDS_DEFAULTS = { gcTime: Infinity, retry: false };
 
+// The reminders list: one request. Never garbage-collected (DataContext reads
+// it without a query observer) and not retried, as before it was a query —
+// set on the query itself, the one way it is fetched.
+const NO_REMINDERS = [];
+const REMINDERS_DEFAULTS = { gcTime: Infinity, retry: false };
+const remindersQuery = (queryKey) => ({
+  queryKey,
+  queryFn: () => get('/reminders'),
+  ...REMINDERS_DEFAULTS,
+});
+
 // The records query, for the sign-in load and usePetRecordsQuery alike.
 export const petRecordsQuery = (queryClient, queryKey) => ({
   queryKey,
@@ -365,7 +377,6 @@ export const petRecordsQuery = (queryClient, queryKey) => ({
 
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
-    reminders: [],
     dataLoaded: false, lastSyncedAt: null,
     medDoseDays: {}, medDoseCounts: {},
   });
@@ -386,6 +397,13 @@ export function DataProvider({ children }) {
   useEffect(() => {
     queryClient.setQueryDefaults(petRecordsKeys.all, PET_RECORDS_DEFAULTS);
   }, [queryClient]);
+
+  // ── Reminders ──
+  // The list lives in the React Query cache (remindersKeys), read here through
+  // a store subscription so useData().reminders re-renders as each new list
+  // lands. refreshReminders fetches it; the listener below schedules it.
+  const remindersKey = remindersKeys.list(user?.id);
+  const reminders = useQueryCacheData(remindersKey, NO_REMINDERS);
   // The records as they are now — read when a mutation runs, not subscribed
   // to: this provider doesn't re-render on pet writes (screens read them with
   // usePetRecords).
@@ -471,8 +489,8 @@ export function DataProvider({ children }) {
   // forward — refetch shortly after so the lists show the next occurrence
   // instead of dropping it (only one-off reminders leave once fired).
   const reminderTimes = useMemo(
-    () => state.reminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
-    [state.reminders],
+    () => reminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
+    [reminders],
   );
   const reminderTick = useTickAt(reminderTimes, REMINDER_REFETCH_DELAY);
   useEffect(() => {
@@ -503,10 +521,15 @@ export function DataProvider({ children }) {
     const { userId, logout: endSession } = session.current;
     if (!userId || expiredFor.current === userId) return;
     expiredFor.current = userId;
-    // Only a sign-out that failed lets the next expired request try again.
+    // A sign-out that failed — or finished with the account still signed in —
+    // lets the next expired request try again. (Checked a tick after it
+    // settles, once the signed-out user has rendered.)
     const retryLater = () => { if (expiredFor.current === userId) expiredFor.current = null; };
+    const retryIfStillSignedIn = () => setTimeout(() => {
+      if (session.current.userId === userId) retryLater();
+    }, 0);
     try {
-      Promise.resolve(endSession()).catch(retryLater);
+      Promise.resolve(endSession()).then(retryIfStillSignedIn, retryLater);
     } catch {
       retryLater();
     }
@@ -566,7 +589,7 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       queryClient.removeQueries({ queryKey: petRecordsKeys.all });
       petLoadFailures.clear();
-      dispatch({ type: 'SET_REMINDERS', payload: [] });
+      queryClient.removeQueries({ queryKey: remindersKeys.all });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
       // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
       // cleared from memory so a different account never renders it — and the
@@ -584,7 +607,7 @@ export function DataProvider({ children }) {
   // throw instead: their forms show the API's validation messages.)
   //   if (await addWeight(...)) showToast('Weight logged'); else showToast("Couldn't …");
   const handleApiError = (err) => {
-    if (err.message === 'SESSION_EXPIRED') logout();
+    if (err.message === 'SESSION_EXPIRED') endExpiredSession();
   };
 
   // Why the last addVaccination / addMedication / updateMedication failed,
@@ -671,8 +694,9 @@ export function DataProvider({ children }) {
     // Initial fan-out finished (even with failures) — screens can report TTI.
     dispatch({ type: 'SET_DATA_LOADED', payload: true });
     // Only stamp the sync time when every domain landed — a partial load must
-    // not read as "synced" (honest state; refreshReminders stamps on its own
-    // success, so a reminders-only recovery still updates the line).
+    // not read as "synced" (honest state; every reminders list that lands
+    // stamps it too — the schedule listener — so a reminders-only recovery
+    // still updates the line).
     if (!failed.length) dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
   };
 
@@ -709,20 +733,90 @@ export function DataProvider({ children }) {
   // refresh* helpers swallow errors via handleApiError by default; loadData
   // passes { rethrow: true } to own error handling itself (allSettled counts
   // the failure and logs out at most once across all domains).
-  // Overlapping refreshes (a vaccination change right after another, or a
-  // tick/focus refetch) can resolve out of order; only the newest request may
-  // write, or a stale list could reschedule a dose that was just marked given.
-  const remindersRequest = useRef(0);
+  // Overlapping refreshes (a vaccination change right after another, or the
+  // fire tick) can resolve out of order; only the newest request may land, or
+  // a stale list could reschedule a dose that was just marked given. A request
+  // already in flight predates whatever asked for this one: it is cancelled
+  // (its answer never lands, so never schedules), then this one runs.
+  // Callers (saves, the sign-in load) resolve on the list they asked for: a
+  // refresh that a newer one cancelled waits for that newer answer — and fails
+  // if it does — rather than resolving on nothing. Only for the account still
+  // signed in: a refresh asked for after logout fetches nothing (it would
+  // bring back a removed list, kept for good, onto the phone).
+  const latestRemindersRefresh = useRef(null);
   const refreshReminders = async ({ rethrow = false } = {}) => {
-    const request = ++remindersRequest.current;
+    const key = remindersKey;
+    const signedIn = () => hashKey(key) === hashKey(remindersKeys.list(session.current.userId));
+    if (!signedIn()) return;
+    const run = (async () => {
+      await queryClient.cancelQueries({ queryKey: key, exact: true });
+      if (!signedIn()) return;
+      await queryClient.fetchQuery({ ...remindersQuery(key), staleTime: 0 });
+    })();
+    latestRemindersRefresh.current = run;
     try {
-      const reminders = await get('/reminders');
-      if (request !== remindersRequest.current) return;
-      dispatch({ type: 'SET_REMINDERS', payload: reminders });
-      dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
-      scheduleLocalReminders(reminders);
-    } catch (err) { if (rethrow) throw err; handleApiError(err); }
+      // Replaced by a newer refresh: its answer (or failure) is this one's,
+      // however many times it is replaced in turn. (A cancelled request may
+      // settle with the list it replaced rather than reject — React Query
+      // keeps the previous data — so "replaced" is read from which refresh is
+      // newest, not from the error.)
+      for (let current = run; ;) {
+        let failure = null;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await current;
+        } catch (err) {
+          if (!isCancelledError(err)) failure = err;
+        }
+        if (latestRemindersRefresh.current === current || !signedIn()) {
+          if (failure) throw failure;
+          return;
+        }
+        current = latestRemindersRefresh.current;
+      }
+    } catch (err) {
+      if (rethrow) throw err;
+      handleApiError(err);
+    }
   };
+
+  // Every new reminders list — whichever refresh fetched it — is this device's
+  // notification schedule and the "last synced" moment: one place does both.
+  // A cancelled request's answer never lands here, and logout's removal of the
+  // list cancels its request, so a late answer for a signed-out account never
+  // reaches the phone either (remindersCache.test.js).
+  // Scheduling cancels every notification, then schedules the list, one await
+  // at a time: two lists landing close together must not interleave (the
+  // older one's entries would outlive the newer list's cancel — a dose just
+  // marked given would still fire). One schedule runs at a time; lists that
+  // land meanwhile wait, and only the newest of them is scheduled.
+  const scheduling = useRef({ running: false, next: undefined });
+  const scheduleNewest = (list) => {
+    const s = scheduling.current;
+    s.next = list;
+    if (s.running) return;
+    s.running = true;
+    (async () => {
+      while (s.next !== undefined) {
+        const newest = s.next;
+        s.next = undefined;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await scheduleLocalReminders(newest);
+        } catch {
+          // Best-effort, as before: the next list schedules again.
+        }
+      }
+      s.running = false;
+    })();
+  };
+  useEffect(() => queryClient.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action?.type !== 'success') return;
+    if (event.query.queryKey[0] !== remindersKeys.all[0]) return;
+    // A local write (setQueryData) changes the schedule but isn't a sync.
+    if (!event.action.manual) dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
+    scheduleNewest(event.query.state.data);
+  }), [queryClient]);
 
   // The notification list is read through useNotifications.js.
   const invalidateNotifications = () => {
@@ -1514,7 +1608,7 @@ export function DataProvider({ children }) {
       value={{
         dataLoaded: state.dataLoaded,
         lastSyncedAt: state.lastSyncedAt,
-        reminders: state.reminders,
+        reminders,
         medDoseDays: state.medDoseDays,
         medDoseCounts: state.medDoseCounts,
         addPet,

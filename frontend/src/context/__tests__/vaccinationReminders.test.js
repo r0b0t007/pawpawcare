@@ -124,10 +124,10 @@ test('an older reminders response arriving last never overwrites the newer one',
 
   let older;
   let newer;
-  await act(async () => {
-    older = data.refreshReminders();
-    newer = data.refreshReminders();
-  });
+  // The older request is in flight when the newer refresh is asked for.
+  await act(async () => { older = data.refreshReminders(); });
+  expect(resolveOld).toBeDefined();
+  await act(async () => { newer = data.refreshReminders(); });
   await act(async () => {
     resolveNew([]); // newest: the reminder is gone
     await newer;

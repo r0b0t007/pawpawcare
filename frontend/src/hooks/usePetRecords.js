@@ -1,8 +1,8 @@
-import { useCallback, useSyncExternalStore } from 'react';
-import { hashKey, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { petRecordsQuery } from '../context/DataContext';
 import { petRecordsKeys } from './queryKeys';
+import { useQueryCacheData } from './useQueryCacheData';
 
 // Every pet with all six sub-resources: the records DataContext's sign-in load
 // fills and its mutations write. Two ways to read them:
@@ -18,13 +18,7 @@ const NO_PETS = [];
 // reloads and the Pets tab's focus re-read keep the records current.
 export function usePetRecords() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const queryKey = petRecordsKeys.list(user?.id);
-  const hash = hashKey(queryKey);
-  const subscribe = useCallback((onChange) => queryClient.getQueryCache().subscribe((event) => {
-    if (event.query.queryHash === hash) onChange();
-  }), [queryClient, hash]);
-  return useSyncExternalStore(subscribe, () => queryClient.getQueryData(queryKey) ?? NO_PETS);
+  return useQueryCacheData(petRecordsKeys.list(user?.id), NO_PETS);
 }
 
 // Whichever starts first — this hook or the sign-in load — runs the one
