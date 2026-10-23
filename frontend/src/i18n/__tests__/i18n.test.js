@@ -163,9 +163,15 @@ describe('latest change wins: the phone language vs a fixed choice (CHW-189)', (
     expect(mockPrefs.languageDeviceSeen).toBe('fr');
   });
 
-  test('a change between two unsupported languages counts too (German to Italian)', async () => {
-    const { initI18n, languageChoice, currentLocale } = load({ device: 'it', saved: 'fr', seen: 'de' });
-    expect(await initI18n()).toBe('en');
+  test('a change between two languages the app does not speak counts too (German to Italian)', async () => {
+    // Both show English, so only the device's own language code tells them apart.
+    const { initI18n, setLanguageChoice, languageChoice, currentLocale } = load({ device: 'de' });
+    await initI18n();
+    await setLanguageChoice('fr');
+
+    mockDeviceLanguage = 'it';
+    appStateListener('active');
+    await Promise.resolve();
     expect(languageChoice()).toBe('device');
     expect(currentLocale()).toBe('en');
   });

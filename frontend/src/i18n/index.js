@@ -76,11 +76,12 @@ let deviceSeen = null;
 // and the system prompts. A choice made in Profile afterwards wins again. The
 // first sighting (a fresh install, or the update that added this) only
 // records the language. Saving is best-effort, like the rest of the setting.
-// `adopt: false` only records it: a choice being made now is the newer change.
-function noteDeviceLanguage({ adopt = true } = {}) {
+// Checked at launch (iOS restarts the app on a change) and, on Android, on
+// return to the foreground: changing either setting leaves the app first.
+function noteDeviceLanguage() {
   const now = rawDeviceLanguage();
   if (!FOLLOW_DEVICE_LANGUAGE || now == null || now === deviceSeen) return;
-  const changed = adopt && deviceSeen != null && choice !== 'device';
+  const changed = deviceSeen != null && choice !== 'device';
   deviceSeen = now;
   setPref(DEVICE_SEEN_PREF, now).catch(() => {});
   if (changed) {
@@ -132,7 +133,6 @@ export function languageChoice() {
  * Resolves to the language now shown.
  */
 export async function setLanguageChoice(next) {
-  noteDeviceLanguage({ adopt: false }); // the device language this choice is made against
   choice = normalizeChoice(next);
   const lng = resolveChoice(choice);
   if (lng !== i18n.language) await i18n.changeLanguage(lng);
