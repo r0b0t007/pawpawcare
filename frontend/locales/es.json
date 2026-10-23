@@ -1,0 +1,12 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "PawPawCare",
+    "NSPhotoLibraryUsageDescription": "Permita que PawPawCare acceda a sus fotos para poner las fotos de sus mascotas y compartir publicaciones.",
+    "NSCameraUsageDescription": "Permita que PawPawCare acceda a su cámara.",
+    "NSMicrophoneUsageDescription": "Permita que PawPawCare acceda a su micrófono.",
+    "NSFaceIDUsageDescription": "Permita que PawPawCare use Face ID."
+  },
+  "android": {
+    "app_name": "PawPawCare"
+  }
+}
