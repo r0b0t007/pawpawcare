@@ -9,8 +9,8 @@ jest.mock('react-native-safe-area-context', () => {
 });
 jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.fn() }));
 let mockQuery = {};
-jest.mock('../../../hooks/usePets', () => ({
-  usePetsQuery: () => ({ data: [], isLoading: false, isError: false, refetch: jest.fn(), ...mockQuery }),
+jest.mock('../../../hooks/usePetRecords', () => ({
+  usePetRecordsQuery: () => ({ data: [], isLoading: false, isError: false, isStale: false, refetch: jest.fn(), ...mockQuery }),
 }));
 
 import React from 'react';
@@ -59,5 +59,31 @@ test('French: chrome translated, pet names untouched', async () => {
   expect(texts(tree)).toEqual(expect.arrayContaining([
     'Vos animaux', '2 animaux · touchez-en un pour voir les soins du jour', 'Luna', 'Milo',
   ]));
+  act(() => tree.unmount());
+});
+
+// The full records are 1 + 6N requests: a focus re-reads them only once stale.
+test('re-reads on focus only once the records are stale', () => {
+  const { useRefetchOnFocus } = require('../../../hooks/useRefetchOnFocus');
+  const refetch = jest.fn();
+  const tree = render({ data: [pet('p1', 'Luna')], isStale: false, refetch });
+  expect(useRefetchOnFocus).toHaveBeenCalledWith(refetch, { isStale: false });
+  act(() => tree.unmount());
+});
+
+// Vaccinations that didn't load: no status, never "All good".
+test('a pet whose vaccinations did not load shows no status', () => {
+  const tree = render({ data: [{ ...pet('p1', 'Luna'), missing: ['vaccinations'] }, pet('p2', 'Milo')] });
+  const PetCard = require('../../../components').PetCard;
+  const cards = tree.root.findAllByType(PetCard);
+  expect(cards.map((c) => [c.props.name, c.props.status])).toEqual([['Luna', null], ['Milo', 'ok']]);
+  act(() => tree.unmount());
+});
+
+// A failed re-read keeps the pets the tab already shows.
+test('a failed re-read keeps the pets on screen', () => {
+  const tree = render({ data: [pet('p1', 'Luna')], isError: true });
+  expect(texts(tree)).toContain('Luna');
+  expect(texts(tree)).not.toContain("Couldn't load your pets.");
   act(() => tree.unmount());
 });
