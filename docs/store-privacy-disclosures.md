@@ -14,7 +14,7 @@ Update this file whenever a new SDK or data flow ships, then update both store f
 | Privacy policy URL | <https://pawpawcare.app/privacy/> |
 | Account deletion URL (Play requires one reachable without the app) | <https://pawpawcare.app/privacy/#delete> |
 | Is data collection required? | Account + pet records: required for the app to work. Analytics: optional (Profile → Privacy). |
-| Device permissions the app asks for | **Photo library** (pick a pet photo, a post picture, a document scan) and **notifications** (plus Android's "Alarms & reminders" for on-time reminders). **No camera, microphone, Face ID, location or contacts:** they're switched off in `app.json` (`cameraPermission`, `microphonePermission`, `faceIDPermission: false`, so Android also drops `CAMERA` and `RECORD_AUDIO`), and `frontend/src/i18n/__tests__/nativeLocales.test.js` fails if one comes back. |
+| Device permissions the app asks for | **Photo library** (pick a pet photo, a post picture, a document scan) and **notifications** (plus Android's "Alarms & reminders" for on-time reminders). **No camera, microphone, Face ID, location or contacts.** In `app.json`, expo-image-picker's `cameraPermission: false` and `microphonePermission: false` drop the iOS prompts and remove Android's `CAMERA` and `RECORD_AUDIO`. expo-secure-store's `faceIDPermission: false` drops the iOS Face ID prompt (it's iOS-only). `frontend/src/i18n/__tests__/nativeLocales.test.js` fails if one of these is switched back on, if `ios.infoPlist` gains a usage description, or if a config plugin nobody has checked for prompts is added. A new library can still add an Android permission through its own manifest, so check the built APK's permissions when one is added. |
 
 ## Apple — App Privacy ("nutrition label")
 

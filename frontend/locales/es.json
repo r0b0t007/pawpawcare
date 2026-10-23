@@ -1,9 +1,5 @@
 {
   "ios": {
-    "CFBundleDisplayName": "PawPawCare",
     "NSPhotoLibraryUsageDescription": "Permita que PawPawCare acceda a sus fotos para poner las fotos de sus mascotas y compartir publicaciones."
-  },
-  "android": {
-    "app_name": "PawPawCare"
   }
 }

@@ -5,8 +5,6 @@
 // ENVIRONMENT is set per-profile in eas.json and is available when EAS
 // evaluates the app config, both locally and on the builder.
 
-const path = require('path');
-
 const IS_E2E = process.env.ENVIRONMENT === 'e2e';
 const BUILD_PROPERTIES = 'expo-build-properties';
 
@@ -31,36 +29,15 @@ function withE2eBuildProperties(plugins = []) {
   return merged ? next : [...next, [BUILD_PROPERTIES, { android: E2E_ANDROID }]];
 }
 
-// The translated app name in each `locales` file wins over `name` on a device
-// in that language, so the e2e name goes into them too (inline objects instead
-// of the file paths).
-function withE2eLocaleNames(locales = {}, name) {
-  return Object.fromEntries(
-    Object.entries(locales).map(([lng, file]) => {
-      const strings = typeof file === 'string' ? require(path.join(__dirname, file)) : file;
-      return [
-        lng,
-        {
-          ...strings,
-          ios: { ...strings.ios, CFBundleDisplayName: name },
-          android: { ...strings.android, app_name: name },
-        },
-      ];
-    }),
-  );
-}
-
 module.exports = ({ config }) => {
   if (!IS_E2E) return config;
 
-  // Distinct name so an e2e build is never mistaken for the real app in the
-  // launcher. The package/bundle id stays the same, so this still installs
-  // over a preview build rather than sitting alongside it.
-  const name = 'PawPawCare (E2E)';
   return {
     ...config,
-    name,
-    locales: withE2eLocaleNames(config.locales, name),
+    // Distinct name so an e2e build is never mistaken for the real app in the
+    // launcher. The package/bundle id stays the same, so this still installs
+    // over a preview build rather than sitting alongside it.
+    name: 'PawPawCare (E2E)',
     plugins: withE2eBuildProperties(config.plugins),
   };
 };
