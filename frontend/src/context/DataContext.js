@@ -1,5 +1,5 @@
 import React, {
-  createContext, useContext, useReducer, useEffect, useMemo, useRef, useSyncExternalStore,
+  createContext, useContext, useReducer, useEffect, useMemo, useRef,
 } from 'react';
 import { AppState } from 'react-native';
 import { hashKey, isCancelledError, useQueryClient } from '@tanstack/react-query';
@@ -17,7 +17,6 @@ import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
-import { usePetRecords } from '../hooks/usePets';
 import {
   petsKeys, petRecordsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys, vaultKeys,
 } from '../hooks/queryKeys';
@@ -347,9 +346,12 @@ export async function fetchPetRecords(queryClient, queryKey) {
   );
 }
 
-// Never garbage-collected (usePetRecords reads them without a
-// query observer), and not retried: a failed load says so at once, as it did
-// before it was a query. Stale after the app-wide five minutes.
+// Never garbage-collected: every pet screen reads them with usePetRecords, a
+// cache subscription rather than a query observer, and only the Pets tab's
+// usePetRecordsQuery observes them — so mostly nothing would keep them (and an
+// invalidation re-reads them only while the Pets tab is mounted). Not
+// retried: a failed load says so at once, as it did before it was a query.
+// Stale after the app-wide five minutes.
 const PET_RECORDS_DEFAULTS = { gcTime: Infinity, retry: false };
 
 // The records query, for the sign-in load and usePetRecordsQuery alike.
@@ -378,13 +380,16 @@ export function DataProvider({ children }) {
   // (petRecordsKeys): fetched by its query (fetchPetRecords — the sign-in
   // load runs it, and usePetRecordsQuery screens re-read it), changed by the
   // mutations. It is never garbage-collected. Screens read it through
-  // usePetRecords (hooks/usePets.js), a store subscription that re-renders
-  // with each write as it happens, as the reducer did; so does this provider.
+  // usePetRecords (hooks/usePetRecords.js), a store subscription that
+  // re-renders with each write as it happens, as the reducer did.
   const petRecordsKey = petRecordsKeys.list(user?.id);
   useEffect(() => {
     queryClient.setQueryDefaults(petRecordsKeys.all, PET_RECORDS_DEFAULTS);
   }, [queryClient]);
-  const pets = usePetRecords();
+  // The records as they are now — read when a mutation runs, not subscribed
+  // to: this provider doesn't re-render on pet writes (screens read them with
+  // usePetRecords).
+  const currentPets = () => queryClient.getQueryData(petRecordsKey) ?? NO_PETS;
   // Every write applies to the cache's current list, as the reducer applied
   // its actions to the current state — only while the account it was made
   // for is still signed in: a late answer after logout must not bring that
@@ -797,12 +802,13 @@ export function DataProvider({ children }) {
         weight_unit: petData.weightUnit || 'kg',
         gender: petData.gender || null,
         microchipped: petData.microchipped || false,
-        color: petData.color || PET_BGS[pets.length % PET_BGS.length],
+        color: petData.color || PET_BGS[currentPets().length % PET_BGS.length],
         avatar_url: petData.avatarUrl || null,
       });
-      const newPet = toPet(apiPet, { index: pets.length });
+      const index = currentPets().length;
+      const newPet = toPet(apiPet, { index });
       writePets((list) => [...list, newPet]);
-      track('pet_added', { type: newPet.type, pet_count: pets.length + 1 });
+      track('pet_added', { type: newPet.type, pet_count: index + 1 });
       // Creating a pet with a weight seeds a server-side log — reflect it.
       if (petData.weight) refreshPetWeights(newPet.id);
       return newPet;

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { usePetRecords } from '../../hooks/usePets';
+import { usePetRecords } from '../../hooks/usePetRecords';
 import { pickRecordImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
 import { appliedToastText, buildExtractionPayload, extractionCount } from '../../utils/extraction';

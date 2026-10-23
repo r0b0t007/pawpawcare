@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { usePetRecords } from '../../hooks/usePets';
+import { usePetRecords } from '../../hooks/usePetRecords';
 import { ui, type, radii, petPair, photos } from '../../theme';
 import { emptyPhotoFor } from '../../utils/pets';
 import { Card, Button, Sheet, ConfirmDialog, EmptyState, PetFace, StatusPill, showToast, ScreenHeader, DeleteButton, TextField } from '../../components';

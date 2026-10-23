@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
-import { usePetRecords } from '../../hooks/usePets';
+import { usePetRecords } from '../../hooks/usePetRecords';
 import { ui, type, motion, photos } from '../../theme';
 import { Card, EmptyState, PetFace, ScreenHeader, reminderIcon, NotificationsBanner } from '../../components';
 import { useToday } from '../../hooks/useToday';

@@ -36,12 +36,11 @@ jest.mock('../../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }));
 
 let mockPets = [];
-jest.mock('../../../hooks/usePets', () => ({ usePetRecords: () => require('../../../context/DataContext').useData().pets }));
+jest.mock('../../../hooks/usePetRecords', () => ({ usePetRecords: () => mockPets }));
 jest.mock('../../../context/DataContext', () => {
   const noop = () => Promise.resolve(null);
   return {
     useData: () => ({
-      pets: mockPets,
       medDoseDays: {},
       ...Object.fromEntries(
         [

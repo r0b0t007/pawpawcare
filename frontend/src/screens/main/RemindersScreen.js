@@ -7,7 +7,7 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
-import { usePetRecords } from '../../hooks/usePets';
+import { usePetRecords } from '../../hooks/usePetRecords';
 import { ui, radii, type, motion, photos } from '../../theme';
 import { Card, Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, reminderIcon, Toggle, DeleteButton, NotificationsBanner } from '../../components';
 import { useInFlight } from '../../hooks/useInFlight';

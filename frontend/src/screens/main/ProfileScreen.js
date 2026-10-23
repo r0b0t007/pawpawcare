@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { usePetRecords } from '../../hooks/usePets';
+import { usePetRecords } from '../../hooks/usePetRecords';
 import { useInvitesQuery } from '../../hooks/useInvites';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { getPref, setPref } from '../../services/prefs';

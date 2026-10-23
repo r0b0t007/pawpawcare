@@ -29,8 +29,7 @@ jest.mock('../AuthContext', () => ({
 }));
 
 import { DataProvider, useData } from '../DataContext';
-import { usePetRecords } from '../../hooks/usePets';
-import { usePetRecordsQuery } from '../../hooks/usePetRecords';
+import { usePetRecords, usePetRecordsQuery } from '../../hooks/usePetRecords';
 import { usePetsQuery } from '../../hooks/usePets';
 import { get, post, patch, del } from '../../services/api';
 
@@ -99,6 +98,34 @@ describe('pet records in the cache', () => {
 
     expect(fromContext).not.toHaveProperty('pets');
     expect(data.pets.map((p) => p.name)).toEqual(['Rex']);
+  });
+
+  // DataContext no longer holds the records, so a pet write doesn't re-render
+  // the screens that read it (feed, invites, settings...).
+  it('a pet write does not re-render useData() screens', async () => {
+    let renders = 0;
+    function ContextProbe() {
+      useData();
+      renders += 1;
+      return null;
+    }
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <DataProvider>
+            <ContextProbe />
+            <Probe />
+          </DataProvider>
+        </QueryClientProvider>,
+      );
+    });
+    const before = renders;
+    post.mockResolvedValue({ id: 'f1', pet_id: 'p1', name: 'Tuna' });
+
+    await act(async () => { await data.addFavoriteFood('p1', 'Tuna'); });
+
+    expect(data.pets[0].favoriteFoods.map((f) => f.name)).toEqual(['Tuna']);
+    expect(renders).toBe(before);
   });
 
   it('holds the loaded pets where query hooks can read them', async () => {

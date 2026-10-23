@@ -26,7 +26,7 @@ jest.mock('../AuthContext', () => ({
 }));
 
 import { DataProvider, useData } from '../DataContext';
-import { usePetRecords } from '../../hooks/usePets';
+import { usePetRecords } from '../../hooks/usePetRecords';
 import { get } from '../../services/api';
 import { getPref, setPref } from '../../services/prefs';
 
