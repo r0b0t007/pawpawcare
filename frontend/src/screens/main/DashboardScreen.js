@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
 import { usePetsQuery } from '../../hooks/usePets';
 import { usePetRecords } from '../../hooks/usePetRecords';
+import { useReminders, useRefreshRemindersOnFocus } from '../../hooks/useReminders';
 import { useFeedCount } from '../../hooks/useFeed';
 import { useUnreadCount } from '../../hooks/useNotifications';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
@@ -77,10 +78,13 @@ export default function DashboardScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const {
-    dataLoaded, reminders, medDoseDays, medDoseCounts,
+    dataLoaded, medDoseDays, medDoseCounts,
     markVaccinationComplete, logMedicationDose,
   } = useData();
   const pets = usePetRecords();
+  // Edits from another phone (a co-owner's reminder): re-read once stale.
+  const reminders = useReminders();
+  useRefreshRemindersOnFocus();
   // The community teaser counts the feed's posts. Home stays mounted under
   // the tab bar: a stale (or failed) feed refetches when it is shown again.
   const { data: postCount, isStale: feedStale, refetch: refetchFeed } = useFeedCount();

@@ -25,11 +25,12 @@ jest.mock('../../../services/storeReview', () => ({ noteGoodMoment: jest.fn() })
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1', name: 'Sam' } }) }));
 
 let mockStore = {};
-const mockWithoutPets = ({ pets, ...rest }) => rest;
+const mockWithoutPets = ({ pets, reminders, ...rest }) => rest;
+const mockNoReminders = [];
+jest.mock('../../../hooks/useReminders', () => ({ useReminders: () => mockStore.reminders ?? mockNoReminders, useRefreshRemindersOnFocus: jest.fn() }));
 jest.mock('../../../hooks/usePetRecords', () => ({ usePetRecords: () => mockStore.pets ?? [] }));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({
-    reminders: [],
     medDoseDays: {},
     medDoseCounts: {},
     markVaccinationComplete: jest.fn(),

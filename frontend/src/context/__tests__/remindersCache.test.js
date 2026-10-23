@@ -15,6 +15,7 @@ jest.mock('../../services/api', () => ({
 }));
 jest.mock('../../services/notifications', () => ({
   scheduleLocalReminders: jest.fn(() => Promise.resolve()),
+  cancelAllLocalReminders: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../services/prefs', () => ({
@@ -28,8 +29,9 @@ jest.mock('../AuthContext', () => ({
 }));
 
 import { DataProvider, useData } from '../DataContext';
+import { useReminders } from '../../hooks/useReminders';
 import { get, post } from '../../services/api';
-import { scheduleLocalReminders } from '../../services/notifications';
+import { cancelAllLocalReminders, scheduleLocalReminders } from '../../services/notifications';
 
 const reminder = (id, title = `Reminder ${id}`) => ({
   id, title, enabled: true, next_fire_at: '2030-01-01T09:00:00Z', fire_at: '2030-01-01T09:00:00Z',
@@ -38,7 +40,7 @@ const reminder = (id, title = `Reminder ${id}`) => ({
 let server;
 let data;
 function Probe() {
-  data = useData();
+  data = { ...useData(), reminders: useReminders() };
   return null;
 }
 
@@ -274,6 +276,21 @@ describe('accounts', () => {
 
     expect(data.reminders).toEqual([]);
     expect(client.getQueryCache().findAll({ queryKey: ['reminders'] })).toHaveLength(0);
+  });
+
+  // A schedule still running at sign-out would put the account's reminders
+  // back after AuthContext's cancel: a cancel follows it.
+  it('a schedule still running at logout is followed by a cancel', async () => {
+    let finish;
+    scheduleLocalReminders.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await mount();
+    mockUser = null;
+    await act(async () => { tree.update(element()); });
+    expect(cancelAllLocalReminders).not.toHaveBeenCalled();
+
+    await act(async () => { finish(); });
+
+    expect(cancelAllLocalReminders).toHaveBeenCalledTimes(1);
   });
 
   // The signed-out account's reminders must not be put back on the phone.

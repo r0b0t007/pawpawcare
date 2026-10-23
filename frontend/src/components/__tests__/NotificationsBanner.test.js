@@ -6,8 +6,8 @@ jest.mock('../ConfirmDialog', () => function ConfirmDialog() { return null; });
 jest.mock('../Toast', () => ({ showToast: jest.fn(), ToastHost: () => null }));
 const mockRegisterPushDevice = jest.fn(() => Promise.resolve());
 jest.mock('../../context/AuthContext', () => ({ useAuth: () => ({ registerPushDevice: mockRegisterPushDevice }) }));
-const mockReminders = [{ id: 'r1' }];
-jest.mock('../../context/DataContext', () => ({ useData: () => ({ reminders: mockReminders }) }));
+const mockReschedule = jest.fn();
+jest.mock('../../context/DataContext', () => ({ useData: () => ({ rescheduleReminders: mockReschedule }) }));
 let mockPermission;
 let mockAnswer;
 jest.mock('../../services/notifications', () => ({
@@ -93,7 +93,8 @@ describe('NotificationsBanner', () => {
     await pressButton(tree, 'Turn on');
     expect(requestNotificationPermission).toHaveBeenCalledTimes(1);
     expect(mockRegisterPushDevice).toHaveBeenCalledTimes(1);
-    expect(scheduleLocalReminders).toHaveBeenCalledWith(mockReminders);
+    // DataContext schedules the current list (tested in useReminders.test.js).
+    expect(mockReschedule).toHaveBeenCalledTimes(1);
     expect(bannerShown(tree)).toBe(false);
   });
 
@@ -150,7 +151,7 @@ describe('NotificationPermissionWatcher', () => {
     mockPermission = { status: 'granted', canAskAgain: true };
     await act(async () => { foreground(); });
     expect(mockRegisterPushDevice).toHaveBeenCalledTimes(1);
-    expect(scheduleLocalReminders).toHaveBeenCalledTimes(1);
+    expect(mockReschedule).toHaveBeenCalledTimes(1);
   });
 
   test('already allowed at launch: nothing to do (sign-in registered)', async () => {
@@ -289,14 +290,14 @@ describe('NotificationPermissionWatcher and exact alarms', () => {
     mockPermission = { status: 'granted', canAskAgain: true };
     mockExact = false;
     await render(<NotificationPermissionWatcher />);
-    expect(scheduleLocalReminders).not.toHaveBeenCalled();
+    expect(mockReschedule).not.toHaveBeenCalled();
 
     mockExact = true; // allowed in the phone's settings
     await act(async () => { foreground(); });
-    expect(scheduleLocalReminders).toHaveBeenCalledTimes(1);
-    expect(scheduleLocalReminders).toHaveBeenCalledWith(mockReminders);
+    expect(mockReschedule).toHaveBeenCalledTimes(1);
+    expect(mockReschedule).toHaveBeenCalled();
 
     await act(async () => { foreground(); });
-    expect(scheduleLocalReminders).toHaveBeenCalledTimes(1);
+    expect(mockReschedule).toHaveBeenCalledTimes(1);
   });
 });

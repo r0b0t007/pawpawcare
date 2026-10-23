@@ -20,7 +20,8 @@ jest.mock('../../../services/notifications', () => ({
   ...jest.requireActual('../../../services/notifications'),
   getNotificationPermission: jest.fn(() => Promise.resolve({ status: 'granted', canAskAgain: true })),
 }));
-const mockWithoutPets = ({ pets, ...rest }) => rest;
+const mockWithoutPets = ({ pets, reminders, ...rest }) => rest;
+jest.mock('../../../hooks/useReminders', () => ({ useReminders: () => mockStore.reminders, useRefreshRemindersOnFocus: jest.fn() }));
 jest.mock('../../../hooks/usePetRecords', () => ({ usePetRecords: () => mockStore.pets }));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => mockWithoutPets(mockStore),
