@@ -15,6 +15,7 @@ jest.mock('../../services/api', () => ({
 }));
 jest.mock('../../services/notifications', () => ({
   scheduleLocalReminders: jest.fn(() => Promise.resolve()),
+  cancelAllLocalReminders: jest.fn(() => Promise.resolve()),
 }));
 jest.mock('../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../services/prefs', () => ({
@@ -24,14 +25,23 @@ jest.mock('../../services/prefs', () => ({
 jest.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'u1' }, logout: jest.fn() }),
 }));
-// Focus is driven by the test: the latest focus callback is kept.
+// Focus is driven by the test: the latest focus callback is kept. With
+// mockFocusOnMount, the first focus also runs on mount — as a real screen's
+// does, in its effect, before DataProvider's own sign-in load starts.
 let mockFocus;
-jest.mock('@react-navigation/native', () => ({ useFocusEffect: (callback) => { mockFocus = callback; } }));
+let mockFocusOnMount = false;
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: (callback) => {
+    mockFocus = callback;
+    // eslint-disable-next-line global-require
+    require('react').useEffect(() => { if (mockFocusOnMount) callback(); }, []);
+  },
+}));
 
-import { DataProvider, useData } from '../../context/DataContext';
-import { useReminders, useRefreshRemindersOnFocus, REMINDERS_STALE_MS } from '../useReminders';
+import { DataProvider, useData, REMINDERS_STALE_MS } from '../../context/DataContext';
+import { useReminders, useRefreshRemindersOnFocus } from '../useReminders';
 import { get } from '../../services/api';
-import { scheduleLocalReminders } from '../../services/notifications';
+import { cancelAllLocalReminders, scheduleLocalReminders } from '../../services/notifications';
 
 const reminder = (id) => ({ id, title: `Reminder ${id}`, enabled: true, next_fire_at: '2030-01-01T09:00:00Z' });
 
@@ -61,6 +71,7 @@ const focus = () => act(async () => { mockFocus(); });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockFocusOnMount = false;
   server = [reminder('r1')];
   get.mockImplementation((path) => {
     if (path === '/reminders') return Promise.resolve(server);
@@ -100,6 +111,47 @@ describe('re-reading on focus', () => {
     expect(reminderCalls()).toBe(1);
   });
 
+  // Home's first focus runs before the sign-in load starts: one request, not
+  // two (the load would cancel and resend it).
+  it('a screen shown before the sign-in load starts adds no request', async () => {
+    mockFocusOnMount = true;
+    await mount();
+
+    expect(REMINDERS_STALE_MS).toBe(5 * 60 * 1000);
+    expect(reminderCalls()).toBe(1);
+    expect(reminders.map((r) => r.id)).toEqual(['r1']);
+  });
+
+  // Tab switches while the list is on its way don't restart it.
+  it('a read already on its way is left alone', async () => {
+    let answer;
+    get.mockImplementation((path) => {
+      if (path === '/reminders') return new Promise((resolve) => { answer = resolve; });
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    await mount();
+    await focus();
+    await focus();
+    expect(reminderCalls()).toBe(1);
+
+    await act(async () => { answer(server); });
+    expect(reminders.map((r) => r.id)).toEqual(['r1']);
+  });
+
+  it('a list that failed to load is re-read when a screen is shown', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    get.mockImplementation((path) => (path === '/reminders' ? Promise.reject(new Error('Network error')) : Promise.resolve([])));
+    await mount();
+    expect(reminders).toEqual([]);
+    get.mockImplementation((path) => (path === '/reminders' ? Promise.resolve(server) : Promise.resolve([])));
+
+    await focus();
+
+    expect(reminders.map((r) => r.id)).toEqual(['r1']);
+    console.warn.mockRestore();
+  });
+
   // Reading never fetches: a screen opened on a stale list re-reads it.
   it('re-reads a stale list when a screen opens on it', async () => {
     await mount();
@@ -132,6 +184,33 @@ describe('re-reading on focus', () => {
 // A permission grant or the care-reminders toggle: the current list, through
 // the same one-at-a-time scheduler.
 describe('rescheduling', () => {
+  // An empty schedule would cancel what the phone already has.
+  it('with no list loaded, schedules nothing', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    get.mockImplementation((path) => (path === '/reminders' ? Promise.reject(new Error('Network error')) : Promise.resolve([])));
+    await mount();
+    scheduleLocalReminders.mockClear();
+
+    await act(async () => { data.rescheduleReminders(); });
+
+    expect(scheduleLocalReminders).not.toHaveBeenCalled();
+    console.warn.mockRestore();
+  });
+
+  // Care reminders off while a schedule runs: the cancel comes after it.
+  it('turning reminders off cancels after a schedule already running', async () => {
+    await mount();
+    let finish;
+    scheduleLocalReminders.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await act(async () => { data.rescheduleReminders(); });
+
+    await act(async () => { data.cancelReminderNotifications(); });
+    expect(cancelAllLocalReminders).not.toHaveBeenCalled();
+    await act(async () => { finish(); });
+
+    expect(cancelAllLocalReminders).toHaveBeenCalledTimes(1);
+  });
+
   it('schedules the current list', async () => {
     await mount();
     scheduleLocalReminders.mockClear();

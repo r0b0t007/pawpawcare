@@ -7,7 +7,6 @@ import { usePetRecords } from '../../hooks/usePetRecords';
 import { useInvitesQuery } from '../../hooks/useInvites';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { getPref, setPref } from '../../services/prefs';
-import { cancelAllLocalReminders } from '../../services/notifications';
 import { exportRecords } from '../../services/exportRecords';
 import { captureException, isSentryEnabled } from '../../services/sentry';
 import { isAnalyticsEnabled, setAnalyticsEnabled } from '../../services/analytics';
@@ -35,7 +34,7 @@ function SectionLabel({ children }) {
 export default function ProfileScreen({ navigation }) {
   const { t } = useTranslation();
   const { user, isAdmin, logout, updateUser } = useAuth();
-  const { rescheduleReminders } = useData();
+  const { rescheduleReminders, cancelReminderNotifications } = useData();
   const pets = usePetRecords();
   // The tab stays mounted: refresh the pending badge whenever it's shown.
   const { data: invites = [], refetch: refetchInvites } = useInvitesQuery();
@@ -72,15 +71,15 @@ export default function ProfileScreen({ navigation }) {
   }, []);
 
   // Real behavior: OFF cancels every pending local notification; ON reschedules
-  // from the current reminder list, through DataContext's one scheduler
-  // (scheduling reads the pref, so persist first).
+  // from the current reminder list — both through DataContext's one scheduler,
+  // so they happen in order (scheduling reads the pref, so persist first).
   const toggleCareReminders = async (value) => {
     setCareReminders(value);
     await setPref('careReminders', value);
     if (value) {
       rescheduleReminders();
     } else {
-      cancelAllLocalReminders();
+      cancelReminderNotifications();
     }
   };
 

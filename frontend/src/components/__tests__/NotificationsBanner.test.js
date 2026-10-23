@@ -93,7 +93,8 @@ describe('NotificationsBanner', () => {
     await pressButton(tree, 'Turn on');
     expect(requestNotificationPermission).toHaveBeenCalledTimes(1);
     expect(mockRegisterPushDevice).toHaveBeenCalledTimes(1);
-    expect(mockReschedule).toHaveBeenCalled();
+    // DataContext schedules the current list (tested in useReminders.test.js).
+    expect(mockReschedule).toHaveBeenCalledTimes(1);
     expect(bannerShown(tree)).toBe(false);
   });
 

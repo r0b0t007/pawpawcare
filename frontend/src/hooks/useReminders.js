@@ -1,6 +1,5 @@
 import { useCallback, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { remindersKeys } from './queryKeys';
@@ -16,22 +15,14 @@ export function useReminders() {
   return useQueryCacheData(remindersKeys.list(user?.id), NO_REMINDERS);
 }
 
-// The app-wide staleTime: a list older than this re-reads when its screen is
-// shown again (the new list reschedules through the same listener).
-export const REMINDERS_STALE_MS = 5 * 60 * 1000;
-
-// Re-read the list when a screen is shown — opened or focused again — and the
-// list is stale. (Reading it never fetches, so opening a screen on a stale
-// list re-reads it too; a fresh one is left alone.)
+// Re-read the list when a screen is shown — opened or focused again — if it
+// is stale (refreshReminders({ ifStale: true }) owns the rule: not while a
+// read is on its way, not before the first load, and a failed list is re-read).
 export function useRefreshRemindersOnFocus() {
-  const { user } = useAuth();
   const { refreshReminders } = useData();
-  const queryClient = useQueryClient();
   const refreshRef = useRef(refreshReminders);
   refreshRef.current = refreshReminders;
   useFocusEffect(useCallback(() => {
-    const state = queryClient.getQueryState(remindersKeys.list(user?.id));
-    if (state?.dataUpdatedAt && Date.now() - state.dataUpdatedAt < REMINDERS_STALE_MS) return;
-    refreshRef.current();
-  }, [queryClient, user?.id]));
+    refreshRef.current({ ifStale: true });
+  }, []));
 }

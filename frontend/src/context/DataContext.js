@@ -8,7 +8,7 @@ import { PET_COLOR_PAIRS } from '../theme';
 
 const PET_BGS = PET_COLOR_PAIRS.map((p) => p.bg);
 import { get, post, patch, put, del, uploadDocument } from '../services/api';
-import { scheduleLocalReminders } from '../services/notifications';
+import { cancelAllLocalReminders, scheduleLocalReminders } from '../services/notifications';
 import { track } from '../services/analytics';
 import { getPref, setPref } from '../services/prefs';
 import { noteGoodMoment } from '../services/storeReview';
@@ -359,7 +359,14 @@ const PET_RECORDS_DEFAULTS = { gcTime: Infinity, retry: false };
 // it without a query observer) and not retried, as before it was a query —
 // set on the query itself, the one way it is fetched.
 const NO_REMINDERS = [];
-const REMINDERS_DEFAULTS = { gcTime: Infinity, retry: false };
+// Stale after five minutes (as the app's other queries): a screen shown on a
+// list older than this re-reads it (refreshReminders({ ifStale: true })).
+export const REMINDERS_STALE_MS = 5 * 60 * 1000;
+// Queued in place of a list to cancel every scheduled notification. One
+// module-level object: the scheduler loop compares it by identity across
+// renders.
+const CANCEL_ALL = { cancel: true };
+const REMINDERS_DEFAULTS = { gcTime: Infinity, retry: false, staleTime: REMINDERS_STALE_MS };
 const remindersQuery = (queryKey) => ({
   queryKey,
   queryFn: () => get('/reminders'),
@@ -590,6 +597,9 @@ export function DataProvider({ children }) {
       queryClient.removeQueries({ queryKey: petRecordsKeys.all });
       petLoadFailures.clear();
       queryClient.removeQueries({ queryKey: remindersKeys.all });
+      // AuthContext cancels them too; this one waits for a schedule still
+      // running, which would otherwise put the signed-out account's back.
+      if (scheduling.current.running) scheduleNewest(CANCEL_ALL);
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
       // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
       // cleared from memory so a different account never renders it — and the
@@ -743,11 +753,20 @@ export function DataProvider({ children }) {
   // if it does — rather than resolving on nothing. Only for the account still
   // signed in: a refresh asked for after logout fetches nothing (it would
   // bring back a removed list, kept for good, onto the phone).
+  // `ifStale` (a screen shown again): re-read only a list that is stale — not
+  // while a read is already on its way (the sign-in load, or a re-read: it
+  // would be cancelled and restarted on every tab switch), nor before the
+  // first load has started. A list that failed to load is re-read.
   const latestRemindersRefresh = useRef(null);
-  const refreshReminders = async ({ rethrow = false } = {}) => {
+  const refreshReminders = async ({ rethrow = false, ifStale = false } = {}) => {
     const key = remindersKey;
     const signedIn = () => hashKey(key) === hashKey(remindersKeys.list(session.current.userId));
     if (!signedIn()) return;
+    if (ifStale) {
+      const query = queryClient.getQueryCache().find({ queryKey: key, exact: true });
+      if (!query || query.state.fetchStatus === 'fetching') return;
+      if (query.state.status === 'success' && !query.isStaleByTime(REMINDERS_STALE_MS)) return;
+    }
     const run = (async () => {
       await queryClient.cancelQueries({ queryKey: key, exact: true });
       if (!signedIn()) return;
@@ -790,6 +809,8 @@ export function DataProvider({ children }) {
   // older one's entries would outlive the newer list's cancel — a dose just
   // marked given would still fire). One schedule runs at a time; lists that
   // land meanwhile wait, and only the newest of them is scheduled.
+  // Cancelling (care reminders off, sign-out) goes through the same queue: a
+  // schedule already running would otherwise put the notifications back.
   const scheduling = useRef({ running: false, next: undefined });
   const scheduleNewest = (list) => {
     const s = scheduling.current;
@@ -802,7 +823,7 @@ export function DataProvider({ children }) {
         s.next = undefined;
         try {
           // eslint-disable-next-line no-await-in-loop
-          await scheduleLocalReminders(newest);
+          await (newest === CANCEL_ALL ? cancelAllLocalReminders() : scheduleLocalReminders(newest));
         } catch {
           // Best-effort, as before: the next list schedules again.
         }
@@ -811,8 +832,15 @@ export function DataProvider({ children }) {
     })();
   };
   // The current list, scheduled through the same one-at-a-time scheduler —
-  // for a permission grant or the care-reminders toggle turned back on.
-  const rescheduleReminders = () => scheduleNewest(queryClient.getQueryData(remindersKey) ?? NO_REMINDERS);
+  // for a permission grant or the care-reminders toggle turned back on. With
+  // no list yet (it never loaded), there is nothing to schedule: scheduling
+  // an empty one would cancel what the phone already has.
+  const rescheduleReminders = () => {
+    const list = queryClient.getQueryData(remindersKey);
+    if (list !== undefined) scheduleNewest(list);
+  };
+  // Care reminders turned off: cancel, after any schedule already running.
+  const cancelReminderNotifications = () => scheduleNewest(CANCEL_ALL);
   useEffect(() => queryClient.getQueryCache().subscribe((event) => {
     if (event.type !== 'updated' || event.action?.type !== 'success') return;
     if (event.query.queryKey[0] !== remindersKeys.all[0]) return;
@@ -1612,6 +1640,7 @@ export function DataProvider({ children }) {
         dataLoaded: state.dataLoaded,
         lastSyncedAt: state.lastSyncedAt,
         rescheduleReminders,
+        cancelReminderNotifications,
         medDoseDays: state.medDoseDays,
         medDoseCounts: state.medDoseCounts,
         addPet,
