@@ -42,7 +42,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow PawPawCare to access your photos to set pet pictures and share posts."
+          "photosPermission": "Allow PawPawCare to access your photos to set pet pictures and share posts.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [
@@ -63,7 +65,12 @@
           "backgroundColor": "#fff8f4"
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-sharing",
       "expo-apple-authentication",
       [

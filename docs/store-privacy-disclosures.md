@@ -14,6 +14,7 @@ Update this file whenever a new SDK or data flow ships, then update both store f
 | Privacy policy URL | <https://pawpawcare.app/privacy/> |
 | Account deletion URL (Play requires one reachable without the app) | <https://pawpawcare.app/privacy/#delete> |
 | Is data collection required? | Account + pet records: required for the app to work. Analytics: optional (Profile → Privacy). |
+| Device permissions the app asks for | **Photo library** (pick a pet photo, a post picture, a document scan) and **notifications** (plus Android's "Alarms & reminders" for on-time reminders). **No camera, microphone, Face ID, location or contacts:** they're switched off in `app.json` (`cameraPermission`, `microphonePermission`, `faceIDPermission: false`, so Android also drops `CAMERA` and `RECORD_AUDIO`), and `frontend/src/i18n/__tests__/nativeLocales.test.js` fails if one comes back. |
 
 ## Apple — App Privacy ("nutrition label")
 
@@ -37,7 +38,7 @@ Device ID is the cautious reading: Apple's definition is "the device's advertisi
 
 IP addresses appear only in server logs (14 days) and rate limiting, for security; they are never used to derive location, so neither form gets a location row for them. Re-check this if anything starts geolocating requests.
 
-Do **not** tick: Health & Fitness (pet records aren't the user's health data), Location (lost-pet reports are typed text, no GPS), Financial Info (Apple/Google take payment; we never see cards), Browsing/Search History, Contacts, Sensitive Info.
+Do **not** tick: Health & Fitness (pet records aren't the user's health data), Location (lost-pet reports are typed text, no GPS), Financial Info (Apple/Google take payment; we never see cards), Browsing/Search History, Contacts, Sensitive Info, Audio Data (no microphone access; see the permissions row above).
 
 ## Google Play — Data safety
 
@@ -59,6 +60,8 @@ Do **not** tick: Health & Fitness (pet records aren't the user's health data), L
 | App activity → Other user-generated content | Required (pet records) | App functionality |
 | App info and performance → Crash logs | Required | App functionality (diagnostics) |
 | App info and performance → Diagnostics | Required | App functionality (diagnostics) |
+
+Not collected: Audio (the build declares no `RECORD_AUDIO`), Location, Contacts, Health and fitness. Play checks the form against the APK's declared permissions, so keep the permissions row above in sync.
 
 Device or other IDs covers PostHog's random installation ID, which pre-sign-in analytics events are sent under. Google's examples for this type include a Firebase installation ID, the closest equivalent.
 

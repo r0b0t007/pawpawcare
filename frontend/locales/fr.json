@@ -1,10 +1,7 @@
 {
   "ios": {
     "CFBundleDisplayName": "PawPawCare",
-    "NSPhotoLibraryUsageDescription": "Autorisez PawPawCare à accéder à vos photos pour choisir les photos de vos animaux et partager des publications.",
-    "NSCameraUsageDescription": "Autorisez PawPawCare à accéder à votre appareil photo.",
-    "NSMicrophoneUsageDescription": "Autorisez PawPawCare à accéder à votre micro.",
-    "NSFaceIDUsageDescription": "Autorisez PawPawCare à utiliser Face ID."
+    "NSPhotoLibraryUsageDescription": "Autorisez PawPawCare à accéder à vos photos pour choisir les photos de vos animaux et partager des publications."
   },
   "android": {
     "app_name": "PawPawCare"
