@@ -319,6 +319,44 @@ describe('the records query', () => {
     warn.mockRestore();
   });
 
+  // Two shared pets accepted back to back: the second reload cancels the
+  // first's fetch, which (records being cached) settles with the records it
+  // replaced instead of failing. The first reload must not carry on with
+  // those — hydrating doses from them, or reporting a load that never
+  // happened — but answer with the newer reload's outcome (#183).
+  it('a reload replaced by a newer one reports the newer outcome, not the old records', async () => {
+    const { getPref } = jest.requireMock('../../services/prefs');
+    await mount();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    let holdPets = true;
+    get.mockImplementation((path) => {
+      if (path === '/pets' && holdPets) { holdPets = false; return new Promise(() => {}); }
+      if (path === '/pets') return Promise.resolve([PET]);
+      if (path === '/pets/p1/medications') return Promise.resolve([{ id: 'm3', pet_id: 'p1', name: 'Bravecto', frequency: 'monthly' }]);
+      if (path === '/pets/p1/weights') return Promise.reject(new Error('Network error'));
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    post.mockResolvedValue({});
+    getPref.mockClear();
+
+    let first;
+    await act(async () => { first = data.acceptInvite('i1'); });
+    for (let i = 0; i < 20 && holdPets; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    }
+    expect(holdPets).toBe(false);
+    await act(async () => { await Promise.all([first, data.acceptInvite('i2')]); });
+
+    // One hydrate, from the newer records; both reloads report its failure.
+    const hydrates = getPref.mock.calls.filter(([key]) => key === 'medDoseDays');
+    expect(hydrates).toHaveLength(1);
+    expect(data.pets[0].medications.map((m) => m.id)).toEqual(['m3']);
+    expect(warn.mock.calls.filter(([msg]) => String(msg).includes('1/2 domains failed'))).toHaveLength(2);
+    warn.mockRestore();
+  });
+
   // A change made while a screen's re-read runs must not be undone by it.
   it('a change during a screen\'s re-read survives it', async () => {
     let refetchTab;
@@ -485,6 +523,39 @@ describe('after logout', () => {
     expect(records()).toHaveLength(0);
     expect(data.pets).toEqual([]);
     // Nothing to report: the load was for an account no longer signed in.
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  // A reload running at logout, with records cached: removing the query
+  // cancels its fetch (silently — unlike a fresh reload's cancel, it doesn't
+  // fall back to the cached records). Nothing is hydrated or reported.
+  it('a reload running at logout hydrates nothing', async () => {
+    const { getPref } = jest.requireMock('../../services/prefs');
+    await mount();
+    let holdPets = true;
+    get.mockImplementation((path) => {
+      if (path === '/pets' && holdPets) { holdPets = false; return new Promise(() => {}); }
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    post.mockResolvedValue({});
+    let accepting;
+    await act(async () => { accepting = data.acceptInvite('i1'); });
+    for (let i = 0; i < 20 && holdPets; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    }
+    expect(holdPets).toBe(false);
+    getPref.mockClear();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    mockUser = null;
+    await act(async () => { tree.update(element()); });
+    await act(async () => { await accepting; });
+
+    expect(getPref.mock.calls.filter(([key]) => key === 'medDoseDays')).toHaveLength(0);
+    expect(records()).toHaveLength(0);
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
   });

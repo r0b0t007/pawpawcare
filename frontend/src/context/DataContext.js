@@ -646,6 +646,54 @@ export function DataProvider({ children }) {
     if (actionType !== 'document_uploaded') noteGoodMoment('care_action');
   };
 
+  // The records query's own fetch (fetchPetRecords), then the dose history
+  // hydrated from it. If a screen's hook already started the fetch, this joins
+  // it rather than running a second 1 + 6N load; otherwise it runs it.
+  // A newer load started meanwhile (a fresh reload cancels this one's fetch)
+  // answers for this one: a cancelled fetch may settle with the records it
+  // replaced rather than reject — React Query keeps the previous data — so
+  // "replaced" is read from which load is newest, not from the error (as
+  // refreshReminders does). Carrying on would hydrate from the old records
+  // and report a load that never happened.
+  const latestPetsLoad = useRef(null);
+  const loadPetRecords = ({ fresh }) => {
+    const load = {};
+    load.promise = (async () => {
+      const loadingFor = petRecordsKey;
+      let petsWithData;
+      let failure = null;
+      petLoadsRunning.current += 1;
+      try {
+        if (fresh) await queryClient.cancelQueries({ queryKey: loadingFor, exact: true });
+        petsWithData = await queryClient.fetchQuery({ ...petRecordsQuery(queryClient, loadingFor), staleTime: 0 });
+      } catch (err) {
+        failure = err;
+      } finally {
+        petLoadsRunning.current -= 1;
+      }
+      // Replaced: the newest load's outcome is this one's. (A screen's
+      // refetch() doesn't count: React Query hands this fetch its answer.)
+      if (latestPetsLoad.current !== load) return latestPetsLoad.current.promise;
+      if (failure) {
+        // Cancelled with nothing newer: logout removed the query.
+        if (isCancelledError(failure)) return;
+        throw failure;
+      }
+      // Signed out (or switched account) while loading: nothing to hydrate.
+      if (hashKey(loadingFor) !== hashKey(petRecordsKeys.list(session.current.userId))) return;
+      // Hydrating prunes the stored dose history of every med it isn't
+      // given, so a pet whose medications never loaded would lose its
+      // history for good. Skip it; the next full load hydrates.
+      if (!petsWithData.some((p) => p.missing?.includes('medications'))) hydrateDoseDays(petsWithData);
+
+      // A partial load still counts as failed (logged by loadData).
+      const failures = takePetLoadFailures(loadingFor);
+      if (failures) throw new Error(`${failures} pet request(s) failed`);
+    })();
+    latestPetsLoad.current = load;
+    return load.promise;
+  };
+
   // Each domain loads and dispatches independently, so one failed request
   // only loses that domain — a transient blip on any single endpoint used to
   // discard the entire store (dashboard showed 0 pets until a full reload).
@@ -657,38 +705,7 @@ export function DataProvider({ children }) {
     // (sign-in, accepting a shared pet) still re-reads them.
     invalidateNotifications();
     const loaders = [
-      async () => {
-        // The records query's own fetch (fetchPetRecords). If a screen's hook
-        // already started it, this joins that fetch rather than running a
-        // second 1 + 6N load; otherwise it runs it, fresh or not.
-        const loadingFor = petRecordsKey;
-        let petsWithData;
-        petLoadsRunning.current += 1;
-        try {
-          if (fresh) await queryClient.cancelQueries({ queryKey: loadingFor, exact: true });
-          try {
-            petsWithData = await queryClient.fetchQuery({ ...petRecordsQuery(queryClient, loadingFor), staleTime: 0 });
-          } catch (err) {
-            // Cancelled: logout removed the query, or a fresh reload replaced
-            // this fetch and reports its own answer. (A screen's refetch()
-            // doesn't land here: React Query hands this fetch its answer.)
-            if (isCancelledError(err)) return;
-            throw err;
-          }
-        } finally {
-          petLoadsRunning.current -= 1;
-        }
-        // Signed out (or switched account) while loading: nothing to hydrate.
-        if (hashKey(loadingFor) !== hashKey(petRecordsKeys.list(session.current.userId))) return;
-        // Hydrating prunes the stored dose history of every med it isn't
-        // given, so a pet whose medications never loaded would lose its
-        // history for good. Skip it; the next full load hydrates.
-        if (!petsWithData.some((p) => p.missing?.includes('medications'))) hydrateDoseDays(petsWithData);
-
-        // A partial load still counts as failed (logged below).
-        const failures = takePetLoadFailures(loadingFor);
-        if (failures) throw new Error(`${failures} pet request(s) failed`);
-      },
+      () => loadPetRecords({ fresh }),
       () => refreshReminders({ rethrow: true }),
     ];
 
