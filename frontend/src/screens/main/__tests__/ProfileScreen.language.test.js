@@ -155,3 +155,19 @@ test('Español uses formal es-ES copy, and English goes back to English', async 
   expect(mockUpdateUser).toHaveBeenLastCalledWith({ locale: 'en' });
   expect(languageRow(tree, 'App language').props.value).toBe('English');
 });
+
+test('a change made outside the screen shows here, while the tab stays mounted (CHW-189)', async () => {
+  // i18n puts the setting back on Device default when the phone's language
+  // changes after a fixed choice; Profile is a tab, so it stays mounted.
+  const tree = await render();
+  await act(async () => languageRow(tree, 'App language').props.onPress());
+  await act(async () => {
+    await chip(tree, 'Français').props.onPress();
+  });
+  expect(languageRow(tree, 'Langue de l\'application').props.value).toBe('Français');
+
+  await act(async () => {
+    await setLanguageChoice('device');
+  });
+  expect(languageRow(tree, 'App language').props.value).toBe('Device default');
+});
