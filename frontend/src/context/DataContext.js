@@ -1,5 +1,5 @@
 import React, {
-  createContext, useContext, useReducer, useEffect, useMemo, useRef,
+  createContext, useCallback, useContext, useReducer, useEffect, useMemo, useRef, useSyncExternalStore,
 } from 'react';
 import { AppState } from 'react-native';
 import { hashKey, isCancelledError, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +18,8 @@ import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
 import {
-  petsKeys, petRecordsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys, vaultKeys,
+  petsKeys, petRecordsKeys, remindersKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys,
+  vaultKeys,
 } from '../hooks/queryKeys';
 import i18n from '../i18n';
 
@@ -240,7 +241,6 @@ const REMINDER_REFETCH_DELAY = 90000;
 function dataReducer(state, action) {
   switch (action.type) {
     case 'SET_DATA_LOADED': return { ...state, dataLoaded: action.payload };
-    case 'SET_REMINDERS':     return { ...state, reminders: action.payload };
     // Trust: when the store last successfully synced with the server (ms
     // epoch, or null before the first sync / after logout).
     case 'SET_LAST_SYNCED':   return { ...state, lastSyncedAt: action.payload };
@@ -354,6 +354,16 @@ export async function fetchPetRecords(queryClient, queryKey) {
 // Stale after the app-wide five minutes.
 const PET_RECORDS_DEFAULTS = { gcTime: Infinity, retry: false };
 
+// The reminders list: one request. Never garbage-collected (DataContext reads
+// it without a query observer) and not retried, as before it was a query.
+const NO_REMINDERS = [];
+const REMINDERS_DEFAULTS = { gcTime: Infinity, retry: false };
+const remindersQuery = (queryKey) => ({
+  queryKey,
+  queryFn: () => get('/reminders'),
+  ...REMINDERS_DEFAULTS,
+});
+
 // The records query, for the sign-in load and usePetRecordsQuery alike.
 export const petRecordsQuery = (queryClient, queryKey) => ({
   queryKey,
@@ -365,7 +375,6 @@ export const petRecordsQuery = (queryClient, queryKey) => ({
 
 export function DataProvider({ children }) {
   const [state, dispatch] = useReducer(dataReducer, {
-    reminders: [],
     dataLoaded: false, lastSyncedAt: null,
     medDoseDays: {}, medDoseCounts: {},
   });
@@ -385,7 +394,22 @@ export function DataProvider({ children }) {
   const petRecordsKey = petRecordsKeys.list(user?.id);
   useEffect(() => {
     queryClient.setQueryDefaults(petRecordsKeys.all, PET_RECORDS_DEFAULTS);
+    queryClient.setQueryDefaults(remindersKeys.all, REMINDERS_DEFAULTS);
   }, [queryClient]);
+
+  // ── Reminders ──
+  // The list lives in the React Query cache (remindersKeys), read here through
+  // a store subscription so useData().reminders re-renders as each new list
+  // lands. refreshReminders fetches it; the listener below schedules it.
+  const remindersKey = remindersKeys.list(user?.id);
+  const remindersHash = hashKey(remindersKey);
+  const subscribeReminders = useCallback((onChange) => queryClient.getQueryCache().subscribe((event) => {
+    if (event.query.queryHash === remindersHash) onChange();
+  }), [queryClient, remindersHash]);
+  const reminders = useSyncExternalStore(
+    subscribeReminders,
+    () => queryClient.getQueryData(remindersKey) ?? NO_REMINDERS,
+  );
   // The records as they are now — read when a mutation runs, not subscribed
   // to: this provider doesn't re-render on pet writes (screens read them with
   // usePetRecords).
@@ -471,8 +495,8 @@ export function DataProvider({ children }) {
   // forward — refetch shortly after so the lists show the next occurrence
   // instead of dropping it (only one-off reminders leave once fired).
   const reminderTimes = useMemo(
-    () => state.reminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
-    [state.reminders],
+    () => reminders.map((r) => new Date(r.next_fire_at || r.fire_at).getTime()).filter(Number.isFinite),
+    [reminders],
   );
   const reminderTick = useTickAt(reminderTimes, REMINDER_REFETCH_DELAY);
   useEffect(() => {
@@ -566,7 +590,7 @@ export function DataProvider({ children }) {
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       queryClient.removeQueries({ queryKey: petRecordsKeys.all });
       petLoadFailures.clear();
-      dispatch({ type: 'SET_REMINDERS', payload: [] });
+      queryClient.removeQueries({ queryKey: remindersKeys.all });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
       // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
       // cleared from memory so a different account never renders it — and the
@@ -584,7 +608,7 @@ export function DataProvider({ children }) {
   // throw instead: their forms show the API's validation messages.)
   //   if (await addWeight(...)) showToast('Weight logged'); else showToast("Couldn't …");
   const handleApiError = (err) => {
-    if (err.message === 'SESSION_EXPIRED') logout();
+    if (err.message === 'SESSION_EXPIRED') endExpiredSession();
   };
 
   // Why the last addVaccination / addMedication / updateMedication failed,
@@ -709,20 +733,35 @@ export function DataProvider({ children }) {
   // refresh* helpers swallow errors via handleApiError by default; loadData
   // passes { rethrow: true } to own error handling itself (allSettled counts
   // the failure and logs out at most once across all domains).
-  // Overlapping refreshes (a vaccination change right after another, or a
-  // tick/focus refetch) can resolve out of order; only the newest request may
-  // write, or a stale list could reschedule a dose that was just marked given.
-  const remindersRequest = useRef(0);
+  // Overlapping refreshes (a vaccination change right after another, or the
+  // fire tick) can resolve out of order; only the newest request may land, or
+  // a stale list could reschedule a dose that was just marked given. A request
+  // already in flight predates whatever asked for this one: it is cancelled
+  // (its answer never lands, so never schedules), then this one runs.
   const refreshReminders = async ({ rethrow = false } = {}) => {
-    const request = ++remindersRequest.current;
+    const key = remindersKey;
     try {
-      const reminders = await get('/reminders');
-      if (request !== remindersRequest.current) return;
-      dispatch({ type: 'SET_REMINDERS', payload: reminders });
-      dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
-      scheduleLocalReminders(reminders);
-    } catch (err) { if (rethrow) throw err; handleApiError(err); }
+      await queryClient.cancelQueries({ queryKey: key, exact: true });
+      await queryClient.fetchQuery({ ...remindersQuery(key), staleTime: 0 });
+    } catch (err) {
+      // A newer refresh replaced this one, or logout removed the list.
+      if (isCancelledError(err)) return;
+      if (rethrow) throw err;
+      handleApiError(err);
+    }
   };
+
+  // Every new reminders list — whichever refresh fetched it — is this device's
+  // notification schedule and the "last synced" moment: one place does both.
+  // A cancelled request's answer never lands here, and logout's removal of the
+  // list cancels its request, so a late answer for a signed-out account never
+  // reaches the phone either (remindersCache.test.js).
+  useEffect(() => queryClient.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.action?.type !== 'success') return;
+    if (event.query.queryKey[0] !== remindersKeys.all[0]) return;
+    dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
+    scheduleLocalReminders(event.query.state.data);
+  }), [queryClient]);
 
   // The notification list is read through useNotifications.js.
   const invalidateNotifications = () => {
@@ -1514,7 +1553,7 @@ export function DataProvider({ children }) {
       value={{
         dataLoaded: state.dataLoaded,
         lastSyncedAt: state.lastSyncedAt,
-        reminders: state.reminders,
+        reminders,
         medDoseDays: state.medDoseDays,
         medDoseCounts: state.medDoseCounts,
         addPet,

@@ -43,6 +43,13 @@ export const lostPetsKeys = {
 };
 
 // The in-app notification list and its unread count (see useNotifications.js).
+// The reminders list — also this device's local notification schedule (see
+// DataContext: one listener schedules each new list).
+export const remindersKeys = {
+  all: ['reminders'],
+  list: (userId) => ['reminders', userId ?? null],
+};
+
 export const notificationsKeys = {
   all: ['notifications'],
   list: (userId) => ['notifications', userId ?? null],
