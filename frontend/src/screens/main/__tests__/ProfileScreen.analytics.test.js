@@ -40,7 +40,7 @@ jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.f
 const mockNoPets = [];
 jest.mock('../../../hooks/usePetRecords', () => ({ usePetRecords: () => mockNoPets }));
 jest.mock('../../../context/DataContext', () => ({
-  useData: () => ({ reminders: [] }),
+  useData: () => ({ rescheduleReminders: jest.fn() }),
 }));
 
 import React from 'react';

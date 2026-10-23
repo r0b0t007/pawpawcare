@@ -219,6 +219,8 @@ describe('the records query', () => {
     expect(calls('/pets/p1/vaccinations')).toBe(1);
     expect(calls('/pets/p1/medications')).toBe(1);
     expect(calls('/pets')).toBe(1);
+    // A query observer gets the cache's answer on a setTimeout(0) tick.
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
     expect(early.map((p) => p.name)).toEqual(['Rex']);
     expect(data.pets.map((p) => p.id)).toEqual(['p1']);
   });

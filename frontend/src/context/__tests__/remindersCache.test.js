@@ -28,6 +28,7 @@ jest.mock('../AuthContext', () => ({
 }));
 
 import { DataProvider, useData } from '../DataContext';
+import { useReminders } from '../../hooks/useReminders';
 import { get, post } from '../../services/api';
 import { scheduleLocalReminders } from '../../services/notifications';
 
@@ -38,7 +39,7 @@ const reminder = (id, title = `Reminder ${id}`) => ({
 let server;
 let data;
 function Probe() {
-  data = useData();
+  data = { ...useData(), reminders: useReminders() };
   return null;
 }
 

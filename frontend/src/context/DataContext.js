@@ -399,9 +399,9 @@ export function DataProvider({ children }) {
   }, [queryClient]);
 
   // ── Reminders ──
-  // The list lives in the React Query cache (remindersKeys), read here through
-  // a store subscription so useData().reminders re-renders as each new list
-  // lands. refreshReminders fetches it; the listener below schedules it.
+  // The list lives in the React Query cache (remindersKeys): screens read it
+  // with useReminders (hooks/useReminders.js); it is read here for the fire
+  // tick. refreshReminders fetches it; the listener below schedules it.
   const remindersKey = remindersKeys.list(user?.id);
   const reminders = useQueryCacheData(remindersKey, NO_REMINDERS);
   // The records as they are now — read when a mutation runs, not subscribed
@@ -810,6 +810,9 @@ export function DataProvider({ children }) {
       s.running = false;
     })();
   };
+  // The current list, scheduled through the same one-at-a-time scheduler —
+  // for a permission grant or the care-reminders toggle turned back on.
+  const rescheduleReminders = () => scheduleNewest(queryClient.getQueryData(remindersKey) ?? NO_REMINDERS);
   useEffect(() => queryClient.getQueryCache().subscribe((event) => {
     if (event.type !== 'updated' || event.action?.type !== 'success') return;
     if (event.query.queryKey[0] !== remindersKeys.all[0]) return;
@@ -1608,7 +1611,7 @@ export function DataProvider({ children }) {
       value={{
         dataLoaded: state.dataLoaded,
         lastSyncedAt: state.lastSyncedAt,
-        reminders,
+        rescheduleReminders,
         medDoseDays: state.medDoseDays,
         medDoseCounts: state.medDoseCounts,
         addPet,

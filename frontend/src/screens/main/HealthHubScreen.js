@@ -8,6 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
 import { usePetRecords } from '../../hooks/usePetRecords';
+import { useReminders, useRefreshRemindersOnFocus } from '../../hooks/useReminders';
 import { getPref } from '../../services/prefs';
 import { fmtShort, fmtDay, fmtDate, fmtClock, fmtWeekday, dayDiff, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
 import i18n, { useLocale, useTranslation } from '../../i18n';
@@ -84,8 +85,11 @@ export default function HealthHubScreen({ navigation }) {
   // (and re-run the memos below that build date strings).
   const locale = useLocale();
   const { t } = useTranslation();
-  const { reminders, lastSyncedAt, addVaccination, markVaccinationComplete, takeFailureNote } = useData();
+  const { lastSyncedAt, addVaccination, markVaccinationComplete, takeFailureNote } = useData();
   const pets = usePetRecords();
+  // Edits from another phone (a co-owner's reminder): re-read once stale.
+  const reminders = useReminders();
+  useRefreshRemindersOnFocus();
 
   const [filter, setFilter] = useState('all');
   // The Health tab stays mounted — "today" must roll over at midnight.

@@ -5,7 +5,6 @@ import { useData } from '../context/DataContext';
 import {
   getNotificationPermission,
   requestNotificationPermission,
-  scheduleLocalReminders,
 } from '../services/notifications';
 import { canScheduleExactAlarms } from '../services/exactAlarms';
 
@@ -81,16 +80,18 @@ export function useNotificationPermission() {
 
 export function NotificationPermissionWatcher() {
   const { registerPushDevice } = useAuth();
-  const { reminders } = useData();
+  // Rescheduling goes through DataContext's one scheduler (one list at a
+  // time, from the current list).
+  const { rescheduleReminders } = useData();
   const registerRef = useRef(registerPushDevice);
   registerRef.current = registerPushDevice;
-  const remindersRef = useRef(reminders);
-  remindersRef.current = reminders;
+  const rescheduleRef = useRef(rescheduleReminders);
+  rescheduleRef.current = rescheduleReminders;
 
   useEffect(() => {
     const react = () => {
       registerRef.current?.();
-      scheduleLocalReminders(remindersRef.current || []);
+      rescheduleRef.current?.();
     };
     onGranted.add(react);
     refreshNotificationPermission();
@@ -102,7 +103,7 @@ export function NotificationPermissionWatcher() {
       if (state !== 'active') return;
       refreshNotificationPermission();
       const now = canScheduleExactAlarms();
-      if (now && !exact) scheduleLocalReminders(remindersRef.current || []);
+      if (now && !exact) rescheduleRef.current?.();
       exact = now;
     });
     return () => {
