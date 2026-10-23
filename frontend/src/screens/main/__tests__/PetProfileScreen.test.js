@@ -36,6 +36,7 @@ jest.mock('../../../services/analytics', () => ({ track: jest.fn() }));
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }));
 
 let mockPets = [];
+jest.mock('../../../hooks/usePets', () => ({ usePetRecords: () => require('../../../context/DataContext').useData().pets }));
 jest.mock('../../../context/DataContext', () => {
   const noop = () => Promise.resolve(null);
   return {

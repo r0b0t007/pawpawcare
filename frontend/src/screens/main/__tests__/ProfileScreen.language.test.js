@@ -47,6 +47,7 @@ jest.mock('../../../context/AuthContext', () => ({
 }));
 jest.mock('../../../hooks/useInvites', () => ({ useInvitesQuery: () => ({ data: [] }) }));
 jest.mock('../../../hooks/useRefetchOnFocus', () => ({ useRefetchOnFocus: jest.fn() }));
+jest.mock('../../../hooks/usePets', () => ({ usePetRecords: () => require('../../../context/DataContext').useData().pets }));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => ({ reminders: [], pets: [{ id: 'p1', name: 'Biscuit' }] }),
 }));

@@ -27,6 +27,7 @@ jest.mock('../../context/AuthContext', () => ({
 }));
 
 import { DataProvider, useData } from '../../context/DataContext';
+import { usePetRecords } from '../usePets';
 import { useLostPetsBoardQuery, useMyLostReportsQuery } from '../useLostPets';
 import { useFeedQuery } from '../useFeed';
 import i18n from '../../i18n';
@@ -51,7 +52,7 @@ let data;
 let board;
 let mine;
 function Probe() {
-  data = useData();
+  data = { ...useData(), pets: usePetRecords() };
   // React Query re-renders only for the fields read during render, so read
   // them here the way the screens destructure them.
   const { data: boardList, isError: boardFailed } = useLostPetsBoardQuery();
@@ -62,7 +63,7 @@ function Probe() {
   return null;
 }
 function DataOnly() {
-  data = useData();
+  data = { ...useData(), pets: usePetRecords() };
   return null;
 }
 

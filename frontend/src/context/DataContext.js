@@ -1,5 +1,5 @@
 import React, {
-  createContext, useCallback, useContext, useReducer, useEffect, useMemo, useRef, useSyncExternalStore,
+  createContext, useContext, useReducer, useEffect, useMemo, useRef, useSyncExternalStore,
 } from 'react';
 import { AppState } from 'react-native';
 import { hashKey, isCancelledError, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,7 @@ import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
+import { usePetRecords } from '../hooks/usePets';
 import {
   petsKeys, petRecordsKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys, vaultKeys,
 } from '../hooks/queryKeys';
@@ -346,7 +347,7 @@ export async function fetchPetRecords(queryClient, queryKey) {
   );
 }
 
-// Never garbage-collected (DataContext's useData().pets reads them without a
+// Never garbage-collected (usePetRecords reads them without a
 // query observer), and not retried: a failed load says so at once, as it did
 // before it was a query. Stale after the app-wide five minutes.
 const PET_RECORDS_DEFAULTS = { gcTime: Infinity, retry: false };
@@ -376,18 +377,14 @@ export function DataProvider({ children }) {
   // Every pet with its six sub-resources lives in the React Query cache
   // (petRecordsKeys): fetched by its query (fetchPetRecords — the sign-in
   // load runs it, and usePetRecordsQuery screens re-read it), changed by the
-  // mutations. It is never garbage-collected. A store subscription (not a
-  // query observer) re-renders with each write as it happens, as the reducer
-  // did.
+  // mutations. It is never garbage-collected. Screens read it through
+  // usePetRecords (hooks/usePets.js), a store subscription that re-renders
+  // with each write as it happens, as the reducer did; so does this provider.
   const petRecordsKey = petRecordsKeys.list(user?.id);
   useEffect(() => {
     queryClient.setQueryDefaults(petRecordsKeys.all, PET_RECORDS_DEFAULTS);
   }, [queryClient]);
-  const petRecordsHash = hashKey(petRecordsKey);
-  const subscribePets = useCallback((onChange) => queryClient.getQueryCache().subscribe((event) => {
-    if (event.query.queryHash === petRecordsHash) onChange();
-  }), [queryClient, petRecordsHash]);
-  const pets = useSyncExternalStore(subscribePets, () => queryClient.getQueryData(petRecordsKey) ?? NO_PETS);
+  const pets = usePetRecords();
   // Every write applies to the cache's current list, as the reducer applied
   // its actions to the current state — only while the account it was made
   // for is still signed in: a late answer after logout must not bring that
@@ -1511,7 +1508,6 @@ export function DataProvider({ children }) {
       value={{
         dataLoaded: state.dataLoaded,
         lastSyncedAt: state.lastSyncedAt,
-        pets,
         reminders: state.reminders,
         medDoseDays: state.medDoseDays,
         medDoseCounts: state.medDoseCounts,

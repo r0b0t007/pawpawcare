@@ -20,6 +20,7 @@ jest.mock('../../../services/notifications', () => ({
   ...jest.requireActual('../../../services/notifications'),
   getNotificationPermission: jest.fn(() => Promise.resolve({ status: 'granted', canAskAgain: true })),
 }));
+jest.mock('../../../hooks/usePets', () => ({ usePetRecords: () => require('../../../context/DataContext').useData().pets }));
 jest.mock('../../../context/DataContext', () => ({
   useData: () => mockStore,
 }));

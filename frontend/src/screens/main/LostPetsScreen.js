@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useData } from '../../context/DataContext';
+import { usePetRecords } from '../../hooks/usePets';
 import { useAuth } from '../../context/AuthContext';
 import { ui, type, photos } from '../../theme';
 import { Button, ConfirmDialog, EmptyState, PetFace, showToast, ScreenHeader, FormScrollView } from '../../components';
@@ -23,7 +24,8 @@ export default function LostPetsScreen({ navigation }) {
   // can stay mounted under another tab while the language is switched.
   useLocale();
   const { t } = useTranslation();
-  const { pets, reportPetLost, resolveLostPet } = useData();
+  const { reportPetLost, resolveLostPet } = useData();
+  const pets = usePetRecords();
   const {
     data: lostPets = [], isLoading: boardLoading, isError: boardFailed, isStale: boardStale,
     refetch: refetchBoard,

@@ -38,7 +38,10 @@ jest.mock('../../../context/DataContext', () => ({
 }));
 let mockEarlyPets;
 const mockUsePetsQuery = jest.fn(() => ({ data: mockEarlyPets }));
-jest.mock('../../../hooks/usePets', () => ({ usePetsQuery: (opts) => mockUsePetsQuery(opts) }));
+jest.mock('../../../hooks/usePets', () => ({
+  usePetsQuery: (opts) => mockUsePetsQuery(opts),
+  usePetRecords: () => require('../../../context/DataContext').useData().pets,
+}));
 jest.mock('../../../hooks/useNotifications', () => ({
   useUnreadCount: () => ({ data: 0, isStale: false, refetch: jest.fn() }),
 }));

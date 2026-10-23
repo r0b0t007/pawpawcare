@@ -8,7 +8,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useObserve } from '../../services/observe';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
-import { usePetsQuery } from '../../hooks/usePets';
+import { usePetRecords, usePetsQuery } from '../../hooks/usePets';
 import { useFeedCount } from '../../hooks/useFeed';
 import { useUnreadCount } from '../../hooks/useNotifications';
 import { useGamificationSummary, useGamificationRecap, milestoneLabel } from '../../hooks/useGamification';
@@ -76,9 +76,10 @@ export default function DashboardScreen({ navigation }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const {
-    dataLoaded, pets, reminders, medDoseDays, medDoseCounts,
+    dataLoaded, reminders, medDoseDays, medDoseCounts,
     markVaccinationComplete, logMedicationDose,
   } = useData();
+  const pets = usePetRecords();
   // The community teaser counts the feed's posts. Home stays mounted under
   // the tab bar: a stale (or failed) feed refetches when it is shown again.
   const { data: postCount, isStale: feedStale, refetch: refetchFeed } = useFeedCount();

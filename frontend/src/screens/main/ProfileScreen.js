@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useData } from '../../context/DataContext';
+import { usePetRecords } from '../../hooks/usePets';
 import { useInvitesQuery } from '../../hooks/useInvites';
 import { useRefetchOnFocus } from '../../hooks/useRefetchOnFocus';
 import { getPref, setPref } from '../../services/prefs';
@@ -34,7 +35,8 @@ function SectionLabel({ children }) {
 export default function ProfileScreen({ navigation }) {
   const { t } = useTranslation();
   const { user, isAdmin, logout, updateUser } = useAuth();
-  const { reminders, pets } = useData();
+  const { reminders } = useData();
+  const pets = usePetRecords();
   // The tab stays mounted: refresh the pending badge whenever it's shown.
   const { data: invites = [], refetch: refetchInvites } = useInvitesQuery();
   useRefetchOnFocus(refetchInvites);

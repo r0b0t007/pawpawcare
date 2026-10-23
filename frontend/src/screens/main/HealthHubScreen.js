@@ -7,6 +7,7 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
+import { usePetRecords } from '../../hooks/usePets';
 import { getPref } from '../../services/prefs';
 import { fmtShort, fmtDay, fmtDate, fmtClock, fmtWeekday, dayDiff, overdueLabel, parseDay, relativeDay } from '../../utils/dates';
 import i18n, { useLocale, useTranslation } from '../../i18n';
@@ -83,7 +84,8 @@ export default function HealthHubScreen({ navigation }) {
   // (and re-run the memos below that build date strings).
   const locale = useLocale();
   const { t } = useTranslation();
-  const { pets, reminders, lastSyncedAt, addVaccination, markVaccinationComplete, takeFailureNote } = useData();
+  const { reminders, lastSyncedAt, addVaccination, markVaccinationComplete, takeFailureNote } = useData();
+  const pets = usePetRecords();
 
   const [filter, setFilter] = useState('all');
   // The Health tab stays mounted — "today" must roll over at midnight.

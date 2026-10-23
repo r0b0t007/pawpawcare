@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { useData } from '../../context/DataContext';
+import { usePetRecords } from '../../hooks/usePets';
 import { pickRecordImage } from '../../services/imagePicker';
 import { track } from '../../services/analytics';
 import { appliedToastText, buildExtractionPayload, extractionCount } from '../../utils/extraction';
@@ -80,10 +81,11 @@ export default function MedicalRecordsScreen({ navigation, route }) {
   const { t } = useTranslation();
   const { petId, petName } = route.params;
   const {
-    pets, addClinic, deleteClinic,
+    addClinic, deleteClinic,
     addAppointment, deleteAppointment, addDocument, deleteDocument, getDocumentUrl,
     extractDocument, applyExtraction,
   } = useData();
+  const pets = usePetRecords();
   const pet = petById(pets, petId);
   const name = pet?.name || petName;
 

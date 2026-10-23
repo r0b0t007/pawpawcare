@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useData } from '../../context/DataContext';
+import { usePetRecords } from '../../hooks/usePets';
 import { ui, type, motion, photos } from '../../theme';
 import { Card, EmptyState, PetFace, ScreenHeader, reminderIcon, NotificationsBanner } from '../../components';
 import { useToday } from '../../hooks/useToday';
@@ -50,8 +51,9 @@ export default function NotificationsScreen({ navigation }) {
   useLocale();
   const { t } = useTranslation();
   const {
-    pets, markNotificationRead, snoozeNotification, dismissNotification,
+    markNotificationRead, snoozeNotification, dismissNotification,
   } = useData();
+  const pets = usePetRecords();
   const {
     data, isLoading, isError, isFetching, refetch,
   } = useNotificationsQuery();

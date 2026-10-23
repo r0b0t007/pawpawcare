@@ -29,6 +29,7 @@ jest.mock('../AuthContext', () => ({
 }));
 
 import { DataProvider, useData } from '../DataContext';
+import { usePetRecords } from '../../hooks/usePets';
 import { usePetRecordsQuery } from '../../hooks/usePetRecords';
 import { usePetsQuery } from '../../hooks/usePets';
 import { get, post, patch, del } from '../../services/api';
@@ -41,7 +42,7 @@ const MEDS = [
 
 let data;
 function Probe() {
-  data = useData();
+  data = { ...useData(), pets: usePetRecords() };
   return null;
 }
 
@@ -78,6 +79,28 @@ afterEach(() => {
 });
 
 describe('pet records in the cache', () => {
+  // Pet screens read them with usePetRecords: one way in, not two.
+  it('are read through usePetRecords, not useData', async () => {
+    let fromContext;
+    function ContextProbe() {
+      fromContext = useData();
+      return null;
+    }
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <DataProvider>
+            <ContextProbe />
+            <Probe />
+          </DataProvider>
+        </QueryClientProvider>,
+      );
+    });
+
+    expect(fromContext).not.toHaveProperty('pets');
+    expect(data.pets.map((p) => p.name)).toEqual(['Rex']);
+  });
+
   it('holds the loaded pets where query hooks can read them', async () => {
     await mount();
 
