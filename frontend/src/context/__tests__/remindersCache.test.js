@@ -185,6 +185,87 @@ describe('the reminders list in the cache', () => {
   });
 });
 
+// A save confirms on the list it asked for, even when a newer refresh
+// cancelled its own re-read.
+describe('a refresh replaced by a newer one', () => {
+  it('a save resolves on the newer list, not before it', async () => {
+    await mount();
+    post.mockResolvedValue({});
+    const answers = [];
+    get.mockImplementation((path) => (path === '/reminders'
+      ? new Promise((resolve) => { answers.push(resolve); })
+      : answer(path)));
+
+    let ok;
+    await act(async () => { data.addReminder({ title: 'Walk' }).then((v) => { ok = v; }); });
+    expect(answers).toHaveLength(1);
+    // The fire tick (or another change) refreshes meanwhile: the save's
+    // re-read is cancelled.
+    await act(async () => { data.refreshReminders(); });
+    expect(answers).toHaveLength(2);
+    await act(async () => { answers[0]([reminder('r1')]); });
+    expect(ok).toBeUndefined();
+
+    await act(async () => { answers[1]([reminder('r1'), reminder('r2', 'Walk')]); });
+
+    expect(ok).toBe(true);
+    expect(data.reminders.map((r) => r.id)).toEqual(['r1', 'r2']);
+  });
+
+  // The sign-in load counts the answer it got, even through a replacement.
+  it('a sign-in load whose list a failed refresh replaced counts as failed', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const answers = [];
+    get.mockImplementation((path) => (path === '/reminders'
+      ? new Promise((resolve, reject) => { answers.push({ resolve, reject }); })
+      : answer(path)));
+    await act(async () => { tree = TestRenderer.create(element()); });
+    expect(answers).toHaveLength(1);
+    await act(async () => { data.refreshReminders(); });
+
+    await act(async () => { answers[1].reject(new Error('Network error')); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('1/2 domains failed'));
+    expect(data.lastSyncedAt).toBeNull();
+    warn.mockRestore();
+  });
+});
+
+// Scheduling cancels every notification then schedules a list, one await at
+// a time: lists landing meanwhile wait, and only the newest is scheduled.
+describe('scheduling', () => {
+  it('one list at a time, and only the newest of those waiting', async () => {
+    await mount();
+    let finishFirst;
+    scheduleLocalReminders.mockClear();
+    scheduleLocalReminders.mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }));
+    const key = ['reminders', 'u1'];
+
+    await act(async () => { client.setQueryData(key, [reminder('a')]); });
+    await act(async () => { client.setQueryData(key, [reminder('b')]); });
+    await act(async () => { client.setQueryData(key, [reminder('c')]); });
+    expect(scheduleLocalReminders.mock.calls).toEqual([[[reminder('a')]]]);
+
+    await act(async () => { finishFirst(); });
+
+    expect(scheduleLocalReminders.mock.calls).toEqual([[[reminder('a')]], [[reminder('c')]]]);
+  });
+
+  // A local write changes the schedule but isn't a sync with the server.
+  it('a local write reschedules without stamping the sync time', async () => {
+    await mount();
+    const syncedAt = data.lastSyncedAt;
+    const now = jest.spyOn(Date, 'now').mockReturnValue(syncedAt + 60000);
+
+    await act(async () => { client.setQueryData(['reminders', 'u1'], [reminder('x')]); });
+
+    expect(scheduleLocalReminders).toHaveBeenLastCalledWith([reminder('x')]);
+    expect(data.lastSyncedAt).toBe(syncedAt);
+    now.mockRestore();
+  });
+});
+
 describe('accounts', () => {
   it('drops the list at logout', async () => {
     await mount();
@@ -234,6 +315,40 @@ describe('accounts', () => {
 
     expect(scheduleLocalReminders).not.toHaveBeenCalled();
     expect(data.reminders.map((r) => r.id)).toEqual(['r2']);
+  });
+
+  // A save that answers after logout must not fetch the signed-out account's
+  // list back into the cache (kept for good) and onto the phone.
+  it('a refresh asked for after logout fetches nothing', async () => {
+    await mount();
+    let answerSave;
+    post.mockImplementation(() => new Promise((resolve) => { answerSave = resolve; }));
+    let saving;
+    await act(async () => { saving = data.addReminder({ title: 'Walk' }); });
+    mockUser = null;
+    await act(async () => { tree.update(element()); });
+    const before = reminderCalls();
+    scheduleLocalReminders.mockClear();
+
+    await act(async () => { answerSave({}); await saving; });
+
+    expect(reminderCalls()).toBe(before);
+    expect(client.getQueryCache().findAll({ queryKey: ['reminders'] })).toHaveLength(0);
+    expect(scheduleLocalReminders).not.toHaveBeenCalled();
+  });
+
+  // A sign-out that finished with the account still signed in must not leave
+  // every later expired request ignored.
+  it('a sign-out that left the account signed in can be tried again', async () => {
+    await mount();
+    get.mockImplementation((path) => (path === '/reminders' ? Promise.reject(new Error('SESSION_EXPIRED')) : answer(path)));
+    await act(async () => { await data.refreshReminders(); });
+    expect(mockLogout).toHaveBeenCalledTimes(1);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
+
+    await act(async () => { await data.refreshReminders(); });
+
+    expect(mockLogout).toHaveBeenCalledTimes(2);
   });
 
   // The reminders query and the refresh's own error handling both meet it.

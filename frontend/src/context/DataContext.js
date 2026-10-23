@@ -1,5 +1,5 @@
 import React, {
-  createContext, useCallback, useContext, useReducer, useEffect, useMemo, useRef, useSyncExternalStore,
+  createContext, useContext, useReducer, useEffect, useMemo, useRef,
 } from 'react';
 import { AppState } from 'react-native';
 import { hashKey, isCancelledError, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,7 @@ import { addDoseCount, mergeDoseHistory } from '../utils/doses';
 import { vaxStatusOn } from '../utils/vaccines';
 import { parseDecimal } from '../utils/numbers';
 import { useTickAt } from '../hooks/useTickAt';
+import { useQueryCacheData } from '../hooks/useQueryCacheData';
 import {
   petsKeys, petRecordsKeys, remindersKeys, gamificationKeys, communityKeys, invitesKeys, lostPetsKeys, notificationsKeys,
   vaultKeys,
@@ -355,7 +356,8 @@ export async function fetchPetRecords(queryClient, queryKey) {
 const PET_RECORDS_DEFAULTS = { gcTime: Infinity, retry: false };
 
 // The reminders list: one request. Never garbage-collected (DataContext reads
-// it without a query observer) and not retried, as before it was a query.
+// it without a query observer) and not retried, as before it was a query —
+// set on the query itself, the one way it is fetched.
 const NO_REMINDERS = [];
 const REMINDERS_DEFAULTS = { gcTime: Infinity, retry: false };
 const remindersQuery = (queryKey) => ({
@@ -394,7 +396,6 @@ export function DataProvider({ children }) {
   const petRecordsKey = petRecordsKeys.list(user?.id);
   useEffect(() => {
     queryClient.setQueryDefaults(petRecordsKeys.all, PET_RECORDS_DEFAULTS);
-    queryClient.setQueryDefaults(remindersKeys.all, REMINDERS_DEFAULTS);
   }, [queryClient]);
 
   // ── Reminders ──
@@ -402,14 +403,7 @@ export function DataProvider({ children }) {
   // a store subscription so useData().reminders re-renders as each new list
   // lands. refreshReminders fetches it; the listener below schedules it.
   const remindersKey = remindersKeys.list(user?.id);
-  const remindersHash = hashKey(remindersKey);
-  const subscribeReminders = useCallback((onChange) => queryClient.getQueryCache().subscribe((event) => {
-    if (event.query.queryHash === remindersHash) onChange();
-  }), [queryClient, remindersHash]);
-  const reminders = useSyncExternalStore(
-    subscribeReminders,
-    () => queryClient.getQueryData(remindersKey) ?? NO_REMINDERS,
-  );
+  const reminders = useQueryCacheData(remindersKey, NO_REMINDERS);
   // The records as they are now — read when a mutation runs, not subscribed
   // to: this provider doesn't re-render on pet writes (screens read them with
   // usePetRecords).
@@ -527,10 +521,15 @@ export function DataProvider({ children }) {
     const { userId, logout: endSession } = session.current;
     if (!userId || expiredFor.current === userId) return;
     expiredFor.current = userId;
-    // Only a sign-out that failed lets the next expired request try again.
+    // A sign-out that failed — or finished with the account still signed in —
+    // lets the next expired request try again. (Checked a tick after it
+    // settles, once the signed-out user has rendered.)
     const retryLater = () => { if (expiredFor.current === userId) expiredFor.current = null; };
+    const retryIfStillSignedIn = () => setTimeout(() => {
+      if (session.current.userId === userId) retryLater();
+    }, 0);
     try {
-      Promise.resolve(endSession()).catch(retryLater);
+      Promise.resolve(endSession()).then(retryIfStillSignedIn, retryLater);
     } catch {
       retryLater();
     }
@@ -695,8 +694,9 @@ export function DataProvider({ children }) {
     // Initial fan-out finished (even with failures) — screens can report TTI.
     dispatch({ type: 'SET_DATA_LOADED', payload: true });
     // Only stamp the sync time when every domain landed — a partial load must
-    // not read as "synced" (honest state; refreshReminders stamps on its own
-    // success, so a reminders-only recovery still updates the line).
+    // not read as "synced" (honest state; every reminders list that lands
+    // stamps it too — the schedule listener — so a reminders-only recovery
+    // still updates the line).
     if (!failed.length) dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
   };
 
@@ -738,14 +738,43 @@ export function DataProvider({ children }) {
   // a stale list could reschedule a dose that was just marked given. A request
   // already in flight predates whatever asked for this one: it is cancelled
   // (its answer never lands, so never schedules), then this one runs.
+  // Callers (saves, the sign-in load) resolve on the list they asked for: a
+  // refresh that a newer one cancelled waits for that newer answer — and fails
+  // if it does — rather than resolving on nothing. Only for the account still
+  // signed in: a refresh asked for after logout fetches nothing (it would
+  // bring back a removed list, kept for good, onto the phone).
+  const latestRemindersRefresh = useRef(null);
   const refreshReminders = async ({ rethrow = false } = {}) => {
     const key = remindersKey;
-    try {
+    const signedIn = () => hashKey(key) === hashKey(remindersKeys.list(session.current.userId));
+    if (!signedIn()) return;
+    const run = (async () => {
       await queryClient.cancelQueries({ queryKey: key, exact: true });
+      if (!signedIn()) return;
       await queryClient.fetchQuery({ ...remindersQuery(key), staleTime: 0 });
+    })();
+    latestRemindersRefresh.current = run;
+    try {
+      // Replaced by a newer refresh: its answer (or failure) is this one's,
+      // however many times it is replaced in turn. (A cancelled request may
+      // settle with the list it replaced rather than reject — React Query
+      // keeps the previous data — so "replaced" is read from which refresh is
+      // newest, not from the error.)
+      for (let current = run; ;) {
+        let failure = null;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await current;
+        } catch (err) {
+          if (!isCancelledError(err)) failure = err;
+        }
+        if (latestRemindersRefresh.current === current || !signedIn()) {
+          if (failure) throw failure;
+          return;
+        }
+        current = latestRemindersRefresh.current;
+      }
     } catch (err) {
-      // A newer refresh replaced this one, or logout removed the list.
-      if (isCancelledError(err)) return;
       if (rethrow) throw err;
       handleApiError(err);
     }
@@ -756,11 +785,37 @@ export function DataProvider({ children }) {
   // A cancelled request's answer never lands here, and logout's removal of the
   // list cancels its request, so a late answer for a signed-out account never
   // reaches the phone either (remindersCache.test.js).
+  // Scheduling cancels every notification, then schedules the list, one await
+  // at a time: two lists landing close together must not interleave (the
+  // older one's entries would outlive the newer list's cancel — a dose just
+  // marked given would still fire). One schedule runs at a time; lists that
+  // land meanwhile wait, and only the newest of them is scheduled.
+  const scheduling = useRef({ running: false, next: undefined });
+  const scheduleNewest = (list) => {
+    const s = scheduling.current;
+    s.next = list;
+    if (s.running) return;
+    s.running = true;
+    (async () => {
+      while (s.next !== undefined) {
+        const newest = s.next;
+        s.next = undefined;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await scheduleLocalReminders(newest);
+        } catch {
+          // Best-effort, as before: the next list schedules again.
+        }
+      }
+      s.running = false;
+    })();
+  };
   useEffect(() => queryClient.getQueryCache().subscribe((event) => {
     if (event.type !== 'updated' || event.action?.type !== 'success') return;
     if (event.query.queryKey[0] !== remindersKeys.all[0]) return;
-    dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
-    scheduleLocalReminders(event.query.state.data);
+    // A local write (setQueryData) changes the schedule but isn't a sync.
+    if (!event.action.manual) dispatch({ type: 'SET_LAST_SYNCED', payload: Date.now() });
+    scheduleNewest(event.query.state.data);
   }), [queryClient]);
 
   // The notification list is read through useNotifications.js.
