@@ -290,8 +290,15 @@ const PET_FIELDS = {
 const PET_RESOURCES = Object.keys(PET_FIELDS);
 
 // Requests that failed in the last load, per records query (by key hash): a
-// partial load still returns its pets, so the count travels beside them.
+// partial load still returns its pets, so the count travels beside them. Read
+// once by the sign-in load (takePetLoadFailures), dropped at logout.
 const petLoadFailures = new Map();
+const takePetLoadFailures = (queryKey) => {
+  const hash = hashKey(queryKey);
+  const failures = petLoadFailures.get(hash) ?? 0;
+  petLoadFailures.delete(hash);
+  return failures;
+};
 
 // Every pet with its six sub-resources: 1 + 6N requests. One failure among
 // them used to reject the whole load: no pets for the rest of the session
@@ -301,6 +308,11 @@ const petLoadFailures = new Map();
 // list as "nothing on record". The failures are counted in petLoadFailures.
 export async function fetchPetRecords(queryClient, queryKey) {
   const apiPets = await get('/pets');
+  // Home's early row (usePetsQuery) shows these names while the rest loads —
+  // unless logout removed this query meanwhile.
+  if (queryClient.getQueryCache().find({ queryKey, exact: true })) {
+    queryClient.setQueryData(petsKeys.all, apiPets.map((apiPet, index) => toPet(apiPet, { index })));
+  }
   const previous = new Map((queryClient.getQueryData(queryKey) ?? NO_PETS).map((p) => [p.id, p]));
   const failures = [];
   const fetchList = (petId, resource) =>
@@ -380,13 +392,30 @@ export function DataProvider({ children }) {
   // its actions to the current state — only while the account it was made
   // for is still signed in: a late answer after logout must not bring that
   // account's records back (they would never be collected).
+  // A screen's re-read (Pets tab focus, "Try again") may be in flight and
+  // predate this change: it is cancelled, the change written, then re-read —
+  // the write rule (writeQueryCache) — or its answer would undo the change.
+  // The sign-in load and full reloads are left to run, as they always were
+  // (cancelling would restart a whole 1 + 6N load; see CLAUDE.md).
   const writePets = (update) => {
     if ((user?.id ?? null) !== session.current.userId) return;
-    queryClient.setQueryData(petRecordsKey, (current) => update(current ?? NO_PETS));
+    const key = petRecordsKey;
+    const apply = () => queryClient.setQueryData(key, (current) => update(current ?? NO_PETS));
+    const rereading = queryClient.isFetching({ queryKey: key, exact: true }) > 0 && petLoadsRunning.current === 0;
+    if (!rereading) {
+      apply();
+      return;
+    }
+    queryClient.cancelQueries({ queryKey: key, exact: true }).then(() => {
+      apply();
+      queryClient.invalidateQueries({ queryKey: key, exact: true });
+    });
   };
   // One pet's change, applied to that pet as it is in the cache now — not as
   // the screen last rendered it — so changes to one pet at once all land. A
   // pet no longer listed is skipped: the server has already saved the change.
+  // Sign-in loads and full reloads running now (see writePets).
+  const petLoadsRunning = useRef(0);
   const updatePetRecord = (petId, update) =>
     writePets((list) => list.map((p) => (p.id === petId ? update(p) : p)));
   const dropPet = (petId) => writePets((list) => list.filter((p) => p.id !== petId));
@@ -472,7 +501,13 @@ export function DataProvider({ children }) {
     const { userId, logout: endSession } = session.current;
     if (!userId || expiredFor.current === userId) return;
     expiredFor.current = userId;
-    endSession();
+    // Only a sign-out that failed lets the next expired request try again.
+    const retryLater = () => { if (expiredFor.current === userId) expiredFor.current = null; };
+    try {
+      Promise.resolve(endSession()).catch(retryLater);
+    } catch {
+      retryLater();
+    }
   };
   useEffect(() => queryClient.getQueryCache().subscribe((event) => {
     if (event.type !== 'updated' || event.action?.type !== 'error') return;
@@ -528,6 +563,7 @@ export function DataProvider({ children }) {
       expiredFor.current = null;
       dispatch({ type: 'SET_DATA_LOADED', payload: false });
       queryClient.removeQueries({ queryKey: petRecordsKeys.all });
+      petLoadFailures.clear();
       dispatch({ type: 'SET_REMINDERS', payload: [] });
       dispatch({ type: 'SET_LAST_SYNCED', payload: null });
       // History stays in AsyncStorage (device-local, med ids are UUIDs) but is
@@ -578,7 +614,10 @@ export function DataProvider({ children }) {
   // Each domain loads and dispatches independently, so one failed request
   // only loses that domain — a transient blip on any single endpoint used to
   // discard the entire store (dashboard showed 0 pets until a full reload).
-  const loadData = async () => {
+  // `fresh`: a reload after a change the server just made (accepting a shared
+  // pet, applying a reading) must not join a records fetch that started before
+  // it. The sign-in load joins whatever fetch a screen already started.
+  const loadData = async ({ fresh = false } = {}) => {
     // Notifications are read through useNotifications.js, but a full reload
     // (sign-in, accepting a shared pet) still re-reads them.
     invalidateNotifications();
@@ -589,12 +628,20 @@ export function DataProvider({ children }) {
         // second 1 + 6N load; otherwise it runs it, fresh or not.
         const loadingFor = petRecordsKey;
         let petsWithData;
+        petLoadsRunning.current += 1;
         try {
-          petsWithData = await queryClient.fetchQuery({ ...petRecordsQuery(queryClient, loadingFor), staleTime: 0 });
-        } catch (err) {
-          // Logout removed the query mid-load: nothing to report.
-          if (isCancelledError(err)) return;
-          throw err;
+          if (fresh) await queryClient.cancelQueries({ queryKey: loadingFor, exact: true });
+          try {
+            petsWithData = await queryClient.fetchQuery({ ...petRecordsQuery(queryClient, loadingFor), staleTime: 0 });
+          } catch (err) {
+            // Cancelled: logout removed the query, or a fresh reload replaced
+            // this fetch and reports its own answer. (A screen's refetch()
+            // doesn't land here: React Query hands this fetch its answer.)
+            if (isCancelledError(err)) return;
+            throw err;
+          }
+        } finally {
+          petLoadsRunning.current -= 1;
         }
         // Signed out (or switched account) while loading: nothing to hydrate.
         if (hashKey(loadingFor) !== hashKey(petRecordsKeys.list(session.current.userId))) return;
@@ -604,7 +651,7 @@ export function DataProvider({ children }) {
         if (!petsWithData.some((p) => p.missing?.includes('medications'))) hydrateDoseDays(petsWithData);
 
         // A partial load still counts as failed (logged below).
-        const failures = petLoadFailures.get(hashKey(loadingFor)) ?? 0;
+        const failures = takePetLoadFailures(loadingFor);
         if (failures) throw new Error(`${failures} pet request(s) failed`);
       },
       () => refreshReminders({ rethrow: true }),
@@ -758,7 +805,6 @@ export function DataProvider({ children }) {
       });
       const newPet = toPet(apiPet, { index: pets.length });
       writePets((list) => [...list, newPet]);
-      queryClient.invalidateQueries({ queryKey: petsKeys.all });
       track('pet_added', { type: newPet.type, pet_count: pets.length + 1 });
       // Creating a pet with a weight seeds a server-side log — reflect it.
       if (petData.weight) refreshPetWeights(newPet.id);
@@ -807,7 +853,6 @@ export function DataProvider({ children }) {
           merged.weights = existing.weights || [];
           return merged;
         });
-        queryClient.invalidateQueries({ queryKey: petsKeys.all });
         // A weight edit creates a server-side log; refetch so the tracker stays in sync.
         if (updates.weight !== undefined) refreshPetWeights(petId);
       }
@@ -822,7 +867,6 @@ export function DataProvider({ children }) {
     try {
       await del(`/pets/${petId}`);
       dropPet(petId);
-      queryClient.invalidateQueries({ queryKey: petsKeys.all });
       // Its medical records must not outlive it in memory.
       queryClient.removeQueries({ queryKey: vaultKeys.pet(user?.id, petId) });
       return true;
@@ -835,12 +879,10 @@ export function DataProvider({ children }) {
   // ── Vaccination ──
 
   // Shared tail of every vaccination mutation: apply the change to the pet's
-  // local list (skipped if the pet isn't listed, e.g. mid-reload — the
-  // invalidated query is the recovery path), then mark the pets query stale
-  // so migrated screens refetch.
+  // records (skipped if the pet isn't listed, e.g. mid-reload — the reload
+  // brings it).
   const applyVaxChange = (petId, mutate) => {
     updatePetRecord(petId, (pet) => ({ ...pet, vaccinations: mutate(pet.vaccinations || []) }));
-    queryClient.invalidateQueries({ queryKey: petsKeys.all });
     // The server creates/removes the vaccination's due-date reminder: refetch
     // so Health and Reminders match and this device's local notifications are
     // rescheduled (a dose marked given must not still notify).
@@ -1190,7 +1232,7 @@ export function DataProvider({ children }) {
       await dropInvite(inviteId, { reread: true });
       // The shared pet may already be on the board: it is mine now too.
       refreshLostPets();
-      await loadData();
+      await loadData({ fresh: true });
       return true;
     } catch (err) { handleApiError(err); return false; }
   };
@@ -1316,7 +1358,7 @@ export function DataProvider({ children }) {
     // marking the document applied: re-read the vault. The new records live
     // in pet state.
     invalidateVault(petId);
-    loadData();
+    loadData({ fresh: true });
     return result;
   };
 

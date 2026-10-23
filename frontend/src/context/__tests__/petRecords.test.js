@@ -147,10 +147,11 @@ describe('the records query', () => {
   }
 
   // The Pets tab mounts with Home at sign-in: one 1 + 6N load between them,
-  // and the light list (Home's early names) adds only /pets.
+  // and Home's early names come from that load's own /pets answer.
   it('runs one load at sign-in, whoever asks first', async () => {
+    let early;
     function Home() {
-      usePetsQuery();
+      ({ data: early } = usePetsQuery());
       return null;
     }
     await act(async () => {
@@ -167,7 +168,8 @@ describe('the records query', () => {
 
     expect(calls('/pets/p1/vaccinations')).toBe(1);
     expect(calls('/pets/p1/medications')).toBe(1);
-    expect(calls('/pets')).toBe(2); // the records load, and the light list
+    expect(calls('/pets')).toBe(1);
+    expect(early.map((p) => p.name)).toEqual(['Rex']);
     expect(data.pets.map((p) => p.id)).toEqual(['p1']);
   });
 
@@ -181,6 +183,124 @@ describe('the records query', () => {
     await act(async () => { await data.acceptInvite('i1'); });
 
     expect(calls('/pets/p1/medications')).toBe(2);
+  });
+
+  // A reload after a change the server just made (accepting a shared pet)
+  // must not take the answer of a fetch that started before it.
+  it('a reload does not join a fetch that predates it', async () => {
+    let refetchTab;
+    function Tab() {
+      ({ refetch: refetchTab } = usePetRecordsQuery());
+      return null;
+    }
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <DataProvider>
+            <Tab />
+            <Probe />
+          </DataProvider>
+        </QueryClientProvider>,
+      );
+    });
+    // A focus re-read starts, and its pets list predates the shared pet.
+    let answerOld;
+    get.mockImplementation((path) => {
+      if (path === '/pets' && !answerOld) return new Promise((resolve) => { answerOld = () => resolve([PET]); });
+      if (path === '/pets') return Promise.resolve([PET, { id: 'p2', owner_id: 'u2', name: 'Milo', type: 'cat' }]);
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    await act(async () => { refetchTab(); });
+    post.mockResolvedValue({});
+
+    let accepting;
+    await act(async () => { accepting = data.acceptInvite('i1'); });
+    await act(async () => { answerOld(); await accepting; });
+
+    expect(data.pets.map((p) => p.id)).toEqual(['p1', 'p2']);
+  });
+
+  // A screen's re-read during a full reload replaces the reload's fetch:
+  // React Query hands the reload the new answer, and the reload still
+  // reports a partial load.
+  it('a reload whose fetch a screen replaced still reports', async () => {
+    let refetchTab;
+    function Tab() {
+      ({ refetch: refetchTab } = usePetRecordsQuery());
+      return null;
+    }
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <DataProvider>
+            <Tab />
+            <Probe />
+          </DataProvider>
+        </QueryClientProvider>,
+      );
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    let held = false;
+    get.mockImplementation((path) => {
+      if (path === '/pets/p1/weights' && !held) { held = true; return new Promise(() => {}); }
+      if (path === '/pets/p1/weights') return Promise.reject(new Error('Network error'));
+      if (path === '/pets') return Promise.resolve([PET]);
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    post.mockResolvedValue({});
+
+    let accepting;
+    await act(async () => { accepting = data.acceptInvite('i1'); });
+    // The reload's own fetch is running (its weights request held) before the
+    // screen re-reads.
+    for (let i = 0; i < 20 && !held; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    }
+    expect(held).toBe(true);
+    await act(async () => { refetchTab(); });
+    await act(async () => { await accepting; });
+
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('1/2 domains failed'));
+    warn.mockRestore();
+  });
+
+  // A change made while a screen's re-read runs must not be undone by it.
+  it('a change during a screen\'s re-read survives it', async () => {
+    let refetchTab;
+    function Tab() {
+      ({ refetch: refetchTab } = usePetRecordsQuery());
+      return null;
+    }
+    await act(async () => {
+      tree = TestRenderer.create(
+        <QueryClientProvider client={client}>
+          <DataProvider>
+            <Tab />
+            <Probe />
+          </DataProvider>
+        </QueryClientProvider>,
+      );
+    });
+    const newW = { id: 'w1', pet_id: 'p1', weight: 21, unit: 'kg', logged_at: '2026-10-22T08:00:00Z' };
+    let answerOld;
+    let saved = false;
+    get.mockImplementation((path) => {
+      if (path === '/pets/p1/weights' && !answerOld) return new Promise((resolve) => { answerOld = () => resolve([]); });
+      if (path === '/pets/p1/weights') return Promise.resolve(saved ? [newW] : []);
+      if (path === '/pets') return Promise.resolve([PET]);
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    await act(async () => { refetchTab(); });
+    post.mockImplementation(() => { saved = true; return Promise.resolve(newW); });
+
+    await act(async () => { await data.addWeight('p1', { weight: '21' }); });
+    await act(async () => { answerOld(); await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+    expect(data.pets[0].weights.map((w) => w.id)).toEqual(['w1']);
   });
 
   // The records query and the sign-in load both meet the expired session.
@@ -207,6 +327,20 @@ describe('the records query', () => {
 
 // Each change to one pet applies to that pet as it is in the cache now, not
 // as the screen last rendered it.
+// A sign-out that failed must not leave every later expired request ignored.
+describe('an expired session', () => {
+  it('a sign-out that failed is tried again by the next expired request', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockLogout.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+    get.mockImplementation((path) => (path === '/pets' ? Promise.reject(new Error('SESSION_EXPIRED')) : Promise.resolve([])));
+    await mount();
+    // The query met the expiry first and its sign-out failed; the sign-in
+    // load, meeting the same expiry, tries again.
+    expect(mockLogout).toHaveBeenCalledTimes(2);
+    console.warn.mockRestore();
+  });
+});
+
 describe('changes to one pet', () => {
   it('a new pet with a weight shows the log the server created', async () => {
     await mount();

@@ -70,3 +70,20 @@ test('re-reads on focus only once the records are stale', () => {
   expect(useRefetchOnFocus).toHaveBeenCalledWith(refetch, { isStale: false });
   act(() => tree.unmount());
 });
+
+// Vaccinations that didn't load: no status, never "All good".
+test('a pet whose vaccinations did not load shows no status', () => {
+  const tree = render({ data: [{ ...pet('p1', 'Luna'), missing: ['vaccinations'] }, pet('p2', 'Milo')] });
+  const PetCard = require('../../../components').PetCard;
+  const cards = tree.root.findAllByType(PetCard);
+  expect(cards.map((c) => [c.props.name, c.props.status])).toEqual([['Luna', null], ['Milo', 'ok']]);
+  act(() => tree.unmount());
+});
+
+// A failed re-read keeps the pets the tab already shows.
+test('a failed re-read keeps the pets on screen', () => {
+  const tree = render({ data: [pet('p1', 'Luna')], isError: true });
+  expect(texts(tree)).toContain('Luna');
+  expect(texts(tree)).not.toContain("Couldn't load your pets.");
+  act(() => tree.unmount());
+});

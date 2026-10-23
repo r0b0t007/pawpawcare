@@ -14,7 +14,16 @@ import { Button, EmptyState, PetCard, Skeleton, petHealthStatus } from '../../co
 // + word on the card); pets that need attention sort first. The whole card
 // navigates, and adding is a quiet outline tile, never a banner.
 
-const SEVERITY = { overdue: 0, due: 1, ok: 2 };
+// Stable while nothing has loaded, so the sort memo doesn't rerun.
+const NO_PETS = [];
+
+// Unknown (vaccinations didn't load) sorts with "due": it needs a look.
+const SEVERITY = { overdue: 0, due: 1, unknown: 1, ok: 2 };
+// A pet whose vaccinations didn't load has no known status: no badge, never
+// "All good" (Home's rule too).
+const healthOf = (pet) => (pet.missing?.includes('vaccinations')
+  ? { status: null, label: null, severity: SEVERITY.unknown }
+  : { ...petHealthStatus(pet.vaccinations), severity: undefined });
 
 export default function PetsListScreen({ navigation }) {
   // The full pet records, as every pet screen sees them: DataContext's writes
@@ -22,15 +31,17 @@ export default function PetsListScreen({ navigation }) {
   // another phone sharing a pet).
   const { t } = useTranslation();
   const {
-    data: pets = [], isLoading, isError, isStale, refetch,
+    data, isLoading, isError, isStale, refetch,
   } = usePetRecordsQuery();
+  const pets = data ?? NO_PETS;
   useRefetchOnFocus(refetch, { isStale });
 
   const sorted = useMemo(
     () =>
       pets
-        .map((pet, i) => ({ pet, i, health: petHealthStatus(pet.vaccinations) }))
-        .sort((a, b) => SEVERITY[a.health.status] - SEVERITY[b.health.status] || a.i - b.i)
+        .map((pet, i) => ({ pet, i, health: healthOf(pet) }))
+        .sort((a, b) => (a.health.severity ?? SEVERITY[a.health.status])
+          - (b.health.severity ?? SEVERITY[b.health.status]) || a.i - b.i)
         // An odd count gets a spacer so the last card keeps its column width.
         .concat(pets.length % 2 ? [{ spacer: true }] : []),
     [pets],
@@ -97,7 +108,8 @@ export default function PetsListScreen({ navigation }) {
     );
   }
 
-  if (isError) {
+  // Failed with nothing to show: a failed re-read keeps the pets it has.
+  if (isError && data === undefined) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
         <View style={styles.centered}>
