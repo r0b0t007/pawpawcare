@@ -32,7 +32,7 @@ function SectionLabel({ children }) {
 }
 
 export default function ProfileScreen({ navigation }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user, isAdmin, logout, updateUser } = useAuth();
   const { rescheduleReminders, cancelReminderNotifications } = useData();
   const pets = usePetRecords();
@@ -161,6 +161,9 @@ export default function ProfileScreen({ navigation }) {
   // updateUser never throws, and the device setting stands either way.
   const [language, setLanguage] = useState(languageChoice);
   const [languageOpen, setLanguageOpen] = useState(false);
+  // A change of the phone's language ends a fixed choice (i18n
+  // noteDeviceLanguage) while this tab stays mounted: show the setting again.
+  useEffect(() => setLanguage(languageChoice()), [i18n.language]);
   const chooseLanguage = async (next) => {
     setLanguageOpen(false);
     setLanguage(next);

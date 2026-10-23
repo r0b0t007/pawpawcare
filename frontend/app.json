@@ -24,6 +24,10 @@
         "usesNonExemptEncryption": false
       }
     },
+    "locales": {
+      "fr": "./locales/fr.json",
+      "es": "./locales/es.json"
+    },
     "android": {
       "package": "com.pawpawcare.app",
       "versionCode": 1,
@@ -38,10 +42,20 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow PawPawCare to access your photos to set pet pictures and share posts."
+          "photosPermission": "Allow PawPawCare to access your photos to set pet pictures and share posts.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
-      "expo-localization",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": ["en", "fr", "es"],
+            "android": ["en", "fr", "es"]
+          }
+        }
+      ],
       "expo-status-bar",
       [
         "expo-splash-screen",
@@ -51,7 +65,12 @@
           "backgroundColor": "#fff8f4"
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-sharing",
       "expo-apple-authentication",
       [
