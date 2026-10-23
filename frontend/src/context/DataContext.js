@@ -294,6 +294,10 @@ const PET_RESOURCES = Object.keys(PET_FIELDS);
 // partial load still returns its pets, so the count travels beside them. Read
 // once by the sign-in load (takePetLoadFailures), dropped at logout.
 const petLoadFailures = new Map();
+// The newest records fetch per query (by key hash). A cancelled queryFn keeps
+// running to its end; once a newer fetch has started, its side effects (Home's
+// early names, the failure count) would overwrite the newer fetch's.
+const petFetchGeneration = new Map();
 const takePetLoadFailures = (queryKey) => {
   const hash = hashKey(queryKey);
   const failures = petLoadFailures.get(hash) ?? 0;
@@ -308,10 +312,15 @@ const takePetLoadFailures = (queryKey) => {
 // none, the field is listed in pet.missing so screens don't read the empty
 // list as "nothing on record". The failures are counted in petLoadFailures.
 export async function fetchPetRecords(queryClient, queryKey) {
+  const hash = hashKey(queryKey);
+  const generation = (petFetchGeneration.get(hash) ?? 0) + 1;
+  petFetchGeneration.set(hash, generation);
+  const newest = () => petFetchGeneration.get(hash) === generation;
   const apiPets = await get('/pets');
   // Home's early row (usePetsQuery) shows these names while the rest loads —
-  // unless logout removed this query meanwhile.
-  if (queryClient.getQueryCache().find({ queryKey, exact: true })) {
+  // unless logout removed this query meanwhile, or a newer fetch replaced
+  // this one (its older list must not overwrite the newer one's).
+  if (newest() && queryClient.getQueryCache().find({ queryKey, exact: true })) {
     queryClient.setQueryData(petsKeys.all, apiPets.map((apiPet, index) => toPet(apiPet, { index })));
   }
   const previous = new Map((queryClient.getQueryData(queryKey) ?? NO_PETS).map((p) => [p.id, p]));
@@ -341,7 +350,7 @@ export async function fetchPetRecords(queryClient, queryKey) {
   const listsByPet = await Promise.all(
     apiPets.map((p) => Promise.all(PET_RESOURCES.map((r) => fetchList(p.id, r))))
   );
-  petLoadFailures.set(hashKey(queryKey), failures.length);
+  if (newest()) petLoadFailures.set(hash, failures.length);
   return apiPets.map((apiPet, i) =>
     buildPet(apiPet, i, Object.fromEntries(PET_RESOURCES.map((r, j) => [r, listsByPet[i][j]])))
   );
@@ -654,12 +663,15 @@ export function DataProvider({ children }) {
   // replaced rather than reject — React Query keeps the previous data — so
   // "replaced" is read from which load is newest, not from the error (as
   // refreshReminders does). Carrying on would hydrate from the old records
-  // and report a load that never happened.
+  // and report a load that never happened. Only for the account still signed
+  // in: a reload asked for after logout (an accept answering late) would
+  // bring back a removed query, kept for good, and take over the next
+  // account's sign-in load as the newest.
   const latestPetsLoad = useRef(null);
-  const loadPetRecords = ({ fresh }) => {
-    const load = {};
-    load.promise = (async () => {
-      const loadingFor = petRecordsKey;
+  const loadPetRecords = async ({ fresh }) => {
+    const loadingFor = petRecordsKey;
+    if (hashKey(loadingFor) !== hashKey(petRecordsKeys.list(session.current.userId))) return undefined;
+    const run = (async () => {
       let petsWithData;
       let failure = null;
       petLoadsRunning.current += 1;
@@ -673,7 +685,7 @@ export function DataProvider({ children }) {
       }
       // Replaced: the newest load's outcome is this one's. (A screen's
       // refetch() doesn't count: React Query hands this fetch its answer.)
-      if (latestPetsLoad.current !== load) return latestPetsLoad.current.promise;
+      if (latestPetsLoad.current !== run) return latestPetsLoad.current;
       if (failure) {
         // Cancelled with nothing newer: logout removed the query.
         if (isCancelledError(failure)) return;
@@ -690,8 +702,8 @@ export function DataProvider({ children }) {
       const failures = takePetLoadFailures(loadingFor);
       if (failures) throw new Error(`${failures} pet request(s) failed`);
     })();
-    latestPetsLoad.current = load;
-    return load.promise;
+    latestPetsLoad.current = run;
+    return run;
   };
 
   // Each domain loads and dispatches independently, so one failed request
@@ -701,6 +713,7 @@ export function DataProvider({ children }) {
   // pet, applying a reading) must not join a records fetch that started before
   // it. The sign-in load joins whatever fetch a screen already started.
   const loadData = async ({ fresh = false } = {}) => {
+    const loadingFor = petRecordsKey;
     // Notifications are read through useNotifications.js, but a full reload
     // (sign-in, accepting a shared pet) still re-reads them.
     invalidateNotifications();
@@ -710,6 +723,9 @@ export function DataProvider({ children }) {
     ];
 
     const results = await Promise.allSettled(loaders.map((load) => load()));
+    // Signed out (or switched account) meanwhile: logout already reset the
+    // loaded and synced state; the next account's load sets them.
+    if (hashKey(loadingFor) !== hashKey(petRecordsKeys.list(session.current.userId))) return;
     const failed = results.filter((r) => r.status === 'rejected');
     // Log out once, however many loaders hit the expired session — logout()
     // has no in-flight guard, so a per-failure handleApiError would fire it

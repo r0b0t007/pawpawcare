@@ -32,6 +32,7 @@ import { DataProvider, useData } from '../DataContext';
 import { usePetRecords, usePetRecordsQuery } from '../../hooks/usePetRecords';
 import { usePetsQuery } from '../../hooks/usePets';
 import { get, post, patch, del } from '../../services/api';
+import { petsKeys } from '../../hooks/queryKeys';
 
 const PET = { id: 'p1', owner_id: 'u1', name: 'Rex', type: 'dog' };
 const MEDS = [
@@ -357,6 +358,35 @@ describe('the records query', () => {
     warn.mockRestore();
   });
 
+  // The first reload's fetch keeps running after the second cancels it; its
+  // older pets list must not replace the newer one Home's early row shows.
+  it('a replaced fetch answering late leaves the newer early names', async () => {
+    await mount();
+    const MILO = { id: 'p2', owner_id: 'u2', name: 'Milo', type: 'cat' };
+    let answerOld;
+    get.mockImplementation((path) => {
+      if (path === '/pets' && !answerOld) return new Promise((resolve) => { answerOld = () => resolve([PET]); });
+      if (path === '/pets') return Promise.resolve([PET, MILO]);
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    post.mockResolvedValue({});
+
+    let first;
+    await act(async () => { first = data.acceptInvite('i1'); });
+    for (let i = 0; i < 20 && !answerOld; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    }
+    expect(answerOld).toBeDefined();
+    await act(async () => { await data.acceptInvite('i2'); });
+    await act(async () => { answerOld(); await first; });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+    expect(client.getQueryData(petsKeys.all).map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(data.pets.map((p) => p.id)).toEqual(['p1', 'p2']);
+  });
+
   // A change made while a screen's re-read runs must not be undone by it.
   it('a change during a screen\'s re-read survives it', async () => {
     let refetchTab;
@@ -557,7 +587,46 @@ describe('after logout', () => {
     expect(getPref.mock.calls.filter(([key]) => key === 'medDoseDays')).toHaveLength(0);
     expect(records()).toHaveLength(0);
     expect(warn).not.toHaveBeenCalled();
+    // Logout reset these; the next account's load sets them.
+    expect(data.dataLoaded).toBe(false);
+    expect(data.lastSyncedAt).toBeNull();
     warn.mockRestore();
+  });
+
+  // An accept that answers after logout, with the next account signed in:
+  // its reload must not bring back the old account's records, nor take over
+  // the new account's sign-in load (which must still hydrate its doses).
+  it('a reload asked for after logout loads nothing and leaves the next sign-in alone', async () => {
+    const { getPref } = jest.requireMock('../../services/prefs');
+    await mount();
+    let answerAccept;
+    post.mockImplementation(() => new Promise((resolve) => { answerAccept = () => resolve({}); }));
+    let accepting;
+    await act(async () => { accepting = data.acceptInvite('i1'); });
+
+    mockUser = null;
+    await act(async () => { tree.update(element()); });
+    let answerPets;
+    get.mockImplementation((path) => {
+      if (path === '/pets') return new Promise((resolve) => { answerPets = () => resolve([{ ...PET, id: 'p9', owner_id: 'u2' }]); });
+      if (path === '/notifications') return Promise.resolve({ notifications: [], unread_count: 0 });
+      return Promise.resolve([]);
+    });
+    mockUser = { id: 'u2' };
+    await act(async () => { tree.update(element()); });
+    getPref.mockClear();
+
+    await act(async () => { answerAccept(); await accepting; });
+    await act(async () => { answerPets(); });
+    for (let i = 0; i < 5; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    }
+
+    expect(records().map((q) => q.queryKey)).toEqual([['petRecords', 'u2']]);
+    expect(data.pets.map((p) => p.id)).toEqual(['p9']);
+    expect(getPref.mock.calls.filter(([key]) => key === 'medDoseDays')).toHaveLength(1);
+    expect(data.dataLoaded).toBe(true);
   });
 
   it('a mutation that answers late writes nothing', async () => {
