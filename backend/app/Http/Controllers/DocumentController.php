@@ -8,6 +8,7 @@ use App\Models\Document;
 use App\Models\Expense;
 use App\Models\Medication;
 use App\Models\Pet;
+use App\Models\User;
 use App\Models\Vaccination;
 use App\Models\WeightLog;
 use App\Services\Analytics\ProductAnalytics;
@@ -52,7 +53,8 @@ class DocumentController extends Controller
      */
     public function store(Request $request, string $petId): JsonResponse
     {
-        $this->petOr404($request, $petId);
+        // Pets have no ownership transfer, so the owner read here stays valid.
+        $ownerId = $this->petOr404($request, $petId)->owner_id;
 
         $data = $request->validate([
             'file' => 'required|file|mimes:pdf,jpg,jpeg,png,webp|max:10240', // 10 MB
@@ -74,22 +76,44 @@ class DocumentController extends Controller
 
         $file = $request->file('file');
         $isPdf = $file->getMimeType() === 'application/pdf';
+        // A full account is refused before anything is written. PDFs are
+        // stored as sent; images are re-encoded (usually smaller), so they
+        // wait for the check that counts: after storing, with the stored size.
+        Document::abortIfOverQuota($ownerId, $isPdf ? (int) $file->getSize() : 1);
+
         // Stored on the PRIVATE disk — never web-accessible without a signed URL.
         [$path, $size] = $isPdf
             ? Uploads::storePrivatePdf($file, 'documents')
             : Uploads::storePrivateImage($file, 'documents');
 
-        $doc = Document::create([
-            'pet_id' => $petId,
-            'appointment_id' => $data['appointment_id'] ?? null,
-            'clinic_id' => $data['clinic_id'] ?? null,
-            'title' => $data['title'],
-            'category' => $data['category'] ?? 'other',
-            'file_path' => $path,
-            'mime' => $isPdf ? 'application/pdf' : $file->getMimeType(),
-            // Record the actual stored size (images are re-encoded, so it differs).
-            'size_bytes' => $size,
-        ]);
+        try {
+            $doc = DB::transaction(function () use ($ownerId, $petId, $data, $path, $size, $isPdf, $file) {
+                // The owner's row lock must be the transaction's first read:
+                // MySQL fixes a REPEATABLE READ snapshot at the first plain
+                // read, and one taken before the wait would miss the documents
+                // of the uploads that held the lock meanwhile.
+                User::whereKey($ownerId)->lockForUpdate()->first();
+                if (! Pet::whereKey($petId)->exists()) {
+                    abort(404, __('Pet not found'));
+                }
+                Document::abortIfOverQuota($ownerId, $size);
+
+                return Document::create([
+                    'pet_id' => $petId,
+                    'appointment_id' => $data['appointment_id'] ?? null,
+                    'clinic_id' => $data['clinic_id'] ?? null,
+                    'title' => $data['title'],
+                    'category' => $data['category'] ?? 'other',
+                    'file_path' => $path,
+                    'mime' => $isPdf ? 'application/pdf' : $file->getMimeType(),
+                    // Record the actual stored size (images are re-encoded, so it differs).
+                    'size_bytes' => $size,
+                ]);
+            });
+        } catch (\Throwable $e) {
+            Uploads::deletePrivate($path);
+            throw $e;
+        }
 
         return response()->json($doc->toApi(), 201);
     }

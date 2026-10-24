@@ -16,6 +16,7 @@
     "Could not reach the subscription service. Please try again.": "Impossible de joindre le service d'abonnement. Veuillez réessayer.",
     "Could not read the document. Please try again.": "Impossible de lire le document. Veuillez réessayer.",
     "Document not found": "Document introuvable",
+    "Document storage is full. Delete some documents to upload more.": "L'espace de stockage des documents est plein. Supprimez des documents pour en ajouter d'autres.",
     "Email already registered": "Cette adresse e-mail est déjà enregistrée",
     "Error": "Erreur",
     "Expense not found": "Dépense introuvable",

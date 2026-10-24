@@ -15,6 +15,26 @@ class Document extends Model
 
     public $incrementing = false;
 
+    /**
+     * Abort with a 422 when one more file of $bytes would pass the storage
+     * quota of the account $ownerId. Every pet an account owns shares one
+     * quota, whoever uploads (a co-owner's uploads count against the owner),
+     * so no single account can grow the documents bucket without limit. To
+     * hold against parallel uploads, call it in a transaction whose first
+     * statement locks the owner's users row (DocumentController::store).
+     */
+    public static function abortIfOverQuota(string $ownerId, int $bytes): void
+    {
+        $owned = static::whereIn('pet_id', Pet::where('owner_id', $ownerId)->select('id'));
+        $count = (clone $owned)->count();
+        $used = (int) (clone $owned)->sum('size_bytes');
+
+        if ($count >= (int) config('filesystems.uploads.documents_max_per_account')
+            || $used + $bytes > (int) config('filesystems.uploads.documents_max_mb_per_account') * 1048576) {
+            abort(422, __('Document storage is full. Delete some documents to upload more.'));
+        }
+    }
+
     protected static function booted(): void
     {
         // Remove the stored file when the record is deleted via Eloquent.

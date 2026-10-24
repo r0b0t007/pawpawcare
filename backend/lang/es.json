@@ -16,6 +16,7 @@
     "Could not reach the subscription service. Please try again.": "No se ha podido contactar con el servicio de suscripciones. Inténtelo de nuevo.",
     "Could not read the document. Please try again.": "No se ha podido leer el documento. Inténtelo de nuevo.",
     "Document not found": "No se ha encontrado el documento",
+    "Document storage is full. Delete some documents to upload more.": "El almacenamiento de documentos está lleno. Elimine algunos documentos para subir más.",
     "Email already registered": "Este correo electrónico ya está registrado",
     "Error": "Error",
     "Expense not found": "No se ha encontrado el gasto",
