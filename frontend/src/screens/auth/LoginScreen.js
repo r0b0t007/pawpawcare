@@ -39,7 +39,9 @@ export default function LoginScreen({ navigation }) {
   };
 
   // The Return key bypasses the disabled button, so check here too: no
-  // email login while one (or a Google sign-in) is already running.
+  // email login while a sign-in is already running. (AuthContext also runs
+  // one at a time: a Google/Apple sign-in still in its native step when this
+  // starts is turned away when it reaches socialLogin.)
   const handleLogin = () =>
     !authBusy && run('login', async () => {
       if (!email.trim() || !password) {
@@ -52,7 +54,9 @@ export default function LoginScreen({ navigation }) {
     });
 
   const displayError = (localError && t(localError)) || error;
-  const busy = authBusy || isBusy('login');
+  // The label says what this screen started; any sign-in running disables it.
+  const submitting = isBusy('login');
+  const busy = authBusy || submitting;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -113,7 +117,7 @@ export default function LoginScreen({ navigation }) {
         <FormError message={displayError} style={styles.formError} />
 
         <Button
-          label={busy ? t('auth.login.submitting') : t('auth.login.submit')}
+          label={submitting ? t('auth.login.submitting') : t('auth.login.submit')}
           onPress={handleLogin}
           disabled={busy}
           style={styles.submitBtn}

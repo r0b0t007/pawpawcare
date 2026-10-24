@@ -98,24 +98,38 @@ describe('in French', () => {
   });
 });
 
-describe('while a sign-in is already running (authBusy)', () => {
+describe('while a sign-in is running', () => {
   afterEach(() => { mockAuth.authBusy = false; });
 
   it.each([
-    [LoginScreen, 'Logging in…', 'login'],
-    [SignupScreen, 'Creating account…', 'signup'],
-  ])('%p shows it on its button and does not start another', async (Screen, busyLabel, action) => {
+    [LoginScreen, 'Log in', 'login'],
+    [SignupScreen, 'Create account', 'signup'],
+  ])('started elsewhere: %p stays labelled as is, disabled, and starts nothing', async (Screen, label, action) => {
     mockAuth.authBusy = true;
     mockAuth[action].mockClear();
     await render(Screen);
     // Filled in, so only the busy guard can stop it (not the missing-fields hint).
-    const fields = tree.root.findAll((n) => n.type === TextInput);
     await act(async () => {
-      fields.forEach((f) => f.props.onChangeText(f.props.secureTextEntry ? 'Passw0rd!x' : f.props.keyboardType === 'email-address' ? 'a@b.c' : 'Sam'));
+      tree.root.findAll((n) => n.type === TextInput).forEach((f) =>
+        f.props.onChangeText(f.props.secureTextEntry ? 'Passw0rd!x' : f.props.keyboardType === 'email-address' ? 'a@b.c' : 'Sam'));
     });
-    const busy = button(tree, busyLabel);
-    expect(busy.props.disabled).toBe(true);
-    await act(async () => busy.props.onPress());
+    const own = button(tree, label);
+    expect(own.props.disabled).toBe(true);
+    await act(async () => own.props.onPress());
     expect(mockAuth[action]).not.toHaveBeenCalled();
+  });
+
+  it('started here: Log in says so until it is over', async () => {
+    let finish;
+    mockAuth.login.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await render(LoginScreen);
+    await act(async () => {
+      tree.root.findAll((n) => n.type === TextInput).forEach((f) =>
+        f.props.onChangeText(f.props.secureTextEntry ? 'Passw0rd!x' : 'a@b.c'));
+    });
+    await act(async () => { button(tree, 'Log in').props.onPress(); });
+    expect(button(tree, 'Logging in…').props.disabled).toBe(true);
+    await act(async () => finish(false));
+    expect(button(tree, 'Log in')).toBeDefined();
   });
 });

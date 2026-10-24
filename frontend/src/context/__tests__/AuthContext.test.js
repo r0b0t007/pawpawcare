@@ -166,6 +166,95 @@ describe('sign-in attempts keep the sign-in screens mounted', () => {
     expect(auth.user).toBeNull();
   });
 
+  it('clearing the error while an attempt runs keeps it busy (editing a field)', async () => {
+    await mount();
+    const pending = deferred();
+    post.mockReturnValueOnce(pending.promise);
+    let running;
+    act(() => {
+      running = auth.login({ email: 'a@b.c', password: 'x' });
+    });
+    act(() => auth.clearError());
+    expect(auth.authBusy).toBe(true);
+    await act(async () => {
+      pending.reject(new Error('Invalid email or password.'));
+      await running;
+    });
+    expect(auth.authBusy).toBe(false);
+  });
+
+  it('runs one at a time: a second attempt is turned away without a request', async () => {
+    await mount();
+    const pending = deferred();
+    post.mockReturnValueOnce(pending.promise);
+    let first;
+    act(() => {
+      first = auth.login({ email: 'a@b.c', password: 'x' });
+    });
+    let second;
+    await act(async () => {
+      second = await auth.socialLogin('google', { id_token: 't' });
+    });
+    expect(second).toBe(false);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(auth.authBusy).toBe(true);
+
+    await act(async () => {
+      pending.reject(new Error('nope'));
+      await first;
+    });
+    // Free again once the first one is over.
+    post.mockRejectedValueOnce(new Error('again'));
+    await act(async () => {
+      await auth.login({ email: 'a@b.c', password: 'y' });
+    });
+    expect(post).toHaveBeenCalledTimes(2);
+  });
+
+  it('a new attempt clears the previous error', async () => {
+    await mount();
+    post.mockRejectedValueOnce(new Error('Invalid email or password.'));
+    await act(async () => {
+      await auth.login({ email: 'a@b.c', password: 'x' });
+    });
+    expect(auth.error).toBe('Invalid email or password.');
+
+    const pending = deferred();
+    post.mockReturnValueOnce(pending.promise);
+    let running;
+    act(() => {
+      running = auth.login({ email: 'a@b.c', password: 'y' });
+    });
+    expect(auth.error).toBeNull();
+    await act(async () => {
+      pending.reject(new Error('later'));
+      await running;
+    });
+  });
+
+  it.each(['login', 'signup', 'socialLogin'])(
+    '%s: if the account then fails to load, the new session is dropped again',
+    async (flow) => {
+      await mount();
+      post.mockResolvedValueOnce({ access_token: 'a', refresh_token: 'r', token_type: 'bearer' });
+      get.mockRejectedValueOnce(new Error('Server error'));
+      const attempt = {
+        login: () => auth.login({ email: 'a@b.c', password: 'x' }),
+        signup: () => auth.signup({ name: 'A', email: 'a@b.c', password: 'x' }),
+        socialLogin: () => auth.socialLogin('google', { id_token: 't' }),
+      }[flow];
+      let result;
+      await act(async () => {
+        result = await attempt();
+      });
+      expect(result).toBe(false);
+      expect(storeTokens).toHaveBeenCalledWith('a', 'r');
+      expect(clearTokens).toHaveBeenCalled();
+      expect(auth.user).toBeNull();
+      expect(auth.error).toBe('Server error');
+    },
+  );
+
   it('a successful login ends busy with the user set', async () => {
     await mount();
     post.mockResolvedValueOnce({ access_token: 'a', refresh_token: 'r', token_type: 'bearer' });
@@ -177,6 +266,7 @@ describe('sign-in attempts keep the sign-in screens mounted', () => {
     expect(auth.user).toEqual(expect.objectContaining({ id: 'u1' }));
     expect(auth.authBusy).toBe(false);
     expect(auth.isLoading).toBe(false);
+    expect(clearTokens).not.toHaveBeenCalled();
   });
 });
 

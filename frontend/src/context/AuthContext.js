@@ -41,8 +41,9 @@ function authReducer(state, action) {
   switch (action.type) {
     case 'SET_USER':       return { ...state, user: action.payload, isLoading: false, authBusy: false, error: null, restoreFailed: false };
     case 'SET_LOADING':    return { ...state, isLoading: action.payload };
-    case 'AUTH_START':     return { ...state, authBusy: true };
+    case 'AUTH_START':     return { ...state, authBusy: true, error: null };
     case 'SET_ERROR':      return { ...state, error: action.payload, isLoading: false, authBusy: false };
+    case 'CLEAR_ERROR':    return { ...state, error: null };
     case 'RESTORE_FAILED': return { ...state, isLoading: false, restoreFailed: true, restoreOffline: action.payload };
     case 'RESTORE_RETRY':  return { ...state, isLoading: true, restoreFailed: false };
     case 'LOGOUT':         return { user: null, isLoading: false, authBusy: false, error: null, restoreFailed: false };
@@ -263,55 +264,72 @@ export function AuthProvider({ children }) {
     return () => sub.remove();
   }, [state.restoreFailed]);
 
-  const signup = async ({ name, email, password }) => {
+  // One sign-in at a time (email, signup, Google/Apple): the form stays on
+  // screen while it runs, so a second one could otherwise start alongside it
+  // (Return on the password field, the Google button, a retry). A second
+  // attempt is turned away (false) without touching the first.
+  const attemptRunning = useRef(false);
+  const runAttempt = async (failedKey, attempt) => {
+    if (attemptRunning.current) return false;
+    attemptRunning.current = true;
     dispatch({ type: 'AUTH_START' });
     try {
-      const tokens = await post('/auth/signup', { name, email, password }, { skipAuth: true });
-      await storeTokens(tokens.access_token, tokens.refresh_token);
-      const user = await get('/users/me');
-      applyUser(user);
-      track('user_signed_up');
-      syncDevice();
+      await attempt();
       return true;
     } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || i18n.t('errors.signupFailed') });
+      dispatch({ type: 'SET_ERROR', payload: err.message || i18n.t(failedKey) });
       return false;
+    } finally {
+      attemptRunning.current = false;
     }
   };
 
-  const login = async ({ email, password }) => {
-    dispatch({ type: 'AUTH_START' });
+  // Store the new session, then load the account. If loading it fails, the
+  // session is dropped again: the user sees the error and stays signed out,
+  // rather than holding a session the next launch would silently restore.
+  const startSession = async (tokens) => {
+    await storeTokens(tokens.access_token, tokens.refresh_token);
     try {
+      return await get('/users/me');
+    } catch (err) {
+      await clearTokens().catch(() => {});
+      throw err;
+    }
+  };
+
+  const signup = ({ name, email, password }) =>
+    runAttempt('errors.signupFailed', async () => {
+      const tokens = await post('/auth/signup', { name, email, password }, { skipAuth: true });
+      const user = await startSession(tokens);
+      applyUser(user);
+      track('user_signed_up');
+      syncDevice();
+    });
+
+  const login = ({ email, password }) =>
+    runAttempt('errors.loginFailed', async () => {
       const tokens = await post('/auth/login', { email, password }, { skipAuth: true });
-      await storeTokens(tokens.access_token, tokens.refresh_token);
+      const user = await startSession(tokens);
       // Logging in during the deletion grace period cancels the deletion.
       if (tokens.reactivated) {
         showToast(i18n.t('auth.reactivated'));
       }
-      const user = await get('/users/me');
       applyUser(user);
       track('user_logged_in');
       syncDevice();
-      return true;
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || i18n.t('errors.loginFailed') });
-      return false;
-    }
-  };
+    });
 
   // Google/Apple sign-in. The screen runs the native provider flow and hands us
   // the resulting token payload; the backend verifies it and returns our own JWT
   // pair, after which the flow is identical to email/password login.
-  const socialLogin = async (provider, payload) => {
-    dispatch({ type: 'AUTH_START' });
-    try {
+  const socialLogin = (provider, payload) =>
+    runAttempt('errors.socialFailed', async () => {
       const tokens = await post(`/auth/${provider}`, payload, { skipAuth: true });
-      await storeTokens(tokens.access_token, tokens.refresh_token);
+      const user = await startSession(tokens);
       // Signing back in during the deletion grace period cancels the deletion.
       if (tokens.reactivated) {
         showToast(i18n.t('auth.reactivated'));
       }
-      const user = await get('/users/me');
       applyUser(user);
       // Social auth is find-or-create and the backend doesn't flag which
       // happened, so infer a brand-new account from a just-set created_at to
@@ -320,12 +338,7 @@ export function AuthProvider({ children }) {
         user?.created_at && Date.now() - new Date(user.created_at).getTime() < 15000;
       track(isNew ? 'user_signed_up' : 'user_logged_in', { method: provider });
       syncDevice();
-      return true;
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: err.message || i18n.t('errors.socialFailed') });
-      return false;
-    }
-  };
+    });
 
   const loggingOut = useRef(false);
   const logout = async () => {
@@ -424,7 +437,8 @@ export function AuthProvider({ children }) {
     return updated;
   };
 
-  const clearError = () => dispatch({ type: 'SET_ERROR', payload: null });
+  // Only the message: a sign-in still running stays busy.
+  const clearError = () => dispatch({ type: 'CLEAR_ERROR' });
 
   return (
     <AuthContext.Provider

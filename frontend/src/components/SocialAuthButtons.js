@@ -54,7 +54,7 @@ function GoogleG({ size = 18 }) {
 // backend verifies before issuing our own session.
 export default function SocialAuthButtons() {
   const { t } = useTranslation();
-  const { socialLogin } = useAuth();
+  const { socialLogin, authBusy } = useAuth();
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [busy, setBusy] = useState(null); // 'google' | 'apple' | null
 
@@ -71,7 +71,7 @@ export default function SocialAuthButtons() {
   }, []);
 
   const handleGoogle = async () => {
-    if (busy) return;
+    if (busy || authBusy) return;
     setBusy('google');
     try {
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
@@ -96,7 +96,7 @@ export default function SocialAuthButtons() {
   };
 
   const handleApple = async () => {
-    if (busy) return;
+    if (busy || authBusy) return;
     setBusy('apple');
     try {
       // Replay guard: we send Apple the SHA-256 of a random nonce; Apple echoes
@@ -148,6 +148,10 @@ export default function SocialAuthButtons() {
   // Nothing to offer (e.g. Android with Google unconfigured) → no orphan divider.
   if (!showGoogle && !showApple) return null;
 
+  // Dimmed and inert while any sign-in runs: this one, or an email login or
+  // signup on the same screen (AuthContext runs one at a time).
+  const blocked = !!busy || authBusy;
+
   return (
     <View style={styles.wrap}>
       <View style={styles.dividerRow}>
@@ -159,13 +163,14 @@ export default function SocialAuthButtons() {
       {showGoogle ? (
         <Pressable
           onPress={handleGoogle}
-          disabled={!!busy}
+          disabled={blocked}
           accessibilityRole="button"
           accessibilityLabel={t('auth.social.google')}
+          accessibilityState={{ disabled: blocked }}
           style={({ pressed }) => [
             styles.googleBtn,
-            busy && { opacity: 0.6 },
-            pressed && !busy && { opacity: motion.pressOpacitySoft },
+            blocked && { opacity: 0.6 },
+            pressed && !blocked && { opacity: motion.pressOpacitySoft },
           ]}
         >
           {busy === 'google' ? (
@@ -185,8 +190,8 @@ export default function SocialAuthButtons() {
           buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
           cornerRadius={radii.control}
           // Dimmed while a sign-in is in flight; taps are already no-ops via the
-          // `busy` guard in handleApple.
-          style={[styles.appleBtn, busy && { opacity: 0.6 }]}
+          // guard in handleApple.
+          style={[styles.appleBtn, blocked && { opacity: 0.6 }]}
           onPress={handleApple}
         />
       ) : null}

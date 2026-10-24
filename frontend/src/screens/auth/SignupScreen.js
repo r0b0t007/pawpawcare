@@ -84,7 +84,9 @@ export default function SignupScreen({ navigation }) {
 
   const displayError = (localError && t(localError, { min: MIN_PASSWORD })) || error;
   const minChars = t('auth.signup.minChars', { min: MIN_PASSWORD });
-  const busy = authBusy || isBusy('signup');
+  // The label says what this screen started; any sign-in running disables it.
+  const submitting = isBusy('signup');
+  const busy = authBusy || submitting;
   const longEnough = password.length >= MIN_PASSWORD;
   const matches = !!confirmPwd && password === confirmPwd;
 
@@ -170,7 +172,7 @@ export default function SignupScreen({ navigation }) {
         <FormError message={displayError} style={styles.formError} />
 
         <Button
-          label={busy ? t('auth.signup.submitting') : t('auth.signup.submit')}
+          label={submitting ? t('auth.signup.submitting') : t('auth.signup.submit')}
           onPress={handleSignup}
           disabled={busy}
           style={styles.submitBtn}
