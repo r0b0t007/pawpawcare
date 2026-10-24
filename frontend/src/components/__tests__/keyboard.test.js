@@ -17,6 +17,7 @@ jest.mock('react-native-gesture-handler', () => {
 import React from 'react';
 import { Keyboard, KeyboardAvoidingView, RefreshControl, ScrollView, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
+import { NavigationContext } from '@react-navigation/native';
 import FormScrollView, { revealScrollDelta } from '../FormScrollView';
 import ConfirmDialog from '../ConfirmDialog';
 
@@ -73,35 +74,114 @@ describe('FormScrollView keepVisible (CHW-154)', () => {
       .toBe(1350 + 80 + 16 - 1400);
   });
 
-  it('scrolls by that much from where the form is when the keyboard opens', async () => {
-    let onShow;
+  // A FormScrollView with a button ref and a stubbed native layout: the
+  // keyboard's own handlers are captured, the ScrollView's host methods mocked.
+  async function mountForm({ navigation, buttonY = 1513, measureLater = false } = {}) {
+    const handlers = {};
     jest.spyOn(Keyboard, 'addListener').mockImplementation((event, fn) => {
-      if (event === 'keyboardDidShow') onShow = fn;
+      (handlers[event] = handlers[event] || []).push(fn);
       return { remove: jest.fn() };
     });
-    const button = { current: { measureInWindow: (cb) => cb(0, 1513, 1000, 80) } };
+    const later = [];
+    const measureInWindow = (rect) => (cb) => (measureLater ? later.push(() => cb(...rect)) : cb(...rect));
+    const button = { current: { measureInWindow: measureInWindow([0, buttonY, 1000, 80]) } };
+    const form = <FormScrollView keepVisible={button}><Text>form</Text></FormScrollView>;
     let tree;
     act(() => {
-      tree = TestRenderer.create(<FormScrollView keepVisible={button}><Text>form</Text></FormScrollView>);
+      tree = TestRenderer.create(navigation ? <NavigationContext.Provider value={navigation}>{form}</NavigationContext.Provider> : form);
     });
     const scroll = tree.root.findByType(ScrollView);
-    const node = scroll.instance;
-    node.measureInWindow = (cb) => cb(0, 0, 1080, 2400);
-    node.scrollTo = jest.fn();
-    act(() => scroll.props.onScroll({ nativeEvent: { contentOffset: { y: 40 } } }));
+    scroll.instance.measureInWindow = measureInWindow([0, 0, 1080, 2400]);
+    scroll.instance.scrollTo = jest.fn();
+    const showKeyboard = (screenY = 1381) =>
+      act(async () => (handlers.keyboardDidShow || []).forEach((fn) => fn({ endCoordinates: { screenY } })));
+    return { tree, scroll, scrollTo: scroll.instance.scrollTo, showKeyboard, flushMeasures: () => later.splice(0).forEach((f) => f()) };
+  }
+  const keyboardUp = (screenY) => {
+    jest.spyOn(Keyboard, 'isVisible').mockReturnValue(screenY != null);
+    jest.spyOn(Keyboard, 'metrics').mockReturnValue(screenY != null ? { screenY, height: 2400 - screenY } : undefined);
+  };
 
-    await act(async () => onShow({ endCoordinates: { screenY: 1381 } }));
-    expect(node.scrollTo).toHaveBeenCalledWith({ y: 40 + 1513 + 80 + 16 - 1381, animated: true });
+  it('scrolls by that much from where the form is when the keyboard opens', async () => {
+    const { tree, scroll, scrollTo, showKeyboard } = await mountForm();
+    act(() => scroll.props.onScroll({ nativeEvent: { contentOffset: { y: 40 } } }));
+    await showKeyboard();
+    expect(scrollTo).toHaveBeenCalledWith({ y: 40 + 1513 + 80 + 16 - 1381, animated: true });
     act(() => tree.unmount());
   });
 
-  it('does nothing without keepVisible', () => {
-    const add = jest.spyOn(Keyboard, 'addListener');
-    act(() => {
-      TestRenderer.create(<FormScrollView><Text>form</Text></FormScrollView>);
-    });
-    expect(add).not.toHaveBeenCalledWith('keyboardDidShow', expect.any(Function));
+  it('reveals it again when the content changes while the keyboard is up (an error line, a taller step)', async () => {
+    keyboardUp(1381);
+    const { tree, scroll, scrollTo } = await mountForm();
+    await act(async () => scroll.props.onContentSizeChange(1080, 2600));
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    // And after the scroll area itself changes (KeyboardAvoidingView shrinking it).
+    await act(async () => scroll.props.onLayout({ nativeEvent: { layout: { height: 1381 } } }));
+    expect(scrollTo).toHaveBeenCalledTimes(2);
+    act(() => tree.unmount());
   });
+
+  it('leaves the form alone when the content changes with the keyboard down', async () => {
+    keyboardUp(null);
+    const { tree, scroll, scrollTo } = await mountForm();
+    await act(async () => scroll.props.onContentSizeChange(1080, 2600));
+    expect(scrollTo).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
+
+  it('a screen below in the stack ignores the keyboard', async () => {
+    const { tree, scrollTo, showKeyboard } = await mountForm({ navigation: { isFocused: () => false } });
+    await showKeyboard();
+    expect(scrollTo).not.toHaveBeenCalled();
+    act(() => tree.unmount());
+  });
+
+  it('does not scroll a form that went away while it was measuring', async () => {
+    const { tree, scrollTo, showKeyboard, flushMeasures } = await mountForm({ measureLater: true });
+    await showKeyboard();
+    act(() => tree.unmount());
+    await act(async () => flushMeasures());
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('does nothing without keepVisible, and adds no scroll tracking', async () => {
+    const handlers = [];
+    jest.spyOn(Keyboard, 'addListener').mockImplementation((event, fn) => {
+      if (event === 'keyboardDidShow') handlers.push(fn);
+      return { remove: jest.fn() };
+    });
+    let tree;
+    act(() => {
+      tree = TestRenderer.create(<FormScrollView><Text>form</Text></FormScrollView>);
+    });
+    const scroll = tree.root.findByType(ScrollView);
+    scroll.instance.scrollTo = jest.fn();
+    await act(async () => handlers.forEach((fn) => fn({ endCoordinates: { screenY: 1381 } })));
+    expect(scroll.instance.scrollTo).not.toHaveBeenCalled();
+    expect(scroll.props.scrollEventThrottle).toBeUndefined();
+    expect(scroll.props.onScroll).toBeUndefined();
+    act(() => tree.unmount());
+  });
+});
+
+// Every form screen names its main button, so a new one can't forget the
+// keyboard rule (CHW-154): a FormScrollView without keepVisible fails here.
+describe('form screens', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const SCREENS = path.join(__dirname, '../../screens');
+  const files = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? (e.name === '__tests__' ? [] : files(path.join(dir, e.name))) : e.name.endsWith('.js') ? [path.join(dir, e.name)] : []);
+
+  it.each(files(SCREENS).filter((f) => fs.readFileSync(f, 'utf8').includes('<FormScrollView')).map((f) => [path.relative(SCREENS, f), f]))(
+    '%s passes keepVisible to every FormScrollView',
+    (_, file) => {
+      const source = fs.readFileSync(file, 'utf8');
+      const tags = source.split('<FormScrollView').slice(1).map((rest) => rest.slice(0, rest.indexOf('>')));
+      tags.forEach((tag) => expect(tag).toMatch(/keepVisible=\{/));
+    },
+  );
 });
 
 describe('ConfirmDialog', () => {

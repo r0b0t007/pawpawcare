@@ -38,6 +38,8 @@ const GROUP_ICONS = ['dog', 'cat', 'bird', 'rabbit', 'paw'];
 const SECTIONS = ['feed', 'lost', 'groups'];
 
 export default function CommunityScreen({ navigation }) {
+  // The composer's Post, kept above the keyboard by FormScrollView (CHW-154).
+  const postRef = useRef(null);
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
@@ -190,6 +192,7 @@ export default function CommunityScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView
         contentContainerStyle={styles.scroll}
+        keepVisible={postRef}
       >
         <Text style={styles.title}>{t('community.title')}</Text>
 
@@ -288,7 +291,9 @@ export default function CommunityScreen({ navigation }) {
                   <Pressable onPress={closeComposer} hitSlop={8} style={styles.cancelBtn} accessibilityRole="button">
                     <Text style={styles.cancelText}>{t('common.cancel')}</Text>
                   </Pressable>
-                  <Button pill label={t('community.post')} onPress={handlePost} disabled={!draft.trim() || isBusy('post')} />
+                  <View ref={postRef} collapsable={false}>
+                    <Button pill label={t('community.post')} onPress={handlePost} disabled={!draft.trim() || isBusy('post')} />
+                  </View>
                 </View>
               </Card>
             )}

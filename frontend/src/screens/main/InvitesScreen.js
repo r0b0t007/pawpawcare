@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet, RefreshControl,
 } from 'react-native';
@@ -14,7 +14,9 @@ import { Card, Button, ConfirmDialog, showToast, FormScrollView, ScreenHeader, E
 
 // Invites are addressed by email, and signup never proves the address — so
 // the server hides them until the account confirms it with an emailed code.
-function VerifyEmailCard({ email, onVerified }) {
+// buttonRef: its Send / Confirm, kept above the keyboard by the screen's
+// FormScrollView (CHW-154).
+function VerifyEmailCard({ email, onVerified, buttonRef }) {
   const { t } = useTranslation();
   const { sendEmailVerification, confirmEmailVerification } = useAuth();
   const [step, setStep] = useState('intro'); // 'intro' | 'code'
@@ -89,17 +91,19 @@ function VerifyEmailCard({ email, onVerified }) {
 
       {error ? <Text style={styles.errorText} selectable>{error}</Text> : null}
 
-      <Button
-        pill
-        label={
-          step === 'intro'
-            ? busy ? t('invites.verify.sending') : t('invites.verify.send')
-            : busy ? t('invites.verify.confirming') : t('invites.verify.confirm')
-        }
-        disabled={busy}
-        onPress={step === 'intro' ? send : confirm}
-        style={styles.verifyBtn}
-      />
+      <View ref={buttonRef} collapsable={false}>
+        <Button
+          pill
+          label={
+            step === 'intro'
+              ? busy ? t('invites.verify.sending') : t('invites.verify.send')
+              : busy ? t('invites.verify.confirming') : t('invites.verify.confirm')
+          }
+          disabled={busy}
+          onPress={step === 'intro' ? send : confirm}
+          style={styles.verifyBtn}
+        />
+      </View>
       {step === 'code' && (
         <Pressable accessibilityRole="button" onPress={send} disabled={busy} style={styles.resendLink}>
           <Text style={styles.resendLinkText}>{t('invites.verify.resend')}</Text>
@@ -130,6 +134,7 @@ const TYPE_ICON = {
 };
 
 export default function InvitesScreen({ navigation }) {
+  const verifyRef = useRef(null);
   const { t } = useTranslation();
   const { user } = useAuth();
   const { acceptInvite, declineInvite } = useData();
@@ -180,10 +185,11 @@ export default function InvitesScreen({ navigation }) {
 
       <FormScrollView
         contentContainerStyle={styles.scroll}
+        keepVisible={verifyRef}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {needsVerification ? (
-          <VerifyEmailCard email={user.email} onVerified={() => refetch()} />
+          <VerifyEmailCard email={user.email} onVerified={() => refetch()} buttonRef={verifyRef} />
         ) : invites.length === 0 && isLoading ? null : invites.length === 0 && isError ? (
           <EmptyState
             compact

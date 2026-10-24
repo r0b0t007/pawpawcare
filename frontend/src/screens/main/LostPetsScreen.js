@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, RefreshControl, Linking, Pressable, TextInput, Keyboard,
 } from 'react-native';
@@ -20,6 +20,8 @@ import { useLocale, useTranslation } from '../../i18n';
 // then your active reports (mark as found), then everyone else's.
 
 export default function LostPetsScreen({ navigation }) {
+  // Kept above the keyboard by FormScrollView (CHW-154).
+  const submitRef = useRef(null);
   // Re-render dates and times when the app language changes: this screen
   // can stay mounted under another tab while the language is switched.
   useLocale();
@@ -102,6 +104,7 @@ export default function LostPetsScreen({ navigation }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FormScrollView
         contentContainerStyle={styles.scroll}
+        keepVisible={submitRef}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ui.accent} />}
       >
         {/* Header */}
@@ -177,11 +180,13 @@ export default function LostPetsScreen({ navigation }) {
             />
           </View>
 
-          <Button
-            label={submitting ? t('lostPets.posting') : t('lostPets.submit')}
-            onPress={handleSubmit}
-            disabled={!selectedPetId || submitting}
-          />
+          <View ref={submitRef} collapsable={false}>
+            <Button
+              label={submitting ? t('lostPets.posting') : t('lostPets.submit')}
+              onPress={handleSubmit}
+              disabled={!selectedPetId || submitting}
+            />
+          </View>
         </View>
 
         {/* Your active reports */}

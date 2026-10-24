@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, Platform,
 } from 'react-native';
@@ -55,6 +55,9 @@ export default function SupportScreen({ navigation, route }) {
   const [sending, setSending] = useState(false);
   const [focused, setFocused] = useState(false);
   const { t } = useTranslation();
+  // Kept above the keyboard by FormScrollView (CHW-154), also while the
+  // message grows.
+  const sendRef = useRef(null);
 
   const canSend = message.trim().length > 0 && !sending;
   const picked = CATEGORIES.find((c) => c.id === category) ?? NO_CATEGORY;
@@ -126,11 +129,13 @@ export default function SupportScreen({ navigation, route }) {
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         />
-        <Button
-          label={sending ? t('support.sending') : t('support.send')}
-          onPress={handleSend}
-          disabled={!canSend}
-        />
+        <View ref={sendRef} collapsable={false}>
+          <Button
+            label={sending ? t('support.sending') : t('support.send')}
+            onPress={handleSend}
+            disabled={!canSend}
+          />
+        </View>
         <Text style={styles.caption}>{expectsReply ? t('support.captionReply') : t('support.captionNote')}</Text>
       </Card>
     </>
@@ -138,7 +143,7 @@ export default function SupportScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <FormScrollView contentContainerStyle={styles.scroll}>
+      <FormScrollView contentContainerStyle={styles.scroll} keepVisible={sendRef}>
         <ScreenHeader title={t('support.title')} onBack={() => navigation.goBack()} />
 
         {form}

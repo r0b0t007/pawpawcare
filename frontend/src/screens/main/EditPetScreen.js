@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, StyleSheet,
   Image, ActivityIndicator,
@@ -39,6 +39,8 @@ const petFg = (bg) => PET_COLOR_PAIRS.find((p) => p.bg === bg)?.fg ?? ui.accent;
 
 export default function EditPetScreen({ navigation, route }) {
   const { t } = useTranslation();
+  // Kept above the keyboard by FormScrollView (CHW-154).
+  const saveRef = useRef(null);
   const { petId } = route.params;
   const { updatePet, deletePet, leavePet } = useData();
   const pets = usePetRecords();
@@ -156,7 +158,7 @@ export default function EditPetScreen({ navigation, route }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <FormScrollView contentContainerStyle={styles.scroll}>
+      <FormScrollView contentContainerStyle={styles.scroll} keepVisible={saveRef}>
         {/* Header */}
         <ScreenHeader title={t('editPet.title', { name: pet.name })} onBack={() => navigation.goBack()} flush style={{ paddingBottom: 20 }} />
 
@@ -276,11 +278,13 @@ export default function EditPetScreen({ navigation, route }) {
           </Text>
         </View>
 
-        <Button
-          label={saving ? t('editPet.saving') : t('editPet.saveChanges')}
-          onPress={handleSave}
-          disabled={saving || uploading}
-        />
+        <View ref={saveRef} collapsable={false}>
+          <Button
+            label={saving ? t('editPet.saving') : t('editPet.saveChanges')}
+            onPress={handleSave}
+            disabled={saving || uploading}
+          />
+        </View>
 
         {/* Danger zone: Remove for the owner, Leave for a co-owner. */}
         <View style={styles.dangerZone}>
