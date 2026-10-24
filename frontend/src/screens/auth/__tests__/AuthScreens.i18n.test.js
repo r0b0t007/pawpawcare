@@ -18,11 +18,11 @@ jest.mock('@react-navigation/native', () => ({ useIsFocused: () => false }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: () => null }));
 jest.mock('../../../services/observe', () => ({ useObserve: () => ({ markInteractive: () => {} }) }));
 jest.mock('../../../components/SocialAuthButtons', () => () => null);
-const mockAuth = { signup: jest.fn(), login: jest.fn(), error: null, isLoading: false, clearError: jest.fn() };
+const mockAuth = { signup: jest.fn(), login: jest.fn(), error: null, authBusy: false, clearError: jest.fn() };
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => mockAuth }));
 
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, TextInput } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import i18n from '../../../i18n';
 import WelcomeScreen from '../WelcomeScreen';
@@ -95,5 +95,41 @@ describe('in French', () => {
     expect(texts(tree)).toContain('6 caractères minimum');
     expect(button(tree, 'Créer un compte')).toBeTruthy();
     expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'Afficher les mots de passe').length).toBeGreaterThan(0);
+  });
+});
+
+describe('while a sign-in is running', () => {
+  afterEach(() => { mockAuth.authBusy = false; });
+
+  it.each([
+    [LoginScreen, 'Log in', 'login'],
+    [SignupScreen, 'Create account', 'signup'],
+  ])('started elsewhere: %p stays labelled as is, disabled, and starts nothing', async (Screen, label, action) => {
+    mockAuth.authBusy = true;
+    mockAuth[action].mockClear();
+    await render(Screen);
+    // Filled in, so only the busy guard can stop it (not the missing-fields hint).
+    await act(async () => {
+      tree.root.findAll((n) => n.type === TextInput).forEach((f) =>
+        f.props.onChangeText(f.props.secureTextEntry ? 'Passw0rd!x' : f.props.keyboardType === 'email-address' ? 'a@b.c' : 'Sam'));
+    });
+    const own = button(tree, label);
+    expect(own.props.disabled).toBe(true);
+    await act(async () => own.props.onPress());
+    expect(mockAuth[action]).not.toHaveBeenCalled();
+  });
+
+  it('started here: Log in says so until it is over', async () => {
+    let finish;
+    mockAuth.login.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    await render(LoginScreen);
+    await act(async () => {
+      tree.root.findAll((n) => n.type === TextInput).forEach((f) =>
+        f.props.onChangeText(f.props.secureTextEntry ? 'Passw0rd!x' : 'a@b.c'));
+    });
+    await act(async () => { button(tree, 'Log in').props.onPress(); });
+    expect(button(tree, 'Logging in…').props.disabled).toBe(true);
+    await act(async () => finish(false));
+    expect(button(tree, 'Log in')).toBeDefined();
   });
 });
