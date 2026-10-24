@@ -126,6 +126,60 @@ describe('AuthContext.socialLogin', () => {
   });
 });
 
+// A sign-in attempt never flips isLoading: AppNavigator swaps the whole tree
+// for a spinner while it is true, so a failed attempt used to remount the auth
+// stack at Welcome and lose the error (seen with a wrong password).
+describe('sign-in attempts keep the sign-in screens mounted', () => {
+  const deferred = () => {
+    let resolve;
+    let reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  it.each([
+    ['login', () => auth.login({ email: 'a@b.c', password: 'wrong' }), 'Invalid email or password.'],
+    ['signup', () => auth.signup({ name: 'A', email: 'a@b.c', password: 'Passw0rd!' }), 'The email has already been taken.'],
+    ['socialLogin', () => auth.socialLogin('google', { id_token: 'bad' }), 'Invalid identity token'],
+  ])('%s: busy while it runs, then the error, never the launch spinner', async (_, attempt, message) => {
+    await mount();
+    expect(auth.isLoading).toBe(false);
+
+    const pending = deferred();
+    post.mockReturnValueOnce(pending.promise);
+    let result;
+    let running;
+    act(() => {
+      running = attempt().then((r) => { result = r; });
+    });
+    expect(auth.authBusy).toBe(true);
+    expect(auth.isLoading).toBe(false);
+
+    await act(async () => {
+      pending.reject(new Error(message));
+      await running;
+    });
+    expect(result).toBe(false);
+    expect(auth.error).toBe(message);
+    expect(auth.authBusy).toBe(false);
+    expect(auth.isLoading).toBe(false);
+    expect(auth.user).toBeNull();
+  });
+
+  it('a successful login ends busy with the user set', async () => {
+    await mount();
+    post.mockResolvedValueOnce({ access_token: 'a', refresh_token: 'r', token_type: 'bearer' });
+    get.mockResolvedValueOnce({ id: 'u1', name: 'Test' });
+
+    await act(async () => {
+      await auth.login({ email: 'a@b.c', password: 'right' });
+    });
+    expect(auth.user).toEqual(expect.objectContaining({ id: 'u1' }));
+    expect(auth.authBusy).toBe(false);
+    expect(auth.isLoading).toBe(false);
+  });
+});
+
 describe('AuthContext.logout', () => {
   async function signInThen() {
     await mount();

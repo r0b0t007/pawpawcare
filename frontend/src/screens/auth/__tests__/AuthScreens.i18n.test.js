@@ -18,11 +18,11 @@ jest.mock('@react-navigation/native', () => ({ useIsFocused: () => false }));
 jest.mock('expo-linear-gradient', () => ({ LinearGradient: () => null }));
 jest.mock('../../../services/observe', () => ({ useObserve: () => ({ markInteractive: () => {} }) }));
 jest.mock('../../../components/SocialAuthButtons', () => () => null);
-const mockAuth = { signup: jest.fn(), login: jest.fn(), error: null, isLoading: false, clearError: jest.fn() };
+const mockAuth = { signup: jest.fn(), login: jest.fn(), error: null, authBusy: false, clearError: jest.fn() };
 jest.mock('../../../context/AuthContext', () => ({ useAuth: () => mockAuth }));
 
 import React from 'react';
-import { Text } from 'react-native';
+import { Text, TextInput } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import i18n from '../../../i18n';
 import WelcomeScreen from '../WelcomeScreen';
@@ -95,5 +95,27 @@ describe('in French', () => {
     expect(texts(tree)).toContain('6 caractères minimum');
     expect(button(tree, 'Créer un compte')).toBeTruthy();
     expect(tree.root.findAll((n) => n.props.accessibilityLabel === 'Afficher les mots de passe').length).toBeGreaterThan(0);
+  });
+});
+
+describe('while a sign-in is already running (authBusy)', () => {
+  afterEach(() => { mockAuth.authBusy = false; });
+
+  it.each([
+    [LoginScreen, 'Logging in…', 'login'],
+    [SignupScreen, 'Creating account…', 'signup'],
+  ])('%p shows it on its button and does not start another', async (Screen, busyLabel, action) => {
+    mockAuth.authBusy = true;
+    mockAuth[action].mockClear();
+    await render(Screen);
+    // Filled in, so only the busy guard can stop it (not the missing-fields hint).
+    const fields = tree.root.findAll((n) => n.type === TextInput);
+    await act(async () => {
+      fields.forEach((f) => f.props.onChangeText(f.props.secureTextEntry ? 'Passw0rd!x' : f.props.keyboardType === 'email-address' ? 'a@b.c' : 'Sam'));
+    });
+    const busy = button(tree, busyLabel);
+    expect(busy.props.disabled).toBe(true);
+    await act(async () => busy.props.onPress());
+    expect(mockAuth[action]).not.toHaveBeenCalled();
   });
 });

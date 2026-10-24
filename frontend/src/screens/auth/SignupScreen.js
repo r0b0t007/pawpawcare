@@ -40,7 +40,7 @@ function Rule({ met, label }) {
 
 export default function SignupScreen({ navigation }) {
   const { t } = useTranslation();
-  const { signup, error, isLoading, clearError } = useAuth();
+  const { signup, error, authBusy, clearError } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,7 +64,7 @@ export default function SignupScreen({ navigation }) {
   // The Return key bypasses the disabled button, so check here too: no
   // signup while one (or a Google sign-in) is already running.
   const handleSignup = () =>
-    !isLoading && run('signup', async () => {
+    !authBusy && run('signup', async () => {
       if (!name.trim() || !email.trim() || !password || !confirmPwd) {
         setLocalError('auth.signup.missingFields');
         return;
@@ -84,7 +84,7 @@ export default function SignupScreen({ navigation }) {
 
   const displayError = (localError && t(localError, { min: MIN_PASSWORD })) || error;
   const minChars = t('auth.signup.minChars', { min: MIN_PASSWORD });
-  const busy = isLoading || isBusy('signup');
+  const busy = authBusy || isBusy('signup');
   const longEnough = password.length >= MIN_PASSWORD;
   const matches = !!confirmPwd && password === confirmPwd;
 

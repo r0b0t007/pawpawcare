@@ -22,7 +22,7 @@ const HIT = { top: 8, bottom: 8, left: 8, right: 8 };
 
 export default function LoginScreen({ navigation }) {
   const { t } = useTranslation();
-  const { login, error, isLoading, clearError } = useAuth();
+  const { login, error, authBusy, clearError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // An i18n key, so the message follows a language change while shown.
@@ -41,7 +41,7 @@ export default function LoginScreen({ navigation }) {
   // The Return key bypasses the disabled button, so check here too: no
   // email login while one (or a Google sign-in) is already running.
   const handleLogin = () =>
-    !isLoading && run('login', async () => {
+    !authBusy && run('login', async () => {
       if (!email.trim() || !password) {
         setLocalError('auth.login.missingFields');
         return;
@@ -52,7 +52,7 @@ export default function LoginScreen({ navigation }) {
     });
 
   const displayError = (localError && t(localError)) || error;
-  const busy = isLoading || isBusy('login');
+  const busy = authBusy || isBusy('login');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>

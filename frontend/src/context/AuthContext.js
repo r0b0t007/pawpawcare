@@ -32,21 +32,27 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const AuthContext = createContext(null);
 
+// isLoading is the saved-session restore at launch: AppNavigator shows a
+// full-screen spinner for it. A sign-in attempt (email, signup, Google/Apple)
+// is authBusy instead, so the sign-in screens stay mounted while it runs: on a
+// failure (wrong password, email taken, offline) the user stays on the form
+// and sees the error, instead of the whole auth stack remounting at Welcome.
 function authReducer(state, action) {
   switch (action.type) {
-    case 'SET_USER':       return { ...state, user: action.payload, isLoading: false, error: null, restoreFailed: false };
+    case 'SET_USER':       return { ...state, user: action.payload, isLoading: false, authBusy: false, error: null, restoreFailed: false };
     case 'SET_LOADING':    return { ...state, isLoading: action.payload };
-    case 'SET_ERROR':      return { ...state, error: action.payload, isLoading: false };
+    case 'AUTH_START':     return { ...state, authBusy: true };
+    case 'SET_ERROR':      return { ...state, error: action.payload, isLoading: false, authBusy: false };
     case 'RESTORE_FAILED': return { ...state, isLoading: false, restoreFailed: true, restoreOffline: action.payload };
     case 'RESTORE_RETRY':  return { ...state, isLoading: true, restoreFailed: false };
-    case 'LOGOUT':         return { user: null, isLoading: false, error: null, restoreFailed: false };
+    case 'LOGOUT':         return { user: null, isLoading: false, authBusy: false, error: null, restoreFailed: false };
     default:               return state;
   }
 }
 
 export function AuthProvider({ children }) {
   const [state, dispatch] = useReducer(authReducer, {
-    user: null, isLoading: true, error: null, restoreFailed: false, restoreOffline: false,
+    user: null, isLoading: true, authBusy: false, error: null, restoreFailed: false, restoreOffline: false,
   });
 
   useEffect(() => { loadUser(); }, []);
@@ -258,7 +264,7 @@ export function AuthProvider({ children }) {
   }, [state.restoreFailed]);
 
   const signup = async ({ name, email, password }) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'AUTH_START' });
     try {
       const tokens = await post('/auth/signup', { name, email, password }, { skipAuth: true });
       await storeTokens(tokens.access_token, tokens.refresh_token);
@@ -274,7 +280,7 @@ export function AuthProvider({ children }) {
   };
 
   const login = async ({ email, password }) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'AUTH_START' });
     try {
       const tokens = await post('/auth/login', { email, password }, { skipAuth: true });
       await storeTokens(tokens.access_token, tokens.refresh_token);
@@ -297,7 +303,7 @@ export function AuthProvider({ children }) {
   // the resulting token payload; the backend verifies it and returns our own JWT
   // pair, after which the flow is identical to email/password login.
   const socialLogin = async (provider, payload) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'AUTH_START' });
     try {
       const tokens = await post(`/auth/${provider}`, payload, { skipAuth: true });
       await storeTokens(tokens.access_token, tokens.refresh_token);
@@ -428,6 +434,8 @@ export function AuthProvider({ children }) {
         // stable boolean so screens can gate admin-only UI without null checks.
         isAdmin: !!state.user?.is_admin,
         isLoading: state.isLoading,
+        // A sign-in, signup or Google/Apple sign-in is running.
+        authBusy: state.authBusy,
         // A saved session couldn't be checked (offline / server down):
         // AppNavigator shows ReconnectScreen instead of the Welcome screen.
         restoreFailed: state.restoreFailed,
