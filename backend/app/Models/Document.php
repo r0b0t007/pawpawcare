@@ -25,12 +25,12 @@ class Document extends Model
      */
     public static function abortIfOverQuota(string $ownerId, int $bytes): void
     {
-        $owned = static::whereIn('pet_id', Pet::where('owner_id', $ownerId)->select('id'));
-        $count = (clone $owned)->count();
-        $used = (int) (clone $owned)->sum('size_bytes');
+        $usage = static::whereIn('pet_id', Pet::where('owner_id', $ownerId)->select('id'))
+            ->selectRaw('count(*) as files, coalesce(sum(size_bytes), 0) as bytes')
+            ->first();
 
-        if ($count >= (int) config('filesystems.uploads.documents_max_per_account')
-            || $used + $bytes > (int) config('filesystems.uploads.documents_max_mb_per_account') * 1048576) {
+        if ($usage->files >= config('filesystems.uploads.documents_max_per_account')
+            || $usage->bytes + $bytes > config('filesystems.uploads.documents_max_mb_per_account') * 1048576) {
             abort(422, __('Document storage is full. Delete some documents to upload more.'));
         }
     }

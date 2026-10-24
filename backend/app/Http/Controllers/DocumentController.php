@@ -87,13 +87,15 @@ class DocumentController extends Controller
             : Uploads::storePrivateImage($file, 'documents');
 
         try {
-            $doc = DB::transaction(function () use ($ownerId, $petId, $data, $path, $size, $isPdf, $file) {
+            $userId = $request->user()->id;
+            $doc = DB::transaction(function () use ($ownerId, $userId, $petId, $data, $path, $size, $isPdf, $file) {
                 // The owner's row lock must be the transaction's first read:
                 // MySQL fixes a REPEATABLE READ snapshot at the first plain
                 // read, and one taken before the wait would miss the documents
-                // of the uploads that held the lock meanwhile.
+                // of the uploads that held the lock meanwhile. Access is asked
+                // again: a co-owner may have been removed while the file stored.
                 User::whereKey($ownerId)->lockForUpdate()->first();
-                if (! Pet::whereKey($petId)->exists()) {
+                if (! Pet::accessibleBy($userId)->whereKey($petId)->exists()) {
                     abort(404, __('Pet not found'));
                 }
                 Document::abortIfOverQuota($ownerId, $size);

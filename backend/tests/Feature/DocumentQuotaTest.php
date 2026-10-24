@@ -129,6 +129,22 @@ class DocumentQuotaTest extends TestCase
         $this->upload($memberToken, $this->pet($member), 900)->assertCreated();
     }
 
+    public function test_an_empty_or_zero_setting_falls_back_to_the_default(): void
+    {
+        foreach (['' => 500, '0' => 500, '7' => 7] as $value => $expected) {
+            $value = (string) $value;
+            putenv("DOCUMENTS_MAX_PER_ACCOUNT={$value}");
+            $_ENV['DOCUMENTS_MAX_PER_ACCOUNT'] = $_SERVER['DOCUMENTS_MAX_PER_ACCOUNT'] = $value;
+            try {
+                $uploads = (require config_path('filesystems.php'))['uploads'];
+            } finally {
+                putenv('DOCUMENTS_MAX_PER_ACCOUNT');
+                unset($_ENV['DOCUMENTS_MAX_PER_ACCOUNT'], $_SERVER['DOCUMENTS_MAX_PER_ACCOUNT']);
+            }
+            $this->assertSame($expected, $uploads['documents_max_per_account'], "value '{$value}'");
+        }
+    }
+
     public function test_the_refusal_is_in_the_users_language(): void
     {
         [$owner, $token] = $this->user();
