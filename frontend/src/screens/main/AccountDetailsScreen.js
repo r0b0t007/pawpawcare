@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import { isRenewingStoreSubscription, storeName } from '../../utils/subscription
 
 export default function AccountDetailsScreen({ navigation }) {
   const { t } = useTranslation();
+  // Kept above the keyboard by FormScrollView (CHW-154).
+  const saveRef = useRef(null);
   const { user, updateUser, deleteAccount } = useAuth();
   // Deleting the account doesn't stop store billing — say so before it happens.
   const renewingSubscription = isRenewingStoreSubscription(user?.plan);
@@ -60,7 +62,7 @@ export default function AccountDetailsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <FormScrollView contentContainerStyle={styles.scroll}>
+      <FormScrollView contentContainerStyle={styles.scroll} keepVisible={saveRef}>
         <ScreenHeader title={t('account.title')} onBack={() => navigation.goBack()} flush />
 
         <View style={styles.avatarWrap}>
@@ -94,7 +96,9 @@ export default function AccountDetailsScreen({ navigation }) {
             <Text style={styles.readOnlyHint}>{t('account.emailHint')}</Text>
           </View>
 
-          <Button label={t('account.save')} onPress={handleSave} disabled={!canSave} />
+          <View ref={saveRef} collapsable={false}>
+            <Button label={t('account.save')} onPress={handleSave} disabled={!canSave} />
+          </View>
         </View>
 
         <View style={styles.dangerZone}>

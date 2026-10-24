@@ -28,6 +28,7 @@ import i18n from '../../../i18n';
 import WelcomeScreen from '../WelcomeScreen';
 import LoginScreen from '../LoginScreen';
 import SignupScreen from '../SignupScreen';
+import FormScrollView from '../../../components/FormScrollView';
 
 const navigation = { navigate: jest.fn(), goBack: jest.fn() };
 const texts = (tree) => tree.root.findAllByType(Text).map((n) => [].concat(n.props.children).join(''));
@@ -131,5 +132,22 @@ describe('while a sign-in is running', () => {
     expect(button(tree, 'Logging in…').props.disabled).toBe(true);
     await act(async () => finish(false));
     expect(button(tree, 'Log in')).toBeDefined();
+  });
+});
+
+// CHW-154: the main button is the one FormScrollView keeps above the keyboard.
+describe('the main button stays above the keyboard', () => {
+  it.each([
+    [LoginScreen, 'Log in'],
+    [SignupScreen, 'Create account'],
+  ])('%p', async (Screen, label) => {
+    await render(Screen);
+    // The ref holds the wrapping View (a mocked component under Jest, so its
+    // props are readable); its one child is the screen's main button.
+    const target = tree.root.findByType(FormScrollView).props.keepVisible?.current;
+    expect(target?.props?.collapsable).toBe(false);
+    const child = React.Children.only(target.props.children);
+    expect(child.props.label).toBe(label);
+    expect(child.props.onPress).toEqual(expect.any(Function));
   });
 });
