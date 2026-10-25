@@ -23,6 +23,10 @@ export default function ForgotPasswordScreen({ navigation }) {
   // The step's main button, kept above the keyboard by FormScrollView (CHW-154).
   const submitRef = useRef(null);
   const [email, setEmail] = useState('');
+  // Ties the code to this request (#195): only a reset sending it can check
+  // the code, so a stranger asking for or guessing codes can't spoil it.
+  // Each send replaces it: the code from this screen's latest send works.
+  const [requestId, setRequestId] = useState(null);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -47,7 +51,8 @@ export default function ForgotPasswordScreen({ navigation }) {
     setError(null);
     setSending(true);
     try {
-      await post('/auth/forgot-password', { email: trimmed }, { skipAuth: true });
+      const res = await post('/auth/forgot-password', { email: trimmed, bind: true }, { skipAuth: true });
+      setRequestId(res?.request_id ?? null);
       if (again) {
         showToast(t('auth.forgot.codeResent'));
       } else {
@@ -78,7 +83,7 @@ export default function ForgotPasswordScreen({ navigation }) {
     try {
       await post(
         '/auth/reset-password',
-        { email: email.trim(), code: code.trim(), password },
+        { email: email.trim(), code: code.trim(), password, ...(requestId ? { request_id: requestId } : {}) },
         { skipAuth: true },
       );
       showToast(t('auth.forgot.updated'));
