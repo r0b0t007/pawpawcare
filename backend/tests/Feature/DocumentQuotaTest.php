@@ -6,6 +6,7 @@ use App\Models\Document;
 use App\Models\Pet;
 use App\Models\User;
 use App\Services\JwtService;
+use App\Support\Uploads;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
@@ -129,9 +130,41 @@ class DocumentQuotaTest extends TestCase
         $this->upload($memberToken, $this->pet($member), 900)->assertCreated();
     }
 
+    public function test_a_document_photo_is_scaled_down_to_the_max_side(): void
+    {
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+
+        $id = $this->withToken($token)->post("/pets/{$pet->id}/documents", [
+            'file' => UploadedFile::fake()->image('record.jpg', 3000, 1500),
+            'title' => 'Lab',
+        ], ['Accept' => 'application/json'])->assertCreated()->json('id');
+
+        $doc = Document::findOrFail($id);
+        $bytes = Storage::disk('local')->get($doc->file_path);
+        [$width, $height] = getimagesizefromstring($bytes);
+        $this->assertSame([Uploads::DOCUMENT_MAX_SIDE, 1000], [$width, $height]);
+        // The quota counts what was stored, not what was sent.
+        $this->assertSame(strlen($bytes), $doc->size_bytes);
+    }
+
+    public function test_a_small_document_photo_is_never_scaled_up(): void
+    {
+        [$owner, $token] = $this->user();
+        $pet = $this->pet($owner);
+
+        $id = $this->withToken($token)->post("/pets/{$pet->id}/documents", [
+            'file' => UploadedFile::fake()->image('record.png', 800, 1200),
+            'title' => 'Lab',
+        ], ['Accept' => 'application/json'])->assertCreated()->json('id');
+
+        [$width, $height] = getimagesizefromstring(Storage::disk('local')->get(Document::findOrFail($id)->file_path));
+        $this->assertSame([800, 1200], [$width, $height]);
+    }
+
     public function test_an_empty_or_zero_setting_falls_back_to_the_default(): void
     {
-        foreach (['' => 500, '0' => 500, '7' => 7] as $value => $expected) {
+        foreach (['' => 300, '0' => 300, '7' => 7] as $value => $expected) {
             $value = (string) $value;
             putenv("DOCUMENTS_MAX_PER_ACCOUNT={$value}");
             $_ENV['DOCUMENTS_MAX_PER_ACCOUNT'] = $_SERVER['DOCUMENTS_MAX_PER_ACCOUNT'] = $value;

@@ -27,6 +27,13 @@ class Uploads
     private const MANAGED_PATH = 'uploads/[A-Za-z0-9]{40}\.[A-Za-z0-9]{2,5}';
 
     /**
+     * Longest side, in pixels, a document photo is stored at. A full-size
+     * phone photo is 2-4 MB; at this size it's a few hundred KB and the text
+     * on a vet record stays readable, for people and for the AI reader.
+     */
+    public const DOCUMENT_MAX_SIDE = 2000;
+
+    /**
      * Every column that can hold a public upload url. The models cast it with
      * App\Casts\UploadUrl; deletes, `uploads:prune` and `uploads:migrate`
      * all read references from here, so a new image column goes here only.
@@ -152,13 +159,14 @@ class Uploads
     // ── Private files (medical documents) ────────────────────────────────────
 
     /**
-     * Re-encode an image and store it on the private disk.
+     * Re-encode an image, scaled down to DOCUMENT_MAX_SIDE, and store it on
+     * the private disk.
      *
      * @return array{0: string, 1: int} [disk path, stored size in bytes]
      */
     public static function storePrivateImage(UploadedFile $file, string $dir = 'documents'): array
     {
-        [$binary, $ext] = self::encodeImage($file);
+        [$binary, $ext] = self::encodeImage($file, self::DOCUMENT_MAX_SIDE);
 
         return self::putPrivate($binary, $dir, $ext);
     }
@@ -315,14 +323,34 @@ class Uploads
 
     // ── Internals ────────────────────────────────────────────────────────────
 
-    /** @return array{0: string, 1: string} re-encoded [binary, extension]. Aborts (422) if not an image. */
-    private static function encodeImage(UploadedFile $file): array
+    /**
+     * Re-encoded [binary, extension], scaled down (never up) so neither side
+     * passes $maxSide when given. Aborts (422) if not an image.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function encodeImage(UploadedFile $file, ?int $maxSide = null): array
     {
         $image = @imagecreatefromstring((string) file_get_contents($file->getRealPath()));
         if ($image === false) {
             abort(422, __('The file could not be read as an image.'));
         }
         imagepalettetotruecolor($image);
+
+        $longest = max(imagesx($image), imagesy($image));
+        if ($maxSide !== null && $longest > $maxSide) {
+            $scale = $maxSide / $longest;
+            $scaled = imagescale(
+                $image,
+                max(1, (int) round(imagesx($image) * $scale)),
+                max(1, (int) round(imagesy($image) * $scale)),
+                IMG_BICUBIC,
+            );
+            if ($scaled !== false) {
+                imagedestroy($image);
+                $image = $scaled;
+            }
+        }
 
         ob_start();
         switch ($file->getMimeType()) {
