@@ -11,6 +11,7 @@ use App\Models\RefreshToken;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -165,6 +166,22 @@ class AccountDeletionTest extends TestCase
         $this->assertNull(User::find($due->id));
         $this->assertNull(Pet::find($pet->id));
         $this->assertNotNull(User::find($recent->id));
+    }
+
+    public function test_purge_forgets_the_networks_remembered_for_sign_in(): void
+    {
+        $user = $this->user('networks@example.com');
+        $this->login($user);
+        $key = 'login-known|'.sha1('networks@example.com');
+        $this->assertTrue(Cache::has($key));
+
+        $user->forceFill([
+            'is_active' => false,
+            'deletion_requested_at' => now()->subDays(User::DELETION_GRACE_DAYS + 1),
+        ])->save();
+        $this->artisan('accounts:purge-deleted')->assertSuccessful();
+
+        $this->assertFalse(Cache::has($key));
     }
 
     // ── Purge: product-analytics (PostHog) data is erased first ─────────────

@@ -8,6 +8,7 @@ use App\Models\PasswordResetCode;
 use App\Models\RefreshToken;
 use App\Models\User;
 use App\Services\JwtService;
+use App\Support\ClientNetwork;
 use App\Support\JwtSecretGuard;
 use Firebase\JWT\BeforeValidException;
 use Firebase\JWT\ExpiredException;
@@ -29,10 +30,16 @@ use Illuminate\Support\Facades\RateLimiter;
 
 class AuthController extends Controller
 {
-    /** Failed password logins allowed per account per window, from any IPs. */
+    /** Failed password logins allowed per budget per window (see login()). */
     private const LOGIN_FAILURES_PER_WINDOW = 10;
 
     private const LOGIN_FAILURE_WINDOW_SECONDS = 900;
+
+    /** How long a network the account signed in from keeps its own failure budget. */
+    private const LOGIN_KNOWN_NETWORK_DAYS = 90;
+
+    /** How many such networks an account keeps (the most recent ones). */
+    private const LOGIN_KNOWN_NETWORKS = 3;
 
     public function signup(Request $request): JsonResponse
     {
@@ -74,7 +81,15 @@ class AuthController extends Controller
         // Counted for unknown emails too, so a lockout reveals nothing.
         // The attempt is counted BEFORE the (slow) bcrypt check, so a parallel
         // burst can't all pass the check at once; a success clears it.
-        $failKey = self::loginFailKey($data['email']);
+        //
+        // That shared budget is one anyone who knows the email can spend, so
+        // a network the account signed in from recently gets a budget of its
+        // own: someone failing elsewhere can't lock the owner out there.
+        // Guessing from new networks stays bounded by the shared budget.
+        $network = ClientNetwork::of($request);
+        $failKey = self::isKnownNetwork($data['email'], $network)
+            ? self::loginFailKey($data['email']).'|'.$network
+            : self::loginFailKey($data['email']);
         $locked = __('Too many failed sign-in attempts for this account. Try again in 15 minutes or reset your password.');
         if (RateLimiter::tooManyAttempts($failKey, self::LOGIN_FAILURES_PER_WINDOW)) {
             abort(429, $locked);
@@ -92,6 +107,7 @@ class AuthController extends Controller
         RateLimiter::clear($failKey);
 
         $reactivated = $this->reactivateOrRejectDisabled($user, 'password');
+        self::rememberNetwork($user, $network);
 
         return response()->json(
             $this->issueTokens($user) + ($reactivated ? ['reactivated' => true] : [])
@@ -368,8 +384,12 @@ class AuthController extends Controller
             abort(400, __('Invalid or expired code')); // purged meanwhile
         }
 
-        // The lockout message tells users to reset; a reset must lift it.
+        // The lockout message tells users to reset; a reset must lift it, and
+        // proves the inbox, so the network it came from counts as the owner's.
+        $network = ClientNetwork::of($request);
         RateLimiter::clear(self::loginFailKey($user->email));
+        RateLimiter::clear(self::loginFailKey($user->email).'|'.$network);
+        self::rememberNetwork($user, $network);
 
         return response()->json(['status' => 'ok']);
     }
@@ -611,6 +631,59 @@ class AuthController extends Controller
     private static function loginFailKey(string $email): string
     {
         return 'login-fail|'.sha1(strtolower(trim($email)));
+    }
+
+    /** The networks an email's account signed in from (or reset its password from) recently. */
+    private static function loginKnownKey(string $email): string
+    {
+        return 'login-known|'.sha1(strtolower(trim($email)));
+    }
+
+    /**
+     * What the known networks are bound to: the account and its current
+     * password. A reset, a Google/Apple link (which drops the password) or a
+     * new account under the same email starts the list over, so whoever held
+     * the old password, or squatted the email, keeps no budget of their own.
+     */
+    private static function credentialDigest(User $user): string
+    {
+        return hash_hmac('sha256', $user->id.'|'.$user->hashed_password, (string) config('app.key'));
+    }
+
+    /** Whether $email's account, with its current password, signed in from $network recently. */
+    public static function isKnownNetwork(string $email, string $network): bool
+    {
+        $known = Cache::get(self::loginKnownKey($email));
+        $seen = is_array($known) ? ($known['networks'][$network] ?? null) : null;
+        if ($seen === null || $seen < now()->subDays(self::LOGIN_KNOWN_NETWORK_DAYS)->timestamp) {
+            return false;
+        }
+        $user = User::where('email', $email)->first();
+
+        return $user !== null && hash_equals((string) ($known['credential'] ?? ''), self::credentialDigest($user));
+    }
+
+    /** Drop every network remembered for $email (account purge). */
+    public static function forgetKnownNetworks(string $email): void
+    {
+        Cache::forget(self::loginKnownKey($email));
+    }
+
+    /** Add $network to the account's known networks, keeping only the most recent few. */
+    private static function rememberNetwork(User $user, string $network): void
+    {
+        $key = self::loginKnownKey($user->email);
+        $digest = self::credentialDigest($user);
+        $known = Cache::get($key);
+        $networks = is_array($known) && hash_equals((string) ($known['credential'] ?? ''), $digest)
+            ? $known['networks']
+            : [];
+        unset($networks[$network]);
+        $networks[$network] = now()->timestamp;
+        Cache::put($key, [
+            'credential' => $digest,
+            'networks' => array_slice($networks, -self::LOGIN_KNOWN_NETWORKS, null, true),
+        ], now()->addDays(self::LOGIN_KNOWN_NETWORK_DAYS));
     }
 
     /** Mint an access + refresh token pair and persist the refresh token. */

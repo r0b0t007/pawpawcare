@@ -236,6 +236,30 @@ class PasswordResetTest extends TestCase
         ])->assertStatus(429);
     }
 
+    public function test_a_stranger_spending_the_reset_budget_cannot_block_the_owner_where_they_signed_in_before(): void
+    {
+        $user = $this->user();
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.5'])
+            ->postJson('/auth/login', ['email' => $user->email, 'password' => 'oldpassword'])->assertOk();
+
+        // Ten wrong guesses from ten other networks spend the shared per-email budget.
+        for ($i = 1; $i <= 10; $i++) {
+            $this->withServerVariables(['REMOTE_ADDR' => "192.0.2.{$i}"])->postJson('/auth/reset-password', [
+                'email' => $user->email, 'code' => '123456', 'password' => 'newpassword99',
+            ])->assertStatus(400);
+        }
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.7'])->postJson('/auth/reset-password', [
+            'email' => $user->email, 'code' => '123456', 'password' => 'newpassword99',
+        ])->assertStatus(429);
+
+        // The owner, on the network they signed in from, still gets through.
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.5']);
+        $code = $this->requestCode($user->email);
+        $this->postJson('/auth/reset-password', [
+            'email' => $user->email, 'code' => $code, 'password' => 'newpassword99',
+        ])->assertOk();
+    }
+
     public function test_reset_revokes_all_refresh_tokens(): void
     {
         $user = $this->user();

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Http\Controllers\AuthController;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\Extraction\AnthropicDriver;
 use App\Services\Extraction\ExtractionClient;
@@ -118,13 +119,20 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // Reset attempts: capped per IP *and* per target email so 6-digit
-        // code brute-forcing can't be spread across rotating source IPs.
+        // code brute-forcing can't be spread across rotating source IPs. As
+        // with the login failure budget, a network the account signed in
+        // from recently gets its own per-email budget, so someone guessing
+        // elsewhere can't block the owner's own valid code there.
         RateLimiter::for('password-reset', function (Request $request) {
             $email = strtolower((string) $request->input('email'));
+            $network = ClientNetwork::of($request);
+            $emailKey = AuthController::isKnownNetwork($email, $network)
+                ? 'reset-email|'.$email.'|'.$network
+                : 'reset-email|'.$email;
 
             return [
-                Limit::perHour(10)->by('reset-ip|'.ClientNetwork::of($request)),
-                Limit::perHour(10)->by('reset-email|'.$email),
+                Limit::perHour(10)->by('reset-ip|'.$network),
+                Limit::perHour(10)->by($emailKey),
             ];
         });
 

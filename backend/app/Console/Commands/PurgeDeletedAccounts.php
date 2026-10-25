@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Http\Controllers\AuthController;
 use App\Models\User;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\Subscriptions\RevenueCatClient;
@@ -127,5 +128,7 @@ class PurgeDeletedAccounts extends Command
         }
 
         $user->delete();
+        // The networks remembered for sign-in protection (privacy policy).
+        AuthController::forgetKnownNetworks($user->email);
     }
 }
