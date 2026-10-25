@@ -20,6 +20,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -343,8 +344,22 @@ class AuthController extends Controller
         }
         $user->update(['hashed_password' => Hash::make($data['password'])]);
 
-        // Completing a reset proves inbox ownership.
-        $user->forceFill(['email_verified_at' => $user->email_verified_at ?? now()])->save();
+        // Completing a reset proves inbox ownership. On an account that never
+        // had, the previous holder may not have been the inbox owner: like a
+        // Google/Apple link (loginSocialUser), withdraw the access it handed
+        // out. Every existing session dies too (stolen refresh tokens, live
+        // access tokens, push bindings), in the same transaction, so the old
+        // holder can't hand out new access in between.
+        DB::transaction(function () use ($user) {
+            $neverVerified = $user->email_verified_at === null;
+            if ($neverVerified) {
+                $user->forceFill(['email_verified_at' => now()])->save();
+            }
+            $user->revokeAllSessions();
+            if ($neverVerified) {
+                $user->revokeDelegatedAccess();
+            }
+        });
 
         // ...so also cancel a pending self-deletion: the user can simply log
         // in with the new password.
@@ -353,9 +368,6 @@ class AuthController extends Controller
             abort(400, __('Invalid or expired code')); // purged meanwhile
         }
 
-        // Kill every existing session: stolen refresh tokens, live access
-        // tokens and push bindings must all die with the old password.
-        $user->revokeAllSessions();
         // The lockout message tells users to reset; a reset must lift it.
         RateLimiter::clear(self::loginFailKey($user->email));
 
@@ -532,13 +544,22 @@ class AuthController extends Controller
                 // issued so far — refresh tokens, live access tokens and push
                 // devices — evicting a pre-registrant who still holds a password
                 // or session. A legitimate password owner simply resets.
-                $existing->forceFill([
-                    'provider' => $provider,
-                    'provider_id' => $providerId,
-                    'hashed_password' => null,
-                    'email_verified_at' => $existing->email_verified_at ?? now(),
-                ])->save();
-                $existing->revokeAllSessions();
+                // An account that never proved its email also loses the access
+                // it handed out (co-owners, invites, share links): the
+                // pre-registrant may have planted it.
+                $neverVerified = $existing->email_verified_at === null;
+                DB::transaction(function () use ($existing, $provider, $providerId, $neverVerified) {
+                    $existing->forceFill([
+                        'provider' => $provider,
+                        'provider_id' => $providerId,
+                        'hashed_password' => null,
+                        'email_verified_at' => $existing->email_verified_at ?? now(),
+                    ])->save();
+                    $existing->revokeAllSessions();
+                    if ($neverVerified) {
+                        $existing->revokeDelegatedAccess();
+                    }
+                });
                 $user = $existing;
             }
         }

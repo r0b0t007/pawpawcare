@@ -13,6 +13,7 @@ use Tests\TestCase;
 
 class PasswordResetTest extends TestCase
 {
+    use PlantsDelegatedAccess;
     use RefreshDatabase;
 
     private function user(string $email = 'reset@example.com'): User
@@ -62,6 +63,36 @@ class PasswordResetTest extends TestCase
             ->assertStatus(401);
         $this->postJson('/auth/login', ['email' => $user->email, 'password' => 'newpassword99'])
             ->assertOk();
+    }
+
+    public function test_a_reset_on_a_never_verified_account_withdraws_the_access_it_handed_out(): void
+    {
+        // Signup doesn't check the address: the holder so far may not be the
+        // inbox owner who now completes the reset.
+        $user = $this->user();
+        $planted = $this->plantAccess($user);
+        $code = $this->requestCode($user->email);
+
+        $this->postJson('/auth/reset-password', [
+            'email' => $user->email, 'code' => $code, 'password' => 'newpassword99',
+        ])->assertOk();
+
+        $this->assertNotNull($user->fresh()->email_verified_at);
+        $this->assertAccessRevoked($planted);
+    }
+
+    public function test_a_reset_on_a_verified_account_keeps_its_sharing(): void
+    {
+        $user = $this->user();
+        $user->forceFill(['email_verified_at' => now()->subMonth()])->save();
+        $planted = $this->plantAccess($user);
+        $code = $this->requestCode($user->email);
+
+        $this->postJson('/auth/reset-password', [
+            'email' => $user->email, 'code' => $code, 'password' => 'newpassword99',
+        ])->assertOk();
+
+        $this->assertAccessKept($planted);
     }
 
     public function test_wrong_code_is_rejected_with_a_generic_message(): void
