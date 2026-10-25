@@ -45,9 +45,9 @@ Uploads live on R2 since 2026-10-11 ([uploads-r2.md](uploads-r2.md)). Each night
     - the uploads are over the size limit, or don't fit on disk (see below).
 
     - A bucket that can't be read, or has a file that downloads short, is left out whole.
-    - Uploads over the size limit or the free disk go in **partly**: the files that fit, shared fairly between accounts across both buckets. The smallest accounts go in whole, and the largest share what's left equally. The error says, per bucket, how many files and MB were left out. So one account's flood of documents or photos never pushes everyone else's files out of the backup.
-      - Within an account, documents go first, then the newest files. Older files left out are still in the earlier archives (up to 88 days old), so raise the limit before those expire.
-      - Photos uploaded before the uploads table existed have no owner row: each one still in use counts as its own small account. Files nothing references (left for `uploads:prune`) only get the room left at the end.
+    - Uploads over the size limit or the free disk go in **partly**: the files that fit. **Documents go first**, across every account, then photos with the room left: medical records matter most, and the per-account document cap (50 MB) bounds how much room one account's documents can take. Within each bucket the room is shared fairly: the smallest accounts go in whole, and the largest share what's left equally. The error says, per bucket, how many files and MB were left out. So one account's flood never pushes everyone else's files out of the backup.
+      - Within an account, the newest files go first. Older files left out are still in the earlier archives (up to 88 days old), so raise the limit before those expire.
+      - Photos uploaded before the uploads table existed have no owner row: each one still in use counts as its own small account. Files nothing references (left for `uploads:prune`, including photos uploaded but never attached) only get the room left at the end.
       - Nothing left out gets in on a later night until the limit is raised (or the disk freed); the error repeats every night until then.
     - Documents are copied first, so a problem with the photos never costs the medical records.
     - A file a user deletes while the run is copying is just skipped; it doesn't belong in the backup.
@@ -166,5 +166,5 @@ A backup nobody has restored is a hope, not a backup. Once a month:
    docker exec -i drill mariadb -uroot -proot drill < db-dumps/mysql-<database>.sql
    docker exec drill mariadb -uroot -proot drill -e "select count(*) from users; select count(*) from pets;"
    ```
-3. Check that the counts look right and that a few files from `r2-documents/` and `r2-media/` open. The number of files should match the bucket's object count (`cf r2 buckets list` or the dashboard).
+3. Check that the counts look right and that a few files from `r2-documents/` and `r2-media/` open. The number of files should match the bucket's object count (`cf r2 buckets list` or the dashboard), unless that night logged `Backup is missing uploads`: then the archive holds only part of the uploads. Restore it, then run the restore again from older archives to fill in the files it left out (restore never overwrites, so the order doesn't matter).
 4. Run `docker rm -f drill` and delete the downloaded files. They are real medical records. If you tested with `BACKUP_DISK=backups-local`, also empty `storage/app/backups-local` and set `BACKUP_DISK=backups` again.
