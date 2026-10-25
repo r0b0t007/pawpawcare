@@ -260,6 +260,24 @@ class PasswordResetTest extends TestCase
         ])->assertOk();
     }
 
+    public function test_a_stranger_spending_the_forgot_budget_cannot_stop_the_owner_asking_for_a_code(): void
+    {
+        Mail::fake();
+        $user = $this->user();
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.5'])
+            ->postJson('/auth/login', ['email' => $user->email, 'password' => 'oldpassword'])->assertOk();
+
+        for ($i = 1; $i <= 5; $i++) {
+            $this->withServerVariables(['REMOTE_ADDR' => "192.0.2.{$i}"])
+                ->postJson('/auth/forgot-password', ['email' => $user->email])->assertOk();
+        }
+        $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.7'])
+            ->postJson('/auth/forgot-password', ['email' => $user->email])->assertStatus(429);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.5'])
+            ->postJson('/auth/forgot-password', ['email' => $user->email])->assertOk();
+    }
+
     public function test_reset_revokes_all_refresh_tokens(): void
     {
         $user = $this->user();

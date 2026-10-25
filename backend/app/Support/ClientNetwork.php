@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
  * $request->ip() is REMOTE_ADDR because no proxy is trusted. If the API ever
  * goes behind one (Cloudflare), trust only that proxy's ranges: trusting `*`
  * would let X-Forwarded-For pick a network, e.g. an account's known one
- * (AuthController::isKnownNetwork).
+ * (KnownNetworks).
  */
 final class ClientNetwork
 {

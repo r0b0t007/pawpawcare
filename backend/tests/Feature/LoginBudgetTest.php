@@ -71,6 +71,20 @@ class LoginBudgetTest extends TestCase
         $this->loginFrom('198.51.100.7', 'correct-horse')->assertOk();
     }
 
+    public function test_a_success_on_a_known_network_also_lifts_the_shared_lock(): void
+    {
+        $this->loginFrom('203.0.113.5', 'correct-horse')->assertOk();
+        // The owner mistypes at a café (a new network, so the shared budget)...
+        for ($i = 1; $i <= 10; $i++) {
+            $this->loginFrom('192.0.2.9', "typo-{$i}")->assertStatus(401);
+        }
+        $this->loginFrom('192.0.2.9', 'correct-horse')->assertStatus(429);
+
+        // ...signs in at home, and the café works again.
+        $this->loginFrom('203.0.113.5', 'correct-horse')->assertOk();
+        $this->loginFrom('192.0.2.9', 'correct-horse')->assertOk();
+    }
+
     public function test_a_password_reset_forgets_the_networks_known_for_the_old_password(): void
     {
         // Whoever held the old password signed in from here...

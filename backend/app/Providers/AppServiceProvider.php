@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Http\Controllers\AuthController;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\Extraction\AnthropicDriver;
 use App\Services\Extraction\ExtractionClient;
@@ -10,6 +9,7 @@ use App\Services\Extraction\OpenAiCompatibleDriver;
 use App\Services\JwtService;
 use App\Support\Backups;
 use App\Support\ClientNetwork;
+use App\Support\KnownNetworks;
 use App\Support\MailDelivery;
 use App\Support\ReportOnce;
 use App\Support\UploadsBackup;
@@ -108,13 +108,20 @@ class AppServiceProvider extends ServiceProvider
         // Forgot-password: capped per target email AND per source IP as two
         // independent limits — a rotating-IP attacker still can't mail-bomb
         // one address (or keep invalidating a victim's fresh codes), and one
-        // host still can't probe many addresses.
+        // host still can't probe many addresses. A network the account
+        // signed in from recently (KnownNetworks) gets its own per-email
+        // budget, so a stranger spending the shared one can't stop the owner
+        // asking for a code there.
         RateLimiter::for('forgot-password', function (Request $request) {
             $email = strtolower((string) $request->input('email'));
+            $network = ClientNetwork::of($request);
+            $emailKey = KnownNetworks::hasForEmail($email, $network)
+                ? 'forgot-email|'.$email.'|'.$network
+                : 'forgot-email|'.$email;
 
             return [
-                Limit::perHour(5)->by('forgot-email|'.$email),
-                Limit::perHour(5)->by('forgot-ip|'.ClientNetwork::of($request)),
+                Limit::perHour(5)->by($emailKey),
+                Limit::perHour(5)->by('forgot-ip|'.$network),
             ];
         });
 
@@ -126,7 +133,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('password-reset', function (Request $request) {
             $email = strtolower((string) $request->input('email'));
             $network = ClientNetwork::of($request);
-            $emailKey = AuthController::isKnownNetwork($email, $network)
+            $emailKey = KnownNetworks::hasForEmail($email, $network)
                 ? 'reset-email|'.$email.'|'.$network
                 : 'reset-email|'.$email;
 
