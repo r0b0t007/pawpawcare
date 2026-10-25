@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\DB;
 
 class User extends Model implements AuthenticatableContract, HasLocalePreference
 {
@@ -146,6 +147,31 @@ class User extends Model implements AuthenticatableContract, HasLocalePreference
         $this->increment('token_version');
         RefreshToken::where('user_id', $this->id)->delete();
         $this->deviceTokens()->delete();
+    }
+
+    /**
+     * Withdraw every grant this account handed out on the pets it owns:
+     * pending invites, co-owners (with their reminders for those pets), live
+     * share and caretaker links, and who an active lost-pet report sends
+     * finders to. Used when the inbox owner takes over an account whose email
+     * was never verified (a Google/Apple link or a completed reset): signup
+     * doesn't check the address, so the previous holder may have been someone
+     * else, planting access to the records the real owner is about to add.
+     */
+    public function revokeDelegatedAccess(): void
+    {
+        $petIds = Pet::where('owner_id', $this->id)->pluck('id');
+
+        // Invites first: one accepted after the co-owners went would add one back.
+        PetInvite::where('status', 'pending')
+            ->where(fn ($q) => $q->where('invited_by', $this->id)->orWhereIn('pet_id', $petIds))
+            ->delete();
+        DB::table('pet_members')->whereIn('pet_id', $petIds)->delete();
+        Reminder::whereIn('pet_id', $petIds)->where('user_id', '!=', $this->id)->delete();
+        // A missing token is a revoked link: the next one gets a new token.
+        Pet::whereIn('id', $petIds)->update(['share_token' => null, 'care_token' => null]);
+        LostPetReport::whereIn('pet_id', $petIds)->where('status', 'active')
+            ->update(['reported_by' => $this->id, 'contact_phone' => null]);
     }
 
     public function hasVerifiedEmail(): bool

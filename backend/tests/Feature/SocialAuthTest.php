@@ -11,6 +11,7 @@ use Tests\TestCase;
 
 class SocialAuthTest extends TestCase
 {
+    use PlantsDelegatedAccess;
     use RefreshDatabase;
 
     private const GOOGLE_AUD = 'test-google-web-client.apps.googleusercontent.com';
@@ -205,6 +206,43 @@ class SocialAuthTest extends TestCase
         $this->withToken($victimAccess)->getJson('/users/me')
             ->assertOk()
             ->assertJsonPath('email_verified', true);
+    }
+
+    public function test_google_link_withdraws_access_a_never_verified_preregistrant_handed_out(): void
+    {
+        $preRegistered = User::create([
+            'name' => 'Attacker',
+            'email' => 'victim@gmail.com',
+            'hashed_password' => Hash::make('attacker-password'),
+        ]);
+        $planted = $this->plantAccess($preRegistered);
+        $this->fakeCerts(self::GOOGLE_CERTS);
+
+        $this->postJson('/auth/google', [
+            'id_token' => $this->sign($this->googleClaims(['email' => 'victim@gmail.com', 'sub' => 'victim-sub'])),
+        ])->assertOk();
+
+        // The pet is the victim's now; nobody the pre-registrant let in keeps access.
+        $this->assertAccessRevoked($planted);
+    }
+
+    public function test_google_link_keeps_the_sharing_of_an_account_that_had_verified_its_email(): void
+    {
+        // The usual case: a verified user later signs in with Google too.
+        $existing = User::create([
+            'name' => 'Existing',
+            'email' => 'existing@gmail.com',
+            'hashed_password' => Hash::make('secret123'),
+        ]);
+        $existing->forceFill(['email_verified_at' => now()->subMonth()])->save();
+        $planted = $this->plantAccess($existing);
+        $this->fakeCerts(self::GOOGLE_CERTS);
+
+        $this->postJson('/auth/google', [
+            'id_token' => $this->sign($this->googleClaims(['email' => 'existing@gmail.com', 'sub' => 'g-777'])),
+        ])->assertOk();
+
+        $this->assertAccessKept($planted);
     }
 
     public function test_returning_google_user_reuses_the_same_account(): void
