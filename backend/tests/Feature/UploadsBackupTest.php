@@ -226,7 +226,22 @@ class UploadsBackupTest extends TestCase
         $this->assertStringContainsString('3 of 7 file(s)', $errors[0]->context['error']);
     }
 
-    public function test_a_flood_of_documents_never_pushes_other_accounts_photos_out(): void
+    private function photo(int $bytes, int $age): string
+    {
+        $key = 'uploads/'.Str::random(40).'.jpg';
+        Storage::disk('r2-media')->put($key, str_repeat('p', $bytes));
+        touch(Storage::disk('r2-media')->path($key), time() - $age);
+
+        return $key;
+    }
+
+    private function petWithAvatar(User $owner, string $key): void
+    {
+        Pet::create(['owner_id' => $owner->id, 'name' => 'Milo', 'weight_unit' => 'kg'])
+            ->forceFill(['avatar_url' => "https://media.pawpawcare.app/{$key}"])->saveQuietly();
+    }
+
+    public function test_over_the_limit_documents_go_in_before_any_accounts_photos(): void
     {
         $this->onR2();
         config(['backup.uploads.max_megabytes' => 1]);
@@ -236,27 +251,47 @@ class UploadsBackupTest extends TestCase
             'name' => 'O', 'email' => 'o'.uniqid().'@example.com',
             'hashed_password' => Hash::make('secret123'), 'timezone' => 'UTC',
         ]);
-        $owned = 'uploads/'.Str::random(40).'.jpg';
-        Storage::disk('r2-media')->put($owned, str_repeat('p', 100000));
-        Upload::create(['path' => $owned, 'user_id' => $other->id]);
-        // Uploaded before the uploads table: no owner row, but still a pet's photo.
-        $legacy = 'uploads/'.Str::random(40).'.jpg';
-        Storage::disk('r2-media')->put($legacy, str_repeat('p', 100000));
-        Pet::create(['owner_id' => $other->id, 'name' => 'Milo', 'weight_unit' => 'kg'])
-            ->forceFill(['avatar_url' => "https://media.pawpawcare.app/{$legacy}"])->saveQuietly();
-        // Nothing points at this one: it only gets what's left at the end.
-        $unused = 'uploads/'.Str::random(40).'.jpg';
-        Storage::disk('r2-media')->put($unused, str_repeat('p', 300000));
+        $avatar = $this->photo(200000, 60);
+        Upload::create(['path' => $avatar, 'user_id' => $other->id]);
+        $this->petWithAvatar($other, $avatar);
 
         $entries = $this->runBackup();
 
-        $this->assertArrayHasKey("r2-media/{$owned}", $entries);
-        $this->assertArrayHasKey("r2-media/{$legacy}", $entries);
-        $this->assertArrayNotHasKey("r2-media/{$unused}", $entries);
-        $this->assertCount(2, array_filter($heavy, fn ($key) => isset($entries["r2-documents/{$key}"])));
+        // Medical records first; the per-account document cap bounds how much room they take.
+        $this->assertCount(3, array_filter($heavy, fn ($key) => isset($entries["r2-documents/{$key}"])));
+        $this->assertArrayNotHasKey("r2-media/{$avatar}", $entries);
         $errors = array_column(array_map(fn ($e) => $e->context, self::only($logs(), 'Backup is missing uploads')), 'error', 'disk');
-        $this->assertStringContainsString('3 of 5 file(s)', $errors['r2-documents']);
-        $this->assertStringContainsString('1 of 3 file(s)', $errors['r2-media']);
+        $this->assertStringContainsString('2 of 5 file(s)', $errors['r2-documents']);
+        $this->assertStringContainsString('1 of 1 file(s)', $errors['r2-media']);
+    }
+
+    public function test_photos_in_use_go_in_before_ones_nothing_references(): void
+    {
+        $this->onR2();
+        config(['backup.uploads.max_megabytes' => 1]);
+        $logs = $this->captureLogs();
+        $user = User::create([
+            'name' => 'O', 'email' => 'o'.uniqid().'@example.com',
+            'hashed_password' => Hash::make('secret123'), 'timezone' => 'UTC',
+        ]);
+        $avatar = $this->photo(400000, 7200);
+        Upload::create(['path' => $avatar, 'user_id' => $user->id]);
+        $this->petWithAvatar($user, $avatar);
+        // Newer, but never attached to anything: it waits for uploads:prune.
+        $unattached = $this->photo(400000, 60);
+        Upload::create(['path' => $unattached, 'user_id' => $user->id]);
+        // Uploaded before the uploads table: no owner row, but still a pet's photo.
+        $legacy = $this->photo(400000, 3600);
+        $this->petWithAvatar($user, $legacy);
+
+        $entries = $this->runBackup();
+
+        $this->assertArrayHasKey("r2-media/{$avatar}", $entries);
+        $this->assertArrayHasKey("r2-media/{$legacy}", $entries);
+        $this->assertArrayNotHasKey("r2-media/{$unattached}", $entries);
+        $errors = self::only($logs(), 'Backup is missing uploads');
+        $this->assertCount(1, $errors);
+        $this->assertStringContainsString('1 of 3 file(s)', $errors[0]->context['error']);
     }
 
     public function test_a_file_deleted_during_the_run_is_skipped_quietly(): void

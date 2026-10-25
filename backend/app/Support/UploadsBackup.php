@@ -64,10 +64,10 @@ class UploadsBackup
      * Copy every object on the remote upload disks next to the manifest and
      * add them to it; in the archive they sit under `<disk>/<key>`. When the
      * uploads don't fit under the size limit or on disk, the files that fit
-     * go in, shared fairly between accounts across both buckets (pick()), and
-     * the rest is logged (Sentry). A bucket that can't be listed or read in
-     * full is logged and left out: an R2 outage, or one user's flood of
-     * uploads, must not also cost the night's database backup.
+     * go in (pick(): documents first, a fair share per account) and the rest
+     * is logged (Sentry). A bucket that can't be listed or read in full is
+     * logged and left out: an R2 outage, or one user's flood of uploads, must
+     * not also cost the night's database backup.
      */
     public static function addToManifest(Manifest $manifest): void
     {
@@ -85,8 +85,7 @@ class UploadsBackup
         usort($disks, fn ($a, $b) => array_search($a, self::PRIORITY, true) <=> array_search($b, self::PRIORITY, true));
 
         self::cleanUpOnFatalError($root);
-        // Every bucket is listed first: the room is shared across them, so a
-        // flood of documents can't push everyone's photos out (or the reverse).
+        // Every bucket is listed first, so the room is shared out across them.
         $listed = [];
         foreach ($disks as $name) {
             try {
@@ -98,21 +97,21 @@ class UploadsBackup
         $budget = (int) config('backup.uploads.max_megabytes') * 1048576;
         $diskRoom = self::diskRoom($root);
         $room = min($budget, $diskRoom);
-        $total = array_sum(array_map(fn (array $objects) => array_sum(array_column($objects, 0)), $listed));
-        $picked = $total > $room ? self::pick($listed, $room) : $listed;
+        $sizes = array_map(fn (array $objects) => array_map(fn (array $object) => $object[0], $objects), $listed);
+        $picked = array_sum(array_map('array_sum', $sizes)) > $room ? self::pick($listed, $room) : $sizes;
 
-        foreach ($listed as $name => $objects) {
+        foreach ($sizes as $name => $objects) {
             try {
-                $staged = self::stage(Storage::disk($name), $name, $picked[$name] ?? [], $root);
+                $staged = self::stage(Storage::disk($name), $name, $picked[$name], $root);
             } catch (Throwable $e) {
                 File::deleteDirectory($root.DIRECTORY_SEPARATOR.$name);
                 Log::error('Backup is missing uploads', ['disk' => $name, 'error' => $e->getMessage()]);
 
                 continue;
             }
-            if (count($picked[$name] ?? []) < count($objects)) {
+            if (count($picked[$name]) < count($objects)) {
                 Log::error('Backup is missing uploads', ['disk' => $name, 'error' => self::leftOutMessage(
-                    $objects, $picked[$name] ?? [], $diskRoom < $budget
+                    $objects, $picked[$name], $diskRoom < $budget
                         ? 'the free disk on the host; free up space there (docs/backups.md)'
                         : sprintf('BACKUP_UPLOADS_MAX_MB (%d MB for all uploads); raise it with the backup storage caps (docs/backups.md)', (int) config('backup.uploads.max_megabytes')),
                 )]);
@@ -123,19 +122,21 @@ class UploadsBackup
     }
 
     /**
-     * The files that fit in $room, shared fairly between accounts across
-     * every bucket: the smallest accounts go in whole, and the largest share
-     * what's left equally. Within an account, documents go first, then the
-     * newest files: older ones are still in earlier archives (88 days) while
-     * the alert asks for a bigger limit. So one account's flood of uploads
-     * never pushes everyone else's files out.
+     * The files that fit in $room. Documents go first, across every account,
+     * then photos with what's left: medical records matter most, and the
+     * per-account document cap (Document::abortIfOverQuota) bounds how much
+     * of the room one account's documents can take. Within each bucket the
+     * room is shared fairly: the smallest accounts go in whole and the
+     * largest share what's left equally, each with its newest files first
+     * (older ones are still in earlier archives while the alert asks for a
+     * bigger limit). So one account's flood never pushes everyone else out.
      *
      * Photos uploaded before the uploads table existed have no owner row;
      * each one still in use counts as its own small account. Files nothing
      * references (left for `uploads:prune`) only get what's left at the end.
      *
      * @param  array<string, array<string, array{0: int, 1: int}>>  $listed  disk => key => [size, last modified]
-     * @return array<string, array<string, array{0: int, 1: int}>>
+     * @return array<string, array<string, int>> disk => key => size
      */
     private static function pick(array $listed, int $room): array
     {
@@ -145,50 +146,56 @@ class UploadsBackup
         $mediaOwners = isset($listed['r2-media']) ? Upload::whereNotNull('user_id')->pluck('user_id', 'path')->all() : [];
         $mediaInUse = isset($listed['r2-media']) ? Uploads::referencedPublicPaths() : [];
 
-        $groups = [];
+        $owned = [];
         $unused = [];
         foreach ($listed as $name => $objects) {
-            $rank = array_search($name, self::PRIORITY, true);
-            foreach ($objects as $key => [$size, $modified]) {
-                $file = [$name, $key, $size, $rank, -$modified];
+            foreach ($objects as $key => $object) {
                 $owner = $name === 'r2-documents'
                     ? $documentOwners[$key] ?? null
-                    : $mediaOwners[$key] ?? (isset($mediaInUse[$key]) ? "legacy:{$key}" : null);
+                    : (isset($mediaInUse[$key]) ? $mediaOwners[$key] ?? "legacy:{$key}" : null);
                 if ($owner === null) {
-                    $unused[] = $file;
+                    $unused[$name][$key] = $object;
                 } else {
-                    $groups[$owner][] = $file;
+                    $owned[$name][$owner][$key] = $object;
                 }
             }
         }
-        $totals = array_map(fn (array $files) => array_sum(array_column($files, 2)), $groups);
-        asort($totals);
 
-        $picked = [];
+        $picked = array_fill_keys(array_keys($listed), []);
         $left = max(0, $room);
-        $remaining = count($totals);
-        foreach (array_keys($totals) as $owner) {
-            // An equal share of what's left; what a smaller account didn't use passes on.
-            $left -= self::take($groups[$owner], intdiv($left, $remaining--), $picked);
+        foreach (self::PRIORITY as $name) {
+            $groups = $owned[$name] ?? [];
+            $totals = array_map(fn (array $files) => array_sum(array_column($files, 0)), $groups);
+            asort($totals);
+            $remaining = count($totals);
+            foreach (array_keys($totals) as $owner) {
+                // An equal share of what's left; what a smaller account didn't use passes on.
+                $left -= self::take($groups[$owner], intdiv($left, $remaining--), $picked[$name]);
+            }
         }
-        self::take($unused, $left, $picked);
+        foreach (self::PRIORITY as $name) {
+            if (isset($picked[$name])) {
+                $left -= self::take($unused[$name] ?? [], $left, $picked[$name]);
+            }
+        }
 
         return $picked;
     }
 
     /**
-     * Add $files to $picked (documents first, newest first) while they fit in $share.
+     * Add $files, newest first, to $picked while they fit in $share.
      *
-     * @param  list<array{0: string, 1: string, 2: int, 3: int, 4: int}>  $files  [disk, key, size, bucket rank, -modified]
+     * @param  array<string, array{0: int, 1: int}>  $files  key => [size, last modified]
+     * @param  array<string, int>  $picked  key => size
      * @return int the bytes taken
      */
     private static function take(array $files, int $share, array &$picked): int
     {
-        usort($files, fn ($a, $b) => [$a[3], $a[4], $a[1]] <=> [$b[3], $b[4], $b[1]]);
+        uksort($files, fn ($a, $b) => [$files[$b][1], $a] <=> [$files[$a][1], $b]);
         $used = 0;
-        foreach ($files as [$name, $key, $size, , $negModified]) {
+        foreach ($files as $key => [$size]) {
             if ($used + $size <= $share) {
-                $picked[$name][$key] = [$size, -$negModified];
+                $picked[$key] = $size;
                 $used += $size;
             }
         }
@@ -197,8 +204,8 @@ class UploadsBackup
     }
 
     /**
-     * @param  array<string, array{0: int, 1: int}>  $objects
-     * @param  array<string, array{0: int, 1: int}>  $picked
+     * @param  array<string, int>  $objects  key => size
+     * @param  array<string, int>  $picked
      */
     private static function leftOutMessage(array $objects, array $picked, string $limit): string
     {
@@ -206,8 +213,7 @@ class UploadsBackup
 
         return sprintf(
             '%d of %d file(s) (%.1f of %.1f MB) left out, over %s',
-            count($out), count($objects), array_sum(array_column($out, 0)) / 1048576,
-            array_sum(array_column($objects, 0)) / 1048576, $limit,
+            count($out), count($objects), array_sum($out) / 1048576, array_sum($objects) / 1048576, $limit,
         );
     }
 
@@ -277,13 +283,13 @@ class UploadsBackup
     }
 
     /**
-     * @param  array<string, array{0: int, 1: int}>  $objects
+     * @param  array<string, int>  $objects  key => size
      * @return array<string, int> the staged copies => their size
      */
     private static function stage(Filesystem $disk, string $name, array $objects, string $root): array
     {
         $staged = [];
-        foreach ($objects as $key => [$size]) {
+        foreach ($objects as $key => $size) {
             $e = null;
             try {
                 $in = $disk->readStream($key);

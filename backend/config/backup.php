@@ -74,11 +74,12 @@ return [
     ],
 
     /*
-     * The R2 upload buckets, copied whole into every archive (App\Support\
+     * The R2 upload buckets, copied into every archive (App\Support\
      * UploadsBackup; spatie ignores this key). About 38 archives fit under
      * the 8 GB caps below, so past ~200 MB of uploads each copy would push
      * old backups out early. Above the limit, or without twice that much free
-     * disk, the uploads are skipped with an error and the database is still
+     * disk, only the files that fit go in (documents first, a fair share per
+     * account), the rest is logged as an error, and the database is still
      * backed up. Raise it together with the caps below.
      */
     'uploads' => [
