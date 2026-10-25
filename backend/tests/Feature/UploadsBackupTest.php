@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use League\Flysystem\DirectoryListing;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\UnableToReadFile;
@@ -180,6 +181,48 @@ class UploadsBackupTest extends TestCase
         $this->assertCount(1, $errors);
         $this->assertSame('r2-media', $errors[0]->context['disk']);
         $this->assertStringContainsString('over what is left of BACKUP_UPLOADS_MAX_MB', $errors[0]->context['error']);
+    }
+
+    /** @return list<string> document keys stored for a new account, oldest first */
+    private function documentsOf(int $count, int $bytes, int $firstAge): array
+    {
+        $owner = User::create([
+            'name' => 'U', 'email' => 'u'.uniqid().'@example.com',
+            'hashed_password' => Hash::make('secret123'), 'timezone' => 'UTC',
+        ]);
+        $pet = Pet::create(['owner_id' => $owner->id, 'name' => 'Luna', 'weight_unit' => 'kg']);
+        $keys = [];
+        foreach (range(0, $count - 1) as $i) {
+            $key = 'documents/'.Str::random(40).'.pdf';
+            Storage::disk('r2-documents')->put($key, str_repeat('d', $bytes));
+            touch(Storage::disk('r2-documents')->path($key), time() - $firstAge + $i * 60);
+            Document::create(['pet_id' => $pet->id, 'title' => 'Lab', 'file_path' => $key, 'mime' => 'application/pdf', 'size_bytes' => $bytes]);
+            $keys[] = $key;
+        }
+
+        return $keys;
+    }
+
+    public function test_over_the_limit_every_account_keeps_a_fair_share_of_its_documents(): void
+    {
+        $this->onR2();
+        config(['backup.uploads.max_megabytes' => 1]);
+        $logs = $this->captureLogs();
+        $light = $this->documentsOf(2, 100000, 3600);
+        $heavy = $this->documentsOf(5, 300000, 7200);
+
+        $entries = $this->runBackup();
+
+        // The light account fits whole; the heavy one gets what's left, its oldest files first.
+        foreach ($light as $key) {
+            $this->assertArrayHasKey("r2-documents/{$key}", $entries);
+        }
+        $kept = array_values(array_filter($heavy, fn ($key) => isset($entries["r2-documents/{$key}"])));
+        $this->assertSame(array_slice($heavy, 0, 2), $kept);
+        $errors = self::only($logs(), 'Backup is missing uploads');
+        $this->assertCount(1, $errors);
+        $this->assertSame('r2-documents', $errors[0]->context['disk']);
+        $this->assertStringContainsString('3 of 7 file(s)', $errors[0]->context['error']);
     }
 
     public function test_a_file_deleted_during_the_run_is_skipped_quietly(): void

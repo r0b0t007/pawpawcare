@@ -44,9 +44,10 @@ Uploads live on R2 since 2026-10-11 ([uploads-r2.md](uploads-r2.md)). Each night
     - a file downloads short;
     - the uploads are over the size limit, or don't fit on disk (see below).
 
-    - Each bucket goes in whole or not at all.
+    - A bucket that can't be read, or has a file that downloads short, is left out whole.
+    - A bucket over the size limit or the free disk goes in **partly**: the files that fit, shared fairly between accounts. The smallest accounts go in whole, and the largest share what's left equally, each with its oldest files first. The error says how many files and MB were left out. So one account's flood of uploads never pushes everyone else's files out of the backup.
     - Documents go first, so a problem with the photos never costs the medical records.
-    - A left-out bucket is retried the next night.
+    - Whatever was left out is tried again the next night.
     - A file a user deletes while the run is copying is just skipped; it doesn't belong in the backup.
   - Only file names the app itself writes are copied: 40 random characters plus a short extension. That includes older uploads that kept theirs, such as `.bmp`. Anything else is skipped with a warning.
   - The privacy promise holds as before: a deleted file is gone from every new archive, and old archives expire within 88 days.
@@ -54,7 +55,7 @@ Uploads live on R2 since 2026-10-11 ([uploads-r2.md](uploads-r2.md)). Each night
   - **Size limit:** `BACKUP_UPLOADS_MAX_MB`, 200 MB by default. About 38 archives fit under the 8 GB bucket limit, so above about 200 MB each copy would push old backups out early.
     - This also stops one user uploading gigabytes from wiping out the backup history.
     - When the alert comes, raise the limit together with `MaximumStorageInMegabytes` and `delete_oldest_backups_when_using_more_megabytes_than` in `config/backup.php` (R2 storage costs about $0.015 per GB-month), or switch the uploads to an incremental copy.
-  - **Free disk:** a run needs about twice the upload total, for the copies plus a zip of everything (uploads and SQL dump). Each bucket is checked against that before it's copied.
+  - **Free disk:** a run needs about twice the upload total, for the copies plus a zip of everything (uploads and SQL dump). Each bucket is checked against that before it's copied, and only what fits goes in.
     - That check sees the filesystem, not the cPanel account's disk quota. The size limit is what keeps a run inside the quota.
     - If the quota fills while copying, that bucket is left out.
     - If it fills while zipping, the whole night's backup fails, database included. The failure alerts like any other.

@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Models\Document;
+use App\Models\Upload;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Filesystem\FilesystemAdapter as Filesystem;
 use Illuminate\Support\Facades\File;
@@ -60,10 +62,11 @@ class UploadsBackup
 
     /**
      * Copy every object on the remote upload disks next to the manifest and
-     * add them to it; in the archive they sit under `<disk>/<key>`. Each
-     * bucket goes in whole or not at all, documents first. A bucket that
-     * can't be listed, read in full, or fit under the size limit or on disk
-     * is logged (Sentry) and left out: an R2 outage, or one user's flood of
+     * add them to it; in the archive they sit under `<disk>/<key>`. Documents
+     * go first. When a bucket doesn't fit under the size limit or on disk,
+     * the files that fit go in, shared fairly between accounts (pick()), and
+     * the rest is logged (Sentry). A bucket that can't be listed or read in
+     * full is logged and left out: an R2 outage, or one user's flood of
      * uploads, must not also cost the night's database backup.
      */
     public static function addToManifest(Manifest $manifest): void
@@ -88,20 +91,88 @@ class UploadsBackup
             try {
                 $disk = Storage::disk($name);
                 $objects = self::listObjects($disk, $name);
-                $bytes = array_sum($objects);
-                self::assertRoom($name, $bytes, $budget, $stagedBytes, $root);
-                $staged = self::stage($disk, $name, $objects, $root);
+                $diskRoom = self::diskRoom($stagedBytes, $root);
+                $room = min($budget, $diskRoom);
+                $picked = array_sum(array_column($objects, 0)) > $room ? self::pick($name, $objects, $room) : $objects;
+                $staged = self::stage($disk, $name, $picked, $root);
             } catch (Throwable $e) {
                 File::deleteDirectory($root.DIRECTORY_SEPARATOR.$name);
                 Log::error('Backup is missing uploads', ['disk' => $name, 'error' => $e->getMessage()]);
 
                 continue;
             }
+            if (count($picked) < count($objects)) {
+                Log::error('Backup is missing uploads', ['disk' => $name, 'error' => self::leftOutMessage(
+                    $objects, $picked, $diskRoom < $budget ? 'the free disk' : sprintf(
+                        'what is left of BACKUP_UPLOADS_MAX_MB (%.1f of %d MB)',
+                        max(0, $budget) / 1048576, (int) config('backup.uploads.max_megabytes'),
+                    ),
+                )]);
+            }
+            $bytes = array_sum(array_column($picked, 0));
             $budget -= $bytes;
             $stagedBytes += $bytes;
             $manifest->addFiles($staged);
             backupLogger()->info('Added '.count($staged).' file(s) ('.round($bytes / 1048576, 1)." MB) from {$name}.");
         }
+    }
+
+    /**
+     * The files that fit in $room, shared fairly between the accounts that
+     * own them: the smallest accounts go in whole, and the largest share
+     * what's left equally (each an account's oldest files first). So one
+     * account's flood of uploads never pushes everyone else's files out.
+     * Files no account owns (left for `uploads:prune`) share as one account.
+     *
+     * @param  array<string, array{0: int, 1: int}>  $objects  key => [size, last modified]
+     * @return array<string, array{0: int, 1: int}>
+     */
+    private static function pick(string $name, array $objects, int $room): array
+    {
+        $owners = $name === 'r2-documents'
+            ? Document::join('pets', 'pets.id', '=', 'documents.pet_id')->pluck('pets.owner_id', 'documents.file_path')->all()
+            : Upload::pluck('user_id', 'path')->all();
+
+        $groups = [];
+        foreach ($objects as $key => $object) {
+            $groups[$owners[$key] ?? ''][$key] = $object;
+        }
+        $total = fn (array $files) => array_sum(array_column($files, 0));
+        usort($groups, fn ($a, $b) => $total($a) <=> $total($b));
+
+        $picked = [];
+        $left = max(0, $room);
+        $remaining = count($groups);
+        foreach ($groups as $files) {
+            uksort($files, fn ($a, $b) => [$files[$a][1], $a] <=> [$files[$b][1], $b]);
+            // An equal share of what's left; what a smaller account didn't use passes on.
+            $share = intdiv($left, $remaining--);
+            $used = 0;
+            foreach ($files as $key => [$size]) {
+                if ($used + $size <= $share) {
+                    $picked[$key] = $files[$key];
+                    $used += $size;
+                }
+            }
+            $left -= $used;
+        }
+
+        return $picked;
+    }
+
+    /**
+     * @param  array<string, array{0: int, 1: int}>  $objects
+     * @param  array<string, array{0: int, 1: int}>  $picked
+     */
+    private static function leftOutMessage(array $objects, array $picked, string $limit): string
+    {
+        $out = array_diff_key($objects, $picked);
+
+        return sprintf(
+            '%d of %d file(s) (%.1f of %.1f MB) left out, over %s; raise it with the backup storage caps (docs/backups.md)',
+            count($out), count($objects), array_sum(array_column($out, 0)) / 1048576,
+            array_sum(array_column($objects, 0)) / 1048576, $limit,
+        );
     }
 
     /** @return list<string> the configured upload disks that live on R2. */
@@ -125,7 +196,7 @@ class UploadsBackup
         return rtrim($base !== '' ? $base : storage_path('app/backup-temp'), '/\\').DIRECTORY_SEPARATOR.'temp';
     }
 
-    /** @return array<string, int> the disk's safe keys and their sizes */
+    /** @return array<string, array{0: int, 1: int}> the disk's safe keys => [size, last modified] */
     private static function listObjects(Filesystem $disk, string $name): array
     {
         $objects = [];
@@ -139,47 +210,44 @@ class UploadsBackup
 
                 continue;
             }
-            $objects[$item->path()] = $item->fileSize() ?? $disk->size($item->path());
+            $objects[$item->path()] = [
+                $item->fileSize() ?? $disk->size($item->path()),
+                (int) $item->lastModified(),
+            ];
         }
 
         return $objects;
     }
 
-    private static function assertRoom(string $name, int $bytes, int $budget, int $stagedBytes, string $root): void
+    /**
+     * How many bytes of this bucket fit on disk. Each byte is written twice:
+     * its copy, then its part of a zip of everything (this bucket, the ones
+     * staged before it, the SQL dump). Running out of space while zipping
+     * would fail the whole run, database included. This sees the filesystem,
+     * not a cPanel quota; the size limit bounds that.
+     */
+    private static function diskRoom(int $stagedBytes, string $root): int
     {
-        if ($bytes > $budget) {
-            throw new \RuntimeException(sprintf(
-                '%s holds %.1f MB, over what is left of BACKUP_UPLOADS_MAX_MB (%.1f of %d MB); raise it with the backup storage caps (docs/backups.md)',
-                $name, $bytes / 1048576, max(0, $budget) / 1048576, (int) config('backup.uploads.max_megabytes'),
-            ));
+        $free = @disk_free_space($root);
+        if ($free === false) {
+            return PHP_INT_MAX;
         }
-
-        // Still to be written: this bucket's copies, then a zip of everything
-        // (this bucket, the ones staged before it, the SQL dump). Running out
-        // of space while zipping would fail the whole run, database included.
-        // This sees the filesystem, not a cPanel quota; the size limit bounds that.
         $dumps = 0;
         foreach (File::glob($root.DIRECTORY_SEPARATOR.'db-dumps'.DIRECTORY_SEPARATOR.'*') as $dump) {
             $dumps += (int) @filesize($dump);
         }
-        $needed = $bytes + ($stagedBytes + $bytes + $dumps) + self::DISK_MARGIN_BYTES;
-        $free = @disk_free_space($root);
-        if ($free !== false && $free < $needed) {
-            throw new \RuntimeException(sprintf(
-                'not enough free disk for %.1f MB of %s (%.1f MB free, %.1f MB needed with the zip)',
-                $bytes / 1048576, $name, $free / 1048576, $needed / 1048576,
-            ));
-        }
+
+        return max(0, intdiv((int) $free - $stagedBytes - $dumps - self::DISK_MARGIN_BYTES, 2));
     }
 
     /**
-     * @param  array<string, int>  $objects
+     * @param  array<string, array{0: int, 1: int}>  $objects
      * @return list<string> the staged copies
      */
     private static function stage(Filesystem $disk, string $name, array $objects, string $root): array
     {
         $staged = [];
-        foreach ($objects as $key => $size) {
+        foreach ($objects as $key => [$size]) {
             $e = null;
             try {
                 $in = $disk->readStream($key);
