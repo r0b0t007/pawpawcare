@@ -278,6 +278,87 @@ class PasswordResetTest extends TestCase
             ->postJson('/auth/forgot-password', ['email' => $user->email])->assertOk();
     }
 
+    private function requestCodeFrom(string $ip, string $email): string
+    {
+        $this->withServerVariables(['REMOTE_ADDR' => $ip]);
+
+        return $this->requestCode($email);
+    }
+
+    private function resetFrom(string $ip, string $email, string $code)
+    {
+        return $this->withServerVariables(['REMOTE_ADDR' => $ip])->postJson('/auth/reset-password', [
+            'email' => $email, 'code' => $code, 'password' => 'newpassword99',
+        ]);
+    }
+
+    public function test_a_stranger_asking_for_a_code_elsewhere_does_not_cancel_the_owners(): void
+    {
+        $user = $this->user();
+        $code = $this->requestCodeFrom('203.0.113.5', $user->email);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.1'])
+            ->postJson('/auth/forgot-password', ['email' => $user->email])->assertOk();
+        $this->assertSame(2, PasswordResetCode::where('user_id', $user->id)->count());
+
+        $this->resetFrom('203.0.113.5', $user->email, $code)->assertOk();
+        // The stranger's code was for the old password: it dies with it.
+        $this->assertSame(0, PasswordResetCode::where('user_id', $user->id)->whereNull('used_at')->count());
+    }
+
+    public function test_a_strangers_wrong_guesses_cannot_burn_the_owners_code(): void
+    {
+        $user = $this->user();
+        $code = $this->requestCodeFrom('203.0.113.5', $user->email);
+        $wrong = $code === '000000' ? '000001' : '000000';
+
+        for ($i = 1; $i <= 5; $i++) {
+            $this->resetFrom("192.0.2.{$i}", $user->email, $wrong)->assertStatus(400);
+        }
+        // Networks that didn't ask for the code share five checks: spent.
+        $this->resetFrom('192.0.2.6', $user->email, $code)->assertStatus(400);
+
+        // The network that asked still has its own five.
+        $this->resetFrom('203.0.113.5', $user->email, $code)->assertOk();
+    }
+
+    public function test_the_code_works_from_a_network_that_did_not_ask_for_it(): void
+    {
+        // Asked on home wifi, typed in on mobile data.
+        $user = $this->user();
+        $code = $this->requestCodeFrom('203.0.113.5', $user->email);
+
+        $this->resetFrom('198.51.100.7', $user->email, $code)->assertOk();
+    }
+
+    public function test_known_gap_a_strangers_newer_code_hides_the_owners_on_another_network(): void
+    {
+        // Pins today's limit (#195): off the network that asked, the check
+        // runs against the newest code, which a stranger can make theirs.
+        // Asking again from the current network gets around it; a token
+        // returned by forgot-password would close it.
+        $user = $this->user();
+        $code = $this->requestCodeFrom('203.0.113.5', $user->email);
+        $this->travel(1)->seconds();
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.1'])
+            ->postJson('/auth/forgot-password', ['email' => $user->email])->assertOk();
+
+        $this->resetFrom('198.51.100.7', $user->email, $code)->assertStatus(400);
+        $this->resetFrom('203.0.113.5', $user->email, $code)->assertOk();
+    }
+
+    public function test_dead_reset_codes_are_pruned(): void
+    {
+        $user = $this->user();
+        $this->requestCodeFrom('203.0.113.5', $user->email);
+        $this->requestCodeFrom('192.0.2.1', $user->email);
+        PasswordResetCode::where('network', '192.0.2.1')->update(['expires_at' => now()->subMinute()]);
+
+        $this->artisan('auth:prune-tokens')->assertSuccessful();
+
+        $this->assertSame(['203.0.113.5'], PasswordResetCode::pluck('network')->all());
+    }
+
     public function test_reset_revokes_all_refresh_tokens(): void
     {
         $user = $this->user();

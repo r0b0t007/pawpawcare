@@ -276,14 +276,22 @@ class AuthController extends Controller
             ->first();
 
         if ($user) {
-            // A new request invalidates every earlier code for this user.
-            PasswordResetCode::where('user_id', $user->id)->delete();
+            // A new request replaces only the code asked for from the same
+            // network (and any dead ones): a stranger asking from elsewhere
+            // can't cancel the code waiting in the owner's inbox.
+            $network = ClientNetwork::of($request);
+            PasswordResetCode::where('user_id', $user->id)
+                ->where(fn ($q) => $q->where('network', $network)
+                    ->orWhereNotNull('used_at')
+                    ->orWhere('expires_at', '<=', now()))
+                ->delete();
 
             $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
             PasswordResetCode::create([
                 'user_id' => $user->id,
                 'code_hash' => Hash::make($code),
+                'network' => $network,
                 'expires_at' => now()->addMinutes(30),
             ]);
 
@@ -326,25 +334,41 @@ class AuthController extends Controller
             ->where(fn ($q) => $q->where('is_active', true)->orWhereNotNull('deletion_requested_at'))
             ->first();
 
-        $record = $user
-            ? PasswordResetCode::where('user_id', $user->id)
-                ->whereNull('used_at')
-                ->where('expires_at', '>', now())
-                ->latest('created_at')
-                ->first()
-            : null;
+        // Each guess is compared against ONE code, so guessing is no easier
+        // than with a single live code. From the network that asked for it,
+        // the check spends that code's own five; from anywhere else (a phone
+        // that moved off its wifi, or a stranger), the newest code's other
+        // five, so a stranger's wrong guesses can't burn the owner's code.
+        $network = ClientNetwork::of($request);
+        $live = fn () => PasswordResetCode::where('user_id', $user->id)
+            ->whereNull('used_at')
+            ->where('expires_at', '>', now())
+            ->latest('created_at');
+        $record = $user ? $live()->where('network', $network)->first() : null;
+        $budget = 'attempts';
+        if ($user && ! $record) {
+            $record = $live()->first();
+            $budget = 'other_attempts';
+        }
 
-        // Per-code attempt cap: at most five comparisons ever run against one
-        // code. The attempt is reserved with one conditional UPDATE *before*
-        // the compare, so parallel guesses can't each read a stale count.
+        // Per-code attempt cap: at most five comparisons per budget ever run
+        // against one code. The attempt is reserved with one conditional
+        // UPDATE *before* the compare, so parallel guesses can't each read a
+        // stale count.
         $reserved = $record
             ? PasswordResetCode::where('id', $record->id)
                 ->whereNull('used_at')
-                ->where('attempts', '<', 5)
-                ->increment('attempts')
+                ->where($budget, '<', 5)
+                ->increment($budget)
             : 0;
 
-        if ($reserved !== 1 || ! Hash::check($data['code'], $record->code_hash)) {
+        if ($reserved !== 1) {
+            // Burn comparable time (as forgotPassword does), so a fast answer
+            // can't tell an unknown email from one with a live code.
+            Hash::make('000000');
+            abort(400, __('Invalid or expired code'));
+        }
+        if (! Hash::check($data['code'], $record->code_hash)) {
             abort(400, __('Invalid or expired code'));
         }
 
@@ -353,6 +377,8 @@ class AuthController extends Controller
             abort(400, __('Invalid or expired code'));
         }
         $user->update(['hashed_password' => Hash::make($data['password'])]);
+        // The other live codes were for the password that just changed.
+        PasswordResetCode::where('user_id', $user->id)->where('id', '!=', $record->id)->delete();
 
         // Completing a reset proves inbox ownership. On an account that never
         // had, the previous holder may not have been the inbox owner: like a
