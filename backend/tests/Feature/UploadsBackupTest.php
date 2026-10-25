@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Document;
 use App\Models\Pet;
+use App\Models\Upload;
 use App\Models\User;
 use App\Support\Backups;
 use App\Support\UploadsBackup;
@@ -180,7 +181,7 @@ class UploadsBackupTest extends TestCase
         $errors = self::only($logs(), 'Backup is missing uploads');
         $this->assertCount(1, $errors);
         $this->assertSame('r2-media', $errors[0]->context['disk']);
-        $this->assertStringContainsString('over what is left of BACKUP_UPLOADS_MAX_MB', $errors[0]->context['error']);
+        $this->assertStringContainsString('over BACKUP_UPLOADS_MAX_MB (1 MB for all uploads)', $errors[0]->context['error']);
     }
 
     /** @return list<string> document keys stored for a new account, oldest first */
@@ -213,16 +214,49 @@ class UploadsBackupTest extends TestCase
 
         $entries = $this->runBackup();
 
-        // The light account fits whole; the heavy one gets what's left, its oldest files first.
+        // The light account fits whole; the heavy one gets what's left, its newest files first.
         foreach ($light as $key) {
             $this->assertArrayHasKey("r2-documents/{$key}", $entries);
         }
         $kept = array_values(array_filter($heavy, fn ($key) => isset($entries["r2-documents/{$key}"])));
-        $this->assertSame(array_slice($heavy, 0, 2), $kept);
+        $this->assertSame(array_slice($heavy, 3), $kept);
         $errors = self::only($logs(), 'Backup is missing uploads');
         $this->assertCount(1, $errors);
         $this->assertSame('r2-documents', $errors[0]->context['disk']);
         $this->assertStringContainsString('3 of 7 file(s)', $errors[0]->context['error']);
+    }
+
+    public function test_a_flood_of_documents_never_pushes_other_accounts_photos_out(): void
+    {
+        $this->onR2();
+        config(['backup.uploads.max_megabytes' => 1]);
+        $logs = $this->captureLogs();
+        $heavy = $this->documentsOf(5, 300000, 7200);
+        $other = User::create([
+            'name' => 'O', 'email' => 'o'.uniqid().'@example.com',
+            'hashed_password' => Hash::make('secret123'), 'timezone' => 'UTC',
+        ]);
+        $owned = 'uploads/'.Str::random(40).'.jpg';
+        Storage::disk('r2-media')->put($owned, str_repeat('p', 100000));
+        Upload::create(['path' => $owned, 'user_id' => $other->id]);
+        // Uploaded before the uploads table: no owner row, but still a pet's photo.
+        $legacy = 'uploads/'.Str::random(40).'.jpg';
+        Storage::disk('r2-media')->put($legacy, str_repeat('p', 100000));
+        Pet::create(['owner_id' => $other->id, 'name' => 'Milo', 'weight_unit' => 'kg'])
+            ->forceFill(['avatar_url' => "https://media.pawpawcare.app/{$legacy}"])->saveQuietly();
+        // Nothing points at this one: it only gets what's left at the end.
+        $unused = 'uploads/'.Str::random(40).'.jpg';
+        Storage::disk('r2-media')->put($unused, str_repeat('p', 300000));
+
+        $entries = $this->runBackup();
+
+        $this->assertArrayHasKey("r2-media/{$owned}", $entries);
+        $this->assertArrayHasKey("r2-media/{$legacy}", $entries);
+        $this->assertArrayNotHasKey("r2-media/{$unused}", $entries);
+        $this->assertCount(2, array_filter($heavy, fn ($key) => isset($entries["r2-documents/{$key}"])));
+        $errors = array_column(array_map(fn ($e) => $e->context, self::only($logs(), 'Backup is missing uploads')), 'error', 'disk');
+        $this->assertStringContainsString('3 of 5 file(s)', $errors['r2-documents']);
+        $this->assertStringContainsString('1 of 3 file(s)', $errors['r2-media']);
     }
 
     public function test_a_file_deleted_during_the_run_is_skipped_quietly(): void

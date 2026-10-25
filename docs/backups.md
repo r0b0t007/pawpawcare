@@ -45,9 +45,11 @@ Uploads live on R2 since 2026-10-11 ([uploads-r2.md](uploads-r2.md)). Each night
     - the uploads are over the size limit, or don't fit on disk (see below).
 
     - A bucket that can't be read, or has a file that downloads short, is left out whole.
-    - A bucket over the size limit or the free disk goes in **partly**: the files that fit, shared fairly between accounts. The smallest accounts go in whole, and the largest share what's left equally, each with its oldest files first. The error says how many files and MB were left out. So one account's flood of uploads never pushes everyone else's files out of the backup.
-    - Documents go first, so a problem with the photos never costs the medical records.
-    - Whatever was left out is tried again the next night.
+    - Uploads over the size limit or the free disk go in **partly**: the files that fit, shared fairly between accounts across both buckets. The smallest accounts go in whole, and the largest share what's left equally. The error says, per bucket, how many files and MB were left out. So one account's flood of documents or photos never pushes everyone else's files out of the backup.
+      - Within an account, documents go first, then the newest files. Older files left out are still in the earlier archives (up to 88 days old), so raise the limit before those expire.
+      - Photos uploaded before the uploads table existed have no owner row: each one still in use counts as its own small account. Files nothing references (left for `uploads:prune`) only get the room left at the end.
+      - Nothing left out gets in on a later night until the limit is raised (or the disk freed); the error repeats every night until then.
+    - Documents are copied first, so a problem with the photos never costs the medical records.
     - A file a user deletes while the run is copying is just skipped; it doesn't belong in the backup.
   - Only file names the app itself writes are copied: 40 random characters plus a short extension. That includes older uploads that kept theirs, such as `.bmp`. Anything else is skipped with a warning.
   - The privacy promise holds as before: a deleted file is gone from every new archive, and old archives expire within 88 days.
