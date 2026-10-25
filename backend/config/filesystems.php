@@ -146,6 +146,12 @@ return [
         'public_disk' => env('UPLOADS_PUBLIC_DISK', 'public'),
         'private_disk' => env('UPLOADS_PRIVATE_DISK', 'local'),
         'media_host' => env('MEDIA_HOST', 'media.pawpawcare.app'),
+        // Per account, across every pet it owns (Document::abortIfOverQuota).
+        // Keep the bytes well under BACKUP_UPLOADS_MAX_MB, which holds every
+        // account's documents at once.
+        // An empty or 0 value means the default, never "refuse every upload".
+        'documents_max_mb_per_account' => (int) env('DOCUMENTS_MAX_MB_PER_ACCOUNT') ?: 50,
+        'documents_max_per_account' => (int) env('DOCUMENTS_MAX_PER_ACCOUNT') ?: 300,
     ],
 
     /*
