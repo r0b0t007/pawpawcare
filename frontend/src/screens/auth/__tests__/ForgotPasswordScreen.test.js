@@ -88,3 +88,31 @@ test('speaks French when the app does', async () => {
     await act(async () => { await i18n.changeLanguage('en'); });
   }
 });
+
+// #195: the code is bound to the request that asked for it, so the reset
+// sends back the newest request's ID.
+test('the reset sends the request ID of the newest code', async () => {
+  const { post } = require('../../../services/api');
+  post
+    .mockResolvedValueOnce({ status: 'ok', request_id: 'first' })
+    .mockResolvedValueOnce({ status: 'ok', request_id: 'second' });
+  await toCodeStep();
+  expect(post).toHaveBeenLastCalledWith('/auth/forgot-password', { email: 'sam@example.test', bind: true }, { skipAuth: true });
+
+  const resend = tree.root.findAll((n) => n.props.accessibilityRole === 'button' && n.props.onPress
+    && texts({ root: n }).includes("Didn't get it? Send again"))[0];
+  await act(async () => resend.props.onPress());
+
+  const [codeInput, pwd, confirm] = tree.root.findAllByType(TextInput);
+  await act(async () => codeInput.props.onChangeText('123456'));
+  await act(async () => pwd.props.onChangeText('newpassword99'));
+  await act(async () => confirm.props.onChangeText('newpassword99'));
+  const submit = tree.root.findAll((n) => n.props.label === 'Reset password' && n.props.onPress)[0];
+  await act(async () => submit.props.onPress());
+
+  expect(post).toHaveBeenLastCalledWith(
+    '/auth/reset-password',
+    { email: 'sam@example.test', code: '123456', password: 'newpassword99', request_id: 'second' },
+    { skipAuth: true },
+  );
+});

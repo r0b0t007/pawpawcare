@@ -267,6 +267,7 @@ class AuthController extends Controller
     {
         $data = $request->validate([
             'email' => 'required|email|ascii|max:255',
+            'bind' => 'sometimes|boolean',
         ]);
 
         // Pending-deletion accounts may still reset: "log back in to cancel
@@ -275,15 +276,28 @@ class AuthController extends Controller
             ->where(fn ($q) => $q->where('is_active', true)->orWhereNotNull('deletion_requested_at'))
             ->first();
 
+        // The app asks for a code bound to this request: only the caller
+        // holding the returned request_id can check it, so a stranger can't
+        // cancel or burn it. Unknown emails get an ID too (no enumeration).
+        $bind = (bool) ($data['bind'] ?? false);
+        $requestId = $bind ? bin2hex(random_bytes(32)) : null;
+
         if ($user) {
-            // A new request invalidates every earlier code for this user.
-            PasswordResetCode::where('user_id', $user->id)->delete();
+            // A new request replaces only the earlier unbound codes (asked
+            // for by older apps, which can't tell their codes apart); bound
+            // codes stay until used or expired.
+            PasswordResetCode::where('user_id', $user->id)
+                ->where(fn ($q) => $q->whereNull('request_hash')
+                    ->orWhereNotNull('used_at')
+                    ->orWhere('expires_at', '<=', now()))
+                ->delete();
 
             $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
             PasswordResetCode::create([
                 'user_id' => $user->id,
                 'code_hash' => Hash::make($code),
+                'request_hash' => $requestId ? hash('sha256', $requestId) : null,
                 'expires_at' => now()->addMinutes(30),
             ]);
 
@@ -307,7 +321,7 @@ class AuthController extends Controller
             Hash::make('000000');
         }
 
-        return response()->json(['status' => 'ok']);
+        return response()->json($bind ? ['status' => 'ok', 'request_id' => $requestId] : ['status' => 'ok']);
     }
 
     /** Complete the reset: verify the emailed code, set the new password. */
@@ -317,6 +331,7 @@ class AuthController extends Controller
             'email' => 'required|email|ascii|max:255',
             'code' => 'required|string|max:10',
             'password' => 'required|string|min:8',
+            'request_id' => 'sometimes|string|max:100',
         ]);
 
         // One generic message for every failure mode — wrong email, wrong
@@ -326,10 +341,17 @@ class AuthController extends Controller
             ->where(fn ($q) => $q->where('is_active', true)->orWhereNotNull('deletion_requested_at'))
             ->first();
 
+        // Each guess is checked against exactly one code: the one bound to
+        // the request_id sent, or else (older apps) the newest unbound code.
+        // A guess without the ID never reaches a bound code.
+        $requestId = $data['request_id'] ?? null;
         $record = $user
             ? PasswordResetCode::where('user_id', $user->id)
                 ->whereNull('used_at')
                 ->where('expires_at', '>', now())
+                ->when($requestId !== null,
+                    fn ($q) => $q->where('request_hash', hash('sha256', $requestId)),
+                    fn ($q) => $q->whereNull('request_hash'))
                 ->latest('created_at')
                 ->first()
             : null;
@@ -344,7 +366,13 @@ class AuthController extends Controller
                 ->increment('attempts')
             : 0;
 
-        if ($reserved !== 1 || ! Hash::check($data['code'], $record->code_hash)) {
+        if ($reserved !== 1) {
+            // Burn comparable time (as forgotPassword does), so a fast answer
+            // can't tell an unknown email or ID from one with a live code.
+            Hash::make('000000');
+            abort(400, __('Invalid or expired code'));
+        }
+        if (! Hash::check($data['code'], $record->code_hash)) {
             abort(400, __('Invalid or expired code'));
         }
 
@@ -352,15 +380,18 @@ class AuthController extends Controller
         if (PasswordResetCode::where('id', $record->id)->whereNull('used_at')->update(['used_at' => now()]) !== 1) {
             abort(400, __('Invalid or expired code'));
         }
-        $user->update(['hashed_password' => Hash::make($data['password'])]);
+        $newHash = Hash::make($data['password']);
 
         // Completing a reset proves inbox ownership. On an account that never
         // had, the previous holder may not have been the inbox owner: like a
         // Google/Apple link (loginSocialUser), withdraw the access it handed
         // out. Every existing session dies too (stolen refresh tokens, live
-        // access tokens, push bindings), in the same transaction, so the old
-        // holder can't hand out new access in between.
-        DB::transaction(function () use ($user) {
+        // access tokens, push bindings), and every other live code (they were
+        // for the old password), in the same transaction as the new password,
+        // so the old holder can't hand out new access in between.
+        DB::transaction(function () use ($user, $record, $newHash) {
+            $user->update(['hashed_password' => $newHash]);
+            PasswordResetCode::where('user_id', $user->id)->where('id', '!=', $record->id)->delete();
             $neverVerified = $user->email_verified_at === null;
             if ($neverVerified) {
                 $user->forceFill(['email_verified_at' => now()])->save();

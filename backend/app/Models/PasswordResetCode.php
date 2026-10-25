@@ -14,7 +14,7 @@ class PasswordResetCode extends Model
 
     public $incrementing = false;
 
-    protected $fillable = ['user_id', 'code_hash', 'attempts', 'expires_at', 'used_at'];
+    protected $fillable = ['user_id', 'code_hash', 'request_hash', 'attempts', 'expires_at', 'used_at'];
 
     protected $casts = [
         'expires_at' => 'datetime',
