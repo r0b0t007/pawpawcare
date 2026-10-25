@@ -9,6 +9,7 @@ use App\Services\Extraction\OpenAiCompatibleDriver;
 use App\Services\JwtService;
 use App\Support\Backups;
 use App\Support\ClientNetwork;
+use App\Support\KnownNetworks;
 use App\Support\MailDelivery;
 use App\Support\ReportOnce;
 use App\Support\UploadsBackup;
@@ -107,24 +108,38 @@ class AppServiceProvider extends ServiceProvider
         // Forgot-password: capped per target email AND per source IP as two
         // independent limits — a rotating-IP attacker still can't mail-bomb
         // one address (or keep invalidating a victim's fresh codes), and one
-        // host still can't probe many addresses.
+        // host still can't probe many addresses. A network the account
+        // signed in from recently (KnownNetworks) gets its own per-email
+        // budget, so a stranger spending the shared one can't stop the owner
+        // asking for a code there.
         RateLimiter::for('forgot-password', function (Request $request) {
             $email = strtolower((string) $request->input('email'));
+            $network = ClientNetwork::of($request);
+            $emailKey = KnownNetworks::hasForEmail($email, $network)
+                ? 'forgot-email|'.$email.'|'.$network
+                : 'forgot-email|'.$email;
 
             return [
-                Limit::perHour(5)->by('forgot-email|'.$email),
-                Limit::perHour(5)->by('forgot-ip|'.ClientNetwork::of($request)),
+                Limit::perHour(5)->by($emailKey),
+                Limit::perHour(5)->by('forgot-ip|'.$network),
             ];
         });
 
         // Reset attempts: capped per IP *and* per target email so 6-digit
-        // code brute-forcing can't be spread across rotating source IPs.
+        // code brute-forcing can't be spread across rotating source IPs. As
+        // with the login failure budget, a network the account signed in
+        // from recently gets its own per-email budget, so someone guessing
+        // elsewhere can't block the owner's own valid code there.
         RateLimiter::for('password-reset', function (Request $request) {
             $email = strtolower((string) $request->input('email'));
+            $network = ClientNetwork::of($request);
+            $emailKey = KnownNetworks::hasForEmail($email, $network)
+                ? 'reset-email|'.$email.'|'.$network
+                : 'reset-email|'.$email;
 
             return [
-                Limit::perHour(10)->by('reset-ip|'.ClientNetwork::of($request)),
-                Limit::perHour(10)->by('reset-email|'.$email),
+                Limit::perHour(10)->by('reset-ip|'.$network),
+                Limit::perHour(10)->by($emailKey),
             ];
         });
 

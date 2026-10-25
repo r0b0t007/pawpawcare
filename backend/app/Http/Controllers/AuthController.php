@@ -8,7 +8,9 @@ use App\Models\PasswordResetCode;
 use App\Models\RefreshToken;
 use App\Models\User;
 use App\Services\JwtService;
+use App\Support\ClientNetwork;
 use App\Support\JwtSecretGuard;
+use App\Support\KnownNetworks;
 use Firebase\JWT\BeforeValidException;
 use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWK;
@@ -29,7 +31,7 @@ use Illuminate\Support\Facades\RateLimiter;
 
 class AuthController extends Controller
 {
-    /** Failed password logins allowed per account per window, from any IPs. */
+    /** Failed password logins allowed per budget per window (see login()). */
     private const LOGIN_FAILURES_PER_WINDOW = 10;
 
     private const LOGIN_FAILURE_WINDOW_SECONDS = 900;
@@ -74,7 +76,15 @@ class AuthController extends Controller
         // Counted for unknown emails too, so a lockout reveals nothing.
         // The attempt is counted BEFORE the (slow) bcrypt check, so a parallel
         // burst can't all pass the check at once; a success clears it.
-        $failKey = self::loginFailKey($data['email']);
+        //
+        // That shared budget is one anyone who knows the email can spend, so
+        // a network the account signed in from recently (KnownNetworks) gets
+        // a budget of its own: someone failing elsewhere can't lock the owner
+        // out there. Guessing from new networks stays bounded by the shared one.
+        $user = User::where('email', $data['email'])->first();
+        $network = ClientNetwork::of($request);
+        $sharedKey = self::loginFailKey($data['email']);
+        $failKey = KnownNetworks::has($user, $network) ? $sharedKey.'|'.$network : $sharedKey;
         $locked = __('Too many failed sign-in attempts for this account. Try again in 15 minutes or reset your password.');
         if (RateLimiter::tooManyAttempts($failKey, self::LOGIN_FAILURES_PER_WINDOW)) {
             abort(429, $locked);
@@ -83,15 +93,15 @@ class AuthController extends Controller
             abort(429, $locked);
         }
 
-        $user = User::where('email', $data['email'])->first();
-
         if (! $user || ! Hash::check($data['password'], $user->hashed_password)) {
             abort(401, __('Invalid email or password'));
         }
 
         RateLimiter::clear($failKey);
+        RateLimiter::clear($sharedKey);
 
         $reactivated = $this->reactivateOrRejectDisabled($user, 'password');
+        KnownNetworks::remember($user, $network);
 
         return response()->json(
             $this->issueTokens($user) + ($reactivated ? ['reactivated' => true] : [])
@@ -368,8 +378,12 @@ class AuthController extends Controller
             abort(400, __('Invalid or expired code')); // purged meanwhile
         }
 
-        // The lockout message tells users to reset; a reset must lift it.
+        // The lockout message tells users to reset; a reset must lift it, and
+        // proves the inbox, so the network it came from counts as the owner's.
+        $network = ClientNetwork::of($request);
         RateLimiter::clear(self::loginFailKey($user->email));
+        RateLimiter::clear(self::loginFailKey($user->email).'|'.$network);
+        KnownNetworks::remember($user, $network);
 
         return response()->json(['status' => 'ok']);
     }

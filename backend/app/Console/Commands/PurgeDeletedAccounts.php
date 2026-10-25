@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\User;
 use App\Services\Analytics\ProductAnalytics;
 use App\Services\Subscriptions\RevenueCatClient;
+use App\Support\KnownNetworks;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -126,6 +127,8 @@ class PurgeDeletedAccounts extends Command
             $user->forceFill(['avatar_url' => null])->save();
         }
 
+        // Before the row goes, so a failure here leaves the account for a retry.
+        KnownNetworks::forget($user->email);
         $user->delete();
     }
 }

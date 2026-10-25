@@ -8,6 +8,11 @@ use Illuminate\Http\Request;
  * The caller's network, for per-IP rate limits: the IPv4 address, or the
  * /64 of an IPv6 one. A single IPv6 subscriber holds a whole /64, so keying
  * on the full address would hand them 2^64 separate budgets.
+ *
+ * $request->ip() is REMOTE_ADDR because no proxy is trusted. If the API ever
+ * goes behind one (Cloudflare), trust only that proxy's ranges: trusting `*`
+ * would let X-Forwarded-For pick a network, e.g. an account's known one
+ * (KnownNetworks).
  */
 final class ClientNetwork
 {
