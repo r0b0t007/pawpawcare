@@ -29,6 +29,8 @@ export const SUPPORTED_LANGUAGES = ['en', 'fr', 'es'];
  */
 export const LANGUAGE_CHOICES = FOLLOW_DEVICE_LANGUAGE ? ['device', ...SUPPORTED_LANGUAGES] : [...SUPPORTED_LANGUAGES];
 export const LANGUAGE_PREF = 'language';
+/** The device language code last seen, to notice when the phone's language changes. */
+export const DEVICE_SEEN_PREF = 'languageDeviceSeen';
 const DEFAULT_CHOICE = FOLLOW_DEVICE_LANGUAGE ? 'device' : 'en';
 
 // The Intl locale each language formats dates with. en stays en-US so English
@@ -53,6 +55,40 @@ const normalizeChoice = (c) => (LANGUAGE_CHOICES.includes(c) ? c : DEFAULT_CHOIC
 
 let choice = DEFAULT_CHOICE;
 const resolveChoice = (c) => (c === 'device' ? startLanguage() : supported(c) ?? startLanguage());
+
+// The device's own first language code, any language (not only the ones the
+// app speaks): a phone going from German to English is a change too.
+function rawDeviceLanguage() {
+  try {
+    return getLocales()?.[0]?.languageCode ?? null;
+  } catch {
+    return null;
+  }
+}
+
+let deviceSeen = null;
+
+// Latest change wins (CHW-189). The phone has its own per-app language setting
+// for PawPawCare (Android 13+, iOS Settings) next to Profile → Language. When
+// the device language changes after a fixed choice was made there — the phone's
+// language or that per-app setting, which the app sees the same way — the
+// setting goes back to "Device default", so the screens follow the app name
+// and the system prompts. A choice made in Profile afterwards wins again. The
+// first sighting (a fresh install, or the update that added this) only
+// records the language. Saving is best-effort, like the rest of the setting.
+// Checked at launch (iOS restarts the app on a change) and, on Android, on
+// return to the foreground: changing either setting leaves the app first.
+function noteDeviceLanguage() {
+  const now = rawDeviceLanguage();
+  if (!FOLLOW_DEVICE_LANGUAGE || now == null || now === deviceSeen) return;
+  const changed = deviceSeen != null && choice !== 'device';
+  deviceSeen = now;
+  setPref(DEVICE_SEEN_PREF, now).catch(() => {});
+  if (changed) {
+    choice = 'device';
+    setPref(LANGUAGE_PREF, choice).catch(() => {});
+  }
+}
 
 i18n.use(initReactI18next).init({
   resources: { en: { translation: en }, fr: { translation: fr }, es: { translation: es } },
@@ -111,20 +147,24 @@ let appStateSub = null;
  * Load the saved Language setting (the instance itself is already initialised
  * at import, in the device language once detection is rolled out, else in
  * English). On Android the app is not restarted when the device language
- * changes, so it is re-read whenever the app comes back to the foreground —
- * only while the setting follows the device. iOS restarts the app on a
- * language change. Idempotent.
+ * changes, so it is re-read whenever the app comes back to the foreground; a
+ * change there also ends a fixed choice (noteDeviceLanguage). iOS restarts
+ * the app on a language change. Idempotent.
  */
 export function initI18n() {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    const saved = await getPref(LANGUAGE_PREF, DEFAULT_CHOICE);
+    const [saved, seen] = await Promise.all([getPref(LANGUAGE_PREF, DEFAULT_CHOICE), getPref(DEVICE_SEEN_PREF, null)]);
     choice = normalizeChoice(saved);
+    deviceSeen = seen;
+    noteDeviceLanguage();
     const lng = resolveChoice(choice);
     if (lng !== i18n.language) await i18n.changeLanguage(lng);
     if (FOLLOW_DEVICE_LANGUAGE && Platform.OS === 'android' && !appStateSub) {
       appStateSub = AppState.addEventListener('change', (state) => {
-        if (state !== 'active' || choice !== 'device') return;
+        if (state !== 'active') return;
+        noteDeviceLanguage();
+        if (choice !== 'device') return;
         const device = deviceLanguage();
         if (device !== i18n.language) i18n.changeLanguage(device);
       });

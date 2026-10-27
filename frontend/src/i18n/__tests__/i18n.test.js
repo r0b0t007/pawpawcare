@@ -29,11 +29,12 @@ jest.mock('../../services/prefs', () => ({
 const { AppState, Platform } = require('react-native');
 
 // A fresh i18n module per test (it initialises at import).
-function load({ device = 'en', saved, os = 'android', follow = true } = {}) {
+function load({ device = 'en', saved, seen, os = 'android', follow = true } = {}) {
   mockFollowDevice = follow;
   mockDeviceLanguage = device;
   Object.keys(mockPrefs).forEach((k) => delete mockPrefs[k]);
   if (saved !== undefined) mockPrefs.language = saved;
+  if (seen !== undefined) mockPrefs.languageDeviceSeen = seen;
   Platform.OS = os;
   let mod;
   jest.isolateModules(() => {
@@ -112,12 +113,75 @@ test('on Android, coming back to the foreground picks up a new device language',
   await Promise.resolve();
   expect(currentLocale()).toBe('es');
 
-  // A fixed choice is never overridden by the device.
+  // A fixed choice holds while the device language stays the same.
   await setLanguageChoice('fr');
-  mockDeviceLanguage = 'en';
   appStateListener('active');
   await Promise.resolve();
   expect(currentLocale()).toBe('fr');
+});
+
+describe('latest change wins: the phone language vs a fixed choice (CHW-189)', () => {
+  test('a device language change after a fixed choice puts the setting back on "Device default"', async () => {
+    const { initI18n, setLanguageChoice, currentLocale, languageChoice } = load({ device: 'en' });
+    await initI18n();
+    await setLanguageChoice('fr');
+
+    // The per-app language in the system settings (or the phone's) changes.
+    mockDeviceLanguage = 'es';
+    appStateListener('active');
+    await Promise.resolve();
+    expect(currentLocale()).toBe('es');
+    expect(languageChoice()).toBe('device');
+    expect(mockPrefs.language).toBe('device');
+    expect(mockPrefs.languageDeviceSeen).toBe('es');
+
+    // A choice made afterwards wins again.
+    expect(await setLanguageChoice('en')).toBe('en');
+    appStateListener('active');
+    await Promise.resolve();
+    expect(currentLocale()).toBe('en');
+  });
+
+  test('at launch (iOS restarts the app), a changed device language ends a saved fixed choice', async () => {
+    const { initI18n, currentLocale, languageChoice } = load({ device: 'fr', saved: 'es', seen: 'en', os: 'ios' });
+    expect(await initI18n()).toBe('fr');
+    expect(currentLocale()).toBe('fr');
+    expect(languageChoice()).toBe('device');
+    expect(mockPrefs.language).toBe('device');
+  });
+
+  test('an unchanged device language keeps the saved fixed choice', async () => {
+    const { initI18n, languageChoice } = load({ device: 'fr', saved: 'es', seen: 'fr' });
+    expect(await initI18n()).toBe('es');
+    expect(languageChoice()).toBe('es');
+  });
+
+  test('the first sighting (an update from before this) only records the language', async () => {
+    const { initI18n, languageChoice } = load({ device: 'fr', saved: 'es' });
+    expect(await initI18n()).toBe('es');
+    expect(languageChoice()).toBe('es');
+    expect(mockPrefs.languageDeviceSeen).toBe('fr');
+  });
+
+  test('a change between two languages the app does not speak counts too (German to Italian)', async () => {
+    // Both show English, so only the device's own language code tells them apart.
+    const { initI18n, setLanguageChoice, languageChoice, currentLocale } = load({ device: 'de' });
+    await initI18n();
+    await setLanguageChoice('fr');
+
+    mockDeviceLanguage = 'it';
+    appStateListener('active');
+    await Promise.resolve();
+    expect(languageChoice()).toBe('device');
+    expect(currentLocale()).toBe('en');
+  });
+
+  test('with detection switched off nothing is tracked', async () => {
+    const { initI18n, languageChoice } = load({ device: 'fr', saved: 'es', seen: 'en', follow: false });
+    expect(await initI18n()).toBe('es');
+    expect(languageChoice()).toBe('es');
+    expect(mockPrefs.languageDeviceSeen).toBe('en');
+  });
 });
 
 test('iOS restarts the app on a language change, so no listener there', async () => {
