@@ -1,11 +1,5 @@
 [
   {
-    "id": "GHSA-86w9-cpqp-85rv",
-    "package": "node-forge",
-    "reason": "No patched release exists (1.4.0 is the latest). Only reached via @expo/code-signing-certificates (expo-updates and @expo/cli), which signs OTA updates in CI with our own key. The flaw is in signature verification; the app verifies updates natively and never bundles node-forge.",
-    "review_by": "2027-01-11"
-  },
-  {
     "id": "GHSA-mrhx-c7xc-m3w5",
     "package": "zod",
     "reason": "No patched 3.x release exists (the fix is 4.6.6, and zod 4 is a breaking API change). Only reached via expo > @expo/cli, which validates our own app config and CLI arguments at build time. Never bundled into the app, and no attacker-supplied input reaches it.",
